@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
+import '../services/history_service.dart';
 import 'camera_scanner_screen.dart';
 import 'compare_products_screen.dart';
+import 'history_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -19,7 +21,24 @@ class ProductDetailScreen extends StatefulWidget {
 }
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
+  final HistoryService _historyService = HistoryService();
   bool _isFavorite = false;
+  String? _historyItemId; // ID of the scan record in history (for syncing ❤️)
+
+  @override
+  void initState() {
+    super.initState();
+    // Find the matching history item for this product (most recent scan)
+    final items = _historyService.getItems(filter: 'Lahat');
+    final match = items.cast<HistoryItem?>().firstWhere(
+      (item) => item!.type == HistoryType.scan && item.productId == widget.product.id,
+      orElse: () => null,
+    );
+    if (match != null) {
+      _historyItemId = match.id;
+      _isFavorite = match.isFavorite;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +84,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: GestureDetector(
-                    onTap: () => setState(() => _isFavorite = !_isFavorite),
+                    onTap: () {
+                      setState(() => _isFavorite = !_isFavorite);
+                      // Sync to history service so it appears in Paborito tab
+                      if (_historyItemId != null) {
+                        _historyService.toggleFavorite(_historyItemId!);
+                      }
+                    },
                     child: Icon(
                       _isFavorite ? Icons.favorite : Icons.favorite_border,
                       color: const Color(0xFFB71C1C),
@@ -536,7 +561,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           children: [
             _navItem(Icons.home_outlined, 'Home', false),
             _navItemActive(),
-            _navItem(Icons.history, 'History', false),
+            _navItem(Icons.history, 'History', false,
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const HistoryScreen()))),
             _navItem(Icons.person_outline, 'Profile', false),
           ],
         ),
@@ -675,9 +702,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // ── Bottom nav helpers ───────────────────────────────────────────────────
-  Widget _navItem(IconData icon, String label, bool active) {
+  Widget _navItem(IconData icon, String label, bool active,
+      {VoidCallback? onTap}) {
     return GestureDetector(
-      onTap: () {},
+      onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

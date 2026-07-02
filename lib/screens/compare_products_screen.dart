@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/product_db_service.dart';
+import '../services/history_service.dart';
 import 'product_detail_screen.dart';
 
 class CompareProductsScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class CompareProductsScreen extends StatefulWidget {
 
 class _CompareProductsScreenState extends State<CompareProductsScreen> {
   final ProductDbService _db = ProductDbService();
+  final HistoryService _historyService = HistoryService();
   final TextEditingController _searchCtrl = TextEditingController();
 
   late List<Product> _allInCategory;
@@ -31,6 +33,11 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     );
     _filtered = List.from(_allInCategory);
     _searchCtrl.addListener(_onSearch);
+    // ── Log comparison session to history ──
+    _historyService.addComparisonRecord(
+      widget.sourceProduct.category,
+      '${widget.sourceProduct.name} Variant Comparison',
+    );
   }
 
   @override
@@ -190,14 +197,18 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                       return _ProductCard(
                         product: product,
                         isCurrent: isCurrent,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProductDetailScreen(
-                              product: product,
+                        onTap: () {
+                          // Log the compared product view as a scan record
+                          _historyService.addScanRecord(product);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ProductDetailScreen(
+                                product: product,
+                              ),
                             ),
-                          ),
-                        ),
+                          );
+                        },
                       );
                     },
                   ),

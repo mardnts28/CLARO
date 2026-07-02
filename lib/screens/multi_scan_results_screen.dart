@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
+import '../services/history_service.dart';
 import 'product_detail_screen.dart';
+import 'history_screen.dart';
 
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
@@ -14,6 +16,7 @@ class MultiScanResultsScreen extends StatefulWidget {
 
 class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   late List<Product> _rankedProducts;
+  final HistoryService _historyService = HistoryService();
 
   @override
   void initState() {
@@ -149,7 +152,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
           children: [
             _navItem(Icons.home_outlined, 'Home', false),
             _navItemScan(context),
-            _navItem(Icons.history, 'History', false),
+            _navItem(Icons.history, 'History', false,
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const HistoryScreen()))),
             _navItem(Icons.person_outline, 'Profile', false),
           ],
         ),
@@ -160,6 +165,8 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   Widget _buildProductCard(BuildContext context, Product p) {
     return GestureDetector(
       onTap: () {
+        // Log the viewed product as a scan record in history
+        _historyService.addScanRecord(p);
         // Navigate to the individual detail screen when clicked
         Navigator.push(
           context,
@@ -216,9 +223,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     );
   }
 
-  Widget _navItem(IconData icon, String label, bool active) {
+  Widget _navItem(IconData icon, String label, bool active,
+      {VoidCallback? onTap}) {
     return GestureDetector(
-      onTap: () {},
+      onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

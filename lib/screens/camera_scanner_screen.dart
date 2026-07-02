@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../services/yolo_recognition_service.dart';
 import '../services/image_validation_service.dart';
 import '../services/product_db_service.dart';
+import '../services/history_service.dart';
 import 'product_detail_screen.dart';
 import 'unknown_product_submission_screen.dart';
 import 'multi_scan_results_screen.dart';
@@ -30,6 +31,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   final YoloRecognitionService _yoloService = YoloRecognitionService();
   final ImageValidationService _validationService = ImageValidationService();
   final ProductDbService _dbService = ProductDbService();
+  final HistoryService _historyService = HistoryService();
 
   // Laser animation
   late AnimationController _laserController;
@@ -169,6 +171,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         }
 
         if (products.length == 1) {
+          // ── Log single scan to history ──
+          _historyService.addScanRecord(products.first);
           if (mounted) {
             Navigator.push(
               context,
@@ -181,6 +185,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             );
           }
         } else if (products.length > 1) {
+          // ── Log all detected products to history ──
+          for (final prod in products) {
+            _historyService.addScanRecord(prod);
+          }
           if (mounted) {
             Navigator.push(
               context,
