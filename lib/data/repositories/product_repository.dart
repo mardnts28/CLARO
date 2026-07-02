@@ -12,7 +12,12 @@ import 'mock_data/mock_products.dart';
 abstract class ProductRepository {
   Future<Product> getProductById(String id);
   Future<List<Product>> getAllProducts();
-  Future<List<Product>> getSameCategoryProducts(ProductCategory category, {String? excludeId});
+  // Renamed from getSameCategoryProducts(ProductCategory) -- matching on the
+  // broad packaging category (cannedFood/instantNoodles) mixed unrelated
+  // products (e.g. sardines with spaghetti sauce). This now matches on the
+  // finer-grained subCategory field instead, so "Compare" alternatives are
+  // actually comparable products.
+  Future<List<Product>> getSimilarProducts(String subCategory, {String? excludeId});
 }
 
 class MockProductRepository implements ProductRepository {
@@ -37,14 +42,14 @@ class MockProductRepository implements ProductRepository {
   }
 
   @override
-  Future<List<Product>> getSameCategoryProducts(
-    ProductCategory category, {
+  Future<List<Product>> getSimilarProducts(
+    String subCategory, {
     String? excludeId,
   }) async {
     await Future.delayed(_simulatedDelay);
     return mockProductsJson
         .map((json) => Product.fromJson(json))
-        .where((p) => p.category == category && p.id != excludeId)
+        .where((p) => p.subCategory == subCategory && p.id != excludeId)
         .toList();
   }
 }

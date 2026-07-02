@@ -15,8 +15,7 @@ import 'package:claro/data/repositories/user_repository.dart';
 void main() {
   test('generateAdvisory returns a real AI advisory for a mock product/user', () async {
     const apiKey = String.fromEnvironment('GEMINI_API_KEY');
-    expect(apiKey.isNotEmpty, true,
-        reason: 'Pass --dart-define=GEMINI_API_KEY=your_key_here when running this test');
+    expect(apiKey.isNotEmpty, true);
 
     final productRepo = MockProductRepository();
     final userRepo = MockUserRepository();
