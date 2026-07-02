@@ -61,4 +61,12 @@ final List<Map<String, dynamic>> mockUsersJson = [
     'dietaryRestrictions': [],
     'lowVisionMode': false,
   },
+  {
+    'userId': 'u008',
+    'displayName': 'Test User - All',
+    'conditions': ['hypertension', 'diabetes'],
+    'allergies': ['fish'],  
+    'dietaryRestrictions': [],
+    'lowVisionMode': false,
+  }
 ];
