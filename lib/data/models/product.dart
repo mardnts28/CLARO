@@ -24,23 +24,11 @@ class NutritionInfo {
   final double caloriesKcal;
   final double sodiumMg;
   final double sugarsG;
-  final double saturatedFatG;
-  final double totalCarbohydratesG;
-  final double dietaryFiberG;
-  final double potassiumMg;
-  final double totalFatG;
-  final double proteinG;
 
   const NutritionInfo({
     required this.caloriesKcal,
     required this.sodiumMg,
     required this.sugarsG,
-    required this.saturatedFatG,
-    required this.totalCarbohydratesG,
-    required this.dietaryFiberG,
-    required this.potassiumMg,
-    required this.totalFatG,
-    required this.proteinG,
   });
 
   factory NutritionInfo.fromJson(Map<String, dynamic> json) {
@@ -48,12 +36,6 @@ class NutritionInfo {
       caloriesKcal: (json['caloriesKcal'] as num).toDouble(),
       sodiumMg: (json['sodiumMg'] as num).toDouble(),
       sugarsG: (json['sugarsG'] as num).toDouble(),
-      saturatedFatG: (json['saturatedFatG'] as num).toDouble(),
-      totalCarbohydratesG: (json['totalCarbohydratesG'] as num).toDouble(),
-      dietaryFiberG: (json['dietaryFiberG'] as num).toDouble(),
-      potassiumMg: (json['potassiumMg'] as num).toDouble(),
-      totalFatG: (json['totalFatG'] as num).toDouble(),
-      proteinG: (json['proteinG'] as num).toDouble(),
     );
   }
 
@@ -61,12 +43,6 @@ class NutritionInfo {
         'caloriesKcal': caloriesKcal,
         'sodiumMg': sodiumMg,
         'sugarsG': sugarsG,
-        'saturatedFatG': saturatedFatG,
-        'totalCarbohydratesG': totalCarbohydratesG,
-        'dietaryFiberG': dietaryFiberG,
-        'potassiumMg': potassiumMg,
-        'totalFatG': totalFatG,
-        'proteinG': proteinG,
       };
 }
 

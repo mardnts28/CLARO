@@ -37,14 +37,6 @@ class WhoCalculator {
         return info.sodiumMg;
       case 'sugarsG':
         return info.sugarsG;
-      case 'saturatedFatG':
-        return info.saturatedFatG;
-      case 'potassiumMg':
-        return info.potassiumMg;
-      case 'totalCarbohydratesG':
-        return info.totalCarbohydratesG;
-      case 'dietaryFiberG':
-        return info.dietaryFiberG;
       default:
         throw ArgumentError('Unknown nutrientKey: $nutrientKey');
     }
