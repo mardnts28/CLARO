@@ -1,8 +1,8 @@
 // lib/core/utils/who_calculator.dart
 //
-// Phase 1: full scoring engine, built out from the Phase 0 classification
-// stub. Implements Table 3.14 (per-nutrient advisory bands) and Table 3.15
-// (risk scoring, tie-breaking, allergen override for ranking).
+// Phase 1: full scoring engine. Implements Table 3.14 (per-nutrient
+// advisory bands) and Table 3.15 (risk scoring, tie-breaking, allergen
+// override for ranking).
 
 import '../constants/who_fda_thresholds.dart';
 import '../../data/models/health_profile.dart';
@@ -10,10 +10,6 @@ import '../../data/models/product.dart';
 import '../../data/models/product_evaluation.dart';
 
 class WhoCalculator {
-  // ---------------------------------------------------------------------
-  // Single-nutrient classification (Phase 0)
-  // ---------------------------------------------------------------------
-
   static AdvisoryLevel classifyNutrient(
     HealthCondition condition,
     String nutrientKey,
@@ -28,10 +24,9 @@ class WhoCalculator {
     return AdvisoryLevel.moderate;
   }
 
-  // Maps a nutrientKey string (as used in ConditionThresholds) to the actual
-  // value on a NutritionInfo object. Extend this when new nutrients get
-  // threshold bands added to who_fda_thresholds.dart.
-  static double _readNutrientValue(NutritionInfo info, String nutrientKey) {
+  // Public (no underscore) so ComparisonCalculator can reuse it without
+  // duplicating this switch statement.
+  static double readNutrientValue(NutritionInfo info, String nutrientKey) {
     switch (nutrientKey) {
       case 'sodiumMg':
         return info.sodiumMg;
@@ -41,10 +36,6 @@ class WhoCalculator {
         throw ArgumentError('Unknown nutrientKey: $nutrientKey');
     }
   }
-
-  // ---------------------------------------------------------------------
-  // Allergen matching
-  // ---------------------------------------------------------------------
 
   static AllergenAssessment assessAllergens(Product product, UserHealthProfile user) {
     final matchedContains = product.containsAllergens
@@ -62,17 +53,13 @@ class WhoCalculator {
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Full product evaluation (Table 3.14 + Table 3.15 risk score)
-  // ---------------------------------------------------------------------
-
   static ProductEvaluation evaluateProduct(Product product, UserHealthProfile user) {
     final nutrientEvals = <NutrientEvaluation>[];
 
     for (final condition in user.conditions) {
       final nutrientKeys = ConditionThresholds.thresholds[condition]?.keys ?? const <String>[];
       for (final key in nutrientKeys) {
-        final value = _readNutrientValue(product.nutritionPer100g, key);
+        final value = readNutrientValue(product.nutritionPer100g, key);
         final level = classifyNutrient(condition, key, value);
         nutrientEvals.add(NutrientEvaluation(
           condition: condition,
@@ -111,19 +98,12 @@ class WhoCalculator {
     );
   }
 
-  // No conditions evaluated (either user has none, or no nutrients matched)
-  // defaults to "suitable" -- nothing flagged means nothing to warn about.
   static AdvisoryLevel _worstLevel(List<NutrientEvaluation> evals) {
     if (evals.isEmpty) return AdvisoryLevel.suitable;
     if (evals.any((e) => e.level == AdvisoryLevel.caution)) return AdvisoryLevel.caution;
     if (evals.any((e) => e.level == AdvisoryLevel.moderate)) return AdvisoryLevel.moderate;
     return AdvisoryLevel.suitable;
   }
-
-  // ---------------------------------------------------------------------
-  // Ranking (Table 3.15): ascending risk score, tie-break by raw nutrient
-  // value, allergen match forces the product to the end regardless of score.
-  // ---------------------------------------------------------------------
 
   static List<ProductEvaluation> rankProducts(
     List<Product> products,
@@ -140,8 +120,6 @@ class WhoCalculator {
         e.nutrientEvaluations.fold<double>(0, (sum, ev) => sum + ev.valuePer100g);
 
     evaluations.sort((a, b) {
-      // Allergen override: any direct allergen match is forced last,
-      // regardless of risk score.
       if (a.allergenOverride != b.allergenOverride) {
         return a.allergenOverride ? 1 : -1;
       }
@@ -153,7 +131,6 @@ class WhoCalculator {
     return evaluations;
   }
 
-  // Convenience for the "Top 3 recommended products" display (Module 4.3).
   static List<ProductEvaluation> topRecommendations(
     List<ProductEvaluation> ranked, {
     int count = 3,

@@ -8,7 +8,10 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/health_advisory.dart';
 import '../models/health_profile.dart';
 import '../models/product_evaluation.dart';
+import '../models/ranked_product_result.dart';
+import '../../core/constants/who_fda_thresholds.dart';
 import '../../core/utils/advisory_prompt_builder.dart';
+import '../../core/utils/comparison_calculator.dart';
 import '../../core/utils/fallback_advisory_generator.dart';
 
 class GeminiAdvisoryService {
@@ -24,26 +27,45 @@ class GeminiAdvisoryService {
         );
 
   final GenerativeModel _model;
-  static const _timeout = Duration(seconds: 10); // TEMP: widened from 3s while debugging
+  static const _timeout = Duration(seconds: 10);
 
   final Map<String, HealthAdvisory> _cache = {};
 
-  String _cacheKey(String scanEventId, String productId) =>
-      '$scanEventId::$productId';
+  String _cacheKey(String scanEventId, String productId, bool isComparison) =>
+      '$scanEventId::$productId${isComparison ? '::cmp' : ''}';
 
   Future<HealthAdvisory> generateAdvisory({
     required String scanEventId,
     required ProductEvaluation evaluation,
     required UserHealthProfile user,
+    ComparisonFact? comparisonFact,
+    SuitabilityRankLabel? rankLabel,
     String languageCode = 'en',
   }) async {
-    final key = _cacheKey(scanEventId, evaluation.product.id);
+    final isComparison = comparisonFact != null;
+    final key = _cacheKey(scanEventId, evaluation.product.id, isComparison);
     final cached = _cache[key];
     if (cached != null) return cached;
+
+    // Skip the API entirely when nothing is flagged and this isn't a
+    // comparison call -- the fallback template covers "suitable" just as
+    // well, at zero token cost.
+    if (evaluation.overallLevel == AdvisoryLevel.suitable &&
+        !evaluation.allergenAssessment.hasDirectAllergen &&
+        !isComparison) {
+      final advisory = FallbackAdvisoryGenerator.generate(
+        evaluation,
+        reason: FallbackReason.notNeeded,
+      );
+      _cache[key] = advisory;
+      return advisory;
+    }
 
     final prompt = AdvisoryPromptBuilder.build(
       evaluation: evaluation,
       user: user,
+      comparisonFact: comparisonFact,
+      rankLabel: rankLabel,
       languageCode: languageCode,
     );
 
@@ -55,14 +77,14 @@ class GeminiAdvisoryService {
 
       advisory = _parseResponse(response.text, evaluation);
     } on TimeoutException catch (e) {
-      print('GEMINI TIMEOUT: $e'); // TEMP DEBUG — remove after fixing
+      print('GEMINI TIMEOUT: $e');
       advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.timeout,
       );
     } catch (e, stack) {
-      print('GEMINI ERROR: $e'); // TEMP DEBUG — remove after fixing
-      print('STACK: $stack'); // TEMP DEBUG — remove after fixing
+      print('GEMINI ERROR: $e');
+      print('STACK: $stack');
       advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.apiError,
@@ -75,7 +97,7 @@ class GeminiAdvisoryService {
 
   HealthAdvisory _parseResponse(String? text, ProductEvaluation evaluation) {
     if (text == null || text.trim().isEmpty) {
-      print('EMPTY RESPONSE from Gemini'); // TEMP DEBUG — remove after fixing
+      print('EMPTY RESPONSE from Gemini');
       return FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.emptyResponse,
@@ -86,6 +108,7 @@ class GeminiAdvisoryService {
       final warningText = json['warningText'] as String?;
       final explanation = json['explanation'] as String?;
       final safeServingSize = json['safeServingSize'] as String?;
+      final comparisonExplanation = json['comparisonExplanation'] as String?;
 
       if (warningText == null || explanation == null) {
         throw const FormatException('Missing required fields');
@@ -96,12 +119,13 @@ class GeminiAdvisoryService {
         warningText: warningText,
         explanation: explanation,
         safeServingSize: safeServingSize,
+        comparisonExplanation: comparisonExplanation,
         source: AdvisorySource.aiGenerated,
         generatedAt: DateTime.now(),
       );
     } catch (e) {
-      print('PARSE ERROR: $e'); // TEMP DEBUG — remove after fixing
-      print('RAW RESPONSE: $text'); // TEMP DEBUG — remove after fixing
+      print('PARSE ERROR: $e');
+      print('RAW RESPONSE: $text');
       return FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.parseError,

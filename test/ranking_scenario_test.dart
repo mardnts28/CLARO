@@ -3,23 +3,14 @@
 // Exercises the two real user flows end-to-end against your mock data, so
 // you can verify the logic BEFORE any UI exists.
 //
-// NOTE on GeminiAdvisoryService: these tests intentionally pass a fake API
-// key ('test-key-not-real'). Real calls to Gemini will fail auth and the
-// service's existing try/catch falls back to FallbackAdvisoryGenerator
-// automatically (that's Phase 2 behavior, unchanged here). This lets us
-// verify RANKING STRUCTURE (order, labels, top-3 cutoff) deterministically
-// without spending real API tokens or depending on network conditions.
-// The advisory TEXT in these tests will be template fallback text, not
-// real Gemini prose -- that's expected and fine for structural testing.
+// NOTE on GeminiAdvisoryService: these tests use the real Gemini API and will
+// consume quota. If you hit quota limits, the service will fall back to
+// FallbackAdvisoryGenerator automatically and tests will still pass.
 //
-// NOTE on package name: same as who_calculator_test.dart -- if your
-// pubspec.yaml `name:` isn't "claro", update the imports below.
-//
-// Run with: flutter test test/ranking_scenarios_test.dart
+// Run with: flutter test test/ranking_scenarios_test.dart --dart-define=GEMINI_API_KEY=your_key
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:claro/data/models/health_profile.dart';
-import 'package:claro/data/models/product.dart';
 import 'package:claro/data/models/ranked_product_result.dart';
 import 'package:claro/data/repositories/product_repository.dart';
 import 'package:claro/data/services/gemini_advisory_service.dart';
@@ -28,9 +19,7 @@ import 'package:claro/data/services/product_ranking_service.dart';
 
 void main() {
   const apiKey = String.fromEnvironment('GEMINI_API_KEY');
-
-print(apiKey.isEmpty ? 'EMPTY KEY' : 'KEY LOADED');
-  final geminiService = GeminiAdvisoryService(apiKey:apiKey);
+  final geminiService = GeminiAdvisoryService(apiKey: apiKey);
   final rankingService = ProductRankingService(geminiService: geminiService);
 
   final hypertensionUser = UserHealthProfile(
@@ -54,10 +43,9 @@ print(apiKey.isEmpty ? 'EMPTY KEY' : 'KEY LOADED');
         await repo.getProductById('p012'), // Low Sodium Corned Beef (should rank well)
       ];
 
-      final results = await rankingService.rankProducts(
+      final results = rankingService.rankProducts(
         products: scanned,
         user: hypertensionUser,
-        scanEventId: 'scan-multi-001',
       );
 
       // All 4 scanned products appear in the result.
@@ -101,7 +89,6 @@ print(apiKey.isEmpty ? 'EMPTY KEY' : 'KEY LOADED');
         () => rankingService.rankProducts(
           products: tooMany,
           user: hypertensionUser,
-          scanEventId: 'scan-toomany',
         ),
         throwsArgumentError,
       );
@@ -125,7 +112,6 @@ print(apiKey.isEmpty ? 'EMPTY KEY' : 'KEY LOADED');
       final results = await comparisonService.compareWithAlternatives(
         scannedProduct: scannedProduct,
         user: hypertensionUser,
-        scanEventId: 'scan-compare-001',
       );
 
       // 1 scanned product + 4 capped alternatives = 5 total (NOT 6, which
@@ -162,7 +148,6 @@ print(apiKey.isEmpty ? 'EMPTY KEY' : 'KEY LOADED');
       final results = await comparisonService.compareWithAlternatives(
         scannedProduct: scannedProduct,
         user: hypertensionUser,
-        scanEventId: 'scan-compare-002',
       );
 
       // 3 cornedBeef products exist total (p001, p004, p012) -- scanned
@@ -187,7 +172,6 @@ print(apiKey.isEmpty ? 'EMPTY KEY' : 'KEY LOADED');
       final results = await comparisonService.compareWithAlternatives(
         scannedProduct: scannedProduct,
         user: hypertensionUser,
-        scanEventId: 'scan-compare-003',
       );
 
       expect(results.length, 1);

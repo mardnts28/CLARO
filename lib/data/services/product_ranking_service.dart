@@ -1,11 +1,11 @@
 // lib/data/services/product_ranking_service.dart
 //
-// Phase 3 (Module 4.3): orchestrates Phase 1's scoring/ranking across
-// multiple products and attaches a Phase 2 reason to each. Cost-conscious
-// by design -- only the top 3 (what's actually shown prominently) get a
-// real Gemini call; everything ranked below that gets the free, deterministic
-// fallback template instead, since a user rarely needs AI-quality prose for
-// "least suitable, ranked #5."
+// rankProducts(): FREE. Pure Dart, zero Gemini calls -- powers the
+// "multiple product compared interface" list (names + rank only).
+//
+// getProductDetail(): the ONLY method here that touches Gemini, and only
+// for ONE product, only when the user actually taps into it. Powers the
+// "solo product interface" screen, with or without comparison context.
 
 import 'gemini_advisory_service.dart';
 import '../models/health_advisory.dart';
@@ -13,7 +13,7 @@ import '../models/health_profile.dart';
 import '../models/product.dart';
 import '../models/ranked_product_result.dart';
 import '../../core/utils/who_calculator.dart';
-import '../../core/utils/fallback_advisory_generator.dart';
+import '../../core/utils/comparison_calculator.dart';
 
 // Module says "up to 3-5 products" per scan/comparison event.
 const int kMaxProductsPerRanking = 5;
@@ -24,19 +24,12 @@ class ProductRankingService {
 
   final GeminiAdvisoryService _geminiService;
 
-  /// Ranks [products] against [user]'s health profile (Phase 1), then
-  /// attaches a display-ready reason to each. Only the top
-  /// [kTopRecommendationCount] products get a real AI-generated explanation;
-  /// the rest get a deterministic template explanation at zero token cost.
-  ///
-  /// Throws [ArgumentError] if [products] exceeds [kMaxProductsPerRanking],
-  /// per Module 4.3's "up to 3-5 products" constraint.
-  Future<List<RankedProductResult>> rankProducts({
+  /// Ranks [products] against [user]'s profile. Pure Dart -- no API calls,
+  /// safe to call as often as needed (rebuilds, re-sorts, etc.) at zero cost.
+  List<RankedProductResult> rankProducts({
     required List<Product> products,
     required UserHealthProfile user,
-    required String scanEventId,
-    String languageCode = 'en',
-  }) async {
+  }) {
     if (products.length > kMaxProductsPerRanking) {
       throw ArgumentError(
         'CLARO supports ranking up to $kMaxProductsPerRanking products per '
@@ -45,57 +38,50 @@ class ProductRankingService {
     }
     if (products.isEmpty) return [];
 
-    // Phase 1: pure logic, no cost, no network -- sorted ascending risk,
-    // tie-break applied, allergen override forces last place.
     final ranked = WhoCalculator.rankProducts(products, user);
-
-    // Position-based labels computed once over the whole list, so exactly
-    // one product is mostSuitable and exactly one is leastSuitable.
     final labels = computeSuitabilityRankLabels(ranked);
 
-    final results = <RankedProductResult>[];
-
-    for (var i = 0; i < ranked.length; i++) {
-      final evaluation = ranked[i];
-      final rank = i + 1;
-
-      HealthAdvisory reason;
-      if (rank <= kTopRecommendationCount) {
-        // Reuses Phase 2 in full -- same cache-by-scanEventId+productId,
-        // same timeout/fallback handling.
-        reason = await _geminiService.generateAdvisory(
-          scanEventId: scanEventId,
-          evaluation: evaluation,
-          user: user,
-          languageCode: languageCode,
-        );
-      } else {
-        // Below the top N: template-only, no API call. These products are
-        // shown lower in the list (if at all) -- not worth spending tokens
-        // on prose quality for "least suitable, ranked last."
-        reason = FallbackAdvisoryGenerator.generate(
-          evaluation,
-          reason: FallbackReason.notNeeded,
-        );
-      }
-
-      results.add(RankedProductResult(
-        rank: rank,
-        evaluation: evaluation,
-        reason: reason,
+    return List.generate(
+      ranked.length,
+      (i) => RankedProductResult(
+        rank: i + 1,
+        evaluation: ranked[i],
         suitabilityRankLabel: labels[i],
-      ));
-    }
-
-    return results;
+      ),
+    );
   }
 
-  /// Convenience for UI code that only wants the top N, matching
-  /// WhoCalculator.topRecommendations but returning the display-ready shape.
-  List<RankedProductResult> topRecommendations(
-    List<RankedProductResult> ranked, {
-    int count = kTopRecommendationCount,
-  }) {
-    return ranked.take(count).toList();
+  /// Called when the user taps a specific product to view its detail
+  /// screen. ONE Gemini call. If [comparisonSet] has more than one entry,
+  /// the same call also returns a comparisonExplanation -- no second call.
+  /// If [comparisonSet] is null or has just [target] (solo scan, Scenario
+  /// A before Compare is tapped), this behaves exactly like the original
+  /// Phase 2 flow -- health advisory only, no comparison text.
+  Future<HealthAdvisory> getProductDetail({
+    required RankedProductResult target,
+    List<RankedProductResult>? comparisonSet,
+    required UserHealthProfile user,
+    required String scanEventId,
+    String languageCode = 'en',
+  }) async {
+    ComparisonFact? primaryFact;
+
+    if (comparisonSet != null && comparisonSet.length > 1) {
+      final facts = ComparisonCalculator.computeFacts(
+        target: target.evaluation,
+        comparisonSet: comparisonSet.map((r) => r.evaluation).toList(),
+        user: user,
+      );
+      primaryFact = ComparisonCalculator.primaryFact(facts);
+    }
+
+    return _geminiService.generateAdvisory(
+      scanEventId: scanEventId,
+      evaluation: target.evaluation,
+      user: user,
+      comparisonFact: primaryFact,
+      rankLabel: primaryFact != null ? target.suitabilityRankLabel : null,
+      languageCode: languageCode,
+    );
   }
 }
