@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "1033502181973",
+    "project_id": "claro-e90dd",
+    "storage_bucket": "claro-e90dd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1033502181973:android:950155c1c720b622ff22dc",
+        "android_client_info": {
+          "package_name": "com.example.claro"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1033502181973-8a3pl7iom0hlmihlgof4juohc54vnpq8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.claro",
+            "certificate_hash": "48761cd5b762b98776a4b37aa0783a2e3f9e6afe"
+          }
+        },
+        {
+          "client_id": "1033502181973-7m0l0j8ep4kgerfiu2b55hmpav1cgmp5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD9zyM5qv29DtCmeRXoE4hcqA1Y5nehSy8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1033502181973-7m0l0j8ep4kgerfiu2b55hmpav1cgmp5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
