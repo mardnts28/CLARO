@@ -73,7 +73,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 'Itlog': allergensList.contains('Itlog'),
                 'Toyo': allergensList.contains('Toyo'),
                 'Trigo': allergensList.contains('Trigo'),
-                'Lamong-sibuyas': allergensList.contains('Lamong-sibuyas'),
+                'Lamang-Dagat': allergensList.contains('Lamang-Dagat'),
                 'Mani': allergensList.contains('Mani'),
               };
               

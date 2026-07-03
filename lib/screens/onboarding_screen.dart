@@ -32,7 +32,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Itlog': false,
     'Toyo': false,
     'Trigo': false,
-    'Lamong-sibuyas': false,
+    'Lamang-Dagat': false,
     'Mani': false,
   };
 
@@ -49,7 +49,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Itlog': 'assets/images/itlog.png',
     'Toyo': 'assets/images/toyo.png',
     'Trigo': 'assets/images/trigo.png',
-    'Lamong-sibuyas': 'assets/images/lamang-dagat.png',
+    'Lamang-Dagat': 'assets/images/lamang-dagat.png',
     'Mani': 'assets/images/mani.png',
   };
 
