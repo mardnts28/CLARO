@@ -6,6 +6,8 @@ import 'package:permission_handler/permission_handler.dart';
 import '../services/yolo_recognition_service.dart';
 import '../services/image_validation_service.dart';
 import '../services/product_db_service.dart';
+import '../services/nutrition_service.dart';
+import '../services/history_service.dart';
 import 'product_detail_screen.dart';
 import 'unknown_product_submission_screen.dart';
 import 'multi_scan_results_screen.dart';
@@ -164,32 +166,41 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         for (var det in detections) {
           final prod = _dbService.getProductById(det.label);
           if (prod != null) {
-            products.add(prod);
+            final enriched = await NutritionService().getProductByName(prod.name);
+            products.add(enriched ?? prod);
           }
         }
 
         if (products.length == 1) {
           if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductDetailScreen(
-                  product: products.first,
-                  confidence: detections.first.confidence,
+            HistoryService().addScanRecord(products.first);
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProductDetailScreen(
+                    product: products.first,
+                    confidence: detections.first.confidence,
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           }
         } else if (products.length > 1) {
           if (mounted) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => MultiScanResultsScreen(
-                  detectedProducts: products,
+            for (var p in products) {
+              HistoryService().addScanRecord(p);
+            }
+            if (mounted) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MultiScanResultsScreen(
+                    detectedProducts: products,
+                  ),
                 ),
-              ),
-            );
+              );
+            }
           }
         }
       } else {

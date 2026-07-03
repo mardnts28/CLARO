@@ -3,6 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/product_db_service.dart';
 import 'product_detail_screen.dart';
+import 'camera_scanner_screen.dart';
+import 'history_screen.dart';
 
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
@@ -264,7 +266,26 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
 
   Widget _navItem(IconData icon, String label, bool active) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        if (label == 'Home') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
+          );
+        } else if (label == 'History') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HistoryScreen()),
+          );
+        } else if (label == 'Profile') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Profile features coming soon!', style: GoogleFonts.inter()),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

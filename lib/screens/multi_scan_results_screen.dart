@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import 'product_detail_screen.dart';
+import 'camera_scanner_screen.dart';
+import 'history_screen.dart';
 
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
@@ -218,7 +220,26 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
 
   Widget _navItem(IconData icon, String label, bool active) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        if (label == 'Home') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
+          );
+        } else if (label == 'History') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HistoryScreen()),
+          );
+        } else if (label == 'Profile') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Profile features coming soon!', style: GoogleFonts.inter()),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

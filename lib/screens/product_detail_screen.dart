@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
+import '../services/fda_verification_service.dart';
 import 'camera_scanner_screen.dart';
 import 'compare_products_screen.dart';
+import 'history_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -20,6 +22,28 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _isFavorite = false;
+  FdaVerificationResult? _fdaResult;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFdaVerification();
+  }
+
+  Future<void> _loadFdaVerification() async {
+    // Try verification using CPR number first, fall back to fuzzy match by product name
+    FdaVerificationResult result = await FdaVerificationService()
+        .verifyByCprNumber(widget.product.fdaRegistrationNumber);
+    
+    if (result.isUnverified) {
+      result = await FdaVerificationService()
+          .verifyByProductName(widget.product.name);
+    }
+
+    if (mounted) {
+      setState(() => _fdaResult = result);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -126,40 +150,54 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                               const SizedBox(height: 10),
                               // FDA badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: p.fdaStatus == 'Registered'
-                                      ? const Color(0xFF2E7D32)
-                                      : const Color(0xFFF57F17),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.check,
-                                        color: Colors.white, size: 13),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      p.fdaStatus == 'Registered'
-                                          ? 'FDA Approved'
-                                          : 'FDA Pending',
-                                      style: GoogleFonts.inter(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              _buildFdaBadge(),
                             ],
                           ),
                         ),
                       ],
                     ),
                   ),
+
+                  // ── FDA Warning Banner (only shown if expired or unverified) ────
+                  if (_fdaResult != null && !_fdaResult!.isActive)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: _fdaResult!.isExpired
+                            ? const Color(0xFFFFEBEE)
+                            : const Color(0xFFFFF8E1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _fdaResult!.isExpired
+                              ? const Color(0xFFEF9A9A)
+                              : const Color(0xFFFFCC02),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.warning_amber_rounded,
+                            color: _fdaResult!.isExpired ? Colors.red : Colors.amber[800],
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _fdaResult!.isExpired
+                                  ? 'BABALA: Ang produktong ito ay may EXPIRED na FDA registration. Maaaring hindi ito ligtas.'
+                                  : 'Ang produktong ito ay hindi pa nabeberipika ng FDA Philippines.',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.black87,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   // ── 2. Age recommendation and LIGTAS I-KONSUMO ──────
                   Padding(
@@ -370,7 +408,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             const SizedBox(width: 8),
                             _nutriCard('Sat. Fat', p.nutritionalFacts.saturatedFat),
                             const SizedBox(width: 8),
-                            Expanded(child: const SizedBox()),
+                            _nutriCard('Trans Fat', p.nutritionalFacts.transFat),
+                            const SizedBox(width: 8),
+                            _nutriCard('Fiber', p.nutritionalFacts.dietaryFiber),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            _nutriCard('Potassium', p.nutritionalFacts.potassiumMg > 0
+                                ? '${p.nutritionalFacts.potassiumMg.toStringAsFixed(0)}mg'
+                                : '0mg'),
+                            const SizedBox(width: 8),
+                            _nutriCard('Calcium', p.nutritionalFacts.calciumMg > 0
+                                ? '${p.nutritionalFacts.calciumMg.toStringAsFixed(0)}mg'
+                                : '0mg'),
+                            const SizedBox(width: 8),
+                            _nutriCard('Iron', p.nutritionalFacts.ironMg > 0
+                                ? '${p.nutritionalFacts.ironMg.toStringAsFixed(1)}mg'
+                                : '0.0mg'),
                             const SizedBox(width: 8),
                             Expanded(child: const SizedBox()),
                           ],
@@ -677,7 +733,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // ── Bottom nav helpers ───────────────────────────────────────────────────
   Widget _navItem(IconData icon, String label, bool active) {
     return GestureDetector(
-      onTap: () {},
+      onTap: () {
+        if (label == 'Home') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
+          );
+        } else if (label == 'History') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const HistoryScreen()),
+          );
+        } else if (label == 'Profile') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Profile features coming soon!', style: GoogleFonts.inter()),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -724,6 +799,91 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildFdaBadge() {
+    final fda = _fdaResult;
+    if (fda == null) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade300,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const SizedBox(
+          width: 60,
+          height: 14,
+          child: LinearProgressIndicator(),
+        ),
+      );
+    }
+
+    Color badgeColor;
+    IconData badgeIcon;
+    String badgeText;
+
+    switch (fda.status) {
+      case FdaStatus.active:
+        badgeColor = const Color(0xFF2E7D32);
+        badgeIcon = Icons.verified;
+        badgeText = 'FDA ACTIVE';
+        break;
+      case FdaStatus.expired:
+        badgeColor = const Color(0xFFC62828);
+        badgeIcon = Icons.warning_amber_rounded;
+        badgeText = 'FDA EXPIRED';
+        break;
+      case FdaStatus.unverified:
+        badgeColor = const Color(0xFFF57F17);
+        badgeIcon = Icons.help_outline;
+        badgeText = 'UNVERIFIED';
+        break;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: badgeColor,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(badgeIcon, color: Colors.white, size: 13),
+              const SizedBox(width: 4),
+              Text(
+                badgeText,
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (fda.cprNumber.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            'CPR: ${fda.cprNumber}',
+            style: GoogleFonts.inter(fontSize: 10, color: Colors.black45, fontWeight: FontWeight.bold),
+          ),
+          if (fda.validityDate.isNotEmpty)
+            Text(
+              'Valid until: ${fda.validityDate}',
+              style: GoogleFonts.inter(fontSize: 10, color: Colors.black45),
+            ),
+          if (fda.manufacturer.isNotEmpty)
+            Text(
+              fda.manufacturer,
+              style: GoogleFonts.inter(fontSize: 10, color: Colors.black45),
+            ),
+        ],
+      ],
     );
   }
 }
