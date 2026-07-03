@@ -70,13 +70,32 @@ class ComparisonMatrixBuilder {
     final cells = <NutrientComparisonCell>[];
     for (var i = 0; i < comparisonSet.length; i++) {
       final value = values[i];
+      final level = _resolveLevel(nutrient, value, user);
 
       // Ties: if every product has the same value for this nutrient,
       // nothing stands out -- neutral, not misleadingly green/red for all.
       final allTied = bestValue == worstValue;
 
       final ComparisonHighlight highlight;
-      if (allTied) {
+      if (level != null) {
+        // Absolute basis available (sodium+hypertension or sugar+diabetes):
+        // color reflects actual WHO/FDA safety, NOT relative rank within
+        // this specific comparison set. Fixes the case where three products
+        // are 700mg/600mg/500mg sodium -- all three are Caution-level per
+        // Table 3.14, so all three should read red, not "500mg = green"
+        // just because it's the lowest of three still-unsafe values.
+        switch (level) {
+          case AdvisoryLevel.suitable:
+            highlight = ComparisonHighlight.favorable;
+            break;
+          case AdvisoryLevel.moderate:
+            highlight = ComparisonHighlight.neutral;
+            break;
+          case AdvisoryLevel.caution:
+            highlight = ComparisonHighlight.unfavorable;
+            break;
+        }
+      } else if (allTied) {
         highlight = ComparisonHighlight.neutral;
       } else if (value == bestValue) {
         highlight = ComparisonHighlight.favorable; // green
@@ -90,7 +109,7 @@ class ComparisonMatrixBuilder {
         productId: comparisonSet[i].product.id,
         value: value,
         highlight: highlight,
-        level: _resolveLevel(nutrient, value, user),
+        level: level,
       ));
     }
 
