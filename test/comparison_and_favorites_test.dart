@@ -20,7 +20,6 @@ void main() {
         displayName: 'Test',
         conditions: [HealthCondition.hypertension],
         allergies: [],
-        dietaryRestrictions: const [],
       );
 
       final matrix = ComparisonMatrixBuilder.build(comparisonSet: [], user: user);
@@ -39,7 +38,6 @@ void main() {
         displayName: 'Test',
         conditions: [],
         allergies: [],
-        dietaryRestrictions: const [],
       );
 
       final productA = await repo.getProductById('p001');
@@ -67,7 +65,6 @@ void main() {
         displayName: 'Test',
         conditions: [HealthCondition.hypertension],
         allergies: [],
-        dietaryRestrictions: const [],
       );
 
       // p001 Argentina: sodiumMg 780. p012 Low Sodium: sodiumMg 320.
@@ -90,9 +87,15 @@ void main() {
       final cellA = sodiumRow.cells.firstWhere((c) => c.productId == 'p001');
       final cellB = sodiumRow.cells.firstWhere((c) => c.productId == 'p012');
 
-      // p001 has higher sodium -> unfavorable (red). p012 has lower -> favorable (green).
+      // Highlight color follows the ABSOLUTE WHO/FDA level (Table 3.14),
+      // not just "which product is lower" -- see comparison_matrix_builder's
+      // top-of-file comment. p001 is Caution-level sodium for a hypertension
+      // user -> unfavorable (red). p012 is lower but still only
+      // Moderate-level (not actually in the safe range) -> neutral, NOT
+      // favorable. Favorable is reserved for AdvisoryLevel.suitable, i.e.
+      // genuinely safe for this user's condition.
       expect(cellA.highlight, ComparisonHighlight.unfavorable);
-      expect(cellB.highlight, ComparisonHighlight.favorable);
+      expect(cellB.highlight, ComparisonHighlight.neutral);
 
       // Absolute levels still follow Table 3.14, only because the user has
       // hypertension saved -- independent of the relative highlight above.
@@ -108,7 +111,6 @@ void main() {
         displayName: 'Test',
         conditions: [HealthCondition.hypertension],
         allergies: [],
-        dietaryRestrictions: const [],
       );
 
       final productA = await repo.getProductById('p001'); // saturatedFatG 6.5
@@ -144,7 +146,6 @@ void main() {
         displayName: 'Test',
         conditions: [HealthCondition.diabetes], // NOT hypertension
         allergies: [],
-        dietaryRestrictions: const [],
       );
 
       final productA = await repo.getProductById('p001');
@@ -174,7 +175,6 @@ test('protein direction is flipped: higher protein is favorable (green), '
         displayName: 'Test',
         conditions: [],
         allergies: [],
-        dietaryRestrictions: const [],
       );
 
       final productA = await repo.getProductById('p001'); // proteinG 18.0
@@ -209,7 +209,6 @@ test('protein direction is flipped: higher protein is favorable (green), '
         displayName: 'Test',
         conditions: [],
         allergies: [],
-        dietaryRestrictions: const [],
       );
 
       // p001 and p012 both have proteinG 18.0 -- a genuine tie.
@@ -242,7 +241,6 @@ test('protein direction is flipped: higher protein is favorable (green), '
         displayName: 'Test',
         conditions: [],
         allergies: [AllergenType.fish],
-        dietaryRestrictions: const [],
       );
 
       final sardine = await repo.getProductById('p002'); // contains fish
