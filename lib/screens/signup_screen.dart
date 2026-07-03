@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
 import 'onboarding_screen.dart';
+import 'home_screen.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';
 
@@ -81,9 +82,14 @@ class _SignupScreenState extends State<SignupScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error)));
     } else {
+      // Check if user has completed onboarding
+      final hasCompleted = await _authService.hasCompletedOnboarding();
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        MaterialPageRoute(
+          builder: (_) =>
+              hasCompleted ? const HomeScreen() : const OnboardingScreen(),
+        ),
       );
     }
   }

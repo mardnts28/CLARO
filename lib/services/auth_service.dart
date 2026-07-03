@@ -88,10 +88,42 @@ class AuthService {
     });
   }
 
+  Future<bool> hasCompletedOnboarding() async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return false;
+
+      final userDoc = await _db.collection('users').doc(uid).get();
+      if (!userDoc.exists) return false;
+
+      final data = userDoc.data();
+      return data != null &&
+          data.containsKey('name') &&
+          data['name'] != null &&
+          data['name'].toString().isNotEmpty &&
+          data.containsKey('conditions') &&
+          data.containsKey('allergens');
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<String?> sendPasswordResetEmail({
+    required String email,
+  }) async {
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      return e.message;
+    }
+  }
+
   Future<void> signOut() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
   }
 
   User? get currentUser => _auth.currentUser;
+  FirebaseFirestore get db => _db;
 }

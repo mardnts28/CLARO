@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'signup_screen.dart';
 import 'onboarding_screen.dart';
+import 'home_screen.dart';
+import 'forgot_password_screen.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';
 
@@ -53,9 +55,14 @@ class _LoginScreenState extends State<LoginScreen> {
         SnackBar(content: Text(ValidationService.getGenericLoginError())),
       );
     } else {
+      // Check if user has completed onboarding
+      final hasCompleted = await _authService.hasCompletedOnboarding();
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        MaterialPageRoute(
+          builder: (_) =>
+              hasCompleted ? const HomeScreen() : const OnboardingScreen(),
+        ),
       );
     }
   }
@@ -69,9 +76,14 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(error)));
     } else {
+      // Check if user has completed onboarding
+      final hasCompleted = await _authService.hasCompletedOnboarding();
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        MaterialPageRoute(
+          builder: (_) =>
+              hasCompleted ? const HomeScreen() : const OnboardingScreen(),
+        ),
       );
     }
   }
@@ -139,7 +151,11 @@ class _LoginScreenState extends State<LoginScreen> {
               Align(
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
-                  onTap: () {},
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const ForgotPasswordScreen()),
+                  ),
                   child: const Text(
                     'Forgot password?',
                     style: TextStyle(
