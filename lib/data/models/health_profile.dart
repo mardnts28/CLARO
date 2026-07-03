@@ -27,16 +27,17 @@ class UserHealthProfile {
   final String displayName;
   final List<HealthCondition> conditions;
   final List<AllergenType> allergies;
-  final List<String> dietaryRestrictions; // free-text, e.g. "low-fat", "halal"
-  final bool lowVisionMode; // toggles large text / high contrast / TTS
+  // Hands-free voice navigation toggle. The feature itself belongs to a
+  // teammate's module, but the on/off state lives on the user doc, so it's
+  // represented here.
+  final bool voiceAssistant;
 
   const UserHealthProfile({
     required this.userId,
     required this.displayName,
     required this.conditions,
     required this.allergies,
-    required this.dietaryRestrictions,
-    this.lowVisionMode = false,
+    this.voiceAssistant = false,
   });
 
   bool get hasHypertension => conditions.contains(HealthCondition.hypertension);
@@ -53,10 +54,7 @@ class UserHealthProfile {
       allergies: (json['allergies'] as List<dynamic>)
           .map((a) => AllergenType.values.firstWhere((e) => e.name == a))
           .toList(),
-      dietaryRestrictions: (json['dietaryRestrictions'] as List<dynamic>)
-          .map((e) => e as String)
-          .toList(),
-      lowVisionMode: json['lowVisionMode'] as bool? ?? false,
+      voiceAssistant: json['voiceAssistant'] as bool? ?? false,
     );
   }
 
@@ -65,7 +63,6 @@ class UserHealthProfile {
         'displayName': displayName,
         'conditions': conditions.map((c) => c.name).toList(),
         'allergies': allergies.map((a) => a.name).toList(),
-        'dietaryRestrictions': dietaryRestrictions,
-        'lowVisionMode': lowVisionMode,
+        'voiceAssistant': voiceAssistant,
       };
 }

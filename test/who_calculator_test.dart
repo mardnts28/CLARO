@@ -52,7 +52,6 @@ UserHealthProfile _buildUser({
     displayName: 'Test User',
     conditions: conditions,
     allergies: allergies,
-    dietaryRestrictions: const [],
   );
 }
 

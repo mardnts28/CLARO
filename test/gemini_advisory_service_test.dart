@@ -4,7 +4,7 @@
 // real tokens. Run on demand only, not part of routine `flutter test` runs.
 //
 // Run with:
-// flutter test test/gemini_advisory_service_test.dart --dart-define=GEMINI_API_KEY=your_key_here
+// flutter test test/gemini_advisory_service_test.dart --dart-define-from-file=.env
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:claro/core/utils/who_calculator.dart';

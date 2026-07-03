@@ -27,7 +27,6 @@ void main() {
     displayName: 'Test User',
     conditions: [HealthCondition.hypertension],
     allergies: [],
-    dietaryRestrictions: const [],
   );
 
   group('Scenario 1: multiple products recognized in one scan', () {
