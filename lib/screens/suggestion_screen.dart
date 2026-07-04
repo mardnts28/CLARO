@@ -23,21 +23,34 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
 
   Future<void> _submit() async {
     if (_submitting) return;
+    final text = _commentController.text.trim();
+    if (_rating < 1) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a rating between 1 and 5.')));
+      return;
+    }
+    if (text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your suggestion before submitting.')));
+      return;
+    }
+    if (text.length > 500) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Suggestion must be 500 characters or less.')));
+      return;
+    }
+
     setState(() => _submitting = true);
     try {
       final uid = _authService.currentUser?.uid;
       if (uid == null) {
-        // Require sign-in for submitting suggestions
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mangyaring mag-sign in bago magpadala ng suhestiyon')));
         return;
       }
 
-      await _authService.db.collection('suggestions').add({
+      await _authService.db.collection('suhestiyon').doc(uid).set({
         'uid': uid,
-        'rating': _rating,
-        'comment': _commentController.text.trim(),
+        'starNumber': _rating,
+        'text': text,
         'createdAt': FieldValue.serverTimestamp(),
-      });
+      }, SetOptions(merge: true));
 
       await showDialog<void>(
         context: context,
@@ -92,12 +105,18 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bodyLarge = theme.textTheme.bodyLarge;
+    final bodyMedium = theme.textTheme.bodyMedium;
+    final bodySmall = theme.textTheme.bodySmall;
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Color(0xFF8B1A1A)),
-        title: const Text('Suhestiyon', style: TextStyle(color: Color(0xFF8B1A1A))),
+        iconTheme: IconThemeData(color: theme.colorScheme.primary),
+        title: Text('Suhestiyon', style: TextStyle(color: theme.colorScheme.primary)),
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -105,14 +124,14 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 8),
-            const Text('Gusto naming marinig ang iyong opinyon.', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            Text('Gusto naming marinig ang iyong opinyon.', style: bodyLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 18),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.white, boxShadow: [BoxShadow(color: Colors.grey.shade200, blurRadius: 6)]),
               child: Column(
                 children: [
-                  const Align(alignment: Alignment.centerLeft, child: Text('I-rate ang iyong karanasan', style: TextStyle(color: Colors.black87))),
+                  Align(alignment: Alignment.centerLeft, child: Text('I-rate ang iyong karanasan', style: bodyMedium?.copyWith(fontSize: 14))),
                   const SizedBox(height: 8),
                   _buildStars(),
                 ],
@@ -125,7 +144,7 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Ibahagi kung ano ang maaari naming i-improve', style: TextStyle(color: Colors.black87)),
+                  Text('Ibahagi kung ano ang maaari naming i-improve', style: bodyMedium?.copyWith(fontSize: 14)),
                   const SizedBox(height: 8),
                   TextField(
                     controller: _commentController,
@@ -133,10 +152,10 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                     maxLines: 8,
                     decoration: InputDecoration(
                       hintText: 'Isulat ang iyong mungkahi dito...',
-                      hintStyle: TextStyle(color: Colors.black45),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: Colors.grey.shade300)),
+                      hintStyle: bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.dividerColor)),
                     ),
-                    style: const TextStyle(color: Colors.black87),
+                    style: bodyMedium?.copyWith(fontSize: 14),
                   ),
                 ],
               ),
@@ -147,12 +166,12 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
               child: ElevatedButton(
                 onPressed: _submitting ? null : _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF8B1A1A),
-                  foregroundColor: Colors.white,
+                  backgroundColor: theme.colorScheme.primary,
+                  foregroundColor: theme.colorScheme.onPrimary,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: Text(_submitting ? 'Sending...' : 'Submit', style: const TextStyle(fontSize: 16, color: Colors.white)),
+                child: Text(_submitting ? 'Sending...' : 'Submit', style: TextStyle(fontSize: 16, color: theme.colorScheme.onPrimary)),
               ),
             ),
             const SizedBox(height: 12),

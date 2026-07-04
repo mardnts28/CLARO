@@ -13,7 +13,6 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _primaryRed = Color(0xFF8B1A1A);
   static const _lightRed = Color(0xFFFCE7E7);
   static const _navPill = Color(0xFFF6CDCD);
-  static const _lightGray = Color(0xFFF3F3F3);
   int _selectedIndex = 0;
   final _authService = AuthService();
   String _userName = 'User';
@@ -38,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
             .doc(uid)
             .get();
         if (userDoc.exists) {
-          final data = userDoc.data() as Map<String, dynamic>?;
+          final data = userDoc.data();
           if (data != null) {
             setState(() {
               _userName = data['name'] ?? 'User';
@@ -57,8 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Stack(
           children: [
@@ -103,6 +103,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader() {
+    final theme = Theme.of(context);
+    final bodyLarge = theme.textTheme.bodyLarge;
+    final bodyMedium = theme.textTheme.bodyMedium;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -113,18 +117,16 @@ class _HomeScreenState extends State<HomeScreen> {
         const SizedBox(height: 12),
         Text(
           'Kumusta, $_userName! 👋',
-          style: const TextStyle(
+          style: bodyLarge?.copyWith(
             fontSize: 24,
             fontWeight: FontWeight.bold,
-            color: Colors.black87,
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
+        Text(
           'Gawing mas matalino ang pamimili ngayon.',
-          style: TextStyle(
+          style: bodyMedium?.copyWith(
             fontSize: 13,
-            color: Colors.black54,
             height: 1.5,
           ),
         ),
@@ -133,6 +135,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildScanCard() {
+    final theme = Theme.of(context);
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -144,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: _primaryRed.withOpacity(0.18),
+            color: _primaryRed.withOpacity(theme.brightness == Brightness.dark ? 0.35 : 0.18),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -166,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 10),
                 const Text(
-                  'Itapat ang iyong camera sa anumang de-latang pagkain.',
+                  'Itapat ang iyong camera sa anumang instant noodles o de-latang pagkain.',
                   style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
                 ),
                 const SizedBox(height: 18),
@@ -265,25 +269,28 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildLabelIntro() {
+    final theme = Theme.of(context);
+    final bodyLarge = theme.textTheme.bodyLarge;
+    final bodyMedium = theme.textTheme.bodyMedium;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
+            children: [
               Text(
                 'Kilalain ang iyong mga Label',
-                style: TextStyle(
+                style: bodyLarge?.copyWith(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.black87,
                 ),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 'Sa tulong ng CLARO, mas madaling maunawaan ang mga label na ito at makagawa ng mas malusog na desisyon.',
-                style: TextStyle(fontSize: 13, color: Colors.black54, height: 1.5),
+                style: bodyMedium?.copyWith(fontSize: 13, height: 1.5),
               ),
             ],
           ),
@@ -293,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
           width: 80,
           height: 80,
           decoration: BoxDecoration(
-            color: _lightGray,
+            color: theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Padding(
@@ -363,12 +370,16 @@ class _HomeScreenState extends State<HomeScreen> {
     required bool expanded,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final bodyLarge = theme.textTheme.bodyLarge;
+    final bodyMedium = theme.textTheme.bodyMedium;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -398,16 +409,15 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: bodyLarge?.copyWith(
                             fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87),
+                            fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         subtitle,
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.black54, height: 1.4),
+                        style: bodyMedium?.copyWith(
+                            fontSize: 12, height: 1.4),
                       ),
                     ],
                   ),
@@ -435,13 +445,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Collapsed state: a single segmented bar of letters A–E.
   Widget _buildGradeSummaryBar() {
+    final theme = Theme.of(context);
+
     return Row(
       children: [
-        const SizedBox(
+        SizedBox(
           width: 46,
           child: Text(
             'Pinaka-\nmahusay',
-            style: TextStyle(fontSize: 10, color: Colors.black45, height: 1.2),
+            style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2),
           ),
         ),
         const SizedBox(width: 6),
@@ -474,12 +486,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         const SizedBox(width: 6),
-        const SizedBox(
+        SizedBox(
           width: 46,
           child: Text(
             'Pinakahindi\nKanais-nais',
             textAlign: TextAlign.right,
-            style: TextStyle(fontSize: 10, color: Colors.black45, height: 1.2),
+            style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2),
           ),
         ),
       ],
@@ -489,12 +501,14 @@ class _HomeScreenState extends State<HomeScreen> {
   /// Expanded state: a full arrow/ribbon breakdown, each grade narrower
   /// than the last, matching a Nutri-Score-style detail view.
   Widget _buildGradeDetailList(List<String> values) {
+    final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Pinaka-mahusay',
-          style: TextStyle(fontSize: 11, color: Colors.black45),
+          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 8),
         ...List.generate(values.length, (index) {
@@ -515,9 +529,9 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }),
         const SizedBox(height: 2),
-        const Text(
+        Text(
           'Pinakahindi Kanais-nais',
-          style: TextStyle(fontSize: 11, color: Colors.black45),
+          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
         ),
       ],
     );
@@ -591,12 +605,16 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   Widget _buildProcessCard() {
+    final theme = Theme.of(context);
+    final bodyLarge = theme.textTheme.bodyLarge;
+    final bodyMedium = theme.textTheme.bodyMedium;
+
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -620,22 +638,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Icon(Icons.blender_outlined, size: 18, color: _primaryRed),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         'Klase ng Pagpoproseso ng Pagkain',
-                        style: TextStyle(
+                        style: bodyLarge?.copyWith(
                             fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87),
+                            fontWeight: FontWeight.bold),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         'Antas ng pagproseso na ginawa sa produkto.',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.black54, height: 1.4),
+                        style: bodyMedium?.copyWith(
+                            fontSize: 12, height: 1.4),
                       ),
                     ],
                   ),
@@ -652,8 +669,8 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Unang\nGrupo',
-                  style: TextStyle(fontSize: 10, color: Colors.black45, height: 1.2)),
+              Text('Unang\nGrupo',
+                  style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2)),
               ...List.generate(4, (index) {
                 final level = index + 1;
                 return CircleAvatar(
@@ -666,9 +683,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               }),
-              const Text('Ika-apat na\nGrupo',
+              Text('Ika-apat na\nGrupo',
                   textAlign: TextAlign.right,
-                  style: TextStyle(fontSize: 10, color: Colors.black45, height: 1.2)),
+                  style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2)),
             ],
           ),
           AnimatedCrossFade(
@@ -739,6 +756,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildPlaceholderPage(String title, String subtitle) {
+    final theme = Theme.of(context);
+    final bodyLarge = theme.textTheme.bodyLarge;
+    final bodyMedium = theme.textTheme.bodyMedium;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -747,13 +768,13 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(
               title,
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
+              style: bodyLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: Colors.black54, height: 1.5),
+              style: bodyMedium?.copyWith(fontSize: 14, height: 1.5),
             ),
           ],
         ),
@@ -773,13 +794,15 @@ class _HomeScreenState extends State<HomeScreen> {
       (icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
     ];
 
+    final theme = Theme.of(context);
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: theme.brightness == Brightness.dark ? Colors.black.withOpacity(0.25) : Colors.black.withOpacity(0.05),
             blurRadius: 12,
             offset: const Offset(0, -2),
           ),

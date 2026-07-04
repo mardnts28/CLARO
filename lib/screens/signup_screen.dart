@@ -21,8 +21,6 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _showConfirmPassword = false;
   bool _isLoading = false;
 
-  static const _red = Color(0xFF8B1A1A);
-
   Future<void> _handleSignUp() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
@@ -96,8 +94,10 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
@@ -109,12 +109,12 @@ class _SignupScreenState extends State<SignupScreen> {
                   children: [
                     Image.asset('assets/images/logo.png', height: 90),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'CLARO',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: _red,
+                        color: colorScheme.primary,
                         letterSpacing: 3,
                       ),
                     ),
@@ -122,14 +122,14 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              const Text(
+              Text(
                 'Welcome!',
                 style: TextStyle(
-                    fontSize: 26, fontWeight: FontWeight.bold, color: _red),
+                    fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.primary),
               ),
-              const Text(
+              Text(
                 'Sign up to start',
-                style: TextStyle(fontSize: 13, color: _red),
+                style: TextStyle(fontSize: 13, color: colorScheme.primary),
               ),
               const SizedBox(height: 24),
               _buildTextField(
@@ -177,7 +177,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _red,
+                    backgroundColor: colorScheme.primary,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
@@ -215,11 +215,11 @@ class _SignupScreenState extends State<SignupScreen> {
                         MaterialPageRoute(
                             builder: (_) => const LoginScreen()),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Login',
                         style: TextStyle(
                             fontSize: 13,
-                            color: _red,
+                            color: colorScheme.primary,
                             fontWeight: FontWeight.bold),
                       ),
                     ),

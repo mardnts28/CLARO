@@ -14,30 +14,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   static const _primaryRed = Color(0xFF8B1A1A);
   static const _lightRed = Color(0xFFFCE7E7);
   final _authService = AuthService();
-  
+
   String _userName = 'User';
   final TextEditingController _nameController = TextEditingController();
   bool _isSavingName = false;
   Map<String, bool> _conditions = {};
   Map<String, bool> _allergens = {};
   bool _isLoading = true;
-
-  final Map<String, String> _conditionIcons = {
-    'Diabetes': 'assets/images/diabetes.png',
-    'Alta-presyon': 'assets/images/presyon.png',
-    'Sakit sa puso': 'assets/images/puso.png',
-    'Wala': '',
-  };
-
-  final Map<String, String> _allergenIcons = {
-    'Isda': 'assets/images/isda.png',
-    'Gatas': 'assets/images/gatas.png',
-    'Itlog': 'assets/images/itlog.png',
-    'Soya': 'assets/images/toyo.png',
-    'Trigo': 'assets/images/trigo.png',
-    'Lamang-dagat': 'assets/images/lamang-dagat.png',
-    'Mani': 'assets/images/mani.png',
-  };
 
   @override
   void initState() {
@@ -55,7 +38,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        // Try server first to get the latest values
         late DocumentSnapshot userDoc;
         try {
           userDoc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
@@ -68,8 +50,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             setState(() {
               _userName = data['name'] ?? 'User';
               _nameController.text = _userName;
-              
-              // Load conditions
+
               final conditionsList = data['conditions'] as List<dynamic>? ?? [];
               _conditions = {
                 'Diabetes': conditionsList.contains('Diabetes'),
@@ -77,8 +58,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 'Sakit sa puso': conditionsList.contains('Sakit sa puso'),
                 'Wala': conditionsList.contains('Wala'),
               };
-              
-              // Load allergens
+
               final allergensList = data['allergens'] as List<dynamic>? ?? [];
               _allergens = {
                 'Isda': allergensList.contains('Isda'),
@@ -89,7 +69,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 'Lamang-Dagat': allergensList.contains('Lamang-Dagat'),
                 'Mani': allergensList.contains('Mani'),
               };
-              
+
               _isLoading = false;
             });
           }
@@ -101,72 +81,63 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
-      Future<void> _saveUserName(String newName) async {
-        try {
-          final uid = _authService.currentUser?.uid;
-          if (uid == null) return;
-          setState(() => _isSavingName = true);
-          final ok = await _authService.updateUserData({'name': newName});
-          setState(() => _isSavingName = false);
-          if (ok) {
-            // Reload server values to ensure consistency
-            await _loadUserData();
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pangalan na-update')));
-          } else {
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hindi ma-save ang pangalan')));
-          }
-        } catch (e) {
-          debugPrint('Error saving user name: $e');
-          setState(() => _isSavingName = false);
-        }
+  Future<void> _saveUserName(String newName) async {
+    try {
+      final uid = _authService.currentUser?.uid;
+      if (uid == null) return;
+      setState(() => _isSavingName = true);
+      final ok = await _authService.updateUserData({'name': newName});
+      setState(() => _isSavingName = false);
+      if (ok) {
+        await _loadUserData();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pangalan na-update')));
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hindi ma-save ang pangalan')));
       }
+    } catch (e) {
+      debugPrint('Error saving user name: $e');
+      setState(() => _isSavingName = false);
+    }
+  }
 
-      void _showEditNameDialog() {
-        showDialog(
-          context: context,
-          builder: (context) {
-            return AlertDialog(
-              title: const Text('I-edit ang pangalan'),
-              content: TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(hintText: 'Pangalan'),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Kanselahin'),
-                ),
-                TextButton(
-                  onPressed: _isSavingName
-                      ? null
-                      : () async {
-                          final newName = _nameController.text.trim();
-                          if (newName.isEmpty) return;
-                          Navigator.pop(context);
-                          await _saveUserName(newName);
-                        },
-                  child: _isSavingName
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('I-save'),
-                ),
-              ],
-            );
-          },
+  void _showEditNameDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final dialogTheme = Theme.of(context);
+        return AlertDialog(
+          backgroundColor: dialogTheme.cardColor,
+          title: Text('I-edit ang pangalan', style: TextStyle(color: dialogTheme.colorScheme.onSurface)),
+          content: TextField(
+            controller: _nameController,
+            decoration: InputDecoration(hintText: 'Pangalan', hintStyle: TextStyle(color: dialogTheme.colorScheme.onSurfaceVariant)),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Kanselahin')),
+            TextButton(
+              onPressed: _isSavingName
+                  ? null
+                  : () async {
+                      final newName = _nameController.text.trim();
+                      if (newName.isEmpty) return;
+                      Navigator.pop(context);
+                      await _saveUserName(newName);
+                    },
+              child: _isSavingName
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('I-save'),
+            ),
+          ],
         );
-      }
+      },
+    );
+  }
 
   Future<void> _updateConditions() async {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        final selectedConditions = _conditions.entries
-            .where((e) => e.value)
-            .map((e) => e.key)
-            .toList();
+        final selectedConditions = _conditions.entries.where((e) => e.value).map((e) => e.key).toList();
         final ok = await _authService.updateUserData({'conditions': selectedConditions});
         if (ok) await _loadUserData();
       }
@@ -179,10 +150,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        final selectedAllergens = _allergens.entries
-            .where((e) => e.value)
-            .map((e) => e.key)
-            .toList();
+        final selectedAllergens = _allergens.entries.where((e) => e.value).map((e) => e.key).toList();
         final ok = await _authService.updateUserData({'allergens': selectedAllergens});
         if (ok) await _loadUserData();
       }
@@ -193,8 +161,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
@@ -203,15 +173,15 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildHeader(),
+                    _buildHeader(theme),
                     const SizedBox(height: 24),
-                    _buildProfileCard(),
+                    _buildProfileCard(theme),
                     const SizedBox(height: 20),
-                    _buildConditionsSection(),
+                    _buildConditionsSection(theme),
                     const SizedBox(height: 20),
-                    _buildAllergensSection(),
+                    _buildAllergensSection(theme),
                     const SizedBox(height: 20),
-                    _buildAccountSettings(),
+                    _buildAccountSettings(theme),
                     const SizedBox(height: 90),
                   ],
                 ),
@@ -220,7 +190,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(ThemeData theme) {
     return Row(
       children: [
         GestureDetector(
@@ -231,29 +201,21 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         Expanded(
           child: Text(
             'Personal na Impormasyon',
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: _primaryRed,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildProfileCard() {
+  Widget _buildProfileCard(ThemeData theme) {
     return Center(
       child: Column(
         children: [
           CircleAvatar(
             radius: 40,
-            backgroundColor: Colors.grey.shade400,
-            child: const Icon(
-              Icons.person,
-              size: 50,
-              color: Colors.white,
-            ),
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            child: const Icon(Icons.person, size: 50, color: Colors.white),
           ),
           const SizedBox(height: 12),
           GestureDetector(
@@ -261,16 +223,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  _userName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
+                Text(_userName, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                 const SizedBox(width: 8),
-                const Icon(Icons.edit, size: 16, color: Colors.grey),
+                Icon(Icons.edit, size: 16, color: theme.colorScheme.onSurfaceVariant),
               ],
             ),
           ),
@@ -279,13 +234,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     );
   }
 
-  Widget _buildConditionsSection() {
+  Widget _buildConditionsSection(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,14 +249,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             children: [
               Icon(Icons.favorite_outline, color: _primaryRed, size: 20),
               const SizedBox(width: 8),
-              const Text(
-                'Kondisyon sa Kalusugan',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
+              Text('Kondisyon sa Kalusugan', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
             ],
           ),
           const SizedBox(height: 12),
@@ -313,44 +261,34 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 children: [
                   Icon(Icons.favorite, color: _primaryRed, size: 18),
                   const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      entry.key,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
+                  Expanded(child: Text(entry.key, style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface))),
                   Switch(
                     value: entry.value,
                     onChanged: (value) {
                       setState(() => _conditions[entry.key] = value);
                       _updateConditions();
                     },
-                    activeColor: _primaryRed,
+                    activeThumbColor: _primaryRed,
+                    activeTrackColor: _primaryRed.withAlpha(120),
                   ),
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildAllergensSection() {
-    final selectedAllergens = _allergens.entries
-        .where((e) => e.value)
-        .map((e) => e.key)
-        .toList();
+  Widget _buildAllergensSection(ThemeData theme) {
+    final selectedAllergens = _allergens.entries.where((e) => e.value).map((e) => e.key).toList();
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,20 +300,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 children: [
                   Icon(Icons.warning_outlined, color: _primaryRed, size: 20),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Allergens',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
+                  Text('Allergens', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                 ],
               ),
-              GestureDetector(
-                onTap: () => _showAllergenSelector(),
-                child: Icon(Icons.add, color: _primaryRed, size: 24),
-              ),
+              GestureDetector(onTap: () => _showAllergenSelector(), child: Icon(Icons.add, color: _primaryRed, size: 24)),
             ],
           ),
           const SizedBox(height: 12),
@@ -393,24 +321,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      allergen,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: _primaryRed,
-                      ),
-                    ),
+                    Text(allergen, style: const TextStyle(fontSize: 13, color: _primaryRed)),
                     const SizedBox(width: 6),
                     GestureDetector(
                       onTap: () {
                         setState(() => _allergens[allergen] = false);
                         _updateAllergens();
                       },
-                      child: const Icon(
-                        Icons.close,
-                        size: 16,
-                        color: _primaryRed,
-                      ),
+                      child: const Icon(Icons.close, size: 16, color: _primaryRed),
                     ),
                   ],
                 ),
@@ -422,12 +340,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     );
   }
 
-  Widget _buildAccountSettings() {
+  Widget _buildAccountSettings(ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         children: [
@@ -437,23 +355,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               children: [
                 Icon(Icons.settings_outlined, color: _primaryRed, size: 20),
                 const SizedBox(width: 12),
-                const Text(
-                  'Account Settings',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                ),
+                Text('Account Settings', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
               ],
             ),
           ),
-          Divider(height: 0, color: Colors.grey.shade200),
+          Divider(height: 0, color: theme.dividerColor),
           GestureDetector(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-            ),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
             behavior: HitTestBehavior.opaque,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -461,16 +369,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 children: [
                   Icon(Icons.lock_outline, color: _primaryRed, size: 20),
                   const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Baguhin ang password',
-                      style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                  Icon(Icons.chevron_right, color: Colors.grey.shade400, size: 20),
+                  Expanded(child: Text('Baguhin ang password', style: TextStyle(fontSize: 15, color: theme.colorScheme.onSurface))),
+                  Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant, size: 20),
                 ],
               ),
             ),
@@ -484,27 +384,18 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     showModalBottomSheet(
       context: context,
       builder: (context) {
+        final sheetTheme = Theme.of(context);
         return Container(
           padding: const EdgeInsets.all(20),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
-            ),
+          decoration: BoxDecoration(
+            color: sheetTheme.cardColor,
+            borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Pumili ng Allergen',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
+              Text('Pumili ng Allergen', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: sheetTheme.colorScheme.onSurface)),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
@@ -518,25 +409,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       Navigator.pop(context);
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: isSelected ? _primaryRed : _lightRed,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: _primaryRed,
-                          width: isSelected ? 2 : 1,
-                        ),
+                        border: Border.all(color: _primaryRed, width: isSelected ? 2 : 1),
                       ),
-                      child: Text(
-                        entry.key,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isSelected ? Colors.white : _primaryRed,
-                        ),
-                      ),
+                      child: Text(entry.key, style: TextStyle(fontSize: 13, color: isSelected ? Colors.white : _primaryRed)),
                     ),
                   );
                 }).toList(),

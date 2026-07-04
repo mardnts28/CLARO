@@ -53,7 +53,6 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
         final ok = await _authService.updateUserData({key: value});
         if (!ok) return false;
 
-        // Try to reload fresh server data to avoid cache overwrites
         try {
           final doc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
           final data = doc.data();
@@ -66,9 +65,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
               _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : _textSize;
             });
           }
-        } catch (_) {
-          // ignore server reload failures
-        }
+        } catch (_) {}
         return true;
       }
     } catch (e) {
@@ -79,9 +76,11 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         iconTheme: const IconThemeData(color: _primaryRed),
         title: const Text('Preference', style: TextStyle(color: _primaryRed)),
@@ -94,28 +93,29 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Boses at Tunog', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black87)),
+                  Text('Boses at Tunog', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: theme.colorScheme.surface,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: theme.colorScheme.outlineVariant),
                     ),
                     child: DropdownButtonHideUnderline(
                       child: DropdownButton<String>(
                         value: _selectedLanguage,
-                        items: const [
-                          DropdownMenuItem(value: 'English', child: Text('English')),
-                          DropdownMenuItem(value: 'Tagalog', child: Text('Tagalog')),
+                        dropdownColor: theme.cardColor,
+                        items: [
+                          DropdownMenuItem(value: 'English', child: Text('English', style: TextStyle(color: theme.colorScheme.onSurface))),
+                          DropdownMenuItem(value: 'Tagalog', child: Text('Tagalog', style: TextStyle(color: theme.colorScheme.onSurface))),
                         ],
                         onChanged: (v) async {
                           if (v == null) return;
@@ -129,7 +129,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text('Bilis Ng Pagsasalita', style: TextStyle(fontSize: 13, color: Colors.black87)),
+                  Text('Bilis Ng Pagsasalita', style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface)),
                   Slider(
                     value: _speechRate,
                     min: 0.3,
@@ -147,7 +147,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.volume_mute, color: Colors.black54),
+                      Icon(Icons.volume_mute, color: theme.colorScheme.onSurfaceVariant),
                       Expanded(
                         child: Slider(
                           value: _speechVolume,
@@ -162,7 +162,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                           },
                         ),
                       ),
-                      const Icon(Icons.volume_up, color: Colors.black54),
+                      Icon(Icons.volume_up, color: theme.colorScheme.onSurfaceVariant),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -172,10 +172,10 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Preview ng audio')));
                       },
-                      icon: const Icon(Icons.play_arrow, color: Color(0xFF8B1A1A)),
-                      label: const Text('I-tap para sa preview ng audio', style: TextStyle(color: Color(0xFF8B1A1A))),
+                      icon: const Icon(Icons.play_arrow, color: _primaryRed),
+                      label: const Text('I-tap para sa preview ng audio', style: TextStyle(color: _primaryRed)),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF8B1A1A)),
+                        side: const BorderSide(color: _primaryRed),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
@@ -189,14 +189,14 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Pisikal na Tugon', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text('Pisikal na Tugon', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -205,18 +205,18 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                         children: [
                           Container(
                             padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: Colors.grey.shade100),
-                            child: const Icon(Icons.vibration_outlined, color: Color(0xFF8B1A1A)),
+                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: theme.colorScheme.surfaceContainerHighest),
+                            child: const Icon(Icons.vibration_outlined, color: _primaryRed),
                           ),
                           const SizedBox(width: 12),
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Vibration Feedback', style: TextStyle(fontWeight: FontWeight.w600)),
+                              Text('Vibration Feedback', style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
                               const SizedBox(height: 4),
-                              const SizedBox(
+                              SizedBox(
                                 width: 220,
-                                child: Text('Vibrate on scan, alerts, and reads', style: TextStyle(fontSize: 12, color: Colors.black54)),
+                                child: Text('Vibrate on scan, alerts, and reads', style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                               ),
                             ],
                           ),
@@ -231,7 +231,8 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hindi ma-save ang preference')));
                           }
                         },
-                        activeColor: _primaryRed,
+                        activeThumbColor: _primaryRed,
+                        activeTrackColor: _primaryRed.withAlpha(120),
                       ),
                     ],
                   ),
@@ -243,18 +244,18 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: theme.cardColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Laki ng Teksto', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text('Laki ng Teksto', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Text('A', style: TextStyle(fontSize: 16)),
+                      Text('A', style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurface)),
                       Expanded(
                         child: Slider(
                           value: _textSize,
@@ -269,7 +270,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                           },
                         ),
                       ),
-                      const Text('A', style: TextStyle(fontSize: 22)),
+                      Text('A', style: TextStyle(fontSize: 22, color: theme.colorScheme.onSurface)),
                     ],
                   ),
                 ],

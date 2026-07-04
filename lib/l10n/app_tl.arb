@@ -1,0 +1,37 @@
+{
+  "@@locale": "tl",
+  "greeting": "Kumusta, {name}! 👋",
+  "@greeting": {
+    "description": "Greeting with user name"
+  },
+
+  "scanProduct": "I-scan ang produkto",
+  "@scanProduct": {
+    "description": "Primary CTA to begin scanning"
+  },
+
+  "welcomeBack": "Welcome back!",
+  "loginToContinue": "Login to continue",
+
+  "email": "Email",
+  "password": "Password",
+  "forgotPassword": "Nakalimutan ang password?",
+  "login": "Mag-login",
+
+  "orContinueWith": "or continue with",
+  "continueWithGoogle": "Magpatuloy gamit ang Google",
+
+  "dontHaveAccount": "Wala pang account?",
+  "signUp": "Mag-sign up",
+
+  "chooseLanguage": "Piliin ang Lenggwuahe",
+  "english": "English",
+  "tagalog": "Tagalog",
+  "profile": "Profile",
+  "personalInfo": "Personal na Impormasyon",
+  "preference": "Preference",
+  "language": "Lenggwuahe",
+  "suggestion": "Sugestiyon",
+  "aboutClaro": "Tungkol sa CLARO",
+  "logout": "Logout"
+}

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'signup_screen.dart';
 import 'onboarding_screen.dart';
+import 'otp_verification_screen.dart';
 import 'home_screen.dart';
 import 'forgot_password_screen.dart';
 import '../services/auth_service.dart';
@@ -19,8 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _authService = AuthService();
   bool _showPassword = false;
   bool _isLoading = false;
-
-  static const _red = Color(0xFF8B1A1A);
 
   Future<void> _handleLogin() async {
     final email = _emailController.text.trim();
@@ -43,20 +42,45 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    if (!mounted) return;
     setState(() => _isLoading = true);
-    final error = await _authService.login(
-      email: email,
-      password: password,
-    );
-    setState(() => _isLoading = false);
-
-    if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ValidationService.getGenericLoginError())),
+    try {
+      final error = await _authService.login(
+        email: email,
+        password: password,
       );
-    } else {
-      // Check if user has completed onboarding
+      if (!mounted) return;
+
+      if (error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(ValidationService.getGenericLoginError())),
+        );
+        return;
+      }
+
+      final requiresMfa = await _authService.isMfaEnabledForCurrentUser();
+      if (!mounted) return;
+      if (requiresMfa) {
+        final otpData = await _authService.buildOtpChallenge(email: email, password: password);
+        if (!mounted) return;
+        if (otpData == null || otpData['code'] == null) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to send the verification code. Please try again.')));
+          return;
+        }
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => OtpVerificationScreen(
+              email: email,
+              password: password,
+            ),
+          ),
+        );
+        return;
+      }
+
       final hasCompleted = await _authService.hasCompletedOnboarding();
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -64,6 +88,10 @@ class _LoginScreenState extends State<LoginScreen> {
               hasCompleted ? const HomeScreen() : const OnboardingScreen(),
         ),
       );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -90,8 +118,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
@@ -103,12 +133,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     Image.asset('assets/images/logo.png', height: 90),
                     const SizedBox(height: 8),
-                    const Text(
+                    Text(
                       'CLARO',
                       style: TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: _red,
+                        color: colorScheme.primary,
                         letterSpacing: 3,
                       ),
                     ),
@@ -116,14 +146,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              const Text(
+              Text(
                 'Welcome back!',
                 style: TextStyle(
-                    fontSize: 26, fontWeight: FontWeight.bold, color: _red),
+                    fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.primary),
               ),
-              const Text(
+              Text(
                 'Login to continue',
-                style: TextStyle(fontSize: 13, color: _red),
+                style: TextStyle(fontSize: 13, color: colorScheme.primary),
               ),
               const SizedBox(height: 24),
               _buildTextField(
@@ -156,11 +186,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     MaterialPageRoute(
                         builder: (_) => const ForgotPasswordScreen()),
                   ),
-                  child: const Text(
+                  child: Text(
                     'Forgot password?',
                     style: TextStyle(
                         fontSize: 13,
-                        color: _red,
+                        color: colorScheme.primary,
                         fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -171,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _red,
+                    backgroundColor: colorScheme.primary,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8)),
                   ),
@@ -209,11 +239,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         MaterialPageRoute(
                             builder: (_) => const SignupScreen()),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Sign up',
                         style: TextStyle(
                             fontSize: 13,
-                            color: _red,
+                            color: colorScheme.primary,
                             fontWeight: FontWeight.bold),
                       ),
                     ),

@@ -120,48 +120,46 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: PageView(
           controller: _pageController,
           physics: const NeverScrollableScrollPhysics(),
           onPageChanged: (i) => setState(() => _currentPage = i),
           children: [
-            _buildPage1(),
-            _buildPage2(),
-            _buildPage3(),
+            _buildPage1(theme),
+            _buildPage2(theme),
+            _buildPage3(theme),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPage1() {
+  Widget _buildPage1(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
       child: Column(
         children: [
           const Spacer(),
-          _buildLogo(),
+          _buildLogo(theme),
           const SizedBox(height: 32),
-          const Text(
+          Text(
             'Ano ang gusto mong itawag namin sa iyo?',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Colors.black87),
+            style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurface),
           ),
           const SizedBox(height: 32),
           TextField(
             controller: _nameController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               hintText: 'Pangalan',
-              hintStyle: TextStyle(color: Colors.grey),
-              enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFFD9A0A0)),
-              ),
-              focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: Color(0xFF8B1A1A)),
-              ),
+              hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: theme.colorScheme.outlineVariant)),
+              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF8B1A1A))),
             ),
           ),
           const Spacer(),
@@ -171,13 +169,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildPage2() {
+  Widget _buildPage2(ThemeData theme) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
       child: Column(
         children: [
           const Spacer(),
-          _buildLogo(),
+          _buildLogo(theme),
           const SizedBox(height: 20),
           const Text(
             'Malinaw. Lokal. Maaasahan.',
@@ -189,10 +187,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Ang iyong AI na katulong\npara sa mas malusog na pamimili.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.black87, height: 1.5),
+            style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface, height: 1.5),
           ),
           const SizedBox(height: 36),
           GridView.count(
@@ -203,10 +201,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             mainAxisSpacing: 16,
             childAspectRatio: 1.4,
             children: [
-              _buildFeatureCard('assets/images/scan.png', 'I-scan ang Produkto'),
-              _buildFeatureCard('assets/images/nutrisyon.png', 'Nutrisyon ng Produkto'),
-              _buildFeatureCard('assets/images/gabay.png', 'Gabay sa Kalusugan'),
-              _buildFeatureCard('assets/images/compare.png', 'Paghahambing ng Produkto'),
+              _buildFeatureCard('assets/images/scan.png', 'I-scan ang Produkto', theme),
+              _buildFeatureCard('assets/images/nutrisyon.png', 'Nutrisyon ng Produkto', theme),
+              _buildFeatureCard('assets/images/gabay.png', 'Gabay sa Kalusugan', theme),
+              _buildFeatureCard('assets/images/compare.png', 'Paghahambing ng Produkto', theme),
             ],
           ),
           const Spacer(),
@@ -216,18 +214,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildPage3() {
+  Widget _buildPage3(ThemeData theme) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildLogo(),
+          _buildLogo(theme),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Sagutan ang mga sumusunod para sa mas ligtas at mas angkop na rekomendasyon para sa iyo',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: Colors.black87, height: 1.5),
+            style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface, height: 1.5),
           ),
           const SizedBox(height: 20),
           _buildSelectionCard(
@@ -236,7 +234,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             subtitle: 'Pumili ng lahat ng naaangkop sa iyo',
             note: 'Maaari mo itong baguhin sa iyong profile settings.',
             noteIcon: Icons.info_outline,
-            child: _buildConditionsGrid(),
+            child: _buildConditionsGrid(theme),
           ),
           const SizedBox(height: 16),
           _buildSelectionCard(
@@ -244,37 +242,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             iconColor: const Color(0xFFB45309),
             title: 'May mga allergen ba na dapat iwasan?',
             subtitle: 'Pumili ng lahat ng naaangkop sa iyo',
-            child: _buildAllergensGrid(),
+            child: _buildAllergensGrid(theme),
           ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: _lightRed,
+              color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFD9A0A0)),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Icon(Icons.shield_outlined, color: _red, size: 20),
-                SizedBox(width: 10),
+              children: [
+                const Icon(Icons.shield_outlined, color: _red, size: 20),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Prayoridad namin ang iyong kaligtasan',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13,
-                            color: _red),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _red),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         'Gagamitin namin ang impormasyong ito upang magbigay ng health insights at mas ligtas na mga rekomendasyon.',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.black87, height: 1.4),
+                        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, height: 1.4),
                       ),
                     ],
                   ),
@@ -299,7 +293,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildConditionsGrid() {
+  Widget _buildConditionsGrid(ThemeData theme) {
     final keys = _conditions.keys.toList();
     return GridView.count(
       crossAxisCount: 4,
@@ -318,13 +312,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             selected: selected,
             isWala: isWala,
             imagePath: isWala ? null : _conditionIcons[key],
+            theme: theme,
           ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildAllergensGrid() {
+  Widget _buildAllergensGrid(ThemeData theme) {
     final keys = _allergens.keys.toList();
     return GridView.count(
       crossAxisCount: 4,
@@ -341,6 +336,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             label: key,
             selected: selected,
             imagePath: _allergenIcons[key],
+            theme: theme,
           ),
         );
       }).toList(),
@@ -352,11 +348,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required bool selected,
     bool isWala = false,
     String? imagePath,
+    required ThemeData theme,
   }) {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFFFDF0F0) : Colors.white,
+        color: selected ? theme.colorScheme.surfaceContainerHighest : theme.cardColor,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: selected ? _red : const Color(0xFFD9A0A0),
@@ -389,7 +386,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 10,
-                    color: selected ? _red : Colors.black87,
+                    color: selected ? _red : theme.colorScheme.onSurface,
                     fontWeight:
                     selected ? FontWeight.bold : FontWeight.normal,
                   ),
@@ -427,9 +424,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9A0A0)),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -460,8 +457,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(note,
-                      style: const TextStyle(
-                          fontSize: 11, color: Colors.grey)),
+                      style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 ),
               ],
             ),
@@ -471,12 +467,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildFeatureCard(String imagePath, String label) {
+  Widget _buildFeatureCard(String imagePath, String label, ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9A0A0)),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -494,24 +490,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, color: Colors.black87),
+            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLogo() {
+  Widget _buildLogo(ThemeData theme) {
     return Column(
       children: [
         Image.asset('assets/images/logo.png', height: 80),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'CLARO',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: _red,
+            color: theme.colorScheme.primary,
             letterSpacing: 3,
           ),
         ),

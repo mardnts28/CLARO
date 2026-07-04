@@ -12,12 +12,12 @@ class ChangePasswordScreen extends StatefulWidget {
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   static const Color _primaryRed = Color(0xFF8B1A1A);
   static const Color _lightRed = Color(0xFFFDF0F0);
-  
+
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _authService = AuthService();
-  
+
   bool _showCurrentPassword = false;
   bool _showNewPassword = false;
   bool _showConfirmPassword = false;
@@ -28,7 +28,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final newPassword = _newPasswordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    // Validate fields
     if (currentPassword.isEmpty) {
       _showError('Pakisulat ang iyong kasalukuyang password');
       return;
@@ -63,15 +62,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         return;
       }
 
-      // Reauthenticate user
       final credential = EmailAuthProvider.credential(
         email: user.email!,
         password: currentPassword,
       );
 
       await user.reauthenticateWithCredential(credential);
-
-      // Update password
       await user.updatePassword(newPassword);
 
       setState(() => _isLoading = false);
@@ -102,40 +98,42 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(),
+              _buildHeader(theme),
               const SizedBox(height: 24),
-              _buildDescriptionBox(),
+              _buildDescriptionBox(theme),
               const SizedBox(height: 24),
               _buildPasswordField(
                 controller: _currentPasswordController,
                 hint: 'Kasalukuyang Password',
                 showPassword: _showCurrentPassword,
-                onToggle: () =>
-                    setState(() => _showCurrentPassword = !_showCurrentPassword),
+                theme: theme,
+                onToggle: () => setState(() => _showCurrentPassword = !_showCurrentPassword),
               ),
               const SizedBox(height: 16),
               _buildPasswordField(
                 controller: _newPasswordController,
                 hint: 'Bagong Password',
                 showPassword: _showNewPassword,
-                onToggle: () =>
-                    setState(() => _showNewPassword = !_showNewPassword),
+                theme: theme,
+                onToggle: () => setState(() => _showNewPassword = !_showNewPassword),
               ),
               const SizedBox(height: 16),
               _buildPasswordField(
                 controller: _confirmPasswordController,
                 hint: 'I-type muli ang bagong Password',
                 showPassword: _showConfirmPassword,
-                onToggle: () =>
-                    setState(() => _showConfirmPassword = !_showConfirmPassword),
+                theme: theme,
+                onToggle: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
               ),
               const SizedBox(height: 32),
               SizedBox(
@@ -144,27 +142,18 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _primaryRed,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: _isLoading ? null : _handleChangePassword,
                   child: _isLoading
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
                       : const Text(
                           'Baguhin ang Password',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                 ),
               ),
@@ -175,7 +164,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(ThemeData theme) {
     return Row(
       children: [
         GestureDetector(
@@ -183,34 +172,26 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           child: const Icon(Icons.arrow_back, color: _primaryRed, size: 24),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Text(
             'Baguhin ang Password',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: _primaryRed,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildDescriptionBox() {
+  Widget _buildDescriptionBox(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _lightRed,
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: const Text(
+      child: Text(
         'Ang iyong password ay dapat nasa hindi babababang anim na characters na may kombinasyon ng numero, letra, at ibang special characters (!@#%)',
-        style: TextStyle(
-          fontSize: 13,
-          color: Colors.black87,
-          height: 1.6,
-        ),
+        style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface, height: 1.6),
       ),
     );
   }
@@ -219,6 +200,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     required TextEditingController controller,
     required String hint,
     required bool showPassword,
+    required ThemeData theme,
     required VoidCallback onToggle,
   }) {
     return TextField(
@@ -226,23 +208,23 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       obscureText: !showPassword,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Colors.grey, fontSize: 14),
+        hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
         contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         suffixIcon: IconButton(
           icon: Icon(
             showPassword ? Icons.visibility : Icons.visibility_off,
             size: 20,
-            color: Colors.grey,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
           onPressed: onToggle,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFD9A0A0)),
+          borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _primaryRed),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(8)),
+          borderSide: BorderSide(color: _primaryRed),
         ),
       ),
     );

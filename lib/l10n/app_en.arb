@@ -1,0 +1,37 @@
+{
+  "@@locale": "en",
+  "greeting": "Hello, {name}! 👋",
+  "@greeting": {
+    "description": "Greeting with user name"
+  },
+
+  "scanProduct": "Scan a product",
+  "@scanProduct": {
+    "description": "Primary CTA to begin scanning"
+  },
+
+  "welcomeBack": "Welcome back!",
+  "loginToContinue": "Login to continue",
+
+  "email": "Email",
+  "password": "Password",
+  "forgotPassword": "Forgot password?",
+  "login": "Login",
+
+  "orContinueWith": "or continue with",
+  "continueWithGoogle": "Continue with Google",
+
+  "dontHaveAccount": "Don't have an account?",
+  "signUp": "Sign up",
+
+  "chooseLanguage": "Choose language",
+  "english": "English",
+  "tagalog": "Tagalog",
+  "profile": "Profile",
+  "personalInfo": "Personal Information",
+  "preference": "Preference",
+  "language": "Language",
+  "suggestion": "Suggestion",
+  "aboutClaro": "About CLARO",
+  "logout": "Logout"
+}

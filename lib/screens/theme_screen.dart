@@ -28,7 +28,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
         // Try to get the latest server value first
         try {
           final userDoc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
-          final data = userDoc.data() as Map<String, dynamic>?;
+          final data = userDoc.data();
           if (data != null) {
             setState(() => _selected = (data['theme'] ?? 'Default').toString());
             setAppThemeMode(parseThemeMode(_selected));
@@ -38,7 +38,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
 
         // Fallback to cache if server read fails
         final userDoc = await _authService.db.collection('users').doc(uid).get();
-        final data = userDoc.data() as Map<String, dynamic>?;
+        final data = userDoc.data();
         if (data != null) {
           setState(() => _selected = (data['theme'] ?? 'Default').toString());
           setAppThemeMode(parseThemeMode(_selected));
@@ -68,6 +68,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
   }
 
   Widget _option(String label, String asset) {
+    final theme = Theme.of(context);
     final selected = _selected.toLowerCase() == label.toLowerCase();
     return Expanded(
       child: GestureDetector(
@@ -75,10 +76,10 @@ class _ThemeScreenState extends State<ThemeScreen> {
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFFCE7E7) : Colors.grey.shade100,
+            color: selected ? theme.colorScheme.primaryContainer : theme.colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: selected ? _primaryRed : Colors.grey.shade300,
+              color: selected ? theme.colorScheme.primary : theme.dividerColor,
               width: selected ? 2 : 1,
             ),
           ),
@@ -91,7 +92,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: selected ? _primaryRed : Colors.black87,
+                  color: selected ? theme.colorScheme.primary : theme.textTheme.bodyLarge?.color,
                 ),
               ),
             ],
@@ -103,12 +104,15 @@ class _ThemeScreenState extends State<ThemeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
-        iconTheme: const IconThemeData(color: _primaryRed),
-        title: const Text('Tema', style: TextStyle(color: _primaryRed)),
+        iconTheme: IconThemeData(color: theme.colorScheme.primary),
+        title: Text('Tema', style: TextStyle(color: theme.colorScheme.primary)),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -144,14 +148,18 @@ class _ThemeScreenState extends State<ThemeScreen> {
     required bool selected,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final bodyLarge = theme.textTheme.bodyLarge;
+    final bodyMedium = theme.textTheme.bodyMedium;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: selected ? _primaryRed : Colors.grey.shade300, width: selected ? 2 : 1),
+          border: Border.all(color: selected ? theme.colorScheme.primary : theme.dividerColor, width: selected ? 2 : 1),
         ),
         child: Row(
           children: [
@@ -160,7 +168,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
               height: 68,
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Image.asset(asset, fit: BoxFit.contain),
@@ -175,17 +183,17 @@ class _ThemeScreenState extends State<ThemeScreen> {
                       Expanded(
                         child: Text(
                           label,
-                          style: TextStyle(
+                          style: bodyLarge?.copyWith(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
-                            color: selected ? _primaryRed : Colors.black87,
+                            color: selected ? theme.colorScheme.primary : bodyLarge.color,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Icon(
                         selected ? Icons.check_circle : Icons.radio_button_unchecked,
-                        color: selected ? _primaryRed : Colors.grey,
+                        color: selected ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
                         size: 22,
                       ),
                     ],
@@ -193,7 +201,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
                   const SizedBox(height: 6),
                   Text(
                     description,
-                    style: TextStyle(fontSize: 13, color: Colors.black54),
+                    style: bodyMedium?.copyWith(fontSize: 13),
                   ),
                 ],
               ),
