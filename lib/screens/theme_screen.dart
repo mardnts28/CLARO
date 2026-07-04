@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
+import '../widgets/translated_text.dart';
 
 class ThemeScreen extends StatefulWidget {
   const ThemeScreen({super.key});
@@ -58,9 +60,13 @@ class _ThemeScreenState extends State<ThemeScreen> {
         // reload server value to be sure
         await _load();
         setAppThemeMode(parseThemeMode(theme));
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tema na-save')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: TranslatedText('Tema na-save')),
+        );
       } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hindi ma-save ang tema')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: TranslatedText('Hindi ma-save ang tema')),
+        );
       }
     } catch (e) {
       debugPrint('Error saving theme: $e');
@@ -112,7 +118,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
         backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         iconTheme: IconThemeData(color: theme.colorScheme.primary),
-        title: Text('Tema', style: TextStyle(color: theme.colorScheme.primary)),
+        title: Text(AppLocalizations.of(context)!.theme, style: TextStyle(color: theme.colorScheme.primary)),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -121,17 +127,17 @@ class _ThemeScreenState extends State<ThemeScreen> {
           children: [
             const SizedBox(height: 8),
             _buildCardOption(
-              label: 'Default',
+              label: AppLocalizations.of(context)!.themeDefault,
               asset: 'assets/images/default.png',
-              description: 'Karaniwang hitsura na may CLARO na kulay',
+              description: AppLocalizations.of(context)!.themeDefaultDescription,
               selected: _selected.toLowerCase() == 'default',
               onTap: () => _choose('Default'),
             ),
             const SizedBox(height: 12),
             _buildCardOption(
-              label: 'Dark Mode',
+              label: AppLocalizations.of(context)!.themeDarkMode,
               asset: 'assets/images/dark.png',
-              description: 'Madilim na background para sa mga lugar na may mababang ilaw.',
+              description: AppLocalizations.of(context)!.themeDarkModeDescription,
               selected: _selected.toLowerCase() == 'dark' || _selected.toLowerCase() == 'dark mode',
               onTap: () => _choose('Dark Mode'),
             ),

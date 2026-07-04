@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 
 class PreferenceScreen extends StatefulWidget {
@@ -13,7 +14,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
   static const _primaryRed = Color(0xFF8B1A1A);
   final _authService = AuthService();
 
-  String _selectedLanguage = 'English';
+  String _selectedLanguage = 'en'; // store language code ('en'|'tl')
   double _speechRate = 0.5;
   double _speechVolume = 0.7;
   bool _vibrationFeedback = false;
@@ -31,9 +32,10 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
       if (uid != null) {
         final doc = await _authService.db.collection('users').doc(uid).get();
         final data = doc.data();
-        if (data != null) {
+          if (data != null) {
           setState(() {
-            _selectedLanguage = data['language'] ?? 'English';
+            // keep the stored language code directly
+            _selectedLanguage = data['language'] ?? 'en';
             _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
             _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
             _vibrationFeedback = data['vibrationFeedback'] ?? false;
@@ -58,6 +60,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
           final data = doc.data();
           if (data != null) {
             setState(() {
+              // store and keep language code directly
               _selectedLanguage = data['language'] ?? _selectedLanguage;
               _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : _speechRate;
               _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : _speechVolume;
@@ -114,11 +117,12 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                         value: _selectedLanguage,
                         dropdownColor: theme.cardColor,
                         items: [
-                          DropdownMenuItem(value: 'English', child: Text('English', style: TextStyle(color: theme.colorScheme.onSurface))),
-                          DropdownMenuItem(value: 'Tagalog', child: Text('Tagalog', style: TextStyle(color: theme.colorScheme.onSurface))),
+                          DropdownMenuItem(value: 'en', child: Text('English', style: TextStyle(color: theme.colorScheme.onSurface))),
+                          DropdownMenuItem(value: 'tl', child: Text('Tagalog', style: TextStyle(color: theme.colorScheme.onSurface))),
                         ],
                         onChanged: (v) async {
                           if (v == null) return;
+                          // store the language code directly
                           setState(() => _selectedLanguage = v);
                           final ok = await _savePref('language', v);
                           if (!ok && mounted) {

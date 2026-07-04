@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import 'profile_screen.dart';
 
@@ -116,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          'Kumusta, $_userName! 👋',
+          '${AppLocalizations.of(context)!.greeting(_userName)}',
           style: bodyLarge?.copyWith(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -124,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Gawing mas matalino ang pamimili ngayon.',
+          AppLocalizations.of(context)!.homeTagline,
           style: bodyMedium?.copyWith(
             fontSize: 13,
             height: 1.5,
@@ -160,18 +161,18 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'I-scan ang produkto',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context)!.scanCardTitle,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  'Itapat ang iyong camera sa anumang instant noodles o de-latang pagkain.',
-                  style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
+                Text(
+                  AppLocalizations.of(context)!.scanCardSubtitle,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
                 ),
                 const SizedBox(height: 18),
                 SizedBox(
@@ -185,9 +186,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       elevation: 0,
                     ),
                     onPressed: () {},
-                    child: const Text(
-                      'I-scan Na',
-                      style: TextStyle(
+                    child: Text(
+                      AppLocalizations.of(context)!.scanNow,
+                      style: const TextStyle(
                         color: _primaryRed,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -281,7 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Kilalain ang iyong mga Label',
+                AppLocalizations.of(context)!.labelIntroTitle,
                 style: bodyLarge?.copyWith(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -289,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Sa tulong ng CLARO, mas madaling maunawaan ang mga label na ito at makagawa ng mas malusog na desisyon.',
+                AppLocalizations.of(context)!.labelIntroSubtitle,
                 style: bodyMedium?.copyWith(fontSize: 13, height: 1.5),
               ),
             ],
@@ -331,14 +332,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHealthCard() {
     return _buildGradeCard(
       icon: Icons.balance,
-      title: 'Sukat ng Kalusugan ng Pagkain',
-      subtitle: 'Kabuuang kalidad ng nutrisyon ng produkto.',
-      values: const [
-        'Pinakamainam – Mataas ang sustansya',
-        'Rekomendadong pagpipilian',
-        'Katanggap-tanggap sa katamtamang dami',
-        'Limitahan ang pagkunsumo',
-        'Iwasan ang madalas na pagkunsumo',
+      title: AppLocalizations.of(context)!.healthGradeTitle,
+      subtitle: AppLocalizations.of(context)!.healthGradeSubtitle,
+      values: [
+        AppLocalizations.of(context)!.healthGradeValue0,
+        AppLocalizations.of(context)!.healthGradeValue1,
+        AppLocalizations.of(context)!.healthGradeValue2,
+        AppLocalizations.of(context)!.healthGradeValue3,
+        AppLocalizations.of(context)!.healthGradeValue4,
       ],
       expanded: _healthExpanded,
       onTap: () => setState(() => _healthExpanded = !_healthExpanded),
@@ -348,14 +349,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildEcoCard() {
     return _buildGradeCard(
       icon: Icons.eco_outlined,
-      title: 'Grado ng Pagiging Maka-Kalikasan',
-      subtitle: 'Epekto ng produkto sa kalikasan.',
-      values: const [
-        'Mahusay ang epekto sa kapaligiran',
-        'Mabuti para sa kapaligiran',
-        'Katamtamang epekto sa kapaligiran',
-        'Isaalang-alang ang ibang opsyon',
-        'May malubhang epekto',
+      title: AppLocalizations.of(context)!.ecoGradeTitle,
+      subtitle: AppLocalizations.of(context)!.ecoGradeSubtitle,
+      values: [
+        AppLocalizations.of(context)!.ecoGradeValue0,
+        AppLocalizations.of(context)!.ecoGradeValue1,
+        AppLocalizations.of(context)!.ecoGradeValue2,
+        AppLocalizations.of(context)!.ecoGradeValue3,
+        AppLocalizations.of(context)!.ecoGradeValue4,
       ],
       expanded: _ecoExpanded,
       onTap: () => setState(() => _ecoExpanded = !_ecoExpanded),
@@ -643,14 +644,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Klase ng Pagpoproseso ng Pagkain',
+                        AppLocalizations.of(context)!.processGradeTitle,
                         style: bodyLarge?.copyWith(
                             fontSize: 15,
                             fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Antas ng pagproseso na ginawa sa produkto.',
+                        AppLocalizations.of(context)!.processGradeSubtitle,
                         style: bodyMedium?.copyWith(
                             fontSize: 12, height: 1.4),
                       ),
@@ -669,7 +670,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Unang\nGrupo',
+              Text(AppLocalizations.of(context)!.processGroupFirst,
                   style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2)),
               ...List.generate(4, (index) {
                 final level = index + 1;
@@ -683,7 +684,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               }),
-              Text('Ika-apat na\nGrupo',
+              Text(AppLocalizations.of(context)!.processGroupFourth,
                   textAlign: TextAlign.right,
                   style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2)),
             ],
@@ -748,11 +749,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildScanPage() {
-    return _buildPlaceholderPage('Scan', 'I-scan ang iyong produkto mula rito.');
+    return _buildPlaceholderPage(
+      AppLocalizations.of(context)!.scanTabTitle,
+      AppLocalizations.of(context)!.scanTabSubtitle,
+    );
   }
 
   Widget _buildHistoryPage() {
-    return _buildPlaceholderPage('History', 'Makikita mo rito ang iyong scan history.');
+    return _buildPlaceholderPage(
+      AppLocalizations.of(context)!.historyTabTitle,
+      AppLocalizations.of(context)!.historyTabSubtitle,
+    );
   }
 
   Widget _buildPlaceholderPage(String title, String subtitle) {
@@ -788,10 +795,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBottomNav() {
     final items = [
-      (icon: Icons.home_outlined, activeIcon: Icons.home, label: 'Home'),
-      (icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: 'Scan'),
-      (icon: Icons.history_outlined, activeIcon: Icons.history, label: 'History'),
-      (icon: Icons.person_outline, activeIcon: Icons.person, label: 'Profile'),
+      (icon: Icons.home_outlined, activeIcon: Icons.home, label: AppLocalizations.of(context)!.home),
+      (icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: AppLocalizations.of(context)!.scan),
+      (icon: Icons.history_outlined, activeIcon: Icons.history, label: AppLocalizations.of(context)!.history),
+      (icon: Icons.person_outline, activeIcon: Icons.person, label: AppLocalizations.of(context)!.profile),
     ];
 
     final theme = Theme.of(context);

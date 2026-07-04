@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../generated/l10n/app_localizations.dart';
 import 'signup_screen.dart';
 import 'onboarding_screen.dart';
 import 'otp_verification_screen.dart';
@@ -37,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // Validate password is not empty
     if (password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password is required')),
+        SnackBar(content: Text(AppLocalizations.of(context)!.passwordRequired)),
       );
       return;
     }
@@ -53,7 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ValidationService.getGenericLoginError())),
+          SnackBar(content: Text(AppLocalizations.of(context)!.invalidEmailOrPassword)),
         );
         return;
       }
@@ -147,24 +148,24 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 32),
               Text(
-                'Welcome back!',
+                AppLocalizations.of(context)!.welcomeBack,
                 style: TextStyle(
                     fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.primary),
               ),
               Text(
-                'Login to continue',
+                AppLocalizations.of(context)!.loginToContinue,
                 style: TextStyle(fontSize: 13, color: colorScheme.primary),
               ),
               const SizedBox(height: 24),
               _buildTextField(
                 controller: _emailController,
-                hint: 'Email',
+                hint: AppLocalizations.of(context)!.email,
                 icon: Icons.email_outlined,
               ),
               const SizedBox(height: 14),
               _buildTextField(
                 controller: _passwordController,
-                hint: 'Password',
+                hint: AppLocalizations.of(context)!.password,
                 icon: Icons.lock_outline,
                 obscure: !_showPassword,
                 suffix: IconButton(
@@ -213,9 +214,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: CircularProgressIndicator(
                         color: Colors.white, strokeWidth: 2),
                   )
-                      : const Text(
-                    'Login',
-                    style: TextStyle(
+                      : Text(
+                    AppLocalizations.of(context)!.login,
+                    style: const TextStyle(
                         fontSize: 16,
                         color: Colors.white,
                         fontWeight: FontWeight.bold),
@@ -231,8 +232,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don't have an account? ",
-                        style: TextStyle(fontSize: 13)),
+                    Text(AppLocalizations.of(context)!.dontHaveAccount + ' ',
+                        style: const TextStyle(fontSize: 13)),
                     GestureDetector(
                       onTap: () => Navigator.pushReplacement(
                         context,
@@ -240,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             builder: (_) => const SignupScreen()),
                       ),
                       child: Text(
-                        'Sign up',
+                        AppLocalizations.of(context)!.signUp,
                         style: TextStyle(
                             fontSize: 13,
                             color: colorScheme.primary,
@@ -287,15 +288,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildDivider() {
-    return const Row(
+    return Row(
       children: [
-        Expanded(child: Divider(color: Colors.grey)),
+        const Expanded(child: Divider(color: Colors.grey)),
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: 10),
-          child: Text('or continue with',
-              style: TextStyle(fontSize: 12, color: Colors.grey)),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Text(AppLocalizations.of(context)!.orContinueWith,
+              style: const TextStyle(fontSize: 12, color: Colors.grey)),
         ),
-        Expanded(child: Divider(color: Colors.grey)),
+        const Expanded(child: Divider(color: Colors.grey)),
       ],
     );
   }
@@ -311,9 +312,9 @@ class _LoginScreenState extends State<LoginScreen> {
               borderRadius: BorderRadius.circular(8)),
         ),
         icon: Image.asset('assets/images/google.png', height: 20),
-        label: const Text(
-          'Continue with Google',
-          style: TextStyle(color: Colors.black87, fontSize: 14),
+        label: Text(
+          AppLocalizations.of(context)!.continueWithGoogle,
+          style: const TextStyle(color: Colors.black87, fontSize: 14),
         ),
         onPressed: _isLoading ? null : _handleGoogleSignIn,
       ),

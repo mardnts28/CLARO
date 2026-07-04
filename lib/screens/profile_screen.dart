@@ -53,7 +53,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _voiceAssistantEnabled = data['voiceAssistant'] ?? false;
                 _mfaEnabled = data['mfaEnabled'] ?? false;
                 _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
-                _selectedLanguage = data['language'] ?? 'English';
+                // `language` stored as language code ('en'|'tl'). Convert to human label for UI.
+                final code = data['language'] ?? 'en';
+                _selectedLanguage = (code == 'tl') ? 'Tagalog' : 'English';
                 _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
                 _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
                 _vibrationFeedback = data['vibrationFeedback'] ?? false;
@@ -69,7 +71,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final userDoc = await _authService.db.collection('users').doc(uid).get();
         if (userDoc.exists) {
           final data = userDoc.data();
-          if (data != null) {
+            if (data != null) {
             final themeString = data['theme'] ?? 'Default';
             setState(() {
               _userName = data['name'] ?? 'User';
@@ -77,7 +79,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _voiceAssistantEnabled = data['voiceAssistant'] ?? false;
               _mfaEnabled = data['mfaEnabled'] ?? false;
               _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
-              _selectedLanguage = data['language'] ?? 'English';
+                final code = data['language'] ?? 'en';
+                _selectedLanguage = (code == 'tl') ? 'Tagalog' : 'English';
               _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
               _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
               _vibrationFeedback = data['vibrationFeedback'] ?? false;
@@ -275,7 +278,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final selectedLabel = choice == 'en' ? AppLocalizations.of(context)!.english : AppLocalizations.of(context)!.tagalog;
       if (selectedLabel != _selectedLanguage) {
         setState(() => _selectedLanguage = selectedLabel);
-        await _updateUserPreference('language', selectedLabel);
+        // Persist language code (e.g., 'en' or 'tl') to Firestore so server-side reads match locale codes.
+        await _updateUserPreference('language', choice);
         await LocaleService.setAppLocale(choice);
       }
     }

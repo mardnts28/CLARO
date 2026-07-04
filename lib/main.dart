@@ -6,7 +6,7 @@ import 'services/auth_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import '../generated/l10n/app_localizations.dart';
+import 'generated/l10n/app_localizations.dart';
 import 'services/locale_service.dart';
 
 ThemeData _buildAppTheme(Brightness brightness) {
