@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -17,6 +18,7 @@ class AuthService {
         password: password,
       );
       await _db.collection('users').doc(credential.user!.uid).set({
+        'uid': credential.user!.uid,
         'email': email,
         'createdAt': Timestamp.now(),
       });
@@ -64,6 +66,7 @@ class AuthService {
 
       if (!userDoc.exists) {
         await _db.collection('users').doc(userCredential.user!.uid).set({
+          'uid': userCredential.user!.uid,
           'email': userCredential.user!.email,
           'name': userCredential.user!.displayName,
           'createdAt': Timestamp.now(),
@@ -81,11 +84,12 @@ class AuthService {
     required List<String> allergens,
   }) async {
     final uid = _auth.currentUser!.uid;
-    await _db.collection('users').doc(uid).update({
+    await _db.collection('users').doc(uid).set({
+      'uid': uid,
       'name': name,
       'conditions': conditions,
       'allergens': allergens,
-    });
+    }, SetOptions(merge: true));
   }
 
   Future<bool> hasCompletedOnboarding() async {
@@ -93,11 +97,11 @@ class AuthService {
       final uid = _auth.currentUser?.uid;
       if (uid == null) return false;
 
-      final userDoc = await _db.collection('users').doc(uid).get();
-      if (!userDoc.exists) return false;
+        final userDoc = await _db.collection('users').doc(uid).get();
+        if (!userDoc.exists) return false;
 
-      final data = userDoc.data();
-      return data != null &&
+        final data = userDoc.data() as Map<String, dynamic>?;
+        return data != null &&
           data.containsKey('name') &&
           data['name'] != null &&
           data['name'].toString().isNotEmpty &&
@@ -126,4 +130,36 @@ class AuthService {
 
   User? get currentUser => _auth.currentUser;
   FirebaseFirestore get db => _db;
+
+  /// Safely updates the current user's document with [data]. Tries `update()` first
+  /// and falls back to `set(..., SetOptions(merge: true))` when the document
+  /// does not exist. Returns true on success, false on failure.
+  Future<bool> updateUserData(Map<String, dynamic> data) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid == null) return false;
+      final docRef = _db.collection('users').doc(uid);
+      // Try update first to avoid accidentally creating duplicate/empty docs.
+      await docRef.update(data);
+      return true;
+    } on FirebaseException catch (e) {
+      // If document not found, fallback to set with merge
+      if (e.code == 'not-found') {
+        try {
+          final uid = _auth.currentUser?.uid;
+          if (uid == null) return false;
+          await _db.collection('users').doc(uid).set(data, SetOptions(merge: true));
+          return true;
+        } catch (e2) {
+          debugPrint('Fallback set failed: $e2');
+          return false;
+        }
+      }
+      debugPrint('Update failed: $e');
+      return false;
+    } catch (e) {
+      debugPrint('Unexpected error updating user data: $e');
+      return false;
+    }
+  }
 }

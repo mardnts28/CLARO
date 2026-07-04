@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import 'change_password_screen.dart';
 
@@ -15,6 +16,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final _authService = AuthService();
   
   String _userName = 'User';
+  final TextEditingController _nameController = TextEditingController();
+  bool _isSavingName = false;
   Map<String, bool> _conditions = {};
   Map<String, bool> _allergens = {};
   bool _isLoading = true;
@@ -30,7 +33,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     'Isda': 'assets/images/isda.png',
     'Gatas': 'assets/images/gatas.png',
     'Itlog': 'assets/images/itlog.png',
-    'Toyo': 'assets/images/toyo.png',
+    'Soya': 'assets/images/toyo.png',
     'Trigo': 'assets/images/trigo.png',
     'Lamang-dagat': 'assets/images/lamang-dagat.png',
     'Mani': 'assets/images/mani.png',
@@ -42,19 +45,29 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     _loadUserData();
   }
 
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadUserData() async {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        final userDoc = await _authService.db
-            .collection('users')
-            .doc(uid)
-            .get();
+        // Try server first to get the latest values
+        late DocumentSnapshot userDoc;
+        try {
+          userDoc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
+        } catch (_) {
+          userDoc = await _authService.db.collection('users').doc(uid).get();
+        }
         if (userDoc.exists) {
-          final data = userDoc.data();
+          final data = userDoc.data() as Map<String, dynamic>?;
           if (data != null) {
             setState(() {
               _userName = data['name'] ?? 'User';
+              _nameController.text = _userName;
               
               // Load conditions
               final conditionsList = data['conditions'] as List<dynamic>? ?? [];
@@ -71,7 +84,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 'Isda': allergensList.contains('Isda'),
                 'Gatas': allergensList.contains('Gatas'),
                 'Itlog': allergensList.contains('Itlog'),
-                'Toyo': allergensList.contains('Toyo'),
+                'Soya': allergensList.contains('Soya'),
                 'Trigo': allergensList.contains('Trigo'),
                 'Lamang-Dagat': allergensList.contains('Lamang-Dagat'),
                 'Mani': allergensList.contains('Mani'),
@@ -88,6 +101,64 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
+      Future<void> _saveUserName(String newName) async {
+        try {
+          final uid = _authService.currentUser?.uid;
+          if (uid == null) return;
+          setState(() => _isSavingName = true);
+          final ok = await _authService.updateUserData({'name': newName});
+          setState(() => _isSavingName = false);
+          if (ok) {
+            // Reload server values to ensure consistency
+            await _loadUserData();
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pangalan na-update')));
+          } else {
+            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hindi ma-save ang pangalan')));
+          }
+        } catch (e) {
+          debugPrint('Error saving user name: $e');
+          setState(() => _isSavingName = false);
+        }
+      }
+
+      void _showEditNameDialog() {
+        showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('I-edit ang pangalan'),
+              content: TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(hintText: 'Pangalan'),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Kanselahin'),
+                ),
+                TextButton(
+                  onPressed: _isSavingName
+                      ? null
+                      : () async {
+                          final newName = _nameController.text.trim();
+                          if (newName.isEmpty) return;
+                          Navigator.pop(context);
+                          await _saveUserName(newName);
+                        },
+                  child: _isSavingName
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('I-save'),
+                ),
+              ],
+            );
+          },
+        );
+      }
+
   Future<void> _updateConditions() async {
     try {
       final uid = _authService.currentUser?.uid;
@@ -96,11 +167,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             .where((e) => e.value)
             .map((e) => e.key)
             .toList();
-        
-        await _authService.db
-            .collection('users')
-            .doc(uid)
-            .update({'conditions': selectedConditions});
+        final ok = await _authService.updateUserData({'conditions': selectedConditions});
+        if (ok) await _loadUserData();
       }
     } catch (e) {
       debugPrint('Error updating conditions: $e');
@@ -115,11 +183,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             .where((e) => e.value)
             .map((e) => e.key)
             .toList();
-        
-        await _authService.db
-            .collection('users')
-            .doc(uid)
-            .update({'allergens': selectedAllergens});
+        final ok = await _authService.updateUserData({'allergens': selectedAllergens});
+        if (ok) await _loadUserData();
       }
     } catch (e) {
       debugPrint('Error updating allergens: $e');
@@ -191,16 +256,24 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             ),
           ),
           const SizedBox(height: 12),
-          Text(
-            _userName,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
+          GestureDetector(
+            onTap: () => _showEditNameDialog(),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _userName,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.edit, size: 16, color: Colors.grey),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          const Icon(Icons.edit, size: 16, color: Colors.grey),
         ],
       ),
     );

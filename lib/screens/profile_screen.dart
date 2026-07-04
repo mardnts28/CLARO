@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
+import '../services/theme_service.dart';
 import 'login_screen.dart';
 import 'personal_info_screen.dart';
+import 'theme_screen.dart';
+import 'preference_screen.dart';
+import 'suggestion_screen.dart';
+import 'about_claro_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -19,6 +25,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _voiceAssistantEnabled = false;
   String _selectedTheme = 'Default';
   String _selectedLanguage = 'English';
+  double _speechRate = 0.5;
+  double _speechVolume = 0.7;
+  bool _vibrationFeedback = false;
+  double _textSize = 1.0; // 0.8 - 1.4 range for example
+  
 
   @override
   void initState() {
@@ -30,20 +41,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        final userDoc = await _authService.db
-            .collection('users')
-            .doc(uid)
-            .get();
+        // try server first
+        try {
+          final userDoc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
+          if (userDoc.exists) {
+            final data = userDoc.data() as Map<String, dynamic>?;
+            if (data != null) {
+              final themeString = data['theme'] ?? 'Default';
+              setState(() {
+                _userName = data['name'] ?? 'User';
+                _userEmail = data['email'] ?? '';
+                _voiceAssistantEnabled = data['voiceAssistant'] ?? false;
+                _selectedTheme = themeString;
+                _selectedLanguage = data['language'] ?? 'English';
+                _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
+                _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
+                _vibrationFeedback = data['vibrationFeedback'] ?? false;
+                _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : 1.0;
+              });
+              setAppThemeMode(parseThemeMode(themeString));
+            }
+            return;
+          }
+        } catch (_) {}
+
+        // fallback to cache
+        final userDoc = await _authService.db.collection('users').doc(uid).get();
         if (userDoc.exists) {
-          final data = userDoc.data();
+          final data = userDoc.data() as Map<String, dynamic>?;
           if (data != null) {
+            final themeString = data['theme'] ?? 'Default';
             setState(() {
               _userName = data['name'] ?? 'User';
               _userEmail = data['email'] ?? '';
               _voiceAssistantEnabled = data['voiceAssistant'] ?? false;
-              _selectedTheme = data['theme'] ?? 'Default';
+              _selectedTheme = themeString;
               _selectedLanguage = data['language'] ?? 'English';
+              _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
+              _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
+              _vibrationFeedback = data['vibrationFeedback'] ?? false;
+              _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : 1.0;
             });
+            setAppThemeMode(parseThemeMode(themeString));
           }
         }
       }
@@ -52,19 +91,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _updateUserPreference(String key, dynamic value) async {
+  Future<bool> _updateUserPreference(String key, dynamic value) async {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        await _authService.db
-            .collection('users')
-            .doc(uid)
-            .update({key: value});
+        final ok = await _authService.updateUserData({key: value});
+        if (ok) {
+          // reload to get server-confirmed values
+          await _loadUserData();
+        }
+        return ok;
       }
     } catch (e) {
       debugPrint('Error updating preference: $e');
     }
+    return false;
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -173,54 +217,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                Icon(Icons.settings_outlined, color: _primaryRed, size: 20),
-                const SizedBox(width: 12),
-                const Text(
-                  'Preference',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.black87,
-                  ),
-                ),
-              ],
+          _buildMenuItemWithArrow(
+            icon: Icons.settings_outlined,
+            label: 'Preference',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PreferenceScreen()),
             ),
           ),
           Divider(height: 0, color: Colors.grey.shade200),
           _buildVoiceAssistantToggle(),
           Divider(height: 0, color: Colors.grey.shade200),
           _buildMenuItemWithArrow(
-            icon: Icons.palette_outlined,
+            icon: Icons.palette,
             label: 'Tema',
-            trailing: Text(
-              _selectedTheme,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Colors.black54,
-              ),
+            trailing: Text(_selectedTheme, style: const TextStyle(color: Colors.black54)),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ThemeScreen()),
             ),
-            onTap: () {},
           ),
           Divider(height: 0, color: Colors.grey.shade200),
           _buildMenuItemWithArrow(
-            icon: Icons.language_outlined,
-            label: 'Lenguwahe',
-            trailing: Text(
-              _selectedLanguage,
-              style: const TextStyle(
-                fontSize: 13,
-                color: Colors.black54,
-              ),
-            ),
-            onTap: () {},
+            icon: Icons.language,
+            label: 'Lenggwuahe',
+            trailing: Text(_selectedLanguage, style: const TextStyle(color: Colors.black54)),
+            onTap: () => _showLanguageChooser(),
           ),
         ],
       ),
     );
+  }
+
+  void _showLanguageChooser() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Piliin ang Lenggwuahe'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'English'),
+            child: const Text('English'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, 'Tagalog'),
+            child: const Text('Tagalog'),
+          ),
+        ],
+      ),
+    );
+
+    if (choice != null && choice != _selectedLanguage) {
+      setState(() => _selectedLanguage = choice);
+      _updateUserPreference('language', choice);
+    }
   }
 
   Widget _buildMoreSection() {
@@ -235,13 +285,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildMenuItemWithArrow(
             icon: Icons.lightbulb_outline,
             label: 'Sugestiyon',
-            onTap: () {},
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SuggestionScreen()),
+            ),
           ),
           Divider(height: 0, color: Colors.grey.shade200),
           _buildMenuItemWithArrow(
             icon: Icons.info_outline,
             label: 'Tungkol sa CLARO',
-            onTap: () {},
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AboutClaroScreen()),
+            ),
           ),
           Divider(height: 0, color: Colors.grey.shade200),
           Padding(
@@ -325,9 +381,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           Switch(
             value: _voiceAssistantEnabled,
-            onChanged: (value) {
+            onChanged: (value) async {
+              final previous = _voiceAssistantEnabled;
               setState(() => _voiceAssistantEnabled = value);
-              _updateUserPreference('voiceAssistant', value);
+              final ok = await _updateUserPreference('voiceAssistant', value);
+              if (!ok) {
+                // revert and inform
+                setState(() => _voiceAssistantEnabled = previous);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hindi ma-save ang preference')));
+                }
+              }
             },
             activeColor: _primaryRed,
           ),

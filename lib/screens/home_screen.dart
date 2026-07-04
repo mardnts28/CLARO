@@ -38,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> {
             .doc(uid)
             .get();
         if (userDoc.exists) {
-          final data = userDoc.data();
+          final data = userDoc.data() as Map<String, dynamic>?;
           if (data != null) {
             setState(() {
               _userName = data['name'] ?? 'User';
@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const ProfileScreen(),
               ],
             ),
-            if (_selectedIndex == 0) _buildVoiceButton(),
+              // Removed local voice button overlay to avoid duplicate and overlapping FAB
           ],
         ),
       ),

@@ -30,7 +30,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Isda': false,
     'Gatas': false,
     'Itlog': false,
-    'Toyo': false,
+    'Soya': false,
     'Trigo': false,
     'Lamang-Dagat': false,
     'Mani': false,
@@ -47,7 +47,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Isda': 'assets/images/isda.png',
     'Gatas': 'assets/images/gatas.png',
     'Itlog': 'assets/images/itlog.png',
-    'Toyo': 'assets/images/toyo.png',
+    'Soya': 'assets/images/toyo.png',
     'Trigo': 'assets/images/trigo.png',
     'Lamang-Dagat': 'assets/images/lamang-dagat.png',
     'Mani': 'assets/images/mani.png',
@@ -218,7 +218,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildPage3() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
