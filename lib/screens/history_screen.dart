@@ -7,7 +7,8 @@ import 'camera_scanner_screen.dart';
 import 'product_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
-  const HistoryScreen({super.key});
+  final bool embeddedMode;
+  const HistoryScreen({super.key, this.embeddedMode = false});
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -361,14 +362,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F0EE),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: widget.embeddedMode ? null : FloatingActionButton(
         onPressed: () {},
         backgroundColor: const Color(0xFFB71C1C),
         foregroundColor: Colors.white,
         elevation: 4,
         child: const Icon(Icons.mic, size: 26),
       ),
-      bottomNavigationBar: Container(
+      bottomNavigationBar: widget.embeddedMode ? null : Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),

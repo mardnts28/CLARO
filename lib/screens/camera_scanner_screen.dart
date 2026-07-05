@@ -14,7 +14,8 @@ import 'multi_scan_results_screen.dart';
 import '../models/product_model.dart';
 
 class CameraScannerScreen extends StatefulWidget {
-  const CameraScannerScreen({super.key});
+  final bool embeddedMode;
+  const CameraScannerScreen({super.key, this.embeddedMode = false});
 
   @override
   State<CameraScannerScreen> createState() => _CameraScannerScreenState();

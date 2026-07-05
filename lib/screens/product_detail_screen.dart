@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/fda_verification_service.dart';
+import '../services/auth_service.dart';
 import 'camera_scanner_screen.dart';
 import 'compare_products_screen.dart';
 import 'history_screen.dart';
@@ -23,11 +24,14 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _isFavorite = false;
   FdaVerificationResult? _fdaResult;
+  final _authService = AuthService();
+  List<String> _personalWarnings = [];
 
   @override
   void initState() {
     super.initState();
     _loadFdaVerification();
+    _loadUserHealthProfile();
   }
 
   Future<void> _loadFdaVerification() async {
@@ -42,6 +46,60 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     if (mounted) {
       setState(() => _fdaResult = result);
+    }
+  }
+
+  Future<void> _loadUserHealthProfile() async {
+    try {
+      final uid = _authService.currentUser?.uid;
+      if (uid == null) return;
+      final doc = await _authService.db.collection('users').doc(uid).get();
+      final data = doc.data();
+      if (data == null) return;
+
+      final conditions = (data['conditions'] as List<dynamic>?)?.cast<String>() ?? [];
+      final allergens = (data['allergens'] as List<dynamic>?)?.cast<String>() ?? [];
+
+      final warnings = <String>[];
+      final p = widget.product;
+
+      // Check allergen matches
+      for (final userAllergen in allergens) {
+        for (final productAllergen in p.allergens) {
+          if (productAllergen.toLowerCase().contains(userAllergen.toLowerCase()) ||
+              userAllergen.toLowerCase().contains(productAllergen.toLowerCase())) {
+            warnings.add('⚠️ May $productAllergen ka na allergen – naglalaman ang produktong ito nito.');
+          }
+        }
+      }
+
+      // Check condition-based warnings
+      if (conditions.contains('Diabetes')) {
+        final sugar = p.nutritionalFacts.sugars;
+        if (p.nutritionalFacts.sugarsG > 0) {
+          warnings.add('⚠️ May diabetes ka – suriin ang sugar content ($sugar) ng produktong ito.');
+        }
+      }
+      if (conditions.contains('Alta-presyon')) {
+        final sodium = p.nutritionalFacts.sodium;
+        if (p.nutritionalFacts.sodiumMg > 0) {
+          warnings.add('⚠️ May alta-presyon ka – suriin ang sodium content ($sodium) ng produktong ito.');
+        }
+      }
+      if (conditions.contains('Sakit sa puso')) {
+        final fat = p.nutritionalFacts.totalFat;
+        if (p.nutritionalFacts.totalFatG > 0) {
+          warnings.add('⚠️ May sakit sa puso ka – suriin ang fat content ($fat) ng produktong ito.');
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _personalWarnings = warnings;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading health profile: $e');
     }
   }
 
@@ -322,6 +380,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ),
                               ),
                             ],
+                          ),
+                        ],
+
+                        // ── Personalized Health Warnings ──
+                        if (_personalWarnings.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFFF9800), width: 1.2),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '🩺 Babala Batay sa Iyong Kalusugan',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFFE65100),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                ..._personalWarnings.map((w) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Text(
+                                    w,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: const Color(0xFFBF360C),
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                )),
+                              ],
+                            ),
                           ),
                         ],
 
