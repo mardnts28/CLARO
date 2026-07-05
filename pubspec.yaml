@@ -29,6 +29,7 @@ dependencies:
   flutter_svg: ^2.0.10
   image: ^4.2.0
   encrypt: ^5.0.3
+  crypto: ^3.0.3
 
   # Module 5 logic and Gemini integration
   flutter_dotenv: ^5.1.0
