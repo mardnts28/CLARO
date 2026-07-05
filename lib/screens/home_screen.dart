@@ -190,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       elevation: 0,
                     ),
-                    onPressed: () {},
+                    onPressed: () => _onNavTap(1),
                     child: Text(
                       AppLocalizations.of(context)!.scanNow,
                       style: const TextStyle(
@@ -747,7 +747,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: IconButton(
           icon: const Icon(Icons.mic, color: Colors.white),
-          onPressed: () {},
+          onPressed: () => _onNavTap(1),
         ),
       ),
     );
