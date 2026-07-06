@@ -27,6 +27,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:claro/firebase_options.dart';
 import 'package:claro/core/utils/who_calculator.dart';
@@ -40,6 +41,20 @@ void main() {
   setUpAll(() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    // NEW: Firestore's security rules require request.auth != null to read
+    // /users/{userId}. Without signing in first, the read below fails with
+    // a permission-denied FirebaseException. Replace the email/password
+    // with a real test account that exists in your Firebase Auth project
+    // (it doesn't have to be the same account as testUserId below -- the
+    // rule only checks that *someone* is authenticated, not who).
+const testEmail = String.fromEnvironment('TEST_ACCOUNT_EMAIL');
+const testPassword = String.fromEnvironment('TEST_ACCOUNT_PASSWORD');
+
+    await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: testEmail,
+      password: testPassword,
     );
   });
 
