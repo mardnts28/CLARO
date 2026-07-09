@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import '../services/haptic_service.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -65,6 +66,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Future<void> _nextPage() async {
+    HapticService().vibrate();
     if (_currentPage < 2) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -78,7 +80,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         );
         return;
       }
-      
+
       // Validate age
       if (_ageController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -121,6 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _toggleCondition(String key) {
+    HapticService().vibrate();
     setState(() {
       if (key == 'Wala') {
         _conditions.forEach((k, v) => _conditions[k] = false);
@@ -133,6 +136,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _toggleAllergen(String key) {
+    HapticService().vibrate();
     setState(() {
       _allergens[key] = !_allergens[key]!;
     });
@@ -140,26 +144,57 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: PageView(
-          controller: _pageController,
-          physics: const NeverScrollableScrollPhysics(),
-          onPageChanged: (i) => setState(() => _currentPage = i),
-          children: [
-            _buildPage1(theme),
-            _buildPage2(theme),
-            _buildPage3(theme),
-          ],
+    // Force Light Mode for Onboarding Screen
+    return Theme(
+      data: ThemeData(
+        brightness: Brightness.light,
+        primaryColor: const Color(0xFF8B1A1A),
+        scaffoldBackgroundColor: const Color(0xFFF5F0EE),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFF8B1A1A),
+          onPrimary: Colors.white,
+          secondary: Color(0xFFD32F2F),
+          onSecondary: Colors.white,
+          surface: Colors.white,
+          onSurface: Color(0xFF1A1A1A),
+          error: Colors.redAccent,
+          onError: Colors.white,
+          surfaceContainerHighest: Color(0xFFE0E0E0),
+          outlineVariant: Color(0xFFBDBDBD),
+          onSurfaceVariant: Color(0xFF757575),
         ),
+        useMaterial3: true,
+      ),
+      child: Builder(
+        builder: (context) {
+          final theme = Theme.of(context);
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.noScaling,
+            ),
+            child: Scaffold(
+              backgroundColor: theme.scaffoldBackgroundColor,
+              body: SafeArea(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (i) => setState(() => _currentPage = i),
+                  children: [
+                    _buildPage1(theme),
+                    _buildPage2(theme),
+                    _buildPage3(theme),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }
 
   Widget _buildPage1(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
       child: Column(
@@ -170,37 +205,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             'Pakilagay ang iyong impormasyon upang magamit ang app',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurface, fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 16, color: colorScheme.onSurface, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 24),
           TextField(
             controller: _nameController,
+            style: TextStyle(color: colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: 'Pangalan',
-              hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: theme.colorScheme.outlineVariant)),
-              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF8B1A1A))),
+              hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
             ),
           ),
           const SizedBox(height: 20),
           TextField(
             controller: _ageController,
             keyboardType: TextInputType.number,
+            style: TextStyle(color: colorScheme.onSurface),
             decoration: InputDecoration(
               hintText: 'Edad',
-              hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: theme.colorScheme.outlineVariant)),
-              focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF8B1A1A))),
+              hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
+              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
             ),
           ),
           const Spacer(),
-          _buildButton('Sunod', _nextPage),
+          _buildButton('Sunod', _nextPage, theme),
         ],
       ),
     );
   }
 
   Widget _buildPage2(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
       child: Column(
@@ -208,20 +246,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const Spacer(),
           _buildLogo(theme),
           const SizedBox(height: 20),
-          const Text(
+          Text(
             'Malinaw. Lokal. Maaasahan.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: _red,
+              color: colorScheme.primary,
             ),
           ),
           const SizedBox(height: 8),
           Text(
             'Ang iyong AI na katulong\npara sa mas malusog na pamimili.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface, height: 1.5),
+            style: TextStyle(fontSize: 14, color: colorScheme.onSurface, height: 1.5),
           ),
           const SizedBox(height: 36),
           GridView.count(
@@ -239,13 +277,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ],
           ),
           const Spacer(),
-          _buildButton('Magsimula', _nextPage),
+          _buildButton('Magsimula', _nextPage, theme),
         ],
       ),
     );
   }
 
   Widget _buildPage3(ThemeData theme) {
+    final colorScheme = theme.colorScheme;
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
       child: Column(
@@ -256,7 +295,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             'Sagutan ang mga sumusunod para sa mas ligtas at mas angkop na rekomendasyon para sa iyo',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface, height: 1.5),
+            style: TextStyle(fontSize: 13, color: colorScheme.onSurface, height: 1.5),
           ),
           const SizedBox(height: 20),
           _buildSelectionCard(
@@ -279,27 +318,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+              color: colorScheme.surfaceContainerHighest.withAlpha(80),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: theme.colorScheme.outlineVariant),
+              border: Border.all(color: colorScheme.outlineVariant),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.shield_outlined, color: _red, size: 20),
+                Icon(Icons.shield_outlined, color: colorScheme.primary, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'Prayoridad namin ang iyong kaligtasan',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: _red),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.primary),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         'Gagamitin namin ang impormasyong ito upang magbigay ng health insights at mas ligtas na mga rekomendasyon.',
-                        style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface, height: 1.4),
+                        style: TextStyle(fontSize: 12, color: colorScheme.onSurface, height: 1.4),
                       ),
                     ],
                   ),
@@ -308,13 +347,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildButton('Magsimula', _nextPage),
+          _buildButton('Magsimula', _nextPage, theme),
           const SizedBox(height: 12),
           Center(
             child: Text(
               '...',
               style: TextStyle(
-                  color: Colors.grey.shade400,
+                  color: colorScheme.outlineVariant,
                   fontSize: 18,
                   letterSpacing: 4),
             ),
@@ -381,13 +420,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     String? imagePath,
     required ThemeData theme,
   }) {
+    final colorScheme = theme.colorScheme;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       decoration: BoxDecoration(
-        color: selected ? theme.colorScheme.surfaceContainerHighest : theme.cardColor,
+        color: selected ? colorScheme.surfaceContainerHighest : theme.cardColor,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: selected ? _red : const Color(0xFFD9A0A0),
+          color: selected ? colorScheme.primary : colorScheme.outlineVariant,
           width: selected ? 1.5 : 1,
         ),
       ),
@@ -398,16 +438,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (isWala)
-                  const Icon(Icons.block, color: Colors.grey, size: 28)
+                  Icon(Icons.block, color: colorScheme.onSurfaceVariant, size: 28)
                 else if (imagePath != null)
                   Image.asset(
                     imagePath,
                     height: 32,
                     width: 32,
-                    errorBuilder: (_, __, ___) => const Icon(
+                    errorBuilder: (_, __, ___) => Icon(
                         Icons.image_not_supported,
                         size: 28,
-                        color: Colors.grey),
+                        color: colorScheme.onSurfaceVariant),
                   )
                 else
                   const SizedBox(height: 32),
@@ -417,7 +457,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 10,
-                    color: selected ? _red : theme.colorScheme.onSurface,
+                    color: selected ? colorScheme.primary : colorScheme.onSurface,
                     fontWeight:
                     selected ? FontWeight.bold : FontWeight.normal,
                   ),
@@ -432,8 +472,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Container(
                 width: 16,
                 height: 16,
-                decoration: const BoxDecoration(
-                    color: _red, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                    color: colorScheme.primary, shape: BoxShape.circle),
                 child:
                 const Icon(Icons.check, size: 10, color: Colors.white),
               ),
@@ -445,50 +485,54 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildSelectionCard({
     required IconData icon,
-    Color iconColor = _red,
+    Color? iconColor,
     required String title,
     required String subtitle,
     String? note,
     IconData? noteIcon,
     required Widget child,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final effectiveIconColor = iconColor ?? colorScheme.primary;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        border: Border.all(color: theme.dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: iconColor, size: 18),
+              Icon(icon, color: effectiveIconColor, size: 18),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.onSurface),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(subtitle,
-              style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
           const SizedBox(height: 12),
           child,
           if (note != null) ...[
             const SizedBox(height: 10),
             Row(
               children: [
-                Icon(noteIcon, size: 14, color: Colors.grey),
+                Icon(noteIcon, size: 14, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(note,
-                      style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                      style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
                 ),
               ],
             ),
@@ -546,29 +590,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildButton(String label, VoidCallback onTap) {
+  Widget _buildButton(String label, VoidCallback onTap, ThemeData theme) {
+    final colorScheme = theme.colorScheme;
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: _red,
+          backgroundColor: colorScheme.primary,
+          foregroundColor: colorScheme.onPrimary,
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8)),
         ),
         onPressed: _isLoading ? null : onTap,
         child: _isLoading
-            ? const SizedBox(
+            ? SizedBox(
           height: 20,
           width: 20,
           child: CircularProgressIndicator(
-              color: Colors.white, strokeWidth: 2),
+              color: colorScheme.onPrimary, strokeWidth: 2),
         )
             : Text(
           label,
           style: const TextStyle(
               fontSize: 16,
-              color: Colors.white,
               fontWeight: FontWeight.bold),
         ),
       ),

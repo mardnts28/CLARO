@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import '../services/haptic_service.dart';
+import '../widgets/voice_assistant_fab.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -24,6 +26,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _isLoading = false;
 
   Future<void> _handleChangePassword() async {
+    HapticService().vibrate();
     final currentPassword = _currentPasswordController.text.trim();
     final newPassword = _newPasswordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
@@ -99,6 +102,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -141,7 +145,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _primaryRed,
+                    backgroundColor: colorScheme.primary,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onPressed: _isLoading ? null : _handleChangePassword,
@@ -161,6 +165,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           ),
         ),
       ),
+      floatingActionButton: const VoiceAssistantFab(),
     );
   }
 
@@ -168,8 +173,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return Row(
       children: [
         GestureDetector(
-          onTap: () => Navigator.pop(context),
-          child: const Icon(Icons.arrow_back, color: _primaryRed, size: 24),
+          onTap: () {
+            HapticService().vibrate();
+            Navigator.pop(context);
+          },
+          child: Icon(Icons.arrow_back, color: theme.colorScheme.primary, size: 24),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -206,6 +214,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     return TextField(
       controller: controller,
       obscureText: !showPassword,
+      style: TextStyle(color: theme.colorScheme.onSurface),
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
@@ -222,9 +231,9 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
-        focusedBorder: const OutlineInputBorder(
-          borderRadius: BorderRadius.all(Radius.circular(8)),
-          borderSide: BorderSide(color: _primaryRed),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: const BorderRadius.all(Radius.circular(8)),
+          borderSide: BorderSide(color: theme.colorScheme.primary),
         ),
       ),
     );

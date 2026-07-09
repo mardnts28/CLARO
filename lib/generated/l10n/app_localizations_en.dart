@@ -189,7 +189,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get language => 'Language';
 
   @override
-  String get suggestion => 'Suggestion';
+  String get suggestion => 'App Review';
 
   @override
   String get aboutClaro => 'About CLARO';
@@ -430,4 +430,322 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aboutDevelopers => 'About the developers';
+
+  @override
+  String get profileUpdateSuccess => 'Profile updated';
+
+  @override
+  String get profileUpdateError => 'Unable to save updates';
+
+  @override
+  String get editName => 'Edit name';
+
+  @override
+  String get editAge => 'Edit age';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get ageLabel => 'Age';
+
+  @override
+  String get none => 'None';
+
+  @override
+  String get healthConditions => 'Health Conditions';
+
+  @override
+  String get allergensLabel => 'Allergens';
+
+  @override
+  String get accountSettings => 'Account Settings';
+
+  @override
+  String get changePassword => 'Change password';
+
+  @override
+  String get selectAllergen => 'Select Allergen';
+
+  @override
+  String get ratePrompt => 'Please select a rating between 1 and 5.';
+
+  @override
+  String get suggestionEmpty =>
+      'Please enter your suggestion before submitting.';
+
+  @override
+  String get suggestionTooLong => 'Suggestion must be 500 characters or less.';
+
+  @override
+  String get suggestionHint => 'Write your suggestion here...';
+
+  @override
+  String get clearAllTitle => 'Clear All?';
+
+  @override
+  String get clearAllConfirm =>
+      'All scan history will be deleted. This cannot be undone.';
+
+  @override
+  String get clear => 'Clear';
+
+  @override
+  String get clearAll => 'Clear All';
+
+  @override
+  String get searchHint => 'Search';
+
+  @override
+  String get tabAll => 'All';
+
+  @override
+  String get tabFavorites => 'Favorites';
+
+  @override
+  String get tabCompare => 'Compare';
+
+  @override
+  String get emptyFavorites => 'No favorite products yet. Tap ❤️ to save.';
+
+  @override
+  String get emptyComparisons => 'No product comparisons yet.';
+
+  @override
+  String noSearchResults(String query) {
+    return 'No results for \"$query\"';
+  }
+
+  @override
+  String get emptyHistory => 'No scan history yet. Scan a product to start!';
+
+  @override
+  String get resultsTitle => 'Results';
+
+  @override
+  String get rankedBySuitability => 'Ranked based on suitability';
+
+  @override
+  String get profileFeatureSoon => 'Profile features coming soon!';
+
+  @override
+  String get fdaExpiredWarning =>
+      'WARNING: This product has an EXPIRED FDA registration. It may not be safe.';
+
+  @override
+  String get fdaUnverifiedWarning =>
+      'This product has not yet been verified by FDA Philippines.';
+
+  @override
+  String get ageRequirementBadge => '3+ yrs old';
+
+  @override
+  String get safeToConsume => 'SAFE TO CONSUME';
+
+  @override
+  String get safeToConsumeSubtitle =>
+      'Best eaten in moderation as it is higher in fat and calories.';
+
+  @override
+  String get reminderLabel => 'Reminder';
+
+  @override
+  String get diabetesSafeReminder =>
+      'Suitable for diabetics, but frequent consumption may not be ideal for those controlling cholesterol or calorie intake.';
+
+  @override
+  String containsAllergens(String list) {
+    return 'Contains $list';
+  }
+
+  @override
+  String get personalHealthWarningTitle => '🩺 Health Profile Warning';
+
+  @override
+  String get servingRecommendation =>
+      '½–¾ can (90–135g) per meal, up to 2–3 times a week.';
+
+  @override
+  String get moreDetailsLink => 'More details';
+
+  @override
+  String get totalNutritionTitle => 'Total Nutrition';
+
+  @override
+  String get nutriCalories => 'Calories';
+
+  @override
+  String get nutriSodium => 'Sodium';
+
+  @override
+  String get nutriSugar => 'Sugar';
+
+  @override
+  String get nutriProtein => 'Protein';
+
+  @override
+  String get nutriTotalFat => 'Total Fat';
+
+  @override
+  String get nutriSatFat => 'Sat. Fat';
+
+  @override
+  String get nutriTransFat => 'Trans Fat';
+
+  @override
+  String get nutriFiber => 'Fiber';
+
+  @override
+  String get nutriPotassium => 'Potassium';
+
+  @override
+  String get nutriCalcium => 'Calcium';
+
+  @override
+  String get nutriIron => 'Iron';
+
+  @override
+  String get scoresTitle => 'Scores';
+
+  @override
+  String get scoreNutrition => 'Nutrition';
+
+  @override
+  String get scoreNutritionDesc =>
+      'Good source of protein but higher in fat and calories.';
+
+  @override
+  String get scoreEnvironment => 'Environment';
+
+  @override
+  String get scoreEnvironmentDesc => 'Moderate environmental impact.';
+
+  @override
+  String get scoreProcess => 'Process';
+
+  @override
+  String get scoreProcessDesc =>
+      'Processed food with relatively simple ingredients.';
+
+  @override
+  String get extraKnowledgeTitle => 'Extra Knowledge';
+
+  @override
+  String get extraKnowledgeDesc =>
+      'More filling and flavorful due to oil, but has higher calories and fat.';
+
+  @override
+  String get compareButton => 'Compare';
+
+  @override
+  String get similarProductsTitle => 'Similar Products';
+
+  @override
+  String productCount(int count) {
+    return '$count products';
+  }
+
+  @override
+  String get noProductsFound => 'No products found';
+
+  @override
+  String get noSearchMatchDesc => 'No products matched your search.';
+
+  @override
+  String get scanGuideText => 'Align product label to scan';
+
+  @override
+  String get productCapturedBadge => 'Product Captured!';
+
+  @override
+  String get tapToScanHint => 'Tap anywhere to scan';
+
+  @override
+  String get productNotRecognizedTitle => 'Product Not Recognized';
+
+  @override
+  String get productNotRecognizedDesc =>
+      'The product could not be identified. Would you like to submit it for review?';
+
+  @override
+  String get tryAgainButton => 'Try Again';
+
+  @override
+  String get submitLabel => 'Submit';
+
+  @override
+  String get submitSkuHeader => 'SUBMIT UNKNOWN SKU';
+
+  @override
+  String get trainModelHeadline => 'Help Train Our Model';
+
+  @override
+  String get trainModelSubtitle =>
+      'If a product isn\'t detected by our camera, upload its photo and info. Our engine uses this data to refine label mapping.';
+
+  @override
+  String get imageCaptureSuccess => 'Mock product image captured successfully!';
+
+  @override
+  String get imageRequiredError =>
+      'Please capture or upload a product label photo first.';
+
+  @override
+  String get submissionReceivedTitle => 'Submission Received';
+
+  @override
+  String get submissionReceivedDesc =>
+      'Thank you! Our AI team will verify this product label and update the on-device YOLOv8 database model within 24 hours.';
+
+  @override
+  String get returnToScanner => 'Return to Scanner';
+
+  @override
+  String get labelImageAttached => 'Label Image Attached';
+
+  @override
+  String get tapToReplace => 'Tap to replace photo';
+
+  @override
+  String get captureProductLabel => 'Capture Product Label (Front/Rear)';
+
+  @override
+  String get ensureReadableNote => 'Ensure text/nutrition facts are readable';
+
+  @override
+  String get productNameLabel => 'Product Name / Description';
+
+  @override
+  String get productNameEmpty => 'Please enter product name';
+
+  @override
+  String get brandNameLabel => 'Brand Name (e.g. Century, Ligo, Lucky Me)';
+
+  @override
+  String get brandNameEmpty => 'Please enter brand name';
+
+  @override
+  String get productVariantLabel =>
+      'Product Variant (e.g. Hot & Spicy, Sweet & Sour)';
+
+  @override
+  String get productVariantEmpty => 'Please enter product variant';
+
+  @override
+  String get productCategoryLabel => 'Product Category';
+
+  @override
+  String get ingredientsListLabel => 'Ingredients List (Optional)';
+
+  @override
+  String get submitTrainingButton => 'SUBMIT FOR TRAINING';
+
+  @override
+  String get bestLabelShort => 'Best';
+
+  @override
+  String get worstLabelShort => 'Worst';
 }

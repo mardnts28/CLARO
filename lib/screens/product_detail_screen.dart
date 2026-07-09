@@ -3,9 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/fda_verification_service.dart';
 import '../services/auth_service.dart';
-import 'camera_scanner_screen.dart';
+import '../generated/l10n/app_localizations.dart';
+import '../widgets/voice_assistant_fab.dart';
 import 'compare_products_screen.dart';
-import 'history_screen.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -38,7 +38,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // Try verification using CPR number first, fall back to fuzzy match by product name
     FdaVerificationResult result = await FdaVerificationService()
         .verifyByCprNumber(widget.product.fdaRegistrationNumber);
-    
+
     if (result.isUnverified) {
       result = await FdaVerificationService()
           .verifyByProductName(widget.product.name);
@@ -108,14 +108,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final p = widget.product;
     final hasAllergens = p.allergens.isNotEmpty;
     final topPadding = MediaQuery.of(context).padding.top;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         children: [
           // ── Header bar: back, Resulta, heart (perfectly centered Stack) ──
           Container(
-            color: Colors.white,
+            color: colorScheme.surface,
             height: topPadding + 56,
             padding: EdgeInsets.only(
               left: 16,
@@ -127,11 +130,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               children: [
                 // Centered Title
                 Text(
-                  'Resulta',
+                  loc.resultsTitle,
                   style: GoogleFonts.outfit(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF8B1A1A),
+                    color: colorScheme.primary,
                   ),
                 ),
                 // Left Back Button
@@ -139,8 +142,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   alignment: Alignment.centerLeft,
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.arrow_back,
-                        color: Color(0xFF8B1A1A), size: 24),
+                    child: Icon(Icons.arrow_back,
+                        color: colorScheme.primary, size: 24),
                   ),
                 ),
                 // Right Heart Button
@@ -150,7 +153,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     onTap: () => setState(() => _isFavorite = !_isFavorite),
                     child: Icon(
                       _isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: const Color(0xFFB71C1C),
+                      color: colorScheme.secondary,
                       size: 26,
                     ),
                   ),
@@ -158,7 +161,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE0E0E0)),
+          Divider(height: 1, color: theme.dividerColor),
 
           // ── Scrollable content ────────────────────────────────────
           Expanded(
@@ -171,6 +174,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                   // ── 1. Main Product Info Card ──────────────────────
                   _buildCard(
+                    context: context,
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -179,11 +183,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           width: 80,
                           height: 80,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF5F5F5),
+                            color: theme.cardColor.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.dining_outlined,
-                              size: 40, color: Color(0xFFBDBDBD)),
+                          child: Icon(Icons.dining_outlined,
+                              size: 40, color: colorScheme.outline),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -195,7 +199,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 style: GoogleFonts.outfit(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -203,7 +207,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 p.nutritionalFacts.servingSize,
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
-                                  color: Colors.black54,
+                                  color: colorScheme.onSurfaceVariant,
                                 ),
                               ),
                               const SizedBox(height: 10),
@@ -223,13 +227,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: _fdaResult!.isExpired
-                            ? const Color(0xFFFFEBEE)
-                            : const Color(0xFFFFF8E1),
+                            ? Colors.red.withOpacity(0.1)
+                            : Colors.amber.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: _fdaResult!.isExpired
-                              ? const Color(0xFFEF9A9A)
-                              : const Color(0xFFFFCC02),
+                              ? Colors.red.withOpacity(0.5)
+                              : Colors.amber.withOpacity(0.5),
                         ),
                       ),
                       child: Row(
@@ -243,12 +247,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           Expanded(
                             child: Text(
                               _fdaResult!.isExpired
-                                  ? 'BABALA: Ang produktong ito ay may EXPIRED na FDA registration. Maaaring hindi ito ligtas.'
-                                  : 'Ang produktong ito ay hindi pa nabeberipika ng FDA Philippines.',
+                                  ? loc.fdaExpiredWarning
+                                  : loc.fdaUnverifiedWarning,
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.black87,
+                                color: colorScheme.onSurface,
                                 height: 1.4,
                               ),
                             ),
@@ -263,10 +267,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     child: Align(
                       alignment: Alignment.centerRight,
                       child: Text(
-                        '3+ yrs old',
+                        loc.ageRequirementBadge,
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: Colors.black54,
+                          color: colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -276,9 +280,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     margin: const EdgeInsets.symmetric(horizontal: 16),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
+                      color: Colors.green.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF4CAF50), width: 1.5),
+                      border: Border.all(color: Colors.green, width: 1.5),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.02),
@@ -291,26 +295,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Icon(Icons.verified_user_outlined,
-                            color: Color(0xFF2E7D32), size: 36),
+                            color: Colors.green, size: 36),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'LIGTAS I-KONSUMO',
+                                loc.safeToConsume,
                                 style: GoogleFonts.outfit(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF2E7D32),
+                                  color: Colors.green,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'Pinakamainam kainin sa katamtamang dami dahil mas mataas sa taba at calories.',
+                                loc.safeToConsumeSubtitle,
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
-                                  color: Colors.black87,
+                                  color: colorScheme.onSurface,
                                   height: 1.4,
                                 ),
                               ),
@@ -325,15 +329,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                   // ── 3. Paalala Card ────────────────────────────────
                   _buildCard(
+                    context: context,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Paalala',
+                          loc.reminderLabel,
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -343,13 +348,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Icon(Icons.check,
-                                color: Color(0xFF4CAF50), size: 20),
+                                color: Colors.green, size: 20),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
-                                'Angkop para sa mga may diabetes, ngunit ang madalas na pagkonsumo ay maaaring hindi mainam para sa mga nagkokontrol ng kolesterol o calorie intake.',
+                                loc.diabetesSafeReminder,
                                 style: GoogleFonts.inter(
-                                  color: const Color(0xFF2E7D32),
+                                  color: Colors.green,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   height: 1.4,
@@ -370,7 +375,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  'Naglalaman ng ${p.allergens.join(', ')}',
+                                  loc.containsAllergens(p.allergens.join(', ')),
                                   style: GoogleFonts.inter(
                                     color: Colors.redAccent,
                                     fontSize: 13,
@@ -390,19 +395,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFF3E0),
+                              color: Colors.orange.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: const Color(0xFFFF9800), width: 1.2),
+                              border: Border.all(color: Colors.orange, width: 1.2),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  '🩺 Babala Batay sa Iyong Kalusugan',
+                                  loc.personalHealthWarningTitle,
                                   style: GoogleFonts.inter(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,
-                                    color: const Color(0xFFE65100),
+                                    color: Colors.orange[900],
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -412,7 +417,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     w,
                                     style: GoogleFonts.inter(
                                       fontSize: 12,
-                                      color: const Color(0xFFBF360C),
+                                      color: Colors.red[900],
                                       fontWeight: FontWeight.w600,
                                       height: 1.4,
                                     ),
@@ -431,16 +436,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: theme.cardColor,
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                                color: const Color(0xFF4CAF50), width: 1.2),
+                                color: Colors.green, width: 1.2),
                           ),
                           child: Text(
-                            '½–¾ ng lata (90–135g) sa bawat meal, maaaring kainin 2–3 beses kada linggo.',
+                            loc.servingRecommendation,
                             style: GoogleFonts.inter(
                               fontSize: 12,
-                              color: Colors.black87,
+                              color: colorScheme.onSurface,
                               height: 1.4,
                             ),
                           ),
@@ -451,15 +456,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         // "Higit pang detalye" link
                         Row(
                           children: [
-                            const Icon(Icons.subdirectory_arrow_right_rounded,
-                                color: Colors.black45, size: 16),
+                            Icon(Icons.subdirectory_arrow_right_rounded,
+                                color: colorScheme.onSurfaceVariant, size: 16),
                             const SizedBox(width: 6),
                             GestureDetector(
                               onTap: () {},
                               child: Text(
-                                'Higit pang detalye',
+                                loc.moreDetailsLink,
                                 style: GoogleFonts.inter(
-                                  color: Colors.black87,
+                                  color: colorScheme.onSurface,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   decoration: TextDecoration.underline,
@@ -476,56 +481,54 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                   // ── 6. Kabuuang Nutrisyon Card ────────────────────
                   _buildCard(
+                    context: context,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Kabuuang Nutrisyon',
+                          loc.totalNutritionTitle,
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                         const SizedBox(height: 14),
                         Row(
                           children: [
-                            _nutriCard('Calories', p.nutritionalFacts.calories),
+                            _nutriCard(context, loc.nutriCalories, p.nutritionalFacts.calories),
                             const SizedBox(width: 8),
-                            _nutriCard('Sodium', p.nutritionalFacts.sodium),
+                            _nutriCard(context, loc.nutriSodium, p.nutritionalFacts.sodium),
                             const SizedBox(width: 8),
-                            _nutriCard('Sugar', p.nutritionalFacts.sugars),
+                            _nutriCard(context, loc.nutriSugar, p.nutritionalFacts.sugars),
                             const SizedBox(width: 8),
-                            _nutriCard('Protein', p.nutritionalFacts.protein),
+                            _nutriCard(context, loc.nutriProtein, p.nutritionalFacts.protein),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _nutriCard('Total Fat', p.nutritionalFacts.totalFat),
+                            _nutriCard(context, loc.nutriTotalFat, p.nutritionalFacts.totalFat),
                             const SizedBox(width: 8),
-                            _nutriCard('Sat. Fat', p.nutritionalFacts.saturatedFat),
+                            _nutriCard(context, loc.nutriSatFat, p.nutritionalFacts.saturatedFat),
                             const SizedBox(width: 8),
-                            _nutriCard('Trans Fat', p.nutritionalFacts.transFat),
+                            _nutriCard(context, loc.nutriTransFat, p.nutritionalFacts.transFat),
                             const SizedBox(width: 8),
-                            _nutriCard('Fiber', p.nutritionalFacts.dietaryFiber),
+                            _nutriCard(context, loc.nutriFiber, p.nutritionalFacts.dietaryFiber),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _nutriCard('Potassium', p.nutritionalFacts.potassiumMg > 0
+                            _nutriCard(context, loc.nutriPotassium, p.nutritionalFacts.potassiumMg > 0
                                 ? '${p.nutritionalFacts.potassiumMg.toStringAsFixed(0)}mg'
                                 : '0mg'),
-                            const SizedBox(width: 8),
-                            _nutriCard('Calcium', p.nutritionalFacts.calciumMg > 0
+                            _nutriCard(context, loc.nutriCalcium, p.nutritionalFacts.calciumMg > 0
                                 ? '${p.nutritionalFacts.calciumMg.toStringAsFixed(0)}mg'
                                 : '0mg'),
-                            const SizedBox(width: 8),
-                            _nutriCard('Iron', p.nutritionalFacts.ironMg > 0
+                            _nutriCard(context, loc.nutriIron, p.nutritionalFacts.ironMg > 0
                                 ? '${p.nutritionalFacts.ironMg.toStringAsFixed(1)}mg'
                                 : '0.0mg'),
-                            const SizedBox(width: 8),
                             Expanded(child: const SizedBox()),
                           ],
                         ),
@@ -539,36 +542,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'Scores',
+                      loc.scoresTitle,
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                   ),
                   const SizedBox(height: 10),
 
                   _scoreCard(
-                    label: 'Nutrisyon',
+                    context: context,
+                    label: loc.scoreNutrition,
                     badge: 'C',
                     badgeColor: const Color(0xFFFFB300),
-                    description: 'Magandang pinagkukunan ng protina ngunit mas mataas sa taba at calories.',
+                    description: loc.scoreNutritionDesc,
                   ),
                   const SizedBox(height: 8),
                   _scoreCard(
-                    label: 'Kalikasan',
+                    context: context,
+                    label: loc.scoreEnvironment,
                     badge: 'B',
                     badgeColor: const Color(0xFF4CAF50),
-                    description: 'Moderate environmental impact.',
+                    description: loc.scoreEnvironmentDesc,
                   ),
                   const SizedBox(height: 8),
                   _scoreCard(
-                    label: 'Proseso',
+                    context: context,
+                    label: loc.scoreProcess,
                     badge: '3',
                     badgeColor: const Color(0xFFFF9800),
                     isCircle: true,
-                    description: 'Processed food with relatively simple ingredients.',
+                    description: loc.scoreProcessDesc,
                   ),
 
                   const SizedBox(height: 16),
@@ -578,7 +584,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     margin: const EdgeInsets.symmetric(horizontal: 16),
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFCE4EC),
+                      color: colorScheme.primary.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
@@ -596,19 +602,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Karagdagang Kaalaman',
+                                loc.extraKnowledgeTitle,
                                 style: GoogleFonts.outfit(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF388E3C),
+                                  color: Colors.green,
                                 ),
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                'Mas nakakabusog at mas malasa dahil sa mantika, ngunit may mas mataas na calories at taba.',
+                                loc.extraKnowledgeDesc,
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
-                                  color: Colors.black87,
+                                  color: colorScheme.onSurface,
                                   height: 1.4,
                                 ),
                               ),
@@ -620,7 +626,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           width: 40,
                           height: 40,
                           decoration: const BoxDecoration(
-                            color: Color(0xFF4CAF50),
+                            color: Colors.green,
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(Icons.check,
@@ -650,15 +656,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFB71C1C),
-                          foregroundColor: Colors.white,
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
                           elevation: 0,
                         ),
                         child: Text(
-                          'Ihambing',
+                          loc.compareButton,
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -676,44 +682,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ],
       ),
-
-      // ── Bottom Navigation Bar ─────────────────────────────────────
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),
-        ),
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).padding.bottom + 4, top: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _navItem(Icons.home_outlined, 'Home', false),
-            _navItemActive(),
-            _navItem(Icons.history, 'History', false),
-            _navItem(Icons.person_outline, 'Profile', false),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFFB71C1C),
-        foregroundColor: Colors.white,
-        elevation: 4,
-        child: const Icon(Icons.mic, size: 26),
-      ),
+      floatingActionButton: const VoiceAssistantFab(),
     );
   }
 
   // ── Helper card builder to make cards completely uniform ────────────────
-  Widget _buildCard({required Widget child}) {
+  Widget _buildCard({required BuildContext context, required Widget child}) {
+    final theme = Theme.of(context);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.03),
@@ -727,14 +710,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // ── Nutritional mini grid card ──────────────────────────────────────────
-  Widget _nutriCard(String label, String value) {
+  Widget _nutriCard(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFFF9F9F9),
+          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5E5E5)),
+          border: Border.all(color: theme.dividerColor),
         ),
         child: Column(
           children: [
@@ -742,7 +727,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                     fontSize: 10,
-                    color: Colors.black54,
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500)),
             const SizedBox(height: 4),
             Text(value,
@@ -750,7 +735,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 style: GoogleFonts.outfit(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black87)),
+                    color: colorScheme.onSurface)),
           ],
         ),
       ),
@@ -759,18 +744,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   // ── Individual white score card (matches the style of scores section) ────
   Widget _scoreCard({
+    required BuildContext context,
     required String label,
     required String badge,
     required Color badgeColor,
     required String description,
     bool isCircle = false,
   }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.dividerColor),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.02),
@@ -789,7 +778,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 label,
                 style: GoogleFonts.inter(
                     fontSize: 10,
-                    color: Colors.black54,
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
@@ -820,82 +809,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Text(
               description,
               style: GoogleFonts.inter(
-                  fontSize: 13, color: Colors.black87, height: 1.4),
+                  fontSize: 13, color: colorScheme.onSurface, height: 1.4),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // ── Bottom nav helpers ───────────────────────────────────────────────────
-  Widget _navItem(IconData icon, String label, bool active) {
-    return GestureDetector(
-      onTap: () {
-        if (label == 'Home') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
-          );
-        } else if (label == 'History') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HistoryScreen()),
-          );
-        } else if (label == 'Profile') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Profile features coming soon!', style: GoogleFonts.inter()),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: active ? const Color(0xFFB71C1C) : Colors.black38,
-              size: 26),
-          const SizedBox(height: 2),
-          Text(label,
-              style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: active ? const Color(0xFFB71C1C) : Colors.black38,
-                  fontWeight:
-                      active ? FontWeight.w600 : FontWeight.normal)),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItemActive() {
-    return GestureDetector(
-      onTap: () {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
-        );
-      },
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFEBEE),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.qr_code_scanner,
-                color: Color(0xFFB71C1C), size: 26),
-            const SizedBox(height: 2),
-            Text('Scan',
-                style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: const Color(0xFFB71C1C),
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
       ),
     );
   }

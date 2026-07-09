@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
-import '../services/encryption_service.dart';
+import '../services/home_tab_controller.dart';
+import '../services/haptic_service.dart';
+import '../services/voice_assistant_service.dart';
+import '../widgets/voice_assistant_fab.dart';
 import 'profile_screen.dart';
 import 'camera_scanner_screen.dart';
 import 'history_screen.dart';
@@ -29,7 +32,24 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    HomeTabController.tabNotifier.addListener(_handleTabChange);
     _loadUserName();
+  }
+
+  @override
+  void dispose() {
+    HomeTabController.tabNotifier.removeListener(_handleTabChange);
+    super.dispose();
+  }
+
+  void _handleTabChange() {
+    if (!mounted) return;
+    setState(() => _selectedIndex = HomeTabController.tabNotifier.value);
+  }
+
+  void switchToTab(int index) {
+    if (!mounted) return;
+    setState(() => _selectedIndex = index);
   }
 
   Future<void> _loadUserName() async {
@@ -44,8 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final data = userDoc.data();
           if (data != null) {
             setState(() {
-              final rawName = data['name'] ?? '';
-              _userName = EncryptionService.decryptText(rawName, uid);
+              _userName = data['name'] ?? 'User';
               if (_userName.isEmpty) _userName = 'User';
             });
           }
@@ -56,7 +75,17 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// Pull-to-refresh handler for the home tab. Re-fetches the latest user
+  /// data (and gives light haptic feedback) so the greeting stays in sync
+  /// with any changes made elsewhere (e.g. profile edits).
+  Future<void> _onRefresh() async {
+    HapticService().vibrate();
+    await _loadUserName();
+  }
+
   void _onNavTap(int index) {
+    HapticService().vibrate();
+    HomeTabController.tabNotifier.value = index;
     setState(() => _selectedIndex = index);
   }
 
@@ -77,39 +106,55 @@ class _HomeScreenState extends State<HomeScreen> {
                 const ProfileScreen(),
               ],
             ),
-              // Removed local voice button overlay to avoid duplicate and overlapping FAB
+            // Removed local voice button overlay to avoid duplicate and overlapping FAB
           ],
         ),
+      ),
+      floatingActionButton: ValueListenableBuilder<bool>(
+        valueListenable: VoiceAssistantService.isEnabledNotifier,
+        builder: (context, isEnabled, child) {
+          // Hide mic on scan tab
+          if (!isEnabled || _selectedIndex == 1) return const SizedBox.shrink();
+          return const VoiceAssistantFab();
+        },
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
 
   Widget _buildHomeContent() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 20),
-          _buildScanCard(),
-          const SizedBox(height: 22),
-          _buildLabelIntro(),
-          const SizedBox(height: 18),
-          _buildHealthCard(),
-          const SizedBox(height: 12),
-          _buildEcoCard(),
-          const SizedBox(height: 12),
-          _buildProcessCard(),
-          const SizedBox(height: 90),
-        ],
+    final theme = Theme.of(context);
+    return RefreshIndicator(
+      color: theme.colorScheme.primary,
+      onRefresh: _onRefresh,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 20),
+            _buildScanCard(),
+            const SizedBox(height: 22),
+            _buildLabelIntro(),
+            const SizedBox(height: 18),
+            _buildHealthCard(),
+            const SizedBox(height: 12),
+            _buildEcoCard(),
+            const SizedBox(height: 12),
+            _buildProcessCard(),
+            const SizedBox(height: 90),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildHeader() {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
     final bodyLarge = theme.textTheme.bodyLarge;
     final bodyMedium = theme.textTheme.bodyMedium;
 
@@ -122,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          '${AppLocalizations.of(context)!.greeting(_userName)}',
+          loc.greeting(_userName),
           style: bodyLarge?.copyWith(
             fontSize: 24,
             fontWeight: FontWeight.bold,
@@ -130,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         const SizedBox(height: 4),
         Text(
-          AppLocalizations.of(context)!.homeTagline,
+          loc.homeTagline,
           style: bodyMedium?.copyWith(
             fontSize: 13,
             height: 1.5,
@@ -142,6 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildScanCard() {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     return Container(
       padding: const EdgeInsets.all(20),
@@ -167,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  AppLocalizations.of(context)!.scanCardTitle,
+                  loc.scanCardTitle,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -176,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  AppLocalizations.of(context)!.scanCardSubtitle,
+                  loc.scanCardSubtitle,
                   style: const TextStyle(color: Colors.white70, fontSize: 14, height: 1.5),
                 ),
                 const SizedBox(height: 18),
@@ -192,7 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     onPressed: () => _onNavTap(1),
                     child: Text(
-                      AppLocalizations.of(context)!.scanNow,
+                      loc.scanNow,
                       style: const TextStyle(
                         color: _primaryRed,
                         fontWeight: FontWeight.bold,
@@ -276,6 +322,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildLabelIntro() {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
     final bodyLarge = theme.textTheme.bodyLarge;
     final bodyMedium = theme.textTheme.bodyMedium;
 
@@ -287,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                AppLocalizations.of(context)!.labelIntroTitle,
+                loc.labelIntroTitle,
                 style: bodyLarge?.copyWith(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -295,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                AppLocalizations.of(context)!.labelIntroSubtitle,
+                loc.labelIntroSubtitle,
                 style: bodyMedium?.copyWith(fontSize: 13, height: 1.5),
               ),
             ],
@@ -347,7 +394,10 @@ class _HomeScreenState extends State<HomeScreen> {
         AppLocalizations.of(context)!.healthGradeValue4,
       ],
       expanded: _healthExpanded,
-      onTap: () => setState(() => _healthExpanded = !_healthExpanded),
+      onTap: () {
+        HapticService().vibrate();
+        setState(() => _healthExpanded = !_healthExpanded);
+      },
     );
   }
 
@@ -364,7 +414,10 @@ class _HomeScreenState extends State<HomeScreen> {
         AppLocalizations.of(context)!.ecoGradeValue4,
       ],
       expanded: _ecoExpanded,
-      onTap: () => setState(() => _ecoExpanded = !_ecoExpanded),
+      onTap: () {
+        HapticService().vibrate();
+        setState(() => _ecoExpanded = !_ecoExpanded);
+      },
     );
   }
 
@@ -405,8 +458,8 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 CircleAvatar(
                   radius: 18,
-                  backgroundColor: _lightRed,
-                  child: Icon(icon, size: 18, color: _primaryRed),
+                  backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
+                  child: Icon(icon, size: 18, color: theme.colorScheme.primary),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -431,7 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 Icon(
                   expanded ? Icons.keyboard_arrow_up : Icons.chevron_right,
-                  color: Colors.grey.shade500,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
             ),
@@ -449,16 +502,16 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Collapsed state: a single segmented bar of letters A–E.
   Widget _buildGradeSummaryBar() {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     return Row(
       children: [
         SizedBox(
           width: 46,
           child: Text(
-            'Pinaka-\nmahusay',
+            loc.bestLabelShort,
             style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2),
           ),
         ),
@@ -495,7 +548,7 @@ class _HomeScreenState extends State<HomeScreen> {
         SizedBox(
           width: 46,
           child: Text(
-            'Pinakahindi\nKanais-nais',
+            loc.worstLabelShort,
             textAlign: TextAlign.right,
             style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2),
           ),
@@ -508,12 +561,13 @@ class _HomeScreenState extends State<HomeScreen> {
   /// than the last, matching a Nutri-Score-style detail view.
   Widget _buildGradeDetailList(List<String> values) {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Pinaka-mahusay',
+          loc.bestLabel,
           style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 8),
@@ -536,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }),
         const SizedBox(height: 2),
         Text(
-          'Pinakahindi Kanais-nais',
+          loc.worstLabel,
           style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
         ),
       ],
@@ -612,8 +666,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildProcessCard() {
     final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
     final bodyLarge = theme.textTheme.bodyLarge;
     final bodyMedium = theme.textTheme.bodyMedium;
+
+    final processLabels = [
+      loc.processLabel0,
+      loc.processLabel1,
+      loc.processLabel2,
+      loc.processLabel3,
+    ];
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -634,14 +696,17 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => setState(() => _processExpanded = !_processExpanded),
+            onTap: () {
+              HapticService().vibrate();
+              setState(() => _processExpanded = !_processExpanded);
+            },
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 18,
-                  backgroundColor: _lightRed,
-                  child: Icon(Icons.blender_outlined, size: 18, color: _primaryRed),
+                  backgroundColor: theme.colorScheme.primary.withOpacity(0.12),
+                  child: Icon(Icons.blender_outlined, size: 18, color: theme.colorScheme.primary),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -649,14 +714,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        AppLocalizations.of(context)!.processGradeTitle,
+                        loc.processGradeTitle,
                         style: bodyLarge?.copyWith(
                             fontSize: 15,
                             fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        AppLocalizations.of(context)!.processGradeSubtitle,
+                        loc.processGradeSubtitle,
                         style: bodyMedium?.copyWith(
                             fontSize: 12, height: 1.4),
                       ),
@@ -666,7 +731,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 8),
                 Icon(
                   _processExpanded ? Icons.keyboard_arrow_up : Icons.chevron_right,
-                  color: Colors.grey.shade500,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
             ),
@@ -675,7 +740,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(AppLocalizations.of(context)!.processGroupFirst,
+              Text(loc.processGroupFirst,
                   style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2)),
               ...List.generate(4, (index) {
                 final level = index + 1;
@@ -689,7 +754,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 );
               }),
-              Text(AppLocalizations.of(context)!.processGroupFourth,
+              Text(loc.processGroupFourth,
                   textAlign: TextAlign.right,
                   style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant, height: 1.2)),
             ],
@@ -703,7 +768,7 @@ class _HomeScreenState extends State<HomeScreen> {
             secondChild: Padding(
               padding: const EdgeInsets.only(top: 14),
               child: Column(
-                children: List.generate(_processLabels.length, (index) {
+                children: List.generate(processLabels.length, (index) {
                   return Container(
                     width: double.infinity,
                     margin: const EdgeInsets.only(bottom: 8),
@@ -713,7 +778,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
-                      '${index + 1}  ${_processLabels[index]}',
+                      '${index + 1}  ${processLabels[index]}',
                       style: const TextStyle(
                           color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
                     ),
@@ -747,7 +812,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: IconButton(
           icon: const Icon(Icons.mic, color: Colors.white),
-          onPressed: () => _onNavTap(1),
+          onPressed: () {
+            HapticService().vibrate();
+            _onNavTap(1);
+          },
         ),
       ),
     );
@@ -763,6 +831,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPlaceholderPage(String title, String subtitle) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final bodyLarge = theme.textTheme.bodyLarge;
     final bodyMedium = theme.textTheme.bodyMedium;
 
@@ -774,13 +843,13 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Text(
               title,
-              style: bodyLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.bold),
+              style: bodyLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
             ),
             const SizedBox(height: 12),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: bodyMedium?.copyWith(fontSize: 14, height: 1.5),
+              style: bodyMedium?.copyWith(fontSize: 14, height: 1.5, color: colorScheme.onSurfaceVariant),
             ),
           ],
         ),
@@ -793,14 +862,18 @@ class _HomeScreenState extends State<HomeScreen> {
   // ---------------------------------------------------------------------
 
   Widget _buildBottomNav() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final navPillColor = theme.brightness == Brightness.dark
+        ? colorScheme.primary.withOpacity(0.2)
+        : const Color(0xFFF6CDCD);
+
     final items = [
       (icon: Icons.home_outlined, activeIcon: Icons.home, label: AppLocalizations.of(context)!.home),
       (icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: AppLocalizations.of(context)!.scan),
       (icon: Icons.history_outlined, activeIcon: Icons.history, label: AppLocalizations.of(context)!.history),
       (icon: Icons.person_outline, activeIcon: Icons.person, label: AppLocalizations.of(context)!.profile),
     ];
-
-    final theme = Theme.of(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -830,7 +903,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   decoration: BoxDecoration(
-                    color: isSelected ? _navPill : Colors.transparent,
+                    color: isSelected ? navPillColor : Colors.transparent,
                     borderRadius: BorderRadius.circular(18),
                   ),
                   child: Column(
@@ -838,7 +911,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Icon(
                         isSelected ? item.activeIcon : item.icon,
-                        color: _primaryRed,
+                        color: colorScheme.primary,
                         size: 22,
                       ),
                       const SizedBox(height: 4),
@@ -846,7 +919,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         item.label,
                         style: TextStyle(
                           fontSize: 11,
-                          color: _primaryRed,
+                          color: colorScheme.primary,
                           fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                         ),
                       ),

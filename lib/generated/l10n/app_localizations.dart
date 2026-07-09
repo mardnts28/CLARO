@@ -449,7 +449,7 @@ abstract class AppLocalizations {
   /// No description provided for @suggestion.
   ///
   /// In en, this message translates to:
-  /// **'Suggestion'**
+  /// **'App Review'**
   String get suggestion;
 
   /// No description provided for @aboutClaro.
@@ -901,6 +901,600 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'About the developers'**
   String get aboutDevelopers;
+
+  /// No description provided for @profileUpdateSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile updated'**
+  String get profileUpdateSuccess;
+
+  /// No description provided for @profileUpdateError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unable to save updates'**
+  String get profileUpdateError;
+
+  /// No description provided for @editName.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit name'**
+  String get editName;
+
+  /// No description provided for @editAge.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit age'**
+  String get editAge;
+
+  /// No description provided for @cancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get cancel;
+
+  /// No description provided for @save.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get save;
+
+  /// No description provided for @ageLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Age'**
+  String get ageLabel;
+
+  /// No description provided for @none.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get none;
+
+  /// No description provided for @healthConditions.
+  ///
+  /// In en, this message translates to:
+  /// **'Health Conditions'**
+  String get healthConditions;
+
+  /// No description provided for @allergensLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allergens'**
+  String get allergensLabel;
+
+  /// No description provided for @accountSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Account Settings'**
+  String get accountSettings;
+
+  /// No description provided for @changePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get changePassword;
+
+  /// No description provided for @selectAllergen.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Allergen'**
+  String get selectAllergen;
+
+  /// No description provided for @ratePrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a rating between 1 and 5.'**
+  String get ratePrompt;
+
+  /// No description provided for @suggestionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your suggestion before submitting.'**
+  String get suggestionEmpty;
+
+  /// No description provided for @suggestionTooLong.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggestion must be 500 characters or less.'**
+  String get suggestionTooLong;
+
+  /// No description provided for @suggestionHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write your suggestion here...'**
+  String get suggestionHint;
+
+  /// No description provided for @clearAllTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear All?'**
+  String get clearAllTitle;
+
+  /// No description provided for @clearAllConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'All scan history will be deleted. This cannot be undone.'**
+  String get clearAllConfirm;
+
+  /// No description provided for @clear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clear;
+
+  /// No description provided for @clearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear All'**
+  String get clearAll;
+
+  /// No description provided for @searchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get searchHint;
+
+  /// No description provided for @tabAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get tabAll;
+
+  /// No description provided for @tabFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorites'**
+  String get tabFavorites;
+
+  /// No description provided for @tabCompare.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare'**
+  String get tabCompare;
+
+  /// No description provided for @emptyFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'No favorite products yet. Tap ❤️ to save.'**
+  String get emptyFavorites;
+
+  /// No description provided for @emptyComparisons.
+  ///
+  /// In en, this message translates to:
+  /// **'No product comparisons yet.'**
+  String get emptyComparisons;
+
+  /// No description provided for @noSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results for \"{query}\"'**
+  String noSearchResults(String query);
+
+  /// No description provided for @emptyHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'No scan history yet. Scan a product to start!'**
+  String get emptyHistory;
+
+  /// No description provided for @resultsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Results'**
+  String get resultsTitle;
+
+  /// No description provided for @rankedBySuitability.
+  ///
+  /// In en, this message translates to:
+  /// **'Ranked based on suitability'**
+  String get rankedBySuitability;
+
+  /// No description provided for @profileFeatureSoon.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile features coming soon!'**
+  String get profileFeatureSoon;
+
+  /// No description provided for @fdaExpiredWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'WARNING: This product has an EXPIRED FDA registration. It may not be safe.'**
+  String get fdaExpiredWarning;
+
+  /// No description provided for @fdaUnverifiedWarning.
+  ///
+  /// In en, this message translates to:
+  /// **'This product has not yet been verified by FDA Philippines.'**
+  String get fdaUnverifiedWarning;
+
+  /// No description provided for @ageRequirementBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'3+ yrs old'**
+  String get ageRequirementBadge;
+
+  /// No description provided for @safeToConsume.
+  ///
+  /// In en, this message translates to:
+  /// **'SAFE TO CONSUME'**
+  String get safeToConsume;
+
+  /// No description provided for @safeToConsumeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Best eaten in moderation as it is higher in fat and calories.'**
+  String get safeToConsumeSubtitle;
+
+  /// No description provided for @reminderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Reminder'**
+  String get reminderLabel;
+
+  /// No description provided for @diabetesSafeReminder.
+  ///
+  /// In en, this message translates to:
+  /// **'Suitable for diabetics, but frequent consumption may not be ideal for those controlling cholesterol or calorie intake.'**
+  String get diabetesSafeReminder;
+
+  /// No description provided for @containsAllergens.
+  ///
+  /// In en, this message translates to:
+  /// **'Contains {list}'**
+  String containsAllergens(String list);
+
+  /// No description provided for @personalHealthWarningTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'🩺 Health Profile Warning'**
+  String get personalHealthWarningTitle;
+
+  /// No description provided for @servingRecommendation.
+  ///
+  /// In en, this message translates to:
+  /// **'½–¾ can (90–135g) per meal, up to 2–3 times a week.'**
+  String get servingRecommendation;
+
+  /// No description provided for @moreDetailsLink.
+  ///
+  /// In en, this message translates to:
+  /// **'More details'**
+  String get moreDetailsLink;
+
+  /// No description provided for @totalNutritionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Nutrition'**
+  String get totalNutritionTitle;
+
+  /// No description provided for @nutriCalories.
+  ///
+  /// In en, this message translates to:
+  /// **'Calories'**
+  String get nutriCalories;
+
+  /// No description provided for @nutriSodium.
+  ///
+  /// In en, this message translates to:
+  /// **'Sodium'**
+  String get nutriSodium;
+
+  /// No description provided for @nutriSugar.
+  ///
+  /// In en, this message translates to:
+  /// **'Sugar'**
+  String get nutriSugar;
+
+  /// No description provided for @nutriProtein.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein'**
+  String get nutriProtein;
+
+  /// No description provided for @nutriTotalFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Total Fat'**
+  String get nutriTotalFat;
+
+  /// No description provided for @nutriSatFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Sat. Fat'**
+  String get nutriSatFat;
+
+  /// No description provided for @nutriTransFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Trans Fat'**
+  String get nutriTransFat;
+
+  /// No description provided for @nutriFiber.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiber'**
+  String get nutriFiber;
+
+  /// No description provided for @nutriPotassium.
+  ///
+  /// In en, this message translates to:
+  /// **'Potassium'**
+  String get nutriPotassium;
+
+  /// No description provided for @nutriCalcium.
+  ///
+  /// In en, this message translates to:
+  /// **'Calcium'**
+  String get nutriCalcium;
+
+  /// No description provided for @nutriIron.
+  ///
+  /// In en, this message translates to:
+  /// **'Iron'**
+  String get nutriIron;
+
+  /// No description provided for @scoresTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scores'**
+  String get scoresTitle;
+
+  /// No description provided for @scoreNutrition.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition'**
+  String get scoreNutrition;
+
+  /// No description provided for @scoreNutritionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Good source of protein but higher in fat and calories.'**
+  String get scoreNutritionDesc;
+
+  /// No description provided for @scoreEnvironment.
+  ///
+  /// In en, this message translates to:
+  /// **'Environment'**
+  String get scoreEnvironment;
+
+  /// No description provided for @scoreEnvironmentDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderate environmental impact.'**
+  String get scoreEnvironmentDesc;
+
+  /// No description provided for @scoreProcess.
+  ///
+  /// In en, this message translates to:
+  /// **'Process'**
+  String get scoreProcess;
+
+  /// No description provided for @scoreProcessDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Processed food with relatively simple ingredients.'**
+  String get scoreProcessDesc;
+
+  /// No description provided for @extraKnowledgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Extra Knowledge'**
+  String get extraKnowledgeTitle;
+
+  /// No description provided for @extraKnowledgeDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'More filling and flavorful due to oil, but has higher calories and fat.'**
+  String get extraKnowledgeDesc;
+
+  /// No description provided for @compareButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Compare'**
+  String get compareButton;
+
+  /// No description provided for @similarProductsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Similar Products'**
+  String get similarProductsTitle;
+
+  /// No description provided for @productCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} products'**
+  String productCount(int count);
+
+  /// No description provided for @noProductsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No products found'**
+  String get noProductsFound;
+
+  /// No description provided for @noSearchMatchDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'No products matched your search.'**
+  String get noSearchMatchDesc;
+
+  /// No description provided for @scanGuideText.
+  ///
+  /// In en, this message translates to:
+  /// **'Align product label to scan'**
+  String get scanGuideText;
+
+  /// No description provided for @productCapturedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Captured!'**
+  String get productCapturedBadge;
+
+  /// No description provided for @tapToScanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap anywhere to scan'**
+  String get tapToScanHint;
+
+  /// No description provided for @productNotRecognizedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Not Recognized'**
+  String get productNotRecognizedTitle;
+
+  /// No description provided for @productNotRecognizedDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'The product could not be identified. Would you like to submit it for review?'**
+  String get productNotRecognizedDesc;
+
+  /// No description provided for @tryAgainButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Try Again'**
+  String get tryAgainButton;
+
+  /// No description provided for @submitLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get submitLabel;
+
+  /// No description provided for @submitSkuHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'SUBMIT UNKNOWN SKU'**
+  String get submitSkuHeader;
+
+  /// No description provided for @trainModelHeadline.
+  ///
+  /// In en, this message translates to:
+  /// **'Help Train Our Model'**
+  String get trainModelHeadline;
+
+  /// No description provided for @trainModelSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If a product isn\'t detected by our camera, upload its photo and info. Our engine uses this data to refine label mapping.'**
+  String get trainModelSubtitle;
+
+  /// No description provided for @imageCaptureSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Mock product image captured successfully!'**
+  String get imageCaptureSuccess;
+
+  /// No description provided for @imageRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please capture or upload a product label photo first.'**
+  String get imageRequiredError;
+
+  /// No description provided for @submissionReceivedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Submission Received'**
+  String get submissionReceivedTitle;
+
+  /// No description provided for @submissionReceivedDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Thank you! Our AI team will verify this product label and update the on-device YOLOv8 database model within 24 hours.'**
+  String get submissionReceivedDesc;
+
+  /// No description provided for @returnToScanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Return to Scanner'**
+  String get returnToScanner;
+
+  /// No description provided for @labelImageAttached.
+  ///
+  /// In en, this message translates to:
+  /// **'Label Image Attached'**
+  String get labelImageAttached;
+
+  /// No description provided for @tapToReplace.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to replace photo'**
+  String get tapToReplace;
+
+  /// No description provided for @captureProductLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture Product Label (Front/Rear)'**
+  String get captureProductLabel;
+
+  /// No description provided for @ensureReadableNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Ensure text/nutrition facts are readable'**
+  String get ensureReadableNote;
+
+  /// No description provided for @productNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Name / Description'**
+  String get productNameLabel;
+
+  /// No description provided for @productNameEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter product name'**
+  String get productNameEmpty;
+
+  /// No description provided for @brandNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Brand Name (e.g. Century, Ligo, Lucky Me)'**
+  String get brandNameLabel;
+
+  /// No description provided for @brandNameEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter brand name'**
+  String get brandNameEmpty;
+
+  /// No description provided for @productVariantLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Variant (e.g. Hot & Spicy, Sweet & Sour)'**
+  String get productVariantLabel;
+
+  /// No description provided for @productVariantEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter product variant'**
+  String get productVariantEmpty;
+
+  /// No description provided for @productCategoryLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Category'**
+  String get productCategoryLabel;
+
+  /// No description provided for @ingredientsListLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredients List (Optional)'**
+  String get ingredientsListLabel;
+
+  /// No description provided for @submitTrainingButton.
+  ///
+  /// In en, this message translates to:
+  /// **'SUBMIT FOR TRAINING'**
+  String get submitTrainingButton;
+
+  /// No description provided for @bestLabelShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Best'**
+  String get bestLabelShort;
+
+  /// No description provided for @worstLabelShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Worst'**
+  String get worstLabelShort;
 }
 
 class _AppLocalizationsDelegate

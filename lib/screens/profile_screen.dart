@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../services/locale_service.dart';
+import '../services/haptic_service.dart';
+import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import 'personal_info_screen.dart';
 import 'preference_screen.dart';
@@ -28,7 +30,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double _speechVolume = 0.7;
   bool _vibrationFeedback = false;
   double _textSize = 1.0; // 0.8 - 1.4 range for example
-  
+
 
   @override
   void initState() {
@@ -71,7 +73,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final userDoc = await _authService.db.collection('users').doc(uid).get();
         if (userDoc.exists) {
           final data = userDoc.data();
-            if (data != null) {
+          if (data != null) {
             final themeString = data['theme'] ?? 'Default';
             setState(() {
               _userName = data['name'] ?? 'User';
@@ -79,8 +81,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _voiceAssistantEnabled = data['voiceAssistant'] ?? false;
               _mfaEnabled = data['mfaEnabled'] ?? false;
               _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
-                final code = data['language'] ?? 'en';
-                _selectedLanguage = (code == 'tl') ? 'Tagalog' : 'English';
+              final code = data['language'] ?? 'en';
+              _selectedLanguage = (code == 'tl') ? 'Tagalog' : 'English';
               _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
               _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
               _vibrationFeedback = data['vibrationFeedback'] ?? false;
@@ -93,6 +95,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       debugPrint('Error loading user data: $e');
     }
+  }
+
+  /// Pull-to-refresh handler. Forces a fresh server read of the user's
+  /// profile/settings and gives light haptic feedback so the pull gesture
+  /// feels responsive even while the network call is in flight.
+  Future<void> _onRefresh() async {
+    HapticService().vibrate();
+    await _loadUserData();
   }
 
   Future<bool> _updateUserPreference(String key, dynamic value) async {
@@ -112,35 +122,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return false;
   }
 
-  
+
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            AppLocalizations.of(context)!.profile,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.onSurface,
+    return RefreshIndicator(
+      color: colorScheme.primary,
+      onRefresh: _onRefresh,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              loc.profile,
+              style: TextStyle(
+                fontSize: 26,
+                fontWeight: FontWeight.bold,
+                color: colorScheme.onSurface,
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          _buildProfileCard(),
-          const SizedBox(height: 24),
-          _buildPersonalSection(),
-          const SizedBox(height: 20),
-          _buildPreferenceSection(),
-          const SizedBox(height: 20),
-          _buildMoreSection(),
-          const SizedBox(height: 90),
-        ],
+            const SizedBox(height: 20),
+            _buildProfileCard(),
+            const SizedBox(height: 24),
+            _buildPersonalSection(),
+            const SizedBox(height: 20),
+            _buildPreferenceSection(),
+            const SizedBox(height: 20),
+            _buildMoreSection(),
+            const SizedBox(height: 90),
+          ],
+        ),
       ),
     );
   }
@@ -196,6 +212,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildPersonalSection() {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Container(
       decoration: BoxDecoration(
@@ -207,11 +224,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _buildMenuItemWithArrow(
             icon: Icons.person_outline,
-            label: AppLocalizations.of(context)!.personalInfo,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
-            ),
+            label: loc.personalInfo,
+            onTap: () {
+              HapticService().vibrate();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+              );
+            },
           ),
         ],
       ),
@@ -220,6 +240,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildPreferenceSection() {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Container(
       decoration: BoxDecoration(
@@ -231,11 +252,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _buildMenuItemWithArrow(
             icon: Icons.settings_outlined,
-            label: AppLocalizations.of(context)!.preference,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PreferenceScreen()),
-            ),
+            label: loc.preference,
+            onTap: () {
+              HapticService().vibrate();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PreferenceScreen()),
+              );
+            },
           ),
           Divider(height: 0, color: colorScheme.outlineVariant),
           _buildVoiceAssistantToggle(),
@@ -246,9 +270,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Divider(height: 0, color: colorScheme.outlineVariant),
           _buildMenuItemWithArrow(
             icon: Icons.language,
-            label: AppLocalizations.of(context)!.language,
+            label: loc.language,
             trailing: Text(_selectedLanguage, style: TextStyle(color: colorScheme.onSurfaceVariant)),
-            onTap: () => _showLanguageChooser(),
+            onTap: () {
+              HapticService().vibrate();
+              _showLanguageChooser();
+            },
           ),
         ],
       ),
@@ -263,11 +290,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         title: Text(loc.chooseLanguage),
         children: [
           SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'en'),
+            onPressed: () {
+              HapticService().vibrate();
+              Navigator.pop(ctx, 'en');
+            },
             child: Text(loc.english),
           ),
           SimpleDialogOption(
-            onPressed: () => Navigator.pop(ctx, 'tl'),
+            onPressed: () {
+              HapticService().vibrate();
+              Navigator.pop(ctx, 'tl');
+            },
             child: Text(loc.tagalog),
           ),
         ],
@@ -287,6 +320,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMoreSection() {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Container(
       decoration: BoxDecoration(
@@ -298,20 +332,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           _buildMenuItemWithArrow(
             icon: Icons.lightbulb_outline,
-            label: AppLocalizations.of(context)!.suggestion,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SuggestionScreen()),
-            ),
+            label: loc.suggestion,
+            onTap: () {
+              HapticService().vibrate();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SuggestionScreen()),
+              );
+            },
           ),
           Divider(height: 0, color: colorScheme.outlineVariant),
           _buildMenuItemWithArrow(
             icon: Icons.info_outline,
-            label: AppLocalizations.of(context)!.aboutClaro,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const AboutClaroScreen()),
-            ),
+            label: loc.aboutClaro,
+            onTap: () {
+              HapticService().vibrate();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AboutClaroScreen()),
+              );
+            },
           ),
           Divider(height: 0, color: colorScheme.outlineVariant),
           Padding(
@@ -320,13 +360,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: double.infinity,
               child: TextButton(
                 onPressed: () async {
+                  HapticService().vibrate();
                   await _authService.signOut();
                   if (mounted) {
                     Navigator.pushReplacementNamed(context, '/');
                   }
                 },
                 child: Text(
-                  AppLocalizations.of(context)!.logout,
+                  loc.logout,
                   style: TextStyle(
                     fontSize: 15,
                     color: colorScheme.primary,
@@ -397,6 +438,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Switch(
             value: _darkModeEnabled,
             onChanged: (value) async {
+              HapticService().vibrate();
               final theme = value ? 'Dark Mode' : 'Default';
               setState(() => _darkModeEnabled = value);
               await setAppThemeMode(parseThemeMode(theme));
@@ -411,6 +453,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildMfaToggle() {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -420,7 +463,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Multi-Factor Authentication',
+              loc.multiFactorAuthentication,
               style: TextStyle(
                 fontSize: 15,
                 color: colorScheme.onSurface,
@@ -430,6 +473,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Switch(
             value: _mfaEnabled,
             onChanged: (value) async {
+              HapticService().vibrate();
               final previous = _mfaEnabled;
               setState(() => _mfaEnabled = value);
               try {
@@ -437,7 +481,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               } catch (_) {
                 setState(() => _mfaEnabled = previous);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hindi ma-save ang MFA setting')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.mfaSaveError)));
                 }
               }
             },
@@ -450,6 +494,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildVoiceAssistantToggle() {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -459,7 +504,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Voice Assistant',
+              loc.voiceAssistant,
               style: TextStyle(
                 fontSize: 15,
                 color: colorScheme.onSurface,
@@ -469,14 +514,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Switch(
             value: _voiceAssistantEnabled,
             onChanged: (value) async {
+              HapticService().vibrate();
               final previous = _voiceAssistantEnabled;
               setState(() => _voiceAssistantEnabled = value);
+              await VoiceAssistantService.instance.updateEnabled(value);
               final ok = await _updateUserPreference('voiceAssistant', value);
               if (!ok) {
                 // revert and inform
                 setState(() => _voiceAssistantEnabled = previous);
+                await VoiceAssistantService.instance.updateEnabled(previous);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hindi ma-save ang preference')));
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
                 }
               }
             },

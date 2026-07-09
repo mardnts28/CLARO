@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
-import '../widgets/translated_text.dart';
+import '../widgets/voice_assistant_fab.dart';
 
 class ThemeScreen extends StatefulWidget {
   const ThemeScreen({super.key});
@@ -52,6 +52,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
   }
 
   Future<void> _choose(String theme) async {
+    final loc = AppLocalizations.of(context)!;
     try {
       final uid = _authService.currentUser?.uid;
       if (uid == null) return;
@@ -61,11 +62,11 @@ class _ThemeScreenState extends State<ThemeScreen> {
         await _load();
         setAppThemeMode(parseThemeMode(theme));
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: TranslatedText('Tema na-save')),
+          SnackBar(content: Text(loc.themeSaved)),
         );
       } else {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: TranslatedText('Hindi ma-save ang tema')),
+          SnackBar(content: Text(loc.themeSaveError)),
         );
       }
     } catch (e) {
@@ -111,14 +112,15 @@ class _ThemeScreenState extends State<ThemeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.appBarTheme.backgroundColor,
+        backgroundColor: colorScheme.surface,
         elevation: 0,
-        iconTheme: IconThemeData(color: theme.colorScheme.primary),
-        title: Text(AppLocalizations.of(context)!.theme, style: TextStyle(color: theme.colorScheme.primary)),
+        iconTheme: IconThemeData(color: colorScheme.primary),
+        title: Text(AppLocalizations.of(context)!.theme, style: TextStyle(color: colorScheme.primary)),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
@@ -144,6 +146,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
           ],
         ),
       ),
+      floatingActionButton: const VoiceAssistantFab(),
     );
   }
 

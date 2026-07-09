@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/product_db_service.dart';
+import '../services/haptic_service.dart';
 import 'product_detail_screen.dart';
-import 'camera_scanner_screen.dart';
-import 'history_screen.dart';
+import '../generated/l10n/app_localizations.dart';
+import '../widgets/voice_assistant_fab.dart';
 
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
@@ -20,6 +21,8 @@ class CompareProductsScreen extends StatefulWidget {
 class _CompareProductsScreenState extends State<CompareProductsScreen> {
   final ProductDbService _db = ProductDbService();
   final TextEditingController _searchCtrl = TextEditingController();
+
+  static const _primaryRed = Color(0xFF8B1A1A);
 
   late List<Product> _allInCategory;
   List<Product> _filtered = [];
@@ -57,16 +60,19 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
     final topPadding = MediaQuery.of(context).padding.top;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Header row: back + title ──────────────────────────────
           Container(
-            color: Colors.white,
+            color: colorScheme.surface,
             padding: EdgeInsets.only(
               left: 16,
               right: 16,
@@ -76,22 +82,26 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
             child: Row(
               children: [
                 GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: const Icon(Icons.arrow_back,
-                      color: Color(0xFF8B1A1A), size: 24),
+                  onTap: () {
+                    HapticService().vibrate();
+                    Navigator.pop(context);
+                  },
+                  child: Icon(Icons.arrow_back,
+                      color: colorScheme.primary, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'Kahalintulad na Produkto',
+                  loc.similarProductsTitle,
                   style: GoogleFonts.outfit(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF8B1A1A),
+                    color: colorScheme.primary,
                   ),
                 ),
               ],
             ),
           ),
+          Divider(height: 1, color: theme.dividerColor),
 
           // ── Category chip ─────────────────────────────────────────
           Padding(
@@ -103,24 +113,24 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 12, vertical: 5),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFEBEE),
+                    color: colorScheme.primary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFEF9A9A)),
+                    border: Border.all(color: colorScheme.primary.withOpacity(0.4)),
                   ),
                   child: Text(
                     widget.sourceProduct.category,
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: const Color(0xFF8B1A1A),
+                      color: colorScheme.primary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${_allInCategory.length} produkto',
+                  loc.productCount(_allInCategory.length),
                   style: GoogleFonts.inter(
-                      fontSize: 12, color: Colors.black45),
+                      fontSize: 12, color: colorScheme.onSurfaceVariant),
                 ),
               ],
             ),
@@ -132,26 +142,26 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: colorScheme.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE0E0E0)),
+                border: Border.all(color: theme.dividerColor),
               ),
               child: Row(
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: Icon(Icons.search,
-                        color: Colors.black38, size: 22),
+                        color: colorScheme.onSurfaceVariant, size: 22),
                   ),
                   Expanded(
                     child: TextField(
                       controller: _searchCtrl,
                       style: GoogleFonts.inter(
-                          fontSize: 14, color: Colors.black87),
+                          fontSize: 14, color: colorScheme.onSurface),
                       decoration: InputDecoration(
-                        hintText: 'Search',
+                        hintText: loc.searchHint,
                         hintStyle: GoogleFonts.inter(
-                            fontSize: 14, color: Colors.black38),
+                            fontSize: 14, color: colorScheme.onSurfaceVariant),
                         border: InputBorder.none,
                         contentPadding:
                             const EdgeInsets.symmetric(vertical: 14),
@@ -164,10 +174,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                         _searchCtrl.clear();
                         FocusScope.of(context).unfocus();
                       },
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 12),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Icon(Icons.close,
-                            color: Colors.black38, size: 18),
+                            color: colorScheme.onSurfaceVariant, size: 18),
                       ),
                     ),
                 ],
@@ -182,7 +192,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
             child: _filtered.isEmpty
                 ? _buildEmpty()
                 : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                     itemCount: _filtered.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, i) {
@@ -208,134 +218,38 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
       ),
 
       // ── Floating mic button (matching design) ─────────────────────
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFFB71C1C),
-        foregroundColor: Colors.white,
-        elevation: 4,
-        child: const Icon(Icons.mic, size: 26),
-      ),
-
-      // ── Bottom nav ────────────────────────────────────────────────
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),
-        ),
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 4,
-          top: 8,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _navItem(Icons.home_outlined, 'Home', false),
-            _navItemScan(context),
-            _navItem(Icons.history, 'History', false),
-            _navItem(Icons.person_outline, 'Profile', false),
-          ],
-        ),
-      ),
+      floatingActionButton: const VoiceAssistantFab(),
     );
   }
 
   Widget _buildEmpty() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.search_off_rounded,
-              size: 64, color: Colors.black26),
+          Icon(Icons.search_off_rounded,
+              size: 64, color: colorScheme.onSurfaceVariant.withOpacity(0.4)),
           const SizedBox(height: 16),
           Text(
-            'Walang nahanap',
+            loc.noProductsFound,
             style: GoogleFonts.outfit(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.black45),
+                color: colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 6),
           Text(
-            'No products matched your search.',
-            style: GoogleFonts.inter(fontSize: 13, color: Colors.black38),
+            loc.noSearchMatchDesc,
+            style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurfaceVariant),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _navItem(IconData icon, String label, bool active) {
-    return GestureDetector(
-      onTap: () {
-        if (label == 'Home') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
-          );
-        } else if (label == 'History') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HistoryScreen()),
-          );
-        } else if (label == 'Profile') {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Profile features coming soon!', style: GoogleFonts.inter()),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              color: active
-                  ? const Color(0xFFB71C1C)
-                  : Colors.black38,
-              size: 26),
-          const SizedBox(height: 2),
-          Text(label,
-              style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: active
-                      ? const Color(0xFFB71C1C)
-                      : Colors.black38,
-                  fontWeight: active
-                      ? FontWeight.w600
-                      : FontWeight.normal)),
-        ],
-      ),
-    );
-  }
-
-  Widget _navItemScan(BuildContext context) {
-    return GestureDetector(
-      onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFEBEE),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.qr_code_scanner,
-                color: Color(0xFFB71C1C), size: 26),
-            const SizedBox(height: 2),
-            Text('Scan',
-                style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: const Color(0xFFB71C1C),
-                    fontWeight: FontWeight.w600)),
-          ],
-        ),
       ),
     );
   }
 }
+
 
 // ── Individual product list card ─────────────────────────────────────────────
 class _ProductCard extends StatelessWidget {
@@ -351,17 +265,19 @@ class _ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(12),
           border: isCurrent
-              ? Border.all(color: const Color(0xFFEF9A9A), width: 1.5)
-              : Border.all(color: const Color(0xFFEEEEEE)),
+              ? Border.all(color: colorScheme.primary.withOpacity(0.5), width: 1.5)
+              : Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withAlpha(10),
@@ -385,14 +301,14 @@ class _ProductCard extends StatelessWidget {
                               horizontal: 6, vertical: 2),
                           margin: const EdgeInsets.only(right: 6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFEBEE),
+                            color: colorScheme.primary.withOpacity(0.12),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             'Kasalukuyan',
                             style: GoogleFonts.inter(
                               fontSize: 10,
-                              color: const Color(0xFF8B1A1A),
+                              color: colorScheme.primary,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -404,7 +320,7 @@ class _ProductCard extends StatelessWidget {
                           style: GoogleFonts.outfit(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: colorScheme.onSurface,
                           ),
                         ),
                       ),
@@ -414,19 +330,19 @@ class _ProductCard extends StatelessWidget {
                   Text(
                     product.nutritionalFacts.servingSize,
                     style: GoogleFonts.inter(
-                        fontSize: 12, color: Colors.black45),
+                        fontSize: 12, color: colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 6),
                   // Nutrition quick-stats row
                   Row(
                     children: [
-                      _miniStat(
+                      _miniStat(context,
                           '⚡', product.nutritionalFacts.calories),
                       const SizedBox(width: 10),
-                      _miniStat(
+                      _miniStat(context,
                           '🥩', product.nutritionalFacts.protein),
                       const SizedBox(width: 10),
-                      _miniStat(
+                      _miniStat(context,
                           '🫙', product.nutritionalFacts.sodium),
                     ],
                   ),
@@ -434,15 +350,16 @@ class _ProductCard extends StatelessWidget {
               ),
             ),
             // Arrow
-            const Icon(Icons.chevron_right,
-                color: Colors.black38, size: 22),
+            Icon(Icons.chevron_right,
+                color: colorScheme.onSurfaceVariant, size: 22),
           ],
         ),
       ),
     );
   }
 
-  Widget _miniStat(String emoji, String value) {
+  Widget _miniStat(BuildContext context, String emoji, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -451,7 +368,7 @@ class _ProductCard extends StatelessWidget {
         Text(value,
             style: GoogleFonts.inter(
                 fontSize: 11,
-                color: Colors.black54,
+                color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500)),
       ],
     );

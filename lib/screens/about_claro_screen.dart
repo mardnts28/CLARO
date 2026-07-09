@@ -1,25 +1,28 @@
 import 'package:flutter/material.dart';
+import '../generated/l10n/app_localizations.dart';
+import '../widgets/voice_assistant_fab.dart';
 
 class AboutClaroScreen extends StatelessWidget {
   const AboutClaroScreen({super.key});
 
-  static const _accentRed = Color(0xFF6B2020);
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: theme.colorScheme.surface,
+        backgroundColor: colorScheme.surface,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _accentRed),
+          icon: Icon(Icons.arrow_back, color: colorScheme.primary),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
-          'Tungkol sa CLARO',
-          style: TextStyle(color: _accentRed, fontWeight: FontWeight.w700),
+        title: Text(
+          loc.aboutClaro,
+          style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700),
         ),
       ),
       body: Padding(
@@ -29,7 +32,7 @@ class AboutClaroScreen extends StatelessWidget {
           children: [
             const SizedBox(height: 6),
             Text(
-              'Alamin ang Tungkol sa Amin!',
+              loc.aboutClaroHeading,
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
@@ -52,7 +55,7 @@ class AboutClaroScreen extends StatelessWidget {
                 ],
               ),
               child: Text(
-                'Ang CLARO ay isang AI-powered mobile application na tumutulong sa mga mamimili ng groceries na maunawaan ang nutritional information ng mga lokal na de-latang pagkain. Sa pamamagitan ng pag-scan ng produkto, agad na makikita ng mga user ang pinasimpleng nutrition summaries, health advisories, allergen warnings, at product comparisons, pati na rin ang mga accessibility features tulad ng voice assistance, upang mas makagawa ng mas maalam at mas healthy na desisyon sa pagbili.',
+                loc.aboutClaroDescription,
                 style: TextStyle(color: theme.colorScheme.onSurface, height: 1.4),
                 textAlign: TextAlign.center,
               ),
@@ -61,7 +64,7 @@ class AboutClaroScreen extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Tungkol sa Mga Developer',
+                loc.aboutDevelopers,
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
                   color: theme.colorScheme.onSurface,
@@ -91,6 +94,7 @@ class AboutClaroScreen extends StatelessWidget {
           ],
         ),
       ),
+      floatingActionButton: const VoiceAssistantFab(),
     );
   }
 }

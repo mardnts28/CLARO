@@ -12,6 +12,7 @@ import 'product_detail_screen.dart';
 import 'unknown_product_submission_screen.dart';
 import 'multi_scan_results_screen.dart';
 import '../models/product_model.dart';
+import '../generated/l10n/app_localizations.dart';
 
 class CameraScannerScreen extends StatefulWidget {
   final bool embeddedMode;
@@ -207,9 +208,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       } else {
         // No product recognized → fallback
         if (!mounted) return;
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+
         showModalBottomSheet(
           context: context,
-          backgroundColor: Colors.white,
+          backgroundColor: theme.cardColor,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
           ),
@@ -218,16 +222,16 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.search_off_rounded, size: 56, color: Colors.grey),
+                Icon(Icons.search_off_rounded, size: 56, color: colorScheme.outline),
                 const SizedBox(height: 16),
-                Text('Product Not Recognized',
+                Text(AppLocalizations.of(context)!.productNotRecognizedTitle,
                     style: GoogleFonts.outfit(
-                        fontSize: 20, fontWeight: FontWeight.bold)),
+                        fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
                 const SizedBox(height: 8),
                 Text(
-                  'The product could not be identified. Would you like to submit it for review?',
+                  AppLocalizations.of(context)!.productNotRecognizedDesc,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(color: Colors.black54, height: 1.5),
+                  style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, height: 1.5),
                 ),
                 const SizedBox(height: 24),
                 Row(
@@ -237,12 +241,13 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                         onPressed: () => Navigator.pop(context),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: colorScheme.outline),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: Text('Try Again',
+                        child: Text(AppLocalizations.of(context)!.tryAgainButton,
                             style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w600)),
+                                fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -259,13 +264,13 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFB71C1C),
-                          foregroundColor: Colors.white,
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                         ),
-                        child: Text('Submit',
+                        child: Text(AppLocalizations.of(context)!.submitLabel,
                             style: GoogleFonts.outfit(
                                 fontWeight: FontWeight.w600)),
                       ),
@@ -325,7 +330,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                   right: 24,
                   child: Center(
                     child: Text(
-                      'I-align ang label ng produkto upang i-scan',
+                      AppLocalizations.of(context)!.scanGuideText,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                         color: Colors.white.withAlpha(180), // enough visibility only
@@ -461,7 +466,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Product Captured!',
+                              AppLocalizations.of(context)!.productCapturedBadge,
                               style: GoogleFonts.outfit(
                                 color: Colors.white,
                                 fontSize: 16,
@@ -494,11 +499,13 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               top: 14,
               bottom: MediaQuery.of(context).padding.bottom + 14,
             ),
-            child: Text(
-              'Tap anywhere to scan',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                  color: Colors.white54, fontSize: 13),
+            child: Center(
+              child: Text(
+                AppLocalizations.of(context)!.tapToScanHint,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                    color: Colors.white54, fontSize: 13),
+              ),
             ),
           ),
         ],

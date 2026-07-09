@@ -4,6 +4,8 @@ import '../models/product_model.dart';
 import 'product_detail_screen.dart';
 import 'camera_scanner_screen.dart';
 import 'history_screen.dart';
+import '../generated/l10n/app_localizations.dart';
+import '../widgets/voice_assistant_fab.dart';
 
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
@@ -60,15 +62,18 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Header bar: back, Resulta (perfectly centered Stack) ──
           Container(
-            color: Colors.white,
+            color: colorScheme.surface,
             height: topPadding + 56,
             padding: EdgeInsets.only(
               left: 16,
@@ -80,11 +85,11 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
               children: [
                 // Centered Title
                 Text(
-                  'Resulta',
+                  loc.resultsTitle,
                   style: GoogleFonts.outfit(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF8B1A1A),
+                    color: colorScheme.primary,
                   ),
                 ),
                 // Left Back Button
@@ -92,23 +97,23 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                   alignment: Alignment.centerLeft,
                   child: GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.arrow_back,
-                        color: Color(0xFF8B1A1A), size: 24),
+                    child: Icon(Icons.arrow_back,
+                        color: colorScheme.primary, size: 24),
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE0E0E0)),
+          Divider(height: 1, color: theme.dividerColor),
 
           // ── Ranked description label ────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
             child: Text(
-              'Ranked based on suitability',
+              loc.rankedBySuitability,
               style: GoogleFonts.inter(
                 fontSize: 12,
-                color: Colors.black54,
+                color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -130,19 +135,13 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
       ),
 
       // ── Floating mic button ───────────────────────────────────────
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFFB71C1C),
-        foregroundColor: Colors.white,
-        elevation: 4,
-        child: const Icon(Icons.mic, size: 26),
-      ),
+      floatingActionButton: const VoiceAssistantFab(),
 
       // ── Bottom Navigation Bar ─────────────────────────────────────
       bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          border: Border(top: BorderSide(color: theme.dividerColor)),
         ),
         padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).padding.bottom + 4, top: 8),
@@ -160,6 +159,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   }
 
   Widget _buildProductCard(BuildContext context, Product p) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return GestureDetector(
       onTap: () {
         // Navigate to the individual detail screen when clicked
@@ -175,9 +177,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFEEEEEE)),
+          border: Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -197,7 +199,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                     style: GoogleFonts.outfit(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const SizedBox(height: 6),
@@ -205,13 +207,13 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                     p.nutritionalFacts.servingSize,
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      color: Colors.black54,
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: Color(0xFF8B1A1A), size: 22),
+            Icon(Icons.chevron_right, color: colorScheme.primary, size: 22),
           ],
         ),
       ),
@@ -219,22 +221,28 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   }
 
   Widget _navItem(IconData icon, String label, bool active) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    final activeColor = colorScheme.primary;
+    final inactiveColor = colorScheme.onSurfaceVariant;
+
     return GestureDetector(
       onTap: () {
-        if (label == 'Home') {
+        if (label == loc.home) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
           );
-        } else if (label == 'History') {
+        } else if (label == loc.history) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (_) => const HistoryScreen()),
           );
-        } else if (label == 'Profile') {
+        } else if (label == loc.profile) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Profile features coming soon!', style: GoogleFonts.inter()),
+              content: Text(loc.profileFeatureSoon, style: GoogleFonts.inter()),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -243,13 +251,13 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: active ? const Color(0xFFB71C1C) : Colors.black38,
+          Icon(icon, color: active ? activeColor : inactiveColor,
               size: 26),
           const SizedBox(height: 2),
           Text(label,
               style: GoogleFonts.inter(
                   fontSize: 11,
-                  color: active ? const Color(0xFFB71C1C) : Colors.black38,
+                  color: active ? activeColor : inactiveColor,
                   fontWeight:
                       active ? FontWeight.w600 : FontWeight.normal)),
         ],
@@ -258,24 +266,26 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   }
 
   Widget _navItemScan(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         decoration: BoxDecoration(
-          color: const Color(0xFFFFEBEE),
+          color: colorScheme.primary.withOpacity(0.12),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.qr_code_scanner,
-                color: Color(0xFFB71C1C), size: 26),
+            Icon(Icons.qr_code_scanner,
+                color: colorScheme.primary, size: 26),
             const SizedBox(height: 2),
-            Text('Scan',
+            Text(loc.scan,
                 style: GoogleFonts.inter(
                     fontSize: 11,
-                    color: const Color(0xFFB71C1C),
+                    color: colorScheme.primary,
                     fontWeight: FontWeight.w600)),
           ],
         ),

@@ -190,7 +190,7 @@ class AppLocalizationsTl extends AppLocalizations {
   String get language => 'Lenggwuahe';
 
   @override
-  String get suggestion => 'Sugestiyon';
+  String get suggestion => 'Pagsusuri ng App';
 
   @override
   String get aboutClaro => 'Tungkol sa CLARO';
@@ -434,4 +434,326 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get aboutDevelopers => 'Tungkol sa mga developer';
+
+  @override
+  String get profileUpdateSuccess => 'Na-update ang profile';
+
+  @override
+  String get profileUpdateError => 'Hindi ma-save ang mga update';
+
+  @override
+  String get editName => 'I-edit ang pangalan';
+
+  @override
+  String get editAge => 'I-edit ang edad';
+
+  @override
+  String get cancel => 'Kanselahin';
+
+  @override
+  String get save => 'I-save';
+
+  @override
+  String get ageLabel => 'Edad';
+
+  @override
+  String get none => 'Wala';
+
+  @override
+  String get healthConditions => 'Kondisyon sa Kalusugan';
+
+  @override
+  String get allergensLabel => 'Allergens';
+
+  @override
+  String get accountSettings => 'Account Settings';
+
+  @override
+  String get changePassword => 'Baguhin ang password';
+
+  @override
+  String get selectAllergen => 'Pumili ng Allergen';
+
+  @override
+  String get ratePrompt => 'Mangyaring pumili ng rating sa pagitan ng 1 at 5.';
+
+  @override
+  String get suggestionEmpty =>
+      'Mangyaring ilagay ang iyong suhestiyon bago ipadala.';
+
+  @override
+  String get suggestionTooLong =>
+      'Ang suhestiyon ay dapat 500 characters o mas mababa pa.';
+
+  @override
+  String get suggestionHint => 'Isulat ang iyong mungkahi dito...';
+
+  @override
+  String get clearAllTitle => 'Burahin ang Lahat?';
+
+  @override
+  String get clearAllConfirm =>
+      'Mabubura ang lahat ng kasaysayan ng iyong mga scan. Hindi ito maibabalik.';
+
+  @override
+  String get clear => 'Burahin';
+
+  @override
+  String get clearAll => 'Burahin Lahat';
+
+  @override
+  String get searchHint => 'Maghanap';
+
+  @override
+  String get tabAll => 'Lahat';
+
+  @override
+  String get tabFavorites => 'Paborito';
+
+  @override
+  String get tabCompare => 'Kumpara';
+
+  @override
+  String get emptyFavorites =>
+      'Wala pang mga paboritong produkto. I-tap ang ❤️ upang mag-save.';
+
+  @override
+  String get emptyComparisons => 'Wala pang mga pag-uugnayan ng produkto.';
+
+  @override
+  String noSearchResults(String query) {
+    return 'Walang resulta para sa \"$query\"';
+  }
+
+  @override
+  String get emptyHistory =>
+      'Wala pang kasaysayan ng scan. I-scan ang isang produkto upang magsimula!';
+
+  @override
+  String get resultsTitle => 'Resulta';
+
+  @override
+  String get rankedBySuitability => 'Naka-rank batay sa suitability';
+
+  @override
+  String get profileFeatureSoon => 'Parating na ang mga feature ng Profile!';
+
+  @override
+  String get fdaExpiredWarning =>
+      'BABALA: Ang produktong ito ay may EXPIRED na FDA registration. Maaaring hindi ito ligtas.';
+
+  @override
+  String get fdaUnverifiedWarning =>
+      'Ang produktong ito ay hindi pa nabeberipika ng FDA Philippines.';
+
+  @override
+  String get ageRequirementBadge => '3+ yrs old';
+
+  @override
+  String get safeToConsume => 'LIGTAS I-KONSUMO';
+
+  @override
+  String get safeToConsumeSubtitle =>
+      'Pinakamainam kainin sa katamtamang dami dahil mas mataas sa taba at calories.';
+
+  @override
+  String get reminderLabel => 'Paalala';
+
+  @override
+  String get diabetesSafeReminder =>
+      'Angkop para sa mga may diabetes, ngunit ang madalas na pagkonsumo ay maaaring hindi mainam para sa mga nagkokontrol ng kolesterol o calorie intake.';
+
+  @override
+  String containsAllergens(String list) {
+    return 'Naglalaman ng $list';
+  }
+
+  @override
+  String get personalHealthWarningTitle => '🩺 Babala Batay sa Iyong Kalusugan';
+
+  @override
+  String get servingRecommendation =>
+      '½–¾ ng lata (90–135g) sa bawat meal, maaaring kainin 2–3 beses kada linggo.';
+
+  @override
+  String get moreDetailsLink => 'Higit pang detalye';
+
+  @override
+  String get totalNutritionTitle => 'Kabuuang Nutrisyon';
+
+  @override
+  String get nutriCalories => 'Calories';
+
+  @override
+  String get nutriSodium => 'Sodium';
+
+  @override
+  String get nutriSugar => 'Sugar';
+
+  @override
+  String get nutriProtein => 'Protina';
+
+  @override
+  String get nutriTotalFat => 'Total Fat';
+
+  @override
+  String get nutriSatFat => 'Sat. Fat';
+
+  @override
+  String get nutriTransFat => 'Trans Fat';
+
+  @override
+  String get nutriFiber => 'Fiber';
+
+  @override
+  String get nutriPotassium => 'Potassium';
+
+  @override
+  String get nutriCalcium => 'Calcium';
+
+  @override
+  String get nutriIron => 'Iron';
+
+  @override
+  String get scoresTitle => 'Grado';
+
+  @override
+  String get scoreNutrition => 'Nutrisyon';
+
+  @override
+  String get scoreNutritionDesc =>
+      'Magandang pinagkukunan ng protina ngunit mas mataas sa taba at calories.';
+
+  @override
+  String get scoreEnvironment => 'Kalikasan';
+
+  @override
+  String get scoreEnvironmentDesc => 'Moderate environmental impact.';
+
+  @override
+  String get scoreProcess => 'Proseso';
+
+  @override
+  String get scoreProcessDesc =>
+      'Processed food with relatively simple ingredients.';
+
+  @override
+  String get extraKnowledgeTitle => 'Karagdagang Kaalaman';
+
+  @override
+  String get extraKnowledgeDesc =>
+      'Mas nakakabusog at mas malasa dahil sa mantika, ngunit may mas mataas na calories at taba.';
+
+  @override
+  String get compareButton => 'Ihambing';
+
+  @override
+  String get similarProductsTitle => 'Kahalintulad na Produkto';
+
+  @override
+  String productCount(int count) {
+    return '$count produkto';
+  }
+
+  @override
+  String get noProductsFound => 'Walang nahanap';
+
+  @override
+  String get noSearchMatchDesc =>
+      'Walang mga produktong tumutugma sa iyong paghahanap.';
+
+  @override
+  String get scanGuideText => 'I-align ang label ng produkto upang i-scan';
+
+  @override
+  String get productCapturedBadge => 'Nakuha na ang Produkto!';
+
+  @override
+  String get tapToScanHint => 'I-tap kahit saan para i-scan';
+
+  @override
+  String get productNotRecognizedTitle => 'Hindi Kilalang Produkto';
+
+  @override
+  String get productNotRecognizedDesc =>
+      'Hindi nakilala ang produkto. Gusto mo bang ipadala ito para sa pagsusuri?';
+
+  @override
+  String get tryAgainButton => 'Subukan Muli';
+
+  @override
+  String get submitLabel => 'Ipadala';
+
+  @override
+  String get submitSkuHeader => 'IPADALA ANG HINDI KILALANG SKU';
+
+  @override
+  String get trainModelHeadline => 'Tulungan Kaming Sanayin ang Model';
+
+  @override
+  String get trainModelSubtitle =>
+      'Kung hindi na-detect ang produkto, i-upload ang photo at impormasyon nito. Ginagamit ito para ma-improve ang aming engine.';
+
+  @override
+  String get imageCaptureSuccess => 'Matagumpay na nakuha ang mock image!';
+
+  @override
+  String get imageRequiredError =>
+      'Mangyaring kumuha muna ng larawan ng label.';
+
+  @override
+  String get submissionReceivedTitle => 'Natanggap na ang Ipinadala';
+
+  @override
+  String get submissionReceivedDesc =>
+      'Salamat! Susuriin ng aming AI team ang label at ia-update ang database sa loob ng 24 oras.';
+
+  @override
+  String get returnToScanner => 'Bumalik sa Scanner';
+
+  @override
+  String get labelImageAttached => 'May nakalakip na larawan';
+
+  @override
+  String get tapToReplace => 'I-tap para palitan ang photo';
+
+  @override
+  String get captureProductLabel => 'Kumuha ng Larawan ng Label';
+
+  @override
+  String get ensureReadableNote =>
+      'Siguraduhing nababasa ang text at nutrition facts';
+
+  @override
+  String get productNameLabel => 'Pangalan ng Produkto / Deskripsyon';
+
+  @override
+  String get productNameEmpty => 'Pakilagay ang pangalan ng produkto';
+
+  @override
+  String get brandNameLabel => 'Brand (hal. Century, Ligo, Lucky Me)';
+
+  @override
+  String get brandNameEmpty => 'Pakilagay ang brand';
+
+  @override
+  String get productVariantLabel => 'Variant (hal. Hot & Spicy, Sweet & Sour)';
+
+  @override
+  String get productVariantEmpty => 'Pakilagay ang variant';
+
+  @override
+  String get productCategoryLabel => 'Kategorya';
+
+  @override
+  String get ingredientsListLabel => 'Listahan ng Sangkap (Opsiyonal)';
+
+  @override
+  String get submitTrainingButton => 'IPADALA PARA SA TRAINING';
+
+  @override
+  String get bestLabelShort => 'Best';
+
+  @override
+  String get worstLabelShort => 'Worst';
 }

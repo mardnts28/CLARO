@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../generated/l10n/app_localizations.dart';
+import '../widgets/voice_assistant_fab.dart';
 
 class UnknownProductSubmissionScreen extends StatefulWidget {
   const UnknownProductSubmissionScreen({super.key});
@@ -29,6 +31,7 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
   ];
 
   void _simulateImageCapture() {
+    final loc = AppLocalizations.of(context)!;
     setState(() {
       _isUploadingImage = true;
     });
@@ -41,7 +44,7 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Mock product image captured successfully!", style: GoogleFonts.inter(color: Colors.black)),
+          content: Text(loc.imageCaptureSuccess, style: GoogleFonts.inter(color: Colors.black)),
           backgroundColor: const Color(0xFF00c6ff),
           behavior: SnackBarBehavior.floating,
         ),
@@ -50,10 +53,13 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
   }
 
   void _handleSubmit() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
     if (!_hasImage) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("Please capture or upload a product label photo first.", style: GoogleFonts.inter(color: Colors.white)),
+          content: Text(loc.imageRequiredError, style: GoogleFonts.inter(color: Colors.white)),
           backgroundColor: Colors.redAccent,
           behavior: SnackBarBehavior.floating,
         ),
@@ -75,7 +81,7 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
         // Show thank you modal/sheet
         showModalBottomSheet(
           context: context,
-          backgroundColor: const Color(0xFF161B26),
+          backgroundColor: theme.cardColor,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
           ),
@@ -89,29 +95,29 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF38ef7d).withOpacity(0.1),
+                      color: Colors.green.withOpacity(0.1),
                     ),
                     child: const Icon(
                       Icons.check_circle_outline,
                       size: 64,
-                      color: Color(0xFF38ef7d),
+                      color: Colors.green,
                     ),
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    "Submission Received",
+                    loc.submissionReceivedTitle,
                     style: GoogleFonts.outfit(
-                      color: Colors.white,
+                      color: colorScheme.onSurface,
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    "Thank you! Our AI team will verify this product label and update the on-device YOLOv8 database model within 24 hours.",
+                    loc.submissionReceivedDesc,
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
-                      color: Colors.white70,
+                      color: colorScheme.onSurfaceVariant,
                       fontSize: 14,
                       height: 1.5,
                     ),
@@ -126,14 +132,14 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
                         Navigator.pop(context); // back to scanner screen
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00c6ff),
-                        foregroundColor: Colors.black,
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
                       child: Text(
-                        "Return to Scanner",
+                        loc.returnToScanner,
                         style: GoogleFonts.outfit(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -161,19 +167,22 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
     return Scaffold(
-      backgroundColor: const Color(0xFF0C0E14),
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: Icon(Icons.arrow_back, color: colorScheme.primary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          "SUBMIT UNKNOWN SKU",
+          loc.submitSkuHeader,
           style: GoogleFonts.outfit(
-            color: Colors.white,
+            color: colorScheme.primary,
             fontSize: 16,
             fontWeight: FontWeight.bold,
             letterSpacing: 1.5,
@@ -189,18 +198,18 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Help Train Our Model",
+                loc.trainModelHeadline,
                 style: GoogleFonts.outfit(
-                  color: Colors.white,
+                  color: colorScheme.onSurface,
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                "If a product isn't detected by our camera, upload its photo and info. Our engine uses this data to refine label mapping.",
+                loc.trainModelSubtitle,
                 style: GoogleFonts.inter(
-                  color: Colors.white.withAlpha(128),
+                  color: colorScheme.onSurfaceVariant,
                   fontSize: 13,
                   height: 1.5,
                 ),
@@ -214,55 +223,55 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
                   height: 160,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF161B26),
+                    color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
                       color: _hasImage 
-                          ? const Color(0xFF38ef7d).withOpacity(0.5) 
-                          : const Color(0xFF1F2937),
+                          ? Colors.green.withOpacity(0.5) 
+                          : theme.dividerColor,
                       width: 1.5,
                     ),
                   ),
                   child: _isUploadingImage
-                      ? const Center(child: CircularProgressIndicator(color: Color(0xFF00c6ff)))
+                      ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
                       : _hasImage
                           ? Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.check_circle_outline, color: Color(0xFF38ef7d), size: 48),
+                                const Icon(Icons.check_circle_outline, color: Colors.green, size: 48),
                                 const SizedBox(height: 12),
                                 Text(
-                                  "Label Image Attached",
+                                  loc.labelImageAttached,
                                   style: GoogleFonts.outfit(
-                                    color: Colors.white,
+                                    color: colorScheme.onSurface,
                                     fontSize: 15,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  "Tap to replace photo",
-                                  style: GoogleFonts.inter(color: Colors.white30, fontSize: 11),
+                                  loc.tapToReplace,
+                                  style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant.withOpacity(0.5), fontSize: 11),
                                 ),
                               ],
                             )
                           : Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.add_a_photo_outlined, color: Color(0xFF00c6ff), size: 40),
+                                Icon(Icons.add_a_photo_outlined, color: colorScheme.primary, size: 40),
                                 const SizedBox(height: 12),
                                 Text(
-                                  "Capture Product Label (Front/Rear)",
+                                  loc.captureProductLabel,
                                   style: GoogleFonts.outfit(
-                                    color: Colors.white,
+                                    color: colorScheme.onSurface,
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  "Ensure text/nutrition facts are readable",
-                                  style: GoogleFonts.inter(color: Colors.white38, fontSize: 11),
+                                  loc.ensureReadableNote,
+                                  style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 11),
                                 ),
                               ],
                             ),
@@ -273,10 +282,10 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
               // Product Name
               TextFormField(
                 controller: _nameController,
-                style: GoogleFonts.inter(color: Colors.white),
-                decoration: _buildInputDecoration("Product Name / Description", Icons.info_outline),
+                style: GoogleFonts.inter(color: colorScheme.onSurface),
+                decoration: _buildInputDecoration(loc.productNameLabel, Icons.info_outline),
                 validator: (value) {
-                  if (value == null || value.isEmpty) return "Please enter product name";
+                  if (value == null || value.isEmpty) return loc.productNameEmpty;
                   return null;
                 },
               ),
@@ -285,10 +294,10 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
               // Brand Name
               TextFormField(
                 controller: _brandController,
-                style: GoogleFonts.inter(color: Colors.white),
-                decoration: _buildInputDecoration("Brand Name (e.g. Century, Ligo, Lucky Me)", Icons.branding_watermark_outlined),
+                style: GoogleFonts.inter(color: colorScheme.onSurface),
+                decoration: _buildInputDecoration(loc.brandNameLabel, Icons.branding_watermark_outlined),
                 validator: (value) {
-                  if (value == null || value.isEmpty) return "Please enter brand name";
+                  if (value == null || value.isEmpty) return loc.brandNameEmpty;
                   return null;
                 },
               ),
@@ -297,10 +306,10 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
               // Variant
               TextFormField(
                 controller: _variantController,
-                style: GoogleFonts.inter(color: Colors.white),
-                decoration: _buildInputDecoration("Product Variant (e.g. Hot & Spicy, Sweet & Sour)", Icons.style_outlined),
+                style: GoogleFonts.inter(color: colorScheme.onSurface),
+                decoration: _buildInputDecoration(loc.productVariantLabel, Icons.style_outlined),
                 validator: (value) {
-                  if (value == null || value.isEmpty) return "Please enter product variant";
+                  if (value == null || value.isEmpty) return loc.productVariantEmpty;
                   return null;
                 },
               ),
@@ -309,13 +318,13 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
               // Category dropdown
               DropdownButtonFormField<String>(
                 value: _selectedCategory,
-                dropdownColor: const Color(0xFF161B26),
-                style: GoogleFonts.inter(color: Colors.white),
-                decoration: _buildInputDecoration("Product Category", Icons.category_outlined),
+                dropdownColor: theme.cardColor,
+                style: GoogleFonts.inter(color: colorScheme.onSurface),
+                decoration: _buildInputDecoration(loc.productCategoryLabel, Icons.category_outlined),
                 items: _categories.map((cat) {
                   return DropdownMenuItem<String>(
                     value: cat,
-                    child: Text(cat, style: GoogleFonts.inter(color: Colors.white)),
+                    child: Text(cat, style: GoogleFonts.inter(color: colorScheme.onSurface)),
                   );
                 }).toList(),
                 onChanged: (val) {
@@ -332,8 +341,8 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
               TextFormField(
                 controller: _ingredientsController,
                 maxLines: 4,
-                style: GoogleFonts.inter(color: Colors.white),
-                decoration: _buildInputDecoration("Ingredients List (Optional)", Icons.receipt_long_outlined),
+                style: GoogleFonts.inter(color: colorScheme.onSurface),
+                decoration: _buildInputDecoration(loc.ingredientsListLabel, Icons.receipt_long_outlined),
               ),
               const SizedBox(height: 36),
 
@@ -344,16 +353,16 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _handleSubmit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00c6ff),
-                    foregroundColor: Colors.black,
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
                   child: _isSubmitting
-                      ? const CircularProgressIndicator(color: Colors.black)
+                      ? CircularProgressIndicator(color: colorScheme.onPrimary)
                       : Text(
-                          "SUBMIT FOR TRAINING",
+                          loc.submitTrainingButton,
                           style: GoogleFonts.outfit(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -366,23 +375,26 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
           ),
         ),
       ),
+      floatingActionButton: const VoiceAssistantFab(),
     );
   }
 
   InputDecoration _buildInputDecoration(String label, IconData icon) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return InputDecoration(
       labelText: label,
-      labelStyle: GoogleFonts.inter(color: Colors.white38, fontSize: 13),
-      prefixIcon: Icon(icon, color: Colors.white38, size: 20),
+      labelStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, fontSize: 13),
+      prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
       filled: true,
-      fillColor: const Color(0xFF161B26),
+      fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.3),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Colors.transparent),
+        borderSide: BorderSide(color: theme.dividerColor),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFF00c6ff), width: 1.5),
+        borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
       ),
     );
   }

@@ -73,7 +73,7 @@
   "personalInfo": "Personal na Impormasyon",
   "preference": "Preference",
   "language": "Lenggwuahe",
-  "suggestion": "Sugestiyon",
+  "suggestion": "Pagsusuri ng App",
   "aboutClaro": "Tungkol sa CLARO",
   "logout": "Logout",
 
@@ -157,5 +157,134 @@
 
   "aboutClaroHeading": "Alamin ang tungkol sa amin!",
   "aboutClaroDescription": "Ang CLARO ay isang AI-powered mobile app na tumutulong sa mga mamimili ng groceries na maunawaan ang impormasyon sa nutrisyon ng lokal na de-latang pagkain. Sa pamamagitan ng pag-scan ng produkto, makikita ng mga user ang pinasimpleng nutrition summaries, health advisories, allergen warnings, product comparisons, at accessibility features tulad ng voice assistance para makapili ng mas matalino at mas malusog na desisyon sa pagbili.",
-  "aboutDevelopers": "Tungkol sa mga developer"
+  "aboutDevelopers": "Tungkol sa mga developer",
+
+  "profileUpdateSuccess": "Na-update ang profile",
+  "profileUpdateError": "Hindi ma-save ang mga update",
+  "editName": "I-edit ang pangalan",
+  "editAge": "I-edit ang edad",
+  "cancel": "Kanselahin",
+  "save": "I-save",
+  "ageLabel": "Edad",
+  "none": "Wala",
+  "healthConditions": "Kondisyon sa Kalusugan",
+  "allergensLabel": "Allergens",
+  "accountSettings": "Account Settings",
+  "changePassword": "Baguhin ang password",
+  "selectAllergen": "Pumili ng Allergen",
+
+  "ratePrompt": "Mangyaring pumili ng rating sa pagitan ng 1 at 5.",
+  "suggestionEmpty": "Mangyaring ilagay ang iyong suhestiyon bago ipadala.",
+  "suggestionTooLong": "Ang suhestiyon ay dapat 500 characters o mas mababa pa.",
+  "suggestionHint": "Isulat ang iyong mungkahi dito...",
+
+  "clearAllTitle": "Burahin ang Lahat?",
+  "clearAllConfirm": "Mabubura ang lahat ng kasaysayan ng iyong mga scan. Hindi ito maibabalik.",
+  "clear": "Burahin",
+  "clearAll": "Burahin Lahat",
+  "searchHint": "Maghanap",
+  "tabAll": "Lahat",
+  "tabFavorites": "Paborito",
+  "tabCompare": "Kumpara",
+  "emptyFavorites": "Wala pang mga paboritong produkto. I-tap ang ❤️ upang mag-save.",
+  "emptyComparisons": "Wala pang mga pag-uugnayan ng produkto.",
+  "noSearchResults": "Walang resulta para sa \"{query}\"",
+  "@noSearchResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "emptyHistory": "Wala pang kasaysayan ng scan. I-scan ang isang produkto upang magsimula!",
+
+  "resultsTitle": "Resulta",
+  "rankedBySuitability": "Naka-rank batay sa suitability",
+  "profileFeatureSoon": "Parating na ang mga feature ng Profile!",
+
+  "fdaExpiredWarning": "BABALA: Ang produktong ito ay may EXPIRED na FDA registration. Maaaring hindi ito ligtas.",
+  "fdaUnverifiedWarning": "Ang produktong ito ay hindi pa nabeberipika ng FDA Philippines.",
+  "ageRequirementBadge": "3+ yrs old",
+  "safeToConsume": "LIGTAS I-KONSUMO",
+  "safeToConsumeSubtitle": "Pinakamainam kainin sa katamtamang dami dahil mas mataas sa taba at calories.",
+  "reminderLabel": "Paalala",
+  "diabetesSafeReminder": "Angkop para sa mga may diabetes, ngunit ang madalas na pagkonsumo ay maaaring hindi mainam para sa mga nagkokontrol ng kolesterol o calorie intake.",
+  "containsAllergens": "Naglalaman ng {list}",
+  "@containsAllergens": {
+    "placeholders": {
+      "list": {
+        "type": "String"
+      }
+    }
+  },
+  "personalHealthWarningTitle": "🩺 Babala Batay sa Iyong Kalusugan",
+  "servingRecommendation": "½–¾ ng lata (90–135g) sa bawat meal, maaaring kainin 2–3 beses kada linggo.",
+  "moreDetailsLink": "Higit pang detalye",
+  "totalNutritionTitle": "Kabuuang Nutrisyon",
+  "nutriCalories": "Calories",
+  "nutriSodium": "Sodium",
+  "nutriSugar": "Sugar",
+  "nutriProtein": "Protina",
+  "nutriTotalFat": "Total Fat",
+  "nutriSatFat": "Sat. Fat",
+  "nutriTransFat": "Trans Fat",
+  "nutriFiber": "Fiber",
+  "nutriPotassium": "Potassium",
+  "nutriCalcium": "Calcium",
+  "nutriIron": "Iron",
+  "scoresTitle": "Grado",
+  "scoreNutrition": "Nutrisyon",
+  "scoreNutritionDesc": "Magandang pinagkukunan ng protina ngunit mas mataas sa taba at calories.",
+  "scoreEnvironment": "Kalikasan",
+  "scoreEnvironmentDesc": "Moderate environmental impact.",
+  "scoreProcess": "Proseso",
+  "scoreProcessDesc": "Processed food with relatively simple ingredients.",
+  "extraKnowledgeTitle": "Karagdagang Kaalaman",
+  "extraKnowledgeDesc": "Mas nakakabusog at mas malasa dahil sa mantika, ngunit may mas mataas na calories at taba.",
+  "compareButton": "Ihambing",
+
+  "similarProductsTitle": "Kahalintulad na Produkto",
+  "productCount": "{count} produkto",
+  "@productCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noProductsFound": "Walang nahanap",
+  "noSearchMatchDesc": "Walang mga produktong tumutugma sa iyong paghahanap.",
+
+  "scanGuideText": "I-align ang label ng produkto upang i-scan",
+  "productCapturedBadge": "Nakuha na ang Produkto!",
+  "tapToScanHint": "I-tap kahit saan para i-scan",
+  "productNotRecognizedTitle": "Hindi Kilalang Produkto",
+  "productNotRecognizedDesc": "Hindi nakilala ang produkto. Gusto mo bang ipadala ito para sa pagsusuri?",
+  "tryAgainButton": "Subukan Muli",
+  "submitLabel": "Ipadala",
+
+  "submitSkuHeader": "IPADALA ANG HINDI KILALANG SKU",
+  "trainModelHeadline": "Tulungan Kaming Sanayin ang Model",
+  "trainModelSubtitle": "Kung hindi na-detect ang produkto, i-upload ang photo at impormasyon nito. Ginagamit ito para ma-improve ang aming engine.",
+  "imageCaptureSuccess": "Matagumpay na nakuha ang mock image!",
+  "imageRequiredError": "Mangyaring kumuha muna ng larawan ng label.",
+  "submissionReceivedTitle": "Natanggap na ang Ipinadala",
+  "submissionReceivedDesc": "Salamat! Susuriin ng aming AI team ang label at ia-update ang database sa loob ng 24 oras.",
+  "returnToScanner": "Bumalik sa Scanner",
+  "labelImageAttached": "May nakalakip na larawan",
+  "tapToReplace": "I-tap para palitan ang photo",
+  "captureProductLabel": "Kumuha ng Larawan ng Label",
+  "ensureReadableNote": "Siguraduhing nababasa ang text at nutrition facts",
+  "productNameLabel": "Pangalan ng Produkto / Deskripsyon",
+  "productNameEmpty": "Pakilagay ang pangalan ng produkto",
+  "brandNameLabel": "Brand (hal. Century, Ligo, Lucky Me)",
+  "brandNameEmpty": "Pakilagay ang brand",
+  "productVariantLabel": "Variant (hal. Hot & Spicy, Sweet & Sour)",
+  "productVariantEmpty": "Pakilagay ang variant",
+  "productCategoryLabel": "Kategorya",
+  "ingredientsListLabel": "Listahan ng Sangkap (Opsiyonal)",
+  "submitTrainingButton": "IPADALA PARA SA TRAINING",
+
+  "bestLabelShort": "Best",
+  "worstLabelShort": "Worst"
 }

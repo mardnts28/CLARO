@@ -5,8 +5,11 @@ service cloud.firestore {
 
     // ─── User Profile Data ───────────────────────────────────────
     // Each user can only read/write their own document.
+    // TEMPORARY: Allow unauthenticated email lookup for MFA check (testing only)
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId
+                  || request.auth == null && request.query.limit <= 1 && request.query.where == 'email';
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
 
     // ─── Scan History ────────────────────────────────────────────
@@ -28,6 +31,15 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && resource.data.submittedBy == request.auth.uid;
       allow update, delete: if false; // admin review only
+    }
+
+    // ─── Login OTP Challenges ─────────────────────────────────────
+    // OTP challenges are stored keyed by user UID. Only the authenticated
+    // user can access their own OTP document. Note: actual OTP operations
+    // are performed by Cloud Functions using Admin SDK (bypasses these rules),
+    // but these rules provide defense-in-depth for any client-side access.
+    match /login_otps/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
     // ─── Deny everything else by default ─────────────────────────

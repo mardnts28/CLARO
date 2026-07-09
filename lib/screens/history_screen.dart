@@ -5,6 +5,8 @@ import '../services/history_service.dart';
 import '../services/product_db_service.dart';
 import 'camera_scanner_screen.dart';
 import 'product_detail_screen.dart';
+import '../generated/l10n/app_localizations.dart';
+import '../widgets/voice_assistant_fab.dart';
 
 class HistoryScreen extends StatefulWidget {
   final bool embeddedMode;
@@ -79,31 +81,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _showClearAllDialog() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: theme.cardColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Burahin ang Lahat?',
-            style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+        title: Text(loc.clearAllTitle,
+            style: GoogleFonts.outfit(
+                fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
         content: Text(
-          'Mabubura ang lahat ng kasaysayan ng iyong mga scan. Hindi ito maibabalik.',
-          style: GoogleFonts.inter(fontSize: 14, color: Colors.black54),
+          loc.clearAllConfirm,
+          style: GoogleFonts.inter(
+              fontSize: 14, color: colorScheme.onSurfaceVariant),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Kanselahin',
-                style: GoogleFonts.inter(color: Colors.black54)),
+            child: Text(loc.cancel,
+                style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant)),
           ),
           TextButton(
             onPressed: () {
               _historyService.clearAllHistory();
               Navigator.pop(ctx);
             },
-            child: Text('Burahin',
+            child: Text(loc.clear,
                 style: GoogleFonts.inter(
-                    color: const Color(0xFFB71C1C),
-                    fontWeight: FontWeight.bold)),
+                    color: colorScheme.primary, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -112,6 +119,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   // ── Build a single scan-type card ─────────────────────────────────────────
   Widget _buildScanCard(HistoryItem item) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final product = item.productId != null
         ? _dbService.getProductById(item.productId!)
         : null;
@@ -123,10 +132,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFFB71C1C),
+          color: colorScheme.primary,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Icon(Icons.delete_outline, color: Colors.white, size: 26),
+        child: Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
       ),
       onDismissed: (_) => _historyService.deleteRecord(item.id),
       child: GestureDetector(
@@ -144,8 +153,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: theme.cardColor,
             borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: theme.dividerColor),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
@@ -162,18 +172,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: Container(
                   width: 52,
                   height: 52,
-                  color: const Color(0xFFF5F5F5),
+                  color: colorScheme.surfaceContainerHighest,
                   child: product != null
                       ? Image.asset(
                           product.imageUrl,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const Icon(
+                          errorBuilder: (_, __, ___) => Icon(
                               Icons.inventory_2_outlined,
-                              color: Color(0xFFB71C1C),
+                              color: colorScheme.primary,
                               size: 30),
                         )
-                      : const Icon(Icons.inventory_2_outlined,
-                          color: Color(0xFFB71C1C), size: 30),
+                      : Icon(Icons.inventory_2_outlined,
+                          color: colorScheme.primary, size: 30),
                 ),
               ),
               const SizedBox(width: 12),
@@ -187,13 +197,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       style: GoogleFonts.outfit(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87),
+                          color: colorScheme.onSurface),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       _formatTime(item.timestamp),
                       style: GoogleFonts.inter(
-                          fontSize: 12, color: Colors.black45),
+                          fontSize: 12, color: colorScheme.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -204,8 +214,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: Icon(
                   item.isFavorite ? Icons.favorite : Icons.favorite_border,
                   color: item.isFavorite
-                      ? const Color(0xFFB71C1C)
-                      : Colors.black26,
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant.withOpacity(0.4),
                   size: 22,
                 ),
               ),
@@ -218,6 +228,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   // ── Build a single comparison-type card (same layout as scan card) ─────────
   Widget _buildCompareCard(HistoryItem item) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     return Dismissible(
       key: Key(item.id),
       direction: DismissDirection.endToStart,
@@ -225,18 +237,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: const Color(0xFFB71C1C),
+          color: colorScheme.primary,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: const Icon(Icons.delete_outline, color: Colors.white, size: 26),
+        child: Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
       ),
       onDismissed: (_) => _historyService.deleteRecord(item.id),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -253,10 +266,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: Container(
                 width: 52,
                 height: 52,
-                color: const Color(0xFFFFEBEE),
-                child: const Center(
+                color: colorScheme.primary.withOpacity(0.12),
+                child: Center(
                   child: Icon(Icons.compare_arrows_rounded,
-                      color: Color(0xFFB71C1C), size: 28),
+                      color: colorScheme.primary, size: 28),
                 ),
               ),
             ),
@@ -271,20 +284,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     style: GoogleFonts.outfit(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: Colors.black87),
+                        color: colorScheme.onSurface),
                   ),
                   const SizedBox(height: 2),
                   Text(
                     _formatTime(item.timestamp),
                     style: GoogleFonts.inter(
-                        fontSize: 12, color: Colors.black45),
+                        fontSize: 12, color: colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
             ),
             // Compare badge icon on right
-            const Icon(Icons.bar_chart_rounded,
-                color: Color(0xFFB71C1C), size: 22),
+            Icon(Icons.bar_chart_rounded,
+                color: colorScheme.primary, size: 22),
           ],
         ),
       ),
@@ -292,6 +305,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildGroupSection(String label, List<HistoryItem> items) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -301,7 +315,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           style: GoogleFonts.outfit(
               fontSize: 16,
               fontWeight: FontWeight.bold,
-              color: Colors.black87),
+              color: theme.colorScheme.onSurface),
         ),
         const SizedBox(height: 10),
         ...items.map((item) => item.type == HistoryType.comparison
@@ -311,22 +325,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // ── Bottom nav ─────────────────────────────────────────────────────────────
   Widget _navItem(IconData icon, String label, bool active,
       {VoidCallback? onTap}) {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon,
-              color: active ? const Color(0xFFB71C1C) : Colors.black38,
+              color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
               size: 26),
           const SizedBox(height: 2),
           Text(label,
               style: GoogleFonts.inter(
                   fontSize: 11,
-                  color: active ? const Color(0xFFB71C1C) : Colors.black38,
+                  color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
                   fontWeight:
                       active ? FontWeight.w600 : FontWeight.normal)),
         ],
@@ -335,18 +349,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _navItemScan() {
+    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: () => Navigator.push(context,
           MaterialPageRoute(builder: (_) => const CameraScannerScreen())),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.qr_code_scanner, color: Colors.black38, size: 26),
+          Icon(Icons.qr_code_scanner, color: colorScheme.onSurfaceVariant, size: 26),
           const SizedBox(height: 2),
           Text('Scan',
               style: GoogleFonts.inter(
                   fontSize: 11,
-                  color: Colors.black38,
+                  color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.normal)),
         ],
       ),
@@ -355,31 +370,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
     final topPadding = MediaQuery.of(context).padding.top;
     final items = _historyService.getItems(
         filter: _activeTab, searchQuery: _searchQuery);
     final grouped = _groupItems(items);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F0EE),
-      floatingActionButton: widget.embeddedMode ? null : FloatingActionButton(
-        onPressed: () {},
-        backgroundColor: const Color(0xFFB71C1C),
-        foregroundColor: Colors.white,
-        elevation: 4,
-        child: const Icon(Icons.mic, size: 26),
-      ),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      floatingActionButton: widget.embeddedMode ? null : const VoiceAssistantFab(),
       bottomNavigationBar: widget.embeddedMode ? null : Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE0E0E0))),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          border: Border(top: BorderSide(color: theme.dividerColor)),
         ),
         padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).padding.bottom + 4, top: 8),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _navItem(Icons.home_outlined, 'Home', false),
+            _navItem(Icons.home_outlined, loc.home, false),
             _navItemScan(),
             // History tab is active
             GestureDetector(
@@ -388,25 +400,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 20, vertical: 8),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFEBEE),
+                  color: colorScheme.primary.withOpacity(0.12),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.history,
-                        color: Color(0xFFB71C1C), size: 26),
+                    Icon(Icons.history,
+                        color: colorScheme.primary, size: 26),
                     const SizedBox(height: 2),
-                    Text('History',
+                    Text(loc.history,
                         style: GoogleFonts.inter(
                             fontSize: 11,
-                            color: const Color(0xFFB71C1C),
+                            color: colorScheme.primary,
                             fontWeight: FontWeight.w600)),
                   ],
                 ),
               ),
             ),
-            _navItem(Icons.person_outline, 'Profile', false),
+            _navItem(Icons.person_outline, loc.profile, false),
           ],
         ),
       ),
@@ -414,7 +426,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         children: [
           // ── Top bar ──────────────────────────────────────────────────────
           Container(
-            color: Colors.white,
+            color: colorScheme.surface,
             padding: EdgeInsets.only(
                 top: topPadding + 8, left: 20, right: 20, bottom: 12),
             child: Column(
@@ -425,20 +437,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   children: [
                     Expanded(
                       child: Text(
-                        'History',
+                        loc.history,
                         style: GoogleFonts.outfit(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87),
+                            color: colorScheme.onSurface),
                       ),
                     ),
                     GestureDetector(
                       onTap: _showClearAllDialog,
                       child: Text(
-                        'Burahin Lahat',
+                        loc.clearAll,
                         style: GoogleFonts.inter(
                             fontSize: 12,
-                            color: const Color(0xFFB71C1C),
+                            color: colorScheme.primary,
                             fontWeight: FontWeight.w500),
                       ),
                     ),
@@ -449,25 +461,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Container(
                   height: 44,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
+                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: const Color(0xFFE0E0E0)),
+                    border: Border.all(color: theme.dividerColor),
                   ),
                   child: Row(
                     children: [
                       const SizedBox(width: 14),
-                      const Icon(Icons.search,
-                          color: Colors.black38, size: 20),
+                      Icon(Icons.search,
+                          color: colorScheme.onSurfaceVariant, size: 20),
                       const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _searchController,
                           style: GoogleFonts.inter(
-                              fontSize: 14, color: Colors.black87),
+                              fontSize: 14, color: colorScheme.onSurface),
                           decoration: InputDecoration(
-                            hintText: 'Search',
+                            hintText: loc.searchHint,
                             hintStyle: GoogleFonts.inter(
-                                fontSize: 14, color: Colors.black38),
+                                fontSize: 14, color: colorScheme.onSurfaceVariant),
                             border: InputBorder.none,
                             isDense: true,
                             contentPadding: EdgeInsets.zero,
@@ -477,8 +489,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       if (_searchQuery.isNotEmpty)
                         GestureDetector(
                           onTap: () => _searchController.clear(),
-                          child: const Icon(Icons.close,
-                              color: Colors.black38, size: 18),
+                          child: Icon(Icons.close,
+                              color: colorScheme.onSurfaceVariant, size: 18),
                         ),
                       const SizedBox(width: 12),
                     ],
@@ -489,12 +501,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF0EAEA),
+                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Row(
                     children: _tabs.map((tab) {
                       final isActive = _activeTab == tab;
+                      String tabLabel = tab;
+                      if (tab == 'Lahat') tabLabel = loc.tabAll;
+                      if (tab == 'Paborito') tabLabel = loc.tabFavorites;
+                      if (tab == 'Kumpara') tabLabel = loc.tabCompare;
+
                       return Expanded(
                         child: GestureDetector(
                           onTap: () =>
@@ -504,7 +521,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 8),
                             decoration: BoxDecoration(
                               color: isActive
-                                  ? Colors.white
+                                  ? theme.cardColor
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: isActive
@@ -520,15 +537,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             ),
                             child: Center(
                               child: Text(
-                                tab,
+                                tabLabel,
                                 style: GoogleFonts.outfit(
                                   fontSize: 13,
                                   fontWeight: isActive
                                       ? FontWeight.bold
                                       : FontWeight.w500,
                                   color: isActive
-                                      ? const Color(0xFFB71C1C)
-                                      : Colors.black54,
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ),
@@ -561,16 +578,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildEmptyState() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
     String message;
     if (_activeTab == 'Paborito') {
-      message = 'Wala pang mga paboritong produkto.\nI-tap ang ❤️ upang mag-save.';
+      message = loc.emptyFavorites;
     } else if (_activeTab == 'Kumpara') {
-      message = 'Wala pang mga pag-uugnayan ng produkto.';
+      message = loc.emptyComparisons;
     } else if (_searchQuery.isNotEmpty) {
-      message = 'Walang resulta para sa "$_searchQuery".';
+      message = loc.noSearchResults(_searchQuery);
     } else {
-      message =
-          'Wala pang kasaysayan ng scan.\nI-scan ang isang produkto upang magsimula!';
+      message = loc.emptyHistory;
     }
     return Center(
       child: Padding(
@@ -578,15 +597,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.history,
-                color: Color(0xFFDDBBBB), size: 72),
+            Icon(Icons.history,
+                color: colorScheme.primary.withOpacity(0.2), size: 72),
             const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                   fontSize: 14,
-                  color: Colors.black38,
+                  color: colorScheme.onSurfaceVariant,
                   height: 1.6),
             ),
           ],

@@ -73,7 +73,7 @@
   "personalInfo": "Personal Information",
   "preference": "Preference",
   "language": "Language",
-  "suggestion": "Suggestion",
+  "suggestion": "App Review",
   "aboutClaro": "About CLARO",
   "logout": "Logout",
 
@@ -157,5 +157,134 @@
 
   "aboutClaroHeading": "Learn about us!",
   "aboutClaroDescription": "CLARO is an AI-powered mobile app that helps grocery shoppers understand nutrition information for local canned foods. By scanning a product, users see simplified nutrition summaries, health advisories, allergen warnings, product comparisons, and accessibility features such as voice assistance to make smarter and healthier buying decisions.",
-  "aboutDevelopers": "About the developers"
+  "aboutDevelopers": "About the developers",
+
+  "profileUpdateSuccess": "Profile updated",
+  "profileUpdateError": "Unable to save updates",
+  "editName": "Edit name",
+  "editAge": "Edit age",
+  "cancel": "Cancel",
+  "save": "Save",
+  "ageLabel": "Age",
+  "none": "None",
+  "healthConditions": "Health Conditions",
+  "allergensLabel": "Allergens",
+  "accountSettings": "Account Settings",
+  "changePassword": "Change password",
+  "selectAllergen": "Select Allergen",
+
+  "ratePrompt": "Please select a rating between 1 and 5.",
+  "suggestionEmpty": "Please enter your suggestion before submitting.",
+  "suggestionTooLong": "Suggestion must be 500 characters or less.",
+  "suggestionHint": "Write your suggestion here...",
+
+  "clearAllTitle": "Clear All?",
+  "clearAllConfirm": "All scan history will be deleted. This cannot be undone.",
+  "clear": "Clear",
+  "clearAll": "Clear All",
+  "searchHint": "Search",
+  "tabAll": "All",
+  "tabFavorites": "Favorites",
+  "tabCompare": "Compare",
+  "emptyFavorites": "No favorite products yet. Tap ❤️ to save.",
+  "emptyComparisons": "No product comparisons yet.",
+  "noSearchResults": "No results for \"{query}\"",
+  "@noSearchResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "emptyHistory": "No scan history yet. Scan a product to start!",
+
+  "resultsTitle": "Results",
+  "rankedBySuitability": "Ranked based on suitability",
+  "profileFeatureSoon": "Profile features coming soon!",
+
+  "fdaExpiredWarning": "WARNING: This product has an EXPIRED FDA registration. It may not be safe.",
+  "fdaUnverifiedWarning": "This product has not yet been verified by FDA Philippines.",
+  "ageRequirementBadge": "3+ yrs old",
+  "safeToConsume": "SAFE TO CONSUME",
+  "safeToConsumeSubtitle": "Best eaten in moderation as it is higher in fat and calories.",
+  "reminderLabel": "Reminder",
+  "diabetesSafeReminder": "Suitable for diabetics, but frequent consumption may not be ideal for those controlling cholesterol or calorie intake.",
+  "containsAllergens": "Contains {list}",
+  "@containsAllergens": {
+    "placeholders": {
+      "list": {
+        "type": "String"
+      }
+    }
+  },
+  "personalHealthWarningTitle": "🩺 Health Profile Warning",
+  "servingRecommendation": "½–¾ can (90–135g) per meal, up to 2–3 times a week.",
+  "moreDetailsLink": "More details",
+  "totalNutritionTitle": "Total Nutrition",
+  "nutriCalories": "Calories",
+  "nutriSodium": "Sodium",
+  "nutriSugar": "Sugar",
+  "nutriProtein": "Protein",
+  "nutriTotalFat": "Total Fat",
+  "nutriSatFat": "Sat. Fat",
+  "nutriTransFat": "Trans Fat",
+  "nutriFiber": "Fiber",
+  "nutriPotassium": "Potassium",
+  "nutriCalcium": "Calcium",
+  "nutriIron": "Iron",
+  "scoresTitle": "Scores",
+  "scoreNutrition": "Nutrition",
+  "scoreNutritionDesc": "Good source of protein but higher in fat and calories.",
+  "scoreEnvironment": "Environment",
+  "scoreEnvironmentDesc": "Moderate environmental impact.",
+  "scoreProcess": "Process",
+  "scoreProcessDesc": "Processed food with relatively simple ingredients.",
+  "extraKnowledgeTitle": "Extra Knowledge",
+  "extraKnowledgeDesc": "More filling and flavorful due to oil, but has higher calories and fat.",
+  "compareButton": "Compare",
+
+  "similarProductsTitle": "Similar Products",
+  "productCount": "{count} products",
+  "@productCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noProductsFound": "No products found",
+  "noSearchMatchDesc": "No products matched your search.",
+
+  "scanGuideText": "Align product label to scan",
+  "productCapturedBadge": "Product Captured!",
+  "tapToScanHint": "Tap anywhere to scan",
+  "productNotRecognizedTitle": "Product Not Recognized",
+  "productNotRecognizedDesc": "The product could not be identified. Would you like to submit it for review?",
+  "tryAgainButton": "Try Again",
+  "submitLabel": "Submit",
+
+  "submitSkuHeader": "SUBMIT UNKNOWN SKU",
+  "trainModelHeadline": "Help Train Our Model",
+  "trainModelSubtitle": "If a product isn't detected by our camera, upload its photo and info. Our engine uses this data to refine label mapping.",
+  "imageCaptureSuccess": "Mock product image captured successfully!",
+  "imageRequiredError": "Please capture or upload a product label photo first.",
+  "submissionReceivedTitle": "Submission Received",
+  "submissionReceivedDesc": "Thank you! Our AI team will verify this product label and update the on-device YOLOv8 database model within 24 hours.",
+  "returnToScanner": "Return to Scanner",
+  "labelImageAttached": "Label Image Attached",
+  "tapToReplace": "Tap to replace photo",
+  "captureProductLabel": "Capture Product Label (Front/Rear)",
+  "ensureReadableNote": "Ensure text/nutrition facts are readable",
+  "productNameLabel": "Product Name / Description",
+  "productNameEmpty": "Please enter product name",
+  "brandNameLabel": "Brand Name (e.g. Century, Ligo, Lucky Me)",
+  "brandNameEmpty": "Please enter brand name",
+  "productVariantLabel": "Product Variant (e.g. Hot & Spicy, Sweet & Sour)",
+  "productVariantEmpty": "Please enter product variant",
+  "productCategoryLabel": "Product Category",
+  "ingredientsListLabel": "Ingredients List (Optional)",
+  "submitTrainingButton": "SUBMIT FOR TRAINING",
+
+  "bestLabelShort": "Best",
+  "worstLabelShort": "Worst"
 }
