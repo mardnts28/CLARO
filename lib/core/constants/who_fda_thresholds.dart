@@ -36,6 +36,7 @@ enum AdvisoryLevel { suitable, moderate, caution }
 class WhoDailyLimits {
   static const double sodiumMgPerDay = 2000;
   static const double sugarsGPerDay = 50;
+  static const double saturatedFatGPerDay = 22;
 }
 
 // Table 3.14 thresholds, keyed by condition -> nutrient
@@ -46,6 +47,9 @@ class ConditionThresholds {
     },
     HealthCondition.diabetes: {
       'sugarsG': NutrientThreshold(suitableMaxInclusive: 2.5, cautionMinInclusive: 9.5),
+    },
+    HealthCondition.heartCondition: {
+      'saturatedFatG': NutrientThreshold(suitableMaxInclusive: 2.2, cautionMinInclusive: 4.4),
     },
   };
 }

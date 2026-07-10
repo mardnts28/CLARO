@@ -19,6 +19,7 @@ import '../models/ranked_product_result.dart';
 import '../../core/utils/who_calculator.dart';
 import '../../core/utils/comparison_calculator.dart';
 import '../../core/utils/comparison_matrix_builder.dart';
+import '../../core/constants/who_fda_thresholds.dart';
 
 // Module says "up to 3-5 products" per scan/comparison event.
 const int kMaxProductsPerRanking = 5;
@@ -104,9 +105,117 @@ class ProductRankingService {
           )
         : null;
 
+    // Generate ranking explanation if comparing
+    String? rankingExplanation;
+    if (isComparing) {
+      rankingExplanation = await _generateRankingExplanation(
+        target: target,
+        comparisonSet: comparisonSet,
+        user: user,
+        languageCode: languageCode,
+      );
+    }
+
     return ProductDetailResult(
       advisory: advisory,
       comparisonMatrix: comparisonMatrix,
+      rankingExplanation: rankingExplanation,
     );
+  }
+
+  Future<String> _generateRankingExplanation({
+    required RankedProductResult target,
+    required List<RankedProductResult> comparisonSet,
+    required UserHealthProfile user,
+    required String languageCode,
+  }) async {
+    // Skip Gemini if product is suitable - use default explanation
+    if (target.evaluation.overallLevel == AdvisoryLevel.suitable) {
+      return 'This product ranks ${target.rank} of ${comparisonSet.length} and is suitable for your health profile.';
+    }
+
+    // Get the main nutrient for the user's condition
+    final mainNutrient = _getMainNutrientForUser(user);
+    if (mainNutrient == null) {
+      return 'This product ranks ${target.rank} of ${comparisonSet.length}.';
+    }
+
+    // Calculate nutrient values for comparison
+    final nutrientValues = comparisonSet.map((r) {
+      final eval = r.evaluation.nutrientEvaluations
+          .where((e) => e.nutrientKey == mainNutrient.key)
+          .firstOrNull;
+      return eval?.valuePer100g ?? 0.0;
+    }).toList();
+
+    final bestValue = nutrientValues.reduce((a, b) => a < b ? a : b);
+    final worstValue = nutrientValues.reduce((a, b) => a > b ? a : b);
+
+    final targetEval = target.evaluation.nutrientEvaluations
+        .where((e) => e.nutrientKey == mainNutrient.key)
+        .firstOrNull;
+
+    if (targetEval == null) {
+      return 'This product ranks ${target.rank} of ${comparisonSet.length}.';
+    }
+
+    final thisValue = targetEval.valuePer100g;
+    final thisIsBest = thisValue == bestValue;
+    final thisIsWorst = thisValue == worstValue;
+
+    final resultData = await _geminiService.generateRankingExplanation(
+      nutrientName: mainNutrient.name,
+      nutrientUnit: mainNutrient.unit,
+      thisValue: thisValue,
+      bestValue: bestValue,
+      worstValue: worstValue,
+      thisIsBest: thisIsBest,
+      thisIsWorst: thisIsWorst,
+      rank: target.rank,
+      totalProducts: comparisonSet.length,
+      languageCode: languageCode,
+    );
+
+    return resultData['explanation'] ?? 'This product ranks ${target.rank} of ${comparisonSet.length}.';
+  }
+
+  ({String key, String name, String unit})? _getMainNutrientForUser(UserHealthProfile user) {
+    if (user.conditions.isEmpty) return null;
+
+    // Get the first condition's main nutrient
+    final condition = user.conditions.first;
+    final thresholds = ConditionThresholds.thresholds[condition];
+    if (thresholds == null || thresholds.isEmpty) return null;
+
+    final nutrientKey = thresholds.keys.first;
+    final nutrientName = _getNutrientName(nutrientKey);
+    final nutrientUnit = _getNutrientUnit(nutrientKey);
+
+    return (key: nutrientKey, name: nutrientName, unit: nutrientUnit);
+  }
+
+  String _getNutrientName(String nutrientKey) {
+    switch (nutrientKey) {
+      case 'sodiumMg':
+        return 'sodium';
+      case 'sugarsG':
+        return 'sugars';
+      case 'saturatedFatG':
+        return 'saturated fat';
+      default:
+        return nutrientKey;
+    }
+  }
+
+  String _getNutrientUnit(String nutrientKey) {
+    switch (nutrientKey) {
+      case 'sodiumMg':
+        return 'mg';
+      case 'sugarsG':
+      case 'saturatedFatG':
+        return 'g';
+      default:
+        return '';
+    }
   }
 }

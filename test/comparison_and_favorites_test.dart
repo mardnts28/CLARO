@@ -103,13 +103,13 @@ void main() {
       expect(cellB.level, AdvisoryLevel.moderate); // 320mg is 101-399 range
     });
 
-    test('level is null for nutrients with no Table 3.14 threshold, even when '
-        'that nutrient clearly differs between products', () async {
+    test('level is null for saturated fat when user does NOT have heart condition, '
+        'even when that nutrient clearly differs between products', () async {
       final repo = MockProductRepository();
       final user = UserHealthProfile(
         userId: 'u1',
         displayName: 'Test',
-        conditions: [HealthCondition.hypertension],
+        conditions: [HealthCondition.hypertension], // NOT heart condition
         allergies: [],
       );
 
@@ -133,9 +133,55 @@ void main() {
       expect(cellA.highlight, ComparisonHighlight.unfavorable); // 6.5g, higher
       expect(cellB.highlight, ComparisonHighlight.favorable); // 4.5g, lower
 
-      // But absolute level stays null -- Table 3.14 has no saturated fat band.
+      // But absolute level stays null -- user doesn't have heart condition.
       expect(cellA.level, null);
       expect(cellB.level, null);
+    });
+
+    test('level is set for saturated fat when user HAS heart condition', () async {
+      final repo = MockProductRepository();
+      final user = UserHealthProfile(
+        userId: 'u1',
+        displayName: 'Test',
+        conditions: [HealthCondition.heartCondition], // HAS heart condition
+        allergies: [],
+      );
+
+      final productA = await repo.getProductById('p001'); // saturatedFatG 6.5
+      final productB = await repo.getProductById('p012'); // saturatedFatG 4.5
+
+      final evalA = WhoCalculator.evaluateProduct(productA, user);
+      final evalB = WhoCalculator.evaluateProduct(productB, user);
+
+      final matrix = ComparisonMatrixBuilder.build(
+        comparisonSet: [evalA, evalB],
+        user: user,
+      );
+
+      final satFatRow = matrix.nutrientRows
+          .firstWhere((r) => r.nutrient == ComparisonNutrient.saturatedFat);
+      final cellA = satFatRow.cells.firstWhere((c) => c.productId == 'p001');
+      final cellB = satFatRow.cells.firstWhere((c) => c.productId == 'p012');
+
+      // When absolute level is available, highlight is based on the level (not relative ranking).
+      // 6.5g >= 4.4g caution threshold => Caution => unfavorable
+      expect(cellA.highlight, ComparisonHighlight.unfavorable);
+      // 4.5g >= 4.4g caution threshold => Caution => unfavorable
+      expect(cellB.highlight, ComparisonHighlight.unfavorable);
+
+      // Absolute level is now set since user has heart condition.
+      // 6.5g >= 4.4g caution threshold => Caution
+      expect(cellA.level, AdvisoryLevel.caution);
+      // 4.5g >= 4.4g caution threshold => Caution
+      expect(cellB.level, AdvisoryLevel.caution);
+
+      print('Comparison Matrix Test (Heart Condition):');
+      print('  Product A (${productA.name}): ${cellA.value}g saturated fat per 100g');
+      print('    - Highlight: ${cellA.highlight}');
+      print('    - Advisory level: ${cellA.level}');
+      print('  Product B (${productB.name}): ${cellB.value}g saturated fat per 100g');
+      print('    - Highlight: ${cellB.highlight}');
+      print('    - Advisory level: ${cellB.level}');
     });
 
     test('level stays null for sodium when the user does NOT have hypertension saved, '

@@ -10,6 +10,15 @@ import '../../data/models/product.dart';
 import '../../data/models/product_evaluation.dart';
 
 class WhoCalculator {
+  // Classify nutrient based on WHO daily limit percentage per serving
+  // Suitable: ≤10%, Moderate: >10-20%, Caution: >20%
+  static AdvisoryLevel classifyByWhoPercentage(double whoPercentage) {
+    if (whoPercentage <= 10) return AdvisoryLevel.suitable;
+    if (whoPercentage > 20) return AdvisoryLevel.caution;
+    return AdvisoryLevel.moderate;
+  }
+
+  // Legacy method for per-100g classification (used for ranking)
   static AdvisoryLevel classifyNutrient(
     HealthCondition condition,
     String nutrientKey,
@@ -32,6 +41,8 @@ class WhoCalculator {
         return info.sodiumMg;
       case 'sugarsG':
         return info.sugarsG;
+      case 'saturatedFatG':
+        return info.saturatedFatG;
       default:
         throw ArgumentError('Unknown nutrientKey: $nutrientKey');
     }
@@ -59,12 +70,26 @@ class WhoCalculator {
     for (final condition in user.conditions) {
       final nutrientKeys = ConditionThresholds.thresholds[condition]?.keys ?? const <String>[];
       for (final key in nutrientKeys) {
-        final value = readNutrientValue(product.nutritionPer100g, key);
-        final level = classifyNutrient(condition, key, value);
+        final valuePer100g = readNutrientValue(product.nutritionPer100g, key);
+        
+        // Calculate per-serving value
+        final valuePerServing = (valuePer100g / 100) * product.servingSizeG;
+        
+        // Get WHO daily limit for this nutrient
+        final whoDailyLimit = _getWhoDailyLimit(key);
+        
+        // Calculate percentage of WHO daily limit per serving
+        final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
+        
+        // Classify based on WHO percentage (for health advisory)
+        final level = classifyByWhoPercentage(whoPercentage);
+        
         nutrientEvals.add(NutrientEvaluation(
           condition: condition,
           nutrientKey: key,
-          valuePer100g: value,
+          valuePer100g: valuePer100g,
+          valuePerServing: valuePerServing,
+          whoDailyLimitPercentage: whoPercentage,
           level: level,
         ));
       }
@@ -96,6 +121,19 @@ class WhoCalculator {
       overallLevel: overallLevel,
       allergenOverride: allergenAssessment.hasDirectAllergen,
     );
+  }
+
+  static double _getWhoDailyLimit(String nutrientKey) {
+    switch (nutrientKey) {
+      case 'sodiumMg':
+        return WhoDailyLimits.sodiumMgPerDay;
+      case 'sugarsG':
+        return WhoDailyLimits.sugarsGPerDay;
+      case 'saturatedFatG':
+        return WhoDailyLimits.saturatedFatGPerDay;
+      default:
+        throw ArgumentError('No WHO daily limit defined for $nutrientKey');
+    }
   }
 
   static AdvisoryLevel _worstLevel(List<NutrientEvaluation> evals) {

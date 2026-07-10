@@ -17,9 +17,15 @@ class ProductDetailResult {
   // whenever 2+ products were in the comparison set this detail came from.
   final ComparisonMatrix? comparisonMatrix;
 
+  // Ranking explanation for why this product received its rank in the comparison.
+  // Null when this product was viewed WITHOUT being compared to anything.
+  // Uses Gemini for non-suitable products, default explanation for suitable products.
+  final String? rankingExplanation;
+
   const ProductDetailResult({
     required this.advisory,
     required this.comparisonMatrix,
+    this.rankingExplanation,
   });
 
   bool get hasComparison => comparisonMatrix != null && !comparisonMatrix!.isEmpty;

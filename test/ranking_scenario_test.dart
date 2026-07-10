@@ -29,6 +29,13 @@ void main() {
     allergies: [],
   );
 
+  final heartConditionUser = UserHealthProfile(
+    userId: 'test-user-2',
+    displayName: 'Test User 2',
+    conditions: [HealthCondition.heartCondition],
+    allergies: [],
+  );
+
   group('Scenario 1: multiple products recognized in one scan', () {
     test('ranks all recognized products regardless of category, top-3 get '
         'AI-path reasons, rest get fallback', () async {
@@ -77,6 +84,50 @@ void main() {
       // the fake key forces failure, but isTopRecommendation still reflects
       // rank, independent of whether Gemini actually succeeded).
       expect(results.where((r) => r.isTopRecommendation).length, 3);
+
+      // Print ranking output with additional information
+      print('Product Ranking Test (Hypertension):');
+      
+      // Calculate sodium values for comparison
+      final sodiumValues = results.map((r) {
+        final eval = r.evaluation.nutrientEvaluations
+            .where((e) => e.nutrientKey == 'sodiumMg')
+            .firstOrNull;
+        return eval?.valuePer100g ?? 0.0;
+      }).toList();
+      
+      final bestSodiumValue = sodiumValues.reduce((a, b) => a < b ? a : b);
+      final worstSodiumValue = sodiumValues.reduce((a, b) => a > b ? a : b);
+      
+      for (int i = 0; i < results.length; i++) {
+        final result = results[i];
+        final product = result.evaluation.product;
+        final sodiumEval = result.evaluation.nutrientEvaluations
+            .where((e) => e.nutrientKey == 'sodiumMg')
+            .firstOrNull;
+        
+        print('  Rank ${result.rank}: ${product.name}');
+        if (sodiumEval != null) {
+          // Generate additional information using Gemini
+          final thisValue = sodiumEval.valuePer100g;
+          final thisIsBest = thisValue == bestSodiumValue;
+          final thisIsWorst = thisValue == worstSodiumValue;
+          
+          final resultData = await geminiService.generateRankingExplanation(
+            nutrientName: 'sodium',
+            nutrientUnit: 'mg',
+            thisValue: thisValue,
+            bestValue: bestSodiumValue,
+            worstValue: worstSodiumValue,
+            thisIsBest: thisIsBest,
+            thisIsWorst: thisIsWorst,
+            rank: result.rank,
+            totalProducts: results.length,
+          );
+          
+          print('    - Additional Information (${resultData['source']}): ${resultData['explanation']}');
+        }
+      }
     });
 
     test('throws if more than 5 products are scanned simultaneously', () async {
@@ -91,6 +142,91 @@ void main() {
         ),
         throwsArgumentError,
       );
+    });
+  });
+
+  group('Scenario 1b: heart condition user ranking', () {
+    test('ranks products based on saturated fat content for heart condition', () async {
+      final repo = MockProductRepository();
+      final scanned = [
+        await repo.getProductById('p001'), // Argentina Corned Beef (higher saturated fat)
+        await repo.getProductById('p012'), // Low Sodium Corned Beef (lower saturated fat)
+      ];
+
+      final results = rankingService.rankProducts(
+        products: scanned,
+        user: heartConditionUser,
+      );
+
+      expect(results.length, 2);
+      expect(results.first.evaluation.product.id, 'p012'); // Lower saturated fat should rank first
+      expect(results.last.evaluation.product.id, 'p001');
+
+      print('Product Ranking Test (Heart Condition):');
+      
+      // Calculate values for comparison
+      final satFatValues = results.map((r) {
+        final eval = r.evaluation.nutrientEvaluations
+            .where((e) => e.nutrientKey == 'saturatedFatG')
+            .firstOrNull;
+        return eval?.valuePer100g ?? 0.0;
+      }).toList();
+      
+      final bestValue = satFatValues.reduce((a, b) => a < b ? a : b);
+      final worstValue = satFatValues.reduce((a, b) => a > b ? a : b);
+      
+      for (int i = 0; i < results.length; i++) {
+        final result = results[i];
+        final product = result.evaluation.product;
+        final satFatEval = result.evaluation.nutrientEvaluations
+            .where((e) => e.nutrientKey == 'saturatedFatG')
+            .firstOrNull;
+        
+        print('  Rank ${i + 1}: ${product.name}');
+        if (satFatEval != null) {
+          // Generate additional information using Gemini
+          final thisValue = satFatEval.valuePer100g;
+          final thisIsBest = thisValue == bestValue;
+          final thisIsWorst = thisValue == worstValue;
+          
+          final resultData = await geminiService.generateRankingExplanation(
+            nutrientName: 'saturated fat',
+            nutrientUnit: 'g',
+            thisValue: thisValue,
+            bestValue: bestValue,
+            worstValue: worstValue,
+            thisIsBest: thisIsBest,
+            thisIsWorst: thisIsWorst,
+            rank: i + 1,
+            totalProducts: results.length,
+          );
+          
+          print('    - Additional Information (${resultData['source']}): ${resultData['explanation']}');
+        }
+      }
+    });
+
+    test('getProductDetail includes ranking explanation for compared products', () async {
+      final repo = MockProductRepository();
+      final allProducts = await repo.getAllProducts();
+      final products = allProducts.take(4).toList();
+
+      final ranked = rankingService.rankProducts(
+        products: products,
+        user: hypertensionUser,
+      );
+
+      // Get detail for the first product with comparison context
+      final detail = await rankingService.getProductDetail(
+        target: ranked.first,
+        comparisonSet: ranked,
+        user: hypertensionUser,
+        scanEventId: 'test-scan-123',
+      );
+
+      // Verify ranking explanation is present
+      expect(detail.rankingExplanation, isNotNull);
+      print('Ranking explanation: ${detail.rankingExplanation}');
     });
   });
 

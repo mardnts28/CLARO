@@ -9,6 +9,7 @@ import '../../data/models/health_advisory.dart';
 import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
 import '../constants/who_fda_thresholds.dart';
+import 'serving_size_calculator.dart';
 
 // notNeeded added for Phase 3 (product_ranking_service.dart): used when a
 // product falls below the top-N cutoff and deliberately skips the AI call
@@ -60,15 +61,29 @@ class FallbackAdvisoryGenerator {
     final severityWord =
         worst.level == AdvisoryLevel.caution ? 'High' : 'Moderate';
 
+    // Calculate safe serving
+    final product = evaluation.product;
+    final safeServing = ServingSizeCalculator.calculate(
+      condition: worst.condition,
+      nutrientKey: worst.nutrientKey,
+      valuePer100g: worst.valuePer100g,
+      servingSizeG: product.servingSizeG,
+    );
+
+    // Build concise advisory following the new format
+    final levelLabel = _levelLabel(evaluation.overallLevel);
+    final explanation = '**$levelLabel** '
+        'Contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
+        '${_nutrientLabel(worst.nutrientKey)} per serving (${product.servingSizeG}g), '
+        'which is ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the WHO recommended maximum daily intake. '
+        'This may affect your ${_conditionLabel(worst.condition)}. '
+        '${safeServing != null ? 'Consider limiting to $safeServing.' : ''}';
+
     return HealthAdvisory(
       overallLevel: evaluation.overallLevel,
       warningText: '$severityWord in $nutrientName',
-      explanation:
-          'This product is ${severityWord.toLowerCase()} in $nutrientName '
-          '(${worst.valuePer100g}${_nutrientUnit(worst.nutrientKey)} per 100g), '
-          'which may affect your ${_conditionLabel(worst.condition)}. '
-          'Consider a smaller serving or a lower-$nutrientName alternative.',
-      safeServingSize: null,
+      explanation: explanation,
+      safeServingSize: safeServing,
       source: AdvisorySource.fallbackRuleBased,
       generatedAt: DateTime.now(),
     );
@@ -91,6 +106,8 @@ class FallbackAdvisoryGenerator {
         return 'sodium';
       case 'sugarsG':
         return 'sugar';
+      case 'saturatedFatG':
+        return 'saturated fat';
       default:
         return key;
     }
@@ -101,6 +118,8 @@ class FallbackAdvisoryGenerator {
       case 'sodiumMg':
         return 'mg';
       case 'sugarsG':
+        return 'g';
+      case 'saturatedFatG':
         return 'g';
       default:
         return '';
@@ -113,6 +132,40 @@ class FallbackAdvisoryGenerator {
         return 'hypertension';
       case HealthCondition.diabetes:
         return 'diabetes';
+      case HealthCondition.heartCondition:
+        return 'heart condition';
+    }
+  }
+
+  static String _levelLabel(AdvisoryLevel level) {
+    switch (level) {
+      case AdvisoryLevel.suitable:
+        return 'Suitable';
+      case AdvisoryLevel.moderate:
+        return 'Moderate';
+      case AdvisoryLevel.caution:
+        return 'Caution';
+    }
+  }
+
+  static String generateRankingExplanation({
+    required String nutrientName,
+    required String nutrientUnit,
+    required double thisValue,
+    required double bestValue,
+    required double worstValue,
+    required bool thisIsBest,
+    required bool thisIsWorst,
+    required int rank,
+  }) {
+    final percentageDiff = ((thisValue - bestValue) / bestValue * 100).abs();
+    
+    if (thisIsBest) {
+      return 'This product ranks first because it has the lowest $nutrientName content (${thisValue}$nutrientUnit per 100g) among the compared products.';
+    } else if (thisIsWorst) {
+      return 'This product ranks last because it has the highest $nutrientName content (${thisValue}$nutrientUnit per 100g), which is ${percentageDiff.toStringAsFixed(0)}% more than the best option (${bestValue}$nutrientUnit per 100g).';
+    } else {
+      return 'This product ranks in the middle with ${thisValue}$nutrientUnit $nutrientName per 100g, which is ${percentageDiff.toStringAsFixed(0)}% more than the best option (${bestValue}$nutrientUnit per 100g).';
     }
   }
 }

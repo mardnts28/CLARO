@@ -136,4 +136,84 @@ class GeminiAdvisoryService {
   void clearScanEvent(String scanEventId) {
     _cache.removeWhere((k, _) => k.startsWith('$scanEventId::'));
   }
+
+  Future<Map<String, String>> generateRankingExplanation({
+    required String nutrientName,
+    required String nutrientUnit,
+    required double thisValue,
+    required double bestValue,
+    required double worstValue,
+    required bool thisIsBest,
+    required bool thisIsWorst,
+    required int rank,
+    required int totalProducts,
+    String languageCode = 'en',
+  }) async {
+    final prompt = AdvisoryPromptBuilder.buildRankingExplanation(
+      nutrientName: nutrientName,
+      nutrientUnit: nutrientUnit,
+      thisValue: thisValue,
+      bestValue: bestValue,
+      worstValue: worstValue,
+      thisIsBest: thisIsBest,
+      thisIsWorst: thisIsWorst,
+      rank: rank,
+      totalProducts: totalProducts,
+      languageCode: languageCode,
+    );
+
+    try {
+      final response = await _model
+          .generateContent([Content.text(prompt)])
+          .timeout(_timeout);
+
+      final explanation = _parseRankingExplanation(response.text);
+      return {'explanation': explanation, 'source': 'Gemini'};
+    } on TimeoutException catch (_) {
+      final explanation = FallbackAdvisoryGenerator.generateRankingExplanation(
+        nutrientName: nutrientName,
+        nutrientUnit: nutrientUnit,
+        thisValue: thisValue,
+        bestValue: bestValue,
+        worstValue: worstValue,
+        thisIsBest: thisIsBest,
+        thisIsWorst: thisIsWorst,
+        rank: rank,
+      );
+      return {'explanation': explanation, 'source': 'Fallback'};
+    } catch (_) {
+      final explanation = FallbackAdvisoryGenerator.generateRankingExplanation(
+        nutrientName: nutrientName,
+        nutrientUnit: nutrientUnit,
+        thisValue: thisValue,
+        bestValue: bestValue,
+        worstValue: worstValue,
+        thisIsBest: thisIsBest,
+        thisIsWorst: thisIsWorst,
+        rank: rank,
+      );
+      return {'explanation': explanation, 'source': 'Fallback'};
+    }
+  }
+
+  String _parseRankingExplanation(String? text) {
+    if (text == null || text.trim().isEmpty) {
+      print('EMPTY RESPONSE from Gemini for ranking explanation');
+      throw const FormatException('Empty response');
+    }
+    try {
+      final json = jsonDecode(text) as Map<String, dynamic>;
+      final explanation = json['explanation'] as String?;
+
+      if (explanation == null) {
+        throw const FormatException('Missing explanation field');
+      }
+
+      return explanation;
+    } catch (e) {
+      print('PARSE ERROR for ranking explanation: $e');
+      print('RAW RESPONSE: $text');
+      rethrow;
+    }
+  }
 }

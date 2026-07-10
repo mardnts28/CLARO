@@ -56,8 +56,9 @@ class AdvisoryPromptBuilder {
           'All evaluated nutrients are within the suitable range for this user\'s condition(s).';
     } else {
       factsBlock =
-          'Exact nutrient value to cite: ${worst.valuePer100g}${_nutrientUnit(worst.nutrientKey)} of '
-          '${_nutrientLabel(worst.nutrientKey)} per 100g. '
+          'Exact nutrient value to cite: ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
+          '${_nutrientLabel(worst.nutrientKey)} per serving (${product.servingSizeG}g). '
+          'This represents ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the WHO recommended maximum daily intake (${_getWhoDailyLimit(worst.nutrientKey)}${_nutrientUnit(worst.nutrientKey)}/day). '
           'Relevant condition: ${_conditionLabel(worst.condition)}. '
           '${safeServing != null ? 'Pre-calculated safe serving (use this EXACT text, do not calculate your own number): "$safeServing".' : ''}';
     }
@@ -75,6 +76,7 @@ Exact comparison numbers to cite: this product has ${comparisonFact.thisValue}$u
 The best value in the compared set is ${comparisonFact.bestValueInSet}$unit. The worst value in the compared set is ${comparisonFact.worstValueInSet}$unit.
 ${comparisonFact.thisIsBest ? 'This product has the BEST (lowest) $nutrientName among all compared products.' : ''}
 ${comparisonFact.thisIsWorst ? 'This product has the WORST (highest) $nutrientName among all compared products.' : ''}
+Note: Product rankings are standardized using nutrient content per 100g to ensure fair comparisons regardless of serving size.
 
 Also write a "comparisonExplanation" field: ONE short sentence explaining why this product is ranked "$rankText" compared to the others, citing the EXACT numbers above. Example style:
 "This product is most suitable compared to the others because it contains the least sodium (${comparisonFact.bestValueInSet}$unit vs up to ${comparisonFact.worstValueInSet}$unit in other options)."
@@ -97,19 +99,20 @@ Also write a "comparisonExplanation" field: ONE short sentence explaining why th
     return '''
 You are a nutrition assistant inside a Filipino grocery app called CLARO, writing a short health advisory for a scanned product.
 
-Product: ${product.name}
 Decision: $decisionWord
 Facts: $factsBlock
 $comparisonBlock
 
 $languageInstruction
 
-Write the "explanation" field as ONE short sentence that:
-1. Starts with exactly this decision word and a dash: "$decisionWord - "
-2. States the EXACT number from the facts above (never use vague words like "high" or "small")
-3. Briefly says why it matters for the user's condition
+Write a concise health advisory paragraph (2-3 sentences, maximum 70 words) following this exact format:
 
-Example: "Moderate - Contains 288mg of sodium per 100g, which may raise concern for your hypertension."
+1. Begin with the Suitability Level ($decisionWord) in bold: **$decisionWord**
+2. Mention the nutrient amount per serving, serving size, and the percentage of the WHO recommended maximum daily intake contributed by one serving
+3. Briefly explain its relevance to the selected health condition
+4. If the suitability level is Moderate or Caution and a safe serving amount is available, conclude with a recommendation that includes the suggested safe serving amount
+5. Use clear, natural, user-friendly language
+6. Do not mention internal calculations, thresholds, variable names, or repeat the product name unnecessarily
 
 Return ONLY valid JSON, no markdown, matching exactly this shape:
 $jsonFields
@@ -146,6 +149,8 @@ $jsonFields
         return 'hypertension';
       case HealthCondition.diabetes:
         return 'diabetes';
+      case HealthCondition.heartCondition:
+        return 'heart condition';
     }
   }
 
@@ -155,6 +160,8 @@ $jsonFields
         return 'sodium';
       case 'sugarsG':
         return 'added sugars';
+      case 'saturatedFatG':
+        return 'saturated fat';
       default:
         return key;
     }
@@ -166,8 +173,23 @@ $jsonFields
         return 'mg';
       case 'sugarsG':
         return 'g';
+      case 'saturatedFatG':
+        return 'g';
       default:
         return '';
+    }
+  }
+
+  static double _getWhoDailyLimit(String nutrientKey) {
+    switch (nutrientKey) {
+      case 'sodiumMg':
+        return WhoDailyLimits.sodiumMgPerDay;
+      case 'sugarsG':
+        return WhoDailyLimits.sugarsGPerDay;
+      case 'saturatedFatG':
+        return WhoDailyLimits.saturatedFatGPerDay;
+      default:
+        return 0;
     }
   }
 
@@ -203,5 +225,50 @@ $jsonFields
       case AllergenType.msg:
         return 'MSG';
     }
+  }
+
+  static String buildRankingExplanation({
+    required String nutrientName,
+    required String nutrientUnit,
+    required double thisValue,
+    required double bestValue,
+    required double worstValue,
+    required bool thisIsBest,
+    required bool thisIsWorst,
+    required int rank,
+    required int totalProducts,
+    String languageCode = 'en',
+  }) {
+    final languageInstruction = languageCode == 'tl'
+        ? 'Respond in simple, conversational Tagalog.'
+        : 'Respond in simple, conversational English.';
+
+    return '''
+You are a nutrition assistant inside a Filipino grocery app called CLARO, writing a short ranking explanation for a product.
+
+Nutrient: $nutrientName
+Unit: $nutrientUnit
+This product value: $thisValue
+Best value in comparison: $bestValue
+Worst value in comparison: $worstValue
+This product rank: $rank of $totalProducts
+Is this the best value: $thisIsBest
+Is this the worst value: $thisIsWorst
+
+$languageInstruction
+
+Write a concise ranking explanation (1-2 sentences, maximum 50 words) that:
+1. Explains why this product received its ranking based on the $nutrientName content
+2. Compares this product against others using per 100g values only
+3. States whether this product contains more or less of $nutrientName than other products
+4. Includes the percentage difference from the best option when applicable
+5. Uses clear, natural, user-friendly language
+6. Does not mention risk scores, internal calculations, thresholds, variable names, or implementation details
+
+Return ONLY valid JSON, no markdown, matching exactly this shape:
+{
+  "explanation": "the ranking explanation"
+}
+''';
   }
 }

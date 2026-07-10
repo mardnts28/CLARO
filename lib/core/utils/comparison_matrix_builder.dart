@@ -134,10 +134,11 @@ class ComparisonMatrixBuilder {
     }
   }
 
-  // Table 3.14 only defines thresholds for sodium (hypertension) and sugars
-  // (diabetes) -- and only meaningful if the user actually has that
-  // condition saved. Every other nutrient/condition combination has no
-  // defined band, so this returns null rather than fabricating one.
+  // Table 3.14 only defines thresholds for sodium (hypertension), sugars
+  // (diabetes), and saturated fat (heart condition) -- and only meaningful
+  // if the user actually has that condition saved. Every other
+  // nutrient/condition combination has no defined band, so this returns
+  // null rather than fabricating one.
   static AdvisoryLevel? _resolveLevel(
     ComparisonNutrient nutrient,
     double value,
@@ -148,6 +149,9 @@ class ComparisonMatrixBuilder {
     }
     if (nutrient == ComparisonNutrient.sugars && user.hasDiabetes) {
       return WhoCalculator.classifyNutrient(HealthCondition.diabetes, 'sugarsG', value);
+    }
+    if (nutrient == ComparisonNutrient.saturatedFat && user.hasHeartCondition) {
+      return WhoCalculator.classifyNutrient(HealthCondition.heartCondition, 'saturatedFatG', value);
     }
     return null;
   }

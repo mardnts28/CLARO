@@ -16,6 +16,8 @@ Product _buildProduct({
   required String id,
   required double sodiumMg,
   required double sugarsG,
+  double saturatedFatG = 3,
+  double servingSizeG = 100,
   List<AllergenType> containsAllergens = const [],
   List<AllergenType> mayContainAllergens = const [],
 }) {
@@ -25,12 +27,12 @@ Product _buildProduct({
     brand: 'TestBrand',
     category: ProductCategory.cannedFood,
     subCategory: 'testSubCategory',
-    servingSizeG: 100,
+    servingSizeG: servingSizeG,
     nutritionPer100g: NutritionInfo(
       caloriesKcal: 200,
       sodiumMg: sodiumMg,
       sugarsG: sugarsG,
-      saturatedFatG: 3,
+      saturatedFatG: saturatedFatG,
       totalCarbohydratesG: 10,
       dietaryFiberG: 1,
       potassiumMg: 200,
@@ -56,7 +58,42 @@ UserHealthProfile _buildUser({
 }
 
 void main() {
-  group('classifyNutrient - Table 3.14 boundaries', () {
+  group('classifyByWhoPercentage - WHO daily limit percentage thresholds', () {
+    test('≤10% of WHO daily limit is Suitable', () {
+      expect(
+        WhoCalculator.classifyByWhoPercentage(10),
+        AdvisoryLevel.suitable,
+      );
+      expect(
+        WhoCalculator.classifyByWhoPercentage(5),
+        AdvisoryLevel.suitable,
+      );
+    });
+
+    test('>10-20% of WHO daily limit is Moderate', () {
+      expect(
+        WhoCalculator.classifyByWhoPercentage(15),
+        AdvisoryLevel.moderate,
+      );
+      expect(
+        WhoCalculator.classifyByWhoPercentage(20),
+        AdvisoryLevel.moderate,
+      );
+    });
+
+    test('>20% of WHO daily limit is Caution', () {
+      expect(
+        WhoCalculator.classifyByWhoPercentage(21),
+        AdvisoryLevel.caution,
+      );
+      expect(
+        WhoCalculator.classifyByWhoPercentage(50),
+        AdvisoryLevel.caution,
+      );
+    });
+  });
+
+  group('classifyNutrient - Table 3.14 boundaries (legacy for ranking)', () {
     test('sodium at exactly 100mg is Suitable (boundary inclusive)', () {
       final level = WhoCalculator.classifyNutrient(
         HealthCondition.hypertension,
@@ -94,9 +131,108 @@ void main() {
         AdvisoryLevel.caution,
       );
     });
+
+    test('saturated fat at 2.2g is Suitable, 4.4g is Caution (heart condition)', () {
+      expect(
+        WhoCalculator.classifyNutrient(HealthCondition.heartCondition, 'saturatedFatG', 2.2),
+        AdvisoryLevel.suitable,
+      );
+      expect(
+        WhoCalculator.classifyNutrient(HealthCondition.heartCondition, 'saturatedFatG', 4.4),
+        AdvisoryLevel.caution,
+      );
+    });
   });
 
-  group('evaluateProduct - risk scoring (Table 3.15)', () {
+  group('evaluateProduct - WHO percentage-based classification', () {
+    test('single condition, ≤10% WHO daily limit => Suitable', () {
+      // 100g serving, 200mg sodium per 100g = 200mg per serving
+      // WHO limit: 2000mg/day => 200mg is 10% => Suitable
+      final product = _buildProduct(id: 'p1', sodiumMg: 200, sugarsG: 1, servingSizeG: 100);
+      final user = _buildUser(conditions: [HealthCondition.hypertension]);
+
+      final result = WhoCalculator.evaluateProduct(product, user);
+
+      expect(result.riskScore, 1);
+      expect(result.overallLevel, AdvisoryLevel.suitable);
+      expect(result.nutrientEvaluations.first.whoDailyLimitPercentage, 10.0);
+      expect(result.nutrientEvaluations.first.valuePerServing, 200.0);
+
+      print('WHO Percentage Classification Test:');
+      print('  Product: ${product.name}');
+      print('  Serving size: ${product.servingSizeG}g');
+      print('  Per 100g sodium: ${result.nutrientEvaluations.first.valuePer100g}mg');
+      print('  Per serving sodium: ${result.nutrientEvaluations.first.valuePerServing}mg');
+      print('  WHO daily limit %: ${result.nutrientEvaluations.first.whoDailyLimitPercentage}%');
+      print('  Advisory level: ${result.overallLevel}');
+      print('  Risk score: ${result.riskScore}');
+    });
+
+    test('single condition, >20% WHO daily limit => Caution', () {
+      // 100g serving, 500mg sodium per 100g = 500mg per serving
+      // WHO limit: 2000mg/day => 500mg is 25% => Caution
+      final product = _buildProduct(id: 'p2', sodiumMg: 500, sugarsG: 1, servingSizeG: 100);
+      final user = _buildUser(conditions: [HealthCondition.hypertension]);
+
+      final result = WhoCalculator.evaluateProduct(product, user);
+
+      expect(result.riskScore, 3);
+      expect(result.overallLevel, AdvisoryLevel.caution);
+      expect(result.nutrientEvaluations.first.whoDailyLimitPercentage, 25.0);
+
+      print('WHO Percentage Classification Test (Caution):');
+      print('  Product: ${product.name}');
+      print('  Per 100g sodium: ${result.nutrientEvaluations.first.valuePer100g}mg');
+      print('  Per serving sodium: ${result.nutrientEvaluations.first.valuePerServing}mg');
+      print('  WHO daily limit %: ${result.nutrientEvaluations.first.whoDailyLimitPercentage}%');
+      print('  Advisory level: ${result.overallLevel}');
+      print('  Risk score: ${result.riskScore}');
+    });
+
+    test('heart condition with saturated fat at 15% WHO daily limit => Moderate', () {
+      // 100g serving, 3.3g saturated fat per 100g = 3.3g per serving
+      // WHO limit: 22g/day => 3.3g is 15% => Moderate
+      final product = _buildProduct(id: 'p3', sodiumMg: 100, sugarsG: 1, saturatedFatG: 3.3, servingSizeG: 100);
+      final user = _buildUser(conditions: [HealthCondition.heartCondition]);
+
+      final result = WhoCalculator.evaluateProduct(product, user);
+
+      expect(result.riskScore, 2);
+      expect(result.overallLevel, AdvisoryLevel.moderate);
+      expect(result.nutrientEvaluations.first.whoDailyLimitPercentage, closeTo(15.0, 0.1));
+
+      print('WHO Percentage Classification Test (Heart Condition):');
+      print('  Product: ${product.name}');
+      print('  Per 100g saturated fat: ${result.nutrientEvaluations.first.valuePer100g}g');
+      print('  Per serving saturated fat: ${result.nutrientEvaluations.first.valuePerServing}g');
+      print('  WHO daily limit %: ${result.nutrientEvaluations.first.whoDailyLimitPercentage}%');
+      print('  Advisory level: ${result.overallLevel}');
+      print('  Risk score: ${result.riskScore}');
+    });
+
+    test('different serving sizes calculate correct per-serving values', () {
+      // 50g serving, 400mg sodium per 100g = 200mg per serving
+      // WHO limit: 2000mg/day => 200mg is 10% => Suitable
+      final product = _buildProduct(id: 'p4', sodiumMg: 400, sugarsG: 1, servingSizeG: 50);
+      final user = _buildUser(conditions: [HealthCondition.hypertension]);
+
+      final result = WhoCalculator.evaluateProduct(product, user);
+
+      expect(result.nutrientEvaluations.first.valuePer100g, 400.0);
+      expect(result.nutrientEvaluations.first.valuePerServing, 200.0); // 400mg/100g * 50g
+      expect(result.nutrientEvaluations.first.whoDailyLimitPercentage, 10.0);
+
+      print('WHO Percentage Classification Test (Different Serving Size):');
+      print('  Product: ${product.name}');
+      print('  Serving size: ${product.servingSizeG}g');
+      print('  Per 100g sodium: ${result.nutrientEvaluations.first.valuePer100g}mg');
+      print('  Per serving sodium: ${result.nutrientEvaluations.first.valuePerServing}mg');
+      print('  WHO daily limit %: ${result.nutrientEvaluations.first.whoDailyLimitPercentage}%');
+      print('  Advisory level: ${result.overallLevel}');
+    });
+  });
+
+  group('evaluateProduct - legacy risk scoring (Table 3.15)', () {
     test('single condition, suitable nutrient => risk score 1', () {
       final product = _buildProduct(id: 'p1', sodiumMg: 80, sugarsG: 1);
       final user = _buildUser(conditions: [HealthCondition.hypertension]);
@@ -118,6 +254,19 @@ void main() {
 
       expect(result.riskScore, 4);
       expect(result.overallLevel, AdvisoryLevel.caution); // worst nutrient wins
+    });
+
+    test('triple condition (hypertension+diabetes+heart) sums all three nutrient scores', () {
+      // sodium=450 -> caution (3pts), sugars=1 -> suitable (1pt), saturatedFat=5 -> caution (3pts) => total 7
+      final product = _buildProduct(id: 'p2b', sodiumMg: 450, sugarsG: 1, saturatedFatG: 5);
+      final user = _buildUser(
+        conditions: [HealthCondition.hypertension, HealthCondition.diabetes, HealthCondition.heartCondition],
+      );
+
+      final result = WhoCalculator.evaluateProduct(product, user);
+
+      expect(result.riskScore, 7);
+      expect(result.overallLevel, AdvisoryLevel.caution);
     });
 
     test('no conditions => risk score 0, overall suitable', () {

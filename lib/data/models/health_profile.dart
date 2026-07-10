@@ -6,6 +6,7 @@
 enum HealthCondition {
   hypertension,
   diabetes,
+  heartCondition,
 }
 
 // Common allergens relevant to Filipino canned food & instant noodles.
@@ -42,6 +43,7 @@ class UserHealthProfile {
 
   bool get hasHypertension => conditions.contains(HealthCondition.hypertension);
   bool get hasDiabetes => conditions.contains(HealthCondition.diabetes);
+  bool get hasHeartCondition => conditions.contains(HealthCondition.heartCondition);
   bool get hasAnyAllergy => allergies.isNotEmpty;
 
   factory UserHealthProfile.fromJson(Map<String, dynamic> json) {

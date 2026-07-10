@@ -17,14 +17,18 @@ import 'product.dart';
 // Result of classifying ONE nutrient against ONE condition's threshold band.
 class NutrientEvaluation {
   final HealthCondition condition;
-  final String nutrientKey; // e.g. 'sodiumMg', 'sugarsG'
-  final double valuePer100g;
-  final AdvisoryLevel level;
+  final String nutrientKey; // e.g. 'sodiumMg', 'sugarsG', 'saturatedFatG'
+  final double valuePer100g; // For ranking/comparison (maintained for consistency)
+  final double valuePerServing; // For health advisory display
+  final double whoDailyLimitPercentage; // Percentage of WHO daily limit per serving
+  final AdvisoryLevel level; // Based on WHO daily limit percentage
 
   const NutrientEvaluation({
     required this.condition,
     required this.nutrientKey,
     required this.valuePer100g,
+    required this.valuePerServing,
+    required this.whoDailyLimitPercentage,
     required this.level,
   });
 }
