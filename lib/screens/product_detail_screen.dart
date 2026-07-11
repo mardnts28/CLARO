@@ -12,6 +12,7 @@ import '../data/models/product_evaluation.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/models/comparison_matrix.dart';
 import '../core/constants/who_fda_thresholds.dart';
+import '../core/utils/rank_label_helper.dart';
 import '../data/services/backend_locator.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -449,6 +450,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                         // Serving recommendation box — from the AI/fallback
                         // advisory when available, generic copy otherwise.
+                        // While _loadAdvisory() is still in flight we show a
+                        // "calculating" placeholder rather than the generic
+                        // fallback copy, since showing that first and then
+                        // swapping it for the real value reads like stale
+                        // or incorrect info flashing on screen.
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
@@ -459,14 +465,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             border: Border.all(
                                 color: Colors.green, width: 1.2),
                           ),
-                          child: Text(
-                            _advisory?.safeServingSize ?? loc.servingRecommendation,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: colorScheme.onSurface,
-                              height: 1.4,
-                            ),
-                          ),
+                          child: _advisoryLoading
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.8,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        'Calculating your safe serving size...',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: colorScheme.onSurfaceVariant,
+                                          fontStyle: FontStyle.italic,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : Text(
+                                  _advisory?.safeServingSize ??
+                                      loc.servingRecommendation,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: colorScheme.onSurface,
+                                    height: 1.4,
+                                  ),
+                                ),
                         ),
 
                         const SizedBox(height: 12),
@@ -755,8 +788,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Determine rank level label based on product's suitability rank
+    // Determine rank level label + color based on product's rank -- both
+    // come from RankLabelHelper so this title always matches the tag
+    // color shown for this same product on the compare/ranking list
+    // screen (compare_products_screen.dart).
     final rankLabel = _getRankLevelLabel();
+    final rankColor = _getRankLevelColor();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -780,7 +817,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             style: GoogleFonts.outfit(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Colors.green,
+              color: rankColor,
             ),
           ),
           if (_rankingExplanation != null) ...[
@@ -890,8 +927,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  // Both label and color are delegated to RankLabelHelper
+  // (core/utils/rank_label_helper.dart) -- the single source of truth
+  // shared with compare_products_screen.dart's list-card tags, so the
+  // title here always matches that tag's text and color for the same
+  // product.
   String _getRankLevelLabel() {
-    // Find the current product's rank in the comparison set
     if (widget.comparisonSet == null) {
       return 'Product Ranking';
     }
@@ -901,29 +942,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       orElse: () => widget.comparisonSet!.first,
     );
 
-    final rank = currentProduct.rank;
-    final suitabilityLabel = currentProduct.suitabilityRankLabel;
+    return RankLabelHelper.label(
+      rank: currentProduct.rank,
+      suitabilityRankLabel: currentProduct.suitabilityRankLabel,
+      includeChoiceSuffix: true,
+    );
+  }
 
-    // If product has allergen warning, always show "Least Recommended"
-    if (suitabilityLabel == SuitabilityRankLabel.forcedLast) {
-      return 'Least Recommended';
+  Color _getRankLevelColor() {
+    if (widget.comparisonSet == null) {
+      return Colors.green;
     }
 
-    // Map rank position to choice labels (for 5 products)
-    switch (rank) {
-      case 1:
-        return 'Best Choice';
-      case 2:
-        return 'Better Choice';
-      case 3:
-        return 'Good Choice';
-      case 4:
-        return 'Fair Choice';
-      case 5:
-        return 'Least Recommended';
-      default:
-        return 'Product Ranking';
-    }
+    final currentProduct = widget.comparisonSet!.firstWhere(
+      (r) => r.evaluation.product.id == widget.product.id,
+      orElse: () => widget.comparisonSet!.first,
+    );
+
+    return RankLabelHelper.color(
+      rank: currentProduct.rank,
+      suitabilityRankLabel: currentProduct.suitabilityRankLabel,
+    );
   }
 
   // ── Helper card builder to make cards completely uniform ────────────────

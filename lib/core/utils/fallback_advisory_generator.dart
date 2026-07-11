@@ -148,21 +148,46 @@ class FallbackAdvisoryGenerator {
     required double thisValue,
     required double bestValue,
     required double worstValue,
-    required bool thisIsBest,
-    required bool thisIsWorst,
     required int rank,
+    required int totalProducts,
     String healthCondition = '',
   }) {
-    final percentageDiff = ((thisValue - bestValue) / bestValue * 100).abs();
     final conditionClause =
         healthCondition.isNotEmpty ? ' given your $healthCondition' : '';
 
-    if (thisIsBest) {
-      return 'This product ranks first because it has the lowest $nutrientName content (${thisValue}$nutrientUnit per 100g) among the compared products$conditionClause.';
-    } else if (thisIsWorst) {
-      return 'This product ranks last because it has the highest $nutrientName content (${thisValue}$nutrientUnit per 100g)$conditionClause, which is ${percentageDiff.toStringAsFixed(0)}% more than the best option (${bestValue}$nutrientUnit per 100g).';
+    // Always format to a fixed number of decimals -- raw doubles (e.g.
+    // 12.345678923) were leaking straight into the sentence before.
+    final thisValueStr = thisValue.toStringAsFixed(1);
+    final bestValueStr = bestValue.toStringAsFixed(1);
+
+    // Guard against division by zero. When the best-in-set value is 0
+    // (e.g. a product with 0mg sodium), (thisValue - 0) / 0 produces
+    // Infinity, which rendered as "Infinity%". In that case we just state
+    // the best option's value instead of a percentage difference.
+    final canShowPercentage = bestValue > 0 && thisValue != bestValue;
+    final percentageDiffStr = canShowPercentage
+        ? (((thisValue - bestValue) / bestValue) * 100).abs().toStringAsFixed(0)
+        : null;
+
+    final comparisonClause = percentageDiffStr != null
+        ? ', which is $percentageDiffStr% more than the best option (${bestValueStr}$nutrientUnit per 100g)'
+        : ' (the best option in this comparison has ${bestValueStr}$nutrientUnit per 100g)';
+
+    // Derived from rank/totalProducts ONLY, never from a separately
+    // computed "lowest value of this one nutrient" check -- that mismatch
+    // (a product can be #1 overall without having the single lowest value
+    // of one nutrient) was the root cause of the rank/explanation
+    // contradiction. Every branch also states the numeric rank so the
+    // sentence is checkable against the badge shown on screen.
+    final isBestRank = rank == 1;
+    final isWorstRank = rank == totalProducts;
+
+    if (isBestRank) {
+      return 'This product ranks $rank of $totalProducts (top choice) with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
+    } else if (isWorstRank) {
+      return 'This product ranks $rank of $totalProducts (least recommended) with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
     } else {
-      return 'This product ranks in the middle with ${thisValue}$nutrientUnit $nutrientName per 100g$conditionClause, which is ${percentageDiff.toStringAsFixed(0)}% more than the best option (${bestValue}$nutrientUnit per 100g).';
+      return 'This product ranks $rank of $totalProducts with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
     }
   }
 }

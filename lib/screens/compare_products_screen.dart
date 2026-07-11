@@ -8,6 +8,7 @@ import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/services/backend_locator.dart';
+import '../core/utils/rank_label_helper.dart';
 
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
@@ -318,31 +319,19 @@ class _ProductCard extends StatelessWidget {
     required this.onTap,
   });
 
-  Color _labelColor() {
-    switch (ranked.suitabilityRankLabel) {
-      case SuitabilityRankLabel.mostSuitable:
-        return Colors.green;
-      case SuitabilityRankLabel.middle:
-        return Colors.amber.shade800;
-      case SuitabilityRankLabel.leastSuitable:
-        return Colors.deepOrange;
-      case SuitabilityRankLabel.forcedLast:
-        return Colors.red;
-    }
-  }
+  // Delegates to RankLabelHelper (core/utils/rank_label_helper.dart) so
+  // this tag always matches the "Product Ranking" card title color on the
+  // product detail screen -- keeping the mapping in one place instead of
+  // two copies that can drift out of sync.
+  Color _labelColor() => RankLabelHelper.color(
+        rank: ranked.rank,
+        suitabilityRankLabel: ranked.suitabilityRankLabel,
+      );
 
-  String _labelText() {
-    switch (ranked.suitabilityRankLabel) {
-      case SuitabilityRankLabel.mostSuitable:
-        return 'Most Suitable';
-      case SuitabilityRankLabel.middle:
-        return 'Middle';
-      case SuitabilityRankLabel.leastSuitable:
-        return 'Least Suitable';
-      case SuitabilityRankLabel.forcedLast:
-        return 'Allergen Warning';
-    }
-  }
+  String _labelText() => RankLabelHelper.label(
+        rank: ranked.rank,
+        suitabilityRankLabel: ranked.suitabilityRankLabel,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -398,25 +387,6 @@ class _ProductCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      if (isCurrent) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          margin: const EdgeInsets.only(right: 6),
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary.withOpacity(0.12),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'Kasalukuyan',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
                       Expanded(
                         child: Text(
                           product.name,

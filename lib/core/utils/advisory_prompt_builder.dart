@@ -230,8 +230,6 @@ $jsonFields
     required double thisValue,
     required double bestValue,
     required double worstValue,
-    required bool thisIsBest,
-    required bool thisIsWorst,
     required int rank,
     required int totalProducts,
     String healthCondition = '',
@@ -249,6 +247,17 @@ $jsonFields
         ? '7. Briefly connect the $nutrientName level to the user\'s $healthCondition (e.g. why it matters for that condition), without sounding clinical'
         : '';
 
+    // Derived from rank/totalProducts ONLY -- this is the same numbered
+    // position shown on the ranking list the user already saw, so the
+    // wording below can never contradict it. Do NOT pass a separately
+    // computed "is this the best nutrient value" flag into this prompt:
+    // that was the original bug -- a product can win on rank overall
+    // (across every condition + allergens) while not having the single
+    // best value for just one nutrient, which produced explanations that
+    // flatly contradicted the badge the user was looking at.
+    final isBestRank = rank == 1;
+    final isWorstRank = rank == totalProducts;
+
     return '''
 You are a nutrition assistant inside a Filipino grocery app called CLARO, writing a short ranking explanation for a product.
 
@@ -257,20 +266,21 @@ Unit: $nutrientUnit
 This product value: $thisValue
 Best value in comparison: $bestValue
 Worst value in comparison: $worstValue
-This product rank: $rank of $totalProducts
-Is this the best value: $thisIsBest
-Is this the worst value: $thisIsWorst
+This product's overall rank: $rank of $totalProducts (based on the user's full health profile, not on this nutrient alone)
+Is this product ranked #1 overall: $isBestRank
+Is this product ranked last overall: $isWorstRank
 $conditionLine
 
 $languageInstruction
 
 Write a concise ranking explanation (1-2 sentences, maximum 50 words) that:
-1. Explains why this product received its ranking based on the $nutrientName content
+1. States the product's overall rank ($rank of $totalProducts) and explains it primarily through the $nutrientName content as the most relevant contributing nutrient
 2. Compares this product against others using per 100g values only
 3. States whether this product contains more or less of $nutrientName than other products
 4. Includes the percentage difference from the best option when applicable
 5. Uses clear, natural, user-friendly language
 6. Does not mention risk scores, internal calculations, variable names, or implementation details
+7. Must never describe this product as "top choice", "best", "first place", etc. unless rank is 1, and never as "worst" or "least recommended" unless rank equals $totalProducts -- always stay consistent with rank $rank of $totalProducts
 $conditionInstruction
 
 Return ONLY valid JSON, no markdown, matching exactly this shape:

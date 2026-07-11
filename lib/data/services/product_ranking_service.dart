@@ -135,72 +135,112 @@ class ProductRankingService {
     final conditionName = _getConditionName(user);
     final conditionSuffix =
         conditionName.isNotEmpty ? ' for your $conditionName' : '';
+    final totalProducts = comparisonSet.length;
+
+    // Allergen override is a HARD rule in WhoCalculator.rankProducts --
+    // any product matching an allergy on the user's profile is forced to
+    // last place no matter how good its nutrients look. The explanation
+    // must lead with that same hard rule, or a product can end up ranked
+    // last for an allergy reason while its explanation talks about
+    // nutrients as if it were a close, nutrient-driven call. Deterministic
+    // and skips Gemini entirely, same as the "suitable" shortcut below --
+    // this is a fact from the profile, not something that benefits from
+    // AI phrasing variance.
+    if (target.evaluation.allergenOverride) {
+      final allergens = target.evaluation.allergenAssessment.matchedContains
+          .map(_allergenLabel)
+          .join(', ');
+      return 'This product ranks ${target.rank} of $totalProducts because it '
+          'contains $allergens, which matches an allergy on your profile. '
+          'We recommend avoiding it regardless of its other nutrients.';
+    }
 
     // Skip Gemini if product is suitable - use default explanation
     if (target.evaluation.overallLevel == AdvisoryLevel.suitable) {
-      return 'This product ranks ${target.rank} of ${comparisonSet.length} and is suitable for your health profile${conditionName.isNotEmpty ? " ($conditionName)" : ""}.';
+      return 'This product ranks ${target.rank} of $totalProducts and is suitable for your health profile${conditionName.isNotEmpty ? " ($conditionName)" : ""}.';
     }
 
-    // Get the main nutrient for the user's condition
-    final mainNutrient = _getMainNutrientForUser(user);
-    if (mainNutrient == null) {
-      return 'This product ranks ${target.rank} of ${comparisonSet.length}$conditionSuffix.';
+    // Get the nutrient that best explains THIS product's position, across
+    // ALL of the user's conditions -- not just the first one -- so a user
+    // with e.g. hypertension + heart condition doesn't lose the
+    // saturated-fat story just because sodium happens to be listed first.
+    final fact = _primaryComparisonFact(
+      target: target,
+      comparisonSet: comparisonSet,
+      user: user,
+    );
+    if (fact == null) {
+      return 'This product ranks ${target.rank} of $totalProducts$conditionSuffix.';
     }
-
-    // Calculate nutrient values for comparison
-    final nutrientValues = comparisonSet.map((r) {
-      final eval = r.evaluation.nutrientEvaluations
-          .where((e) => e.nutrientKey == mainNutrient.key)
-          .firstOrNull;
-      return eval?.valuePer100g ?? 0.0;
-    }).toList();
-
-    final bestValue = nutrientValues.reduce((a, b) => a < b ? a : b);
-    final worstValue = nutrientValues.reduce((a, b) => a > b ? a : b);
-
-    final targetEval = target.evaluation.nutrientEvaluations
-        .where((e) => e.nutrientKey == mainNutrient.key)
-        .firstOrNull;
-
-    if (targetEval == null) {
-      return 'This product ranks ${target.rank} of ${comparisonSet.length}$conditionSuffix.';
-    }
-
-    final thisValue = targetEval.valuePer100g;
-    final thisIsBest = thisValue == bestValue;
-    final thisIsWorst = thisValue == worstValue;
 
     final resultData = await _geminiService.generateRankingExplanation(
-      nutrientName: mainNutrient.name,
-      nutrientUnit: mainNutrient.unit,
-      thisValue: thisValue,
-      bestValue: bestValue,
-      worstValue: worstValue,
-      thisIsBest: thisIsBest,
-      thisIsWorst: thisIsWorst,
+      nutrientName: fact.name,
+      nutrientUnit: fact.unit,
+      thisValue: fact.thisValue,
+      bestValue: fact.bestValue,
+      worstValue: fact.worstValue,
       rank: target.rank,
-      totalProducts: comparisonSet.length,
+      totalProducts: totalProducts,
       healthCondition: conditionName,
       languageCode: languageCode,
     );
 
     return resultData['explanation'] ??
-        'This product ranks ${target.rank} of ${comparisonSet.length}$conditionSuffix.';
+        'This product ranks ${target.rank} of $totalProducts$conditionSuffix.';
   }
 
-  ({String key, String name, String unit})? _getMainNutrientForUser(UserHealthProfile user) {
-    if (user.conditions.isEmpty) return null;
+  /// Picks the single most decision-useful nutrient fact to narrate for
+  /// [target], considering every nutrient tied to every one of the user's
+  /// conditions (via ComparisonCalculator, which already does this
+  /// correctly for the main advisory) -- not just [user.conditions.first].
+  /// This is supporting detail only; it does NOT decide whether the
+  /// wording says "best"/"worst"/"middle" -- that comes from [target.rank]
+  /// itself inside generateRankingExplanation, so the sentence can never
+  /// contradict the numbered badge shown on the ranking list.
+  ({String name, String unit, double thisValue, double bestValue, double worstValue})?
+      _primaryComparisonFact({
+    required RankedProductResult target,
+    required List<RankedProductResult> comparisonSet,
+    required UserHealthProfile user,
+  }) {
+    final facts = ComparisonCalculator.computeFacts(
+      target: target.evaluation,
+      comparisonSet: comparisonSet.map((r) => r.evaluation).toList(),
+      user: user,
+    );
+    final fact = ComparisonCalculator.primaryFact(facts);
+    if (fact == null) return null;
 
-    // Get the first condition's main nutrient
-    final condition = user.conditions.first;
-    final thresholds = ConditionThresholds.thresholds[condition];
-    if (thresholds == null || thresholds.isEmpty) return null;
+    return (
+      name: _getNutrientName(fact.nutrientKey),
+      unit: _getNutrientUnit(fact.nutrientKey),
+      thisValue: fact.thisValue,
+      bestValue: fact.bestValueInSet,
+      worstValue: fact.worstValueInSet,
+    );
+  }
 
-    final nutrientKey = thresholds.keys.first;
-    final nutrientName = _getNutrientName(nutrientKey);
-    final nutrientUnit = _getNutrientUnit(nutrientKey);
-
-    return (key: nutrientKey, name: nutrientName, unit: nutrientUnit);
+  String _allergenLabel(AllergenType a) {
+    switch (a) {
+      case AllergenType.shellfish:
+        return 'shellfish';
+      case AllergenType.fish:
+        return 'fish';
+      case AllergenType.peanuts:
+        return 'peanuts';
+      case AllergenType.treeNuts:
+        return 'tree nuts';
+      case AllergenType.soy:
+        return 'soy';
+      case AllergenType.dairy:
+        return 'dairy';
+      case AllergenType.eggs:
+        return 'eggs';
+      case AllergenType.wheatGluten:
+        return 'wheat/gluten';
+      case AllergenType.msg:
+        return 'MSG';
+    }
   }
 
   String _getNutrientName(String nutrientKey) {

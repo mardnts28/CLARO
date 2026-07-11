@@ -148,8 +148,6 @@ class GeminiAdvisoryService {
     required double thisValue,
     required double bestValue,
     required double worstValue,
-    required bool thisIsBest,
-    required bool thisIsWorst,
     required int rank,
     required int totalProducts,
     String healthCondition = '',
@@ -161,8 +159,6 @@ class GeminiAdvisoryService {
       thisValue: thisValue,
       bestValue: bestValue,
       worstValue: worstValue,
-      thisIsBest: thisIsBest,
-      thisIsWorst: thisIsWorst,
       rank: rank,
       totalProducts: totalProducts,
       healthCondition: healthCondition,
@@ -183,9 +179,8 @@ class GeminiAdvisoryService {
         thisValue: thisValue,
         bestValue: bestValue,
         worstValue: worstValue,
-        thisIsBest: thisIsBest,
-        thisIsWorst: thisIsWorst,
         rank: rank,
+        totalProducts: totalProducts,
         healthCondition: healthCondition,
       );
       return {'explanation': explanation, 'source': 'Fallback'};
@@ -196,9 +191,8 @@ class GeminiAdvisoryService {
         thisValue: thisValue,
         bestValue: bestValue,
         worstValue: worstValue,
-        thisIsBest: thisIsBest,
-        thisIsWorst: thisIsWorst,
         rank: rank,
+        totalProducts: totalProducts,
         healthCondition: healthCondition,
       );
       return {'explanation': explanation, 'source': 'Fallback'};

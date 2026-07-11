@@ -18,7 +18,13 @@ class WhoCalculator {
     return AdvisoryLevel.moderate;
   }
 
-  // Legacy method for per-100g classification (used for ranking)
+  // Per-100g band classification. Powers both the comparison matrix
+  // (red/green/neutral cells) AND riskScore in evaluateProduct() below --
+  // i.e. the actual ranking order -- so a product's rank and its matrix
+  // cells are always derived from the same numbers. Deliberately
+  // independent of any one product's serving size, so products with
+  // different serving sizes are compared on equal nutrient-density
+  // footing rather than favoring whichever has the smaller label serving.
   static AdvisoryLevel classifyNutrient(
     HealthCondition condition,
     String nutrientKey,
@@ -62,6 +68,16 @@ class WhoCalculator {
   static ProductEvaluation evaluateProduct(Product product, UserHealthProfile user) {
     final nutrientEvals = <NutrientEvaluation>[];
 
+    // Ranking basis: per-100g. Kept separate from nutrientEvals/level above
+    // so two products with different serving sizes (e.g. an 85g vs a 155g
+    // can) are compared on equal nutrient-density footing rather than one
+    // looking artificially "better" just because its label serving happens
+    // to be smaller. This uses classifyNutrient() -- the same per-100g
+    // band classification already powering the comparison matrix -- so a
+    // product's rank and its red/green/neutral comparison cells are
+    // always derived from the same numbers.
+    int riskScore = 0;
+
     for (final condition in user.conditions) {
       final nutrientKeys = ConditionThresholds.thresholds[condition]?.keys ?? const <String>[];
       for (final key in nutrientKeys) {
@@ -76,7 +92,10 @@ class WhoCalculator {
         // Calculate percentage of WHO daily limit per serving
         final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
         
-        // Classify based on WHO percentage (for health advisory)
+        // Classify based on WHO percentage, per serving -- this is the
+        // health advisory basis: what a person actually eats in one
+        // sitting is what should drive the advisory text/warning level
+        // for a single product.
         final level = classifyByWhoPercentage(whoPercentage);
         
         nutrientEvals.add(NutrientEvaluation(
@@ -87,15 +106,15 @@ class WhoCalculator {
           whoDailyLimitPercentage: whoPercentage,
           level: level,
         ));
+
+        // Ranking basis: per-100g band classification, independent of
+        // this product's own serving size.
+        final rankingLevel = classifyNutrient(condition, key, valuePer100g);
+        riskScore += RiskScoring.points[rankingLevel] ?? 0;
       }
     }
 
     final allergenAssessment = assessAllergens(product, user);
-
-    final riskScore = nutrientEvals.fold<int>(
-      0,
-      (sum, e) => sum + (RiskScoring.points[e.level] ?? 0),
-    );
 
     // Table 3.14: food allergy is a THIRD condition row in the same table
     // as hypertension/diabetes, with its own Suitable/Caution classification
