@@ -239,11 +239,9 @@
   "scoreEnvironmentDesc": "Moderate environmental impact.",
   "scoreProcess": "Proseso",
   "scoreProcessDesc": "Processed food with relatively simple ingredients.",
-  "extraKnowledgeTitle": "Karagdagang Kaalaman",
-  "extraKnowledgeDesc": "Mas nakakabusog at mas malasa dahil sa mantika, ngunit may mas mataas na calories at taba.",
   "compareButton": "Ihambing",
 
-  "similarProductsTitle": "Kahalintulad na Produkto",
+  "similarProductsTitle": "Pagraranggo ng Produkto",
   "productCount": "{count} produkto",
   "@productCount": {
     "placeholders": {

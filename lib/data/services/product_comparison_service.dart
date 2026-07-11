@@ -36,12 +36,80 @@ class ProductComparisonService {
       excludeId: scannedProduct.id,
     );
 
-    final cappedAlternatives = alternatives.take(_maxAlternatives).toList();
+    // Intelligent selection: score alternatives by similarity
+    final scoredAlternatives = alternatives.map((p) {
+      final score = _calculateSimilarityScore(scannedProduct, p);
+      return (product: p, score: score);
+    }).toList();
+
+    // Sort by similarity score (highest first)
+    scoredAlternatives.sort((a, b) => b.score.compareTo(a.score));
+
+    // Take top 4 most similar products
+    final cappedAlternatives = scoredAlternatives
+        .take(_maxAlternatives)
+        .map((s) => s.product)
+        .toList();
+
     final comparisonSet = [scannedProduct, ...cappedAlternatives];
 
     return _productRankingService.rankProducts(
       products: comparisonSet,
       user: user,
     );
+  }
+
+  /// Calculates a similarity score between two products.
+  /// Higher score = more similar.
+  /// Scoring factors:
+  /// - Same brand: +50 points
+  /// - Similar sodium content (within 50mg): +20 points
+  /// - Similar sugar content (within 2g): +15 points
+  /// - Similar saturated fat (within 1g): +10 points
+  /// - Same variant keywords: +5 points per matching keyword
+  double _calculateSimilarityScore(Product a, Product b) {
+    double score = 0;
+
+    // Brand match (highest priority)
+    if (a.brand == b.brand) {
+      score += 50;
+    }
+
+    // Nutritional similarity
+    final sodiumDiff = (_parseSodium(a.nutritionalFacts.sodium) - _parseSodium(b.nutritionalFacts.sodium)).abs();
+    if (sodiumDiff <= 50) score += 20;
+
+    final sugarDiff = (_parseSugar(a.nutritionalFacts.sugars) - _parseSugar(b.nutritionalFacts.sugars)).abs();
+    if (sugarDiff <= 2) score += 15;
+
+    final satFatDiff = (_parseFat(a.nutritionalFacts.saturatedFat) - _parseFat(b.nutritionalFacts.saturatedFat)).abs();
+    if (satFatDiff <= 1) score += 10;
+
+    // Variant keyword similarity
+    final aVariant = a.variant.toLowerCase();
+    final bVariant = b.variant.toLowerCase();
+    final keywords = ['flakes', 'hot', 'spicy', 'calamansi', 'tomato', 'oil', 'natural', 'garlic', 'onion'];
+    for (final keyword in keywords) {
+      if (aVariant.contains(keyword) && bVariant.contains(keyword)) {
+        score += 5;
+      }
+    }
+
+    return score;
+  }
+
+  double _parseSodium(String sodiumStr) {
+    final match = RegExp(r'(\d+(?:\.\d+)?)\s*mg').firstMatch(sodiumStr);
+    return match != null ? double.parse(match.group(1)!) : 0.0;
+  }
+
+  double _parseSugar(String sugarStr) {
+    final match = RegExp(r'(\d+(?:\.\d+)?)\s*g').firstMatch(sugarStr);
+    return match != null ? double.parse(match.group(1)!) : 0.0;
+  }
+
+  double _parseFat(String fatStr) {
+    final match = RegExp(r'(\d+(?:\.\d+)?)\s*g').firstMatch(fatStr);
+    return match != null ? double.parse(match.group(1)!) : 0.0;
   }
 }

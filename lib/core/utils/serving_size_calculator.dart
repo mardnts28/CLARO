@@ -29,12 +29,12 @@ class ServingSizeCalculator {
     final ratio = maxGramsBeforeCaution / servingSizeG;
 
     if (ratio >= 1.0) {
-      return 'Up to 1 full serving (${servingSizeG.toStringAsFixed(0)}g) stays below the Caution threshold';
+      return 'Up to 1 full serving (${servingSizeG.toStringAsFixed(0)}g) stays within the suggested limit';
     } else if (ratio >= 0.5) {
-      return 'About half a serving (${(servingSizeG * ratio).toStringAsFixed(0)}g) stays below the Caution threshold';
+      return 'About half a serving (${(servingSizeG * ratio).toStringAsFixed(0)}g) stays within the suggested limit';
     } else {
       final safeGrams = (servingSizeG * ratio).clamp(0, servingSizeG);
-      return 'No more than ${safeGrams.toStringAsFixed(0)}g stays below the Caution threshold';
+      return 'No more than ${safeGrams.toStringAsFixed(0)}g stays within the suggested limit';
     }
   }
 }

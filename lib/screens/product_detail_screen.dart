@@ -556,16 +556,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                   const SizedBox(height: 20),
 
-                  // ── 6b. Comparison vs. other scanned/compared products ──
-                  // Only rendered when this product was viewed as part of
-                  // a comparison set (Compare button / multi-scan), per
-                  // ProductDetailResult.hasComparison.
-                  if (_comparisonMatrix != null && !_comparisonMatrix!.isEmpty)
-                    _buildComparisonCard(context, loc),
-
-                  if (_comparisonMatrix != null && !_comparisonMatrix!.isEmpty)
-                    const SizedBox(height: 20),
-
                   // ── 7. Scores (Individual White Cards) ─────────────
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -607,64 +597,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ── 8. Karagdagang Kaalaman Card ──────────────────
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.03),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                loc.extraKnowledgeTitle,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                loc.extraKnowledgeDesc,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: colorScheme.onSurface,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: const BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.check,
-                              color: Colors.white, size: 20),
-                        ),
-                      ],
-                    ),
-                  ),
+                  // ── 8. Product Ranking Card ─────────────────────────
+                  // Only rendered when this product was viewed as part of
+                  // a comparison set (Compare button / multi-scan), per
+                  // ProductDetailResult.hasComparison.
+                  if (_comparisonMatrix != null && !_comparisonMatrix!.isEmpty)
+                    _buildComparisonCard(context, loc),
 
-                  const SizedBox(height: 16),
+                  if (_comparisonMatrix != null && !_comparisonMatrix!.isEmpty)
+                    const SizedBox(height: 16),
 
                   // ── 9. Ihambing Button ─────────────────────────────
                   Padding(
@@ -752,8 +693,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         break;
     }
 
-    final title = _advisory?.warningText ??
+    final levelLabel = _levelLabel(level);
+    final advisoryTitle = _advisory?.warningText ??
         (level == AdvisoryLevel.suitable ? loc.safeToConsume : loc.reminderLabel);
+    final title = '$levelLabel - $advisoryTitle';
     final subtitle = _advisory?.explanation ?? loc.safeToConsumeSubtitle;
 
     return Container(
@@ -809,18 +752,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget _buildComparisonCard(BuildContext context, AppLocalizations loc) {
     final matrix = _comparisonMatrix!;
     final productId = widget.product.id;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
-    return _buildCard(
-      context: context,
+    // Determine rank level label based on product's suitability rank
+    final rankLabel = _getRankLevelLabel();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            loc.similarProductsTitle,
+            rankLabel,
             style: GoogleFonts.outfit(
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onSurface,
+              color: Colors.green,
             ),
           ),
           if (_rankingExplanation != null) ...[
@@ -916,6 +876,53 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return 'g';
       default:
         return '';
+    }
+  }
+
+  String _levelLabel(AdvisoryLevel level) {
+    switch (level) {
+      case AdvisoryLevel.suitable:
+        return 'Suitable';
+      case AdvisoryLevel.moderate:
+        return 'Moderate';
+      case AdvisoryLevel.caution:
+        return 'Caution';
+    }
+  }
+
+  String _getRankLevelLabel() {
+    // Find the current product's rank in the comparison set
+    if (widget.comparisonSet == null) {
+      return 'Product Ranking';
+    }
+
+    final currentProduct = widget.comparisonSet!.firstWhere(
+      (r) => r.evaluation.product.id == widget.product.id,
+      orElse: () => widget.comparisonSet!.first,
+    );
+
+    final rank = currentProduct.rank;
+    final suitabilityLabel = currentProduct.suitabilityRankLabel;
+
+    // If product has allergen warning, always show "Least Recommended"
+    if (suitabilityLabel == SuitabilityRankLabel.forcedLast) {
+      return 'Least Recommended';
+    }
+
+    // Map rank position to choice labels (for 5 products)
+    switch (rank) {
+      case 1:
+        return 'Best Choice';
+      case 2:
+        return 'Better Choice';
+      case 3:
+        return 'Good Choice';
+      case 4:
+        return 'Fair Choice';
+      case 5:
+        return 'Least Recommended';
+      default:
+        return 'Product Ranking';
     }
   }
 

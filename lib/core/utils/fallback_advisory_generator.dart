@@ -72,11 +72,9 @@ class FallbackAdvisoryGenerator {
     );
 
     // Build concise advisory following the new format
-    final levelLabel = _levelLabel(evaluation.overallLevel);
-    final explanation = '**$levelLabel** '
-        'Contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
+    final explanation = 'Contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
         '${_nutrientLabel(worst.nutrientKey)} per serving (${product.servingSizeG}g), '
-        'which is ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the WHO recommended maximum daily intake. '
+        'which is ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the recommended healthy daily limit. '
         'This may affect your ${_conditionLabel(worst.condition)}. '
         '${safeServing != null ? 'Consider limiting to $safeServing.' : ''}';
 
@@ -138,17 +136,12 @@ class FallbackAdvisoryGenerator {
     }
   }
 
-  static String _levelLabel(AdvisoryLevel level) {
-    switch (level) {
-      case AdvisoryLevel.suitable:
-        return 'Suitable';
-      case AdvisoryLevel.moderate:
-        return 'Moderate';
-      case AdvisoryLevel.caution:
-        return 'Caution';
-    }
-  }
-
+  /// [healthCondition] is the user's condition name (e.g. "hypertension",
+  /// or a comma-joined list for multiple conditions). Used here purely as
+  /// templated text -- no AI call involved -- so the fallback sentence
+  /// still ties the nutrient back to the user's condition even when
+  /// Gemini is unavailable. May be empty if the user has no conditions on
+  /// file, in which case the condition clause is simply omitted.
   static String generateRankingExplanation({
     required String nutrientName,
     required String nutrientUnit,
@@ -158,15 +151,18 @@ class FallbackAdvisoryGenerator {
     required bool thisIsBest,
     required bool thisIsWorst,
     required int rank,
+    String healthCondition = '',
   }) {
     final percentageDiff = ((thisValue - bestValue) / bestValue * 100).abs();
-    
+    final conditionClause =
+        healthCondition.isNotEmpty ? ' given your $healthCondition' : '';
+
     if (thisIsBest) {
-      return 'This product ranks first because it has the lowest $nutrientName content (${thisValue}$nutrientUnit per 100g) among the compared products.';
+      return 'This product ranks first because it has the lowest $nutrientName content (${thisValue}$nutrientUnit per 100g) among the compared products$conditionClause.';
     } else if (thisIsWorst) {
-      return 'This product ranks last because it has the highest $nutrientName content (${thisValue}$nutrientUnit per 100g), which is ${percentageDiff.toStringAsFixed(0)}% more than the best option (${bestValue}$nutrientUnit per 100g).';
+      return 'This product ranks last because it has the highest $nutrientName content (${thisValue}$nutrientUnit per 100g)$conditionClause, which is ${percentageDiff.toStringAsFixed(0)}% more than the best option (${bestValue}$nutrientUnit per 100g).';
     } else {
-      return 'This product ranks in the middle with ${thisValue}$nutrientUnit $nutrientName per 100g, which is ${percentageDiff.toStringAsFixed(0)}% more than the best option (${bestValue}$nutrientUnit per 100g).';
+      return 'This product ranks in the middle with ${thisValue}$nutrientUnit $nutrientName per 100g$conditionClause, which is ${percentageDiff.toStringAsFixed(0)}% more than the best option (${bestValue}$nutrientUnit per 100g).';
     }
   }
 }

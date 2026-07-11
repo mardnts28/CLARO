@@ -129,15 +129,22 @@ class ProductRankingService {
     required UserHealthProfile user,
     required String languageCode,
   }) async {
+    // Health condition name is attached to every branch below so the
+    // explanation always ties back to *why* the nutrient matters to this
+    // user, not just the raw numbers/rank.
+    final conditionName = _getConditionName(user);
+    final conditionSuffix =
+        conditionName.isNotEmpty ? ' for your $conditionName' : '';
+
     // Skip Gemini if product is suitable - use default explanation
     if (target.evaluation.overallLevel == AdvisoryLevel.suitable) {
-      return 'This product ranks ${target.rank} of ${comparisonSet.length} and is suitable for your health profile.';
+      return 'This product ranks ${target.rank} of ${comparisonSet.length} and is suitable for your health profile${conditionName.isNotEmpty ? " ($conditionName)" : ""}.';
     }
 
     // Get the main nutrient for the user's condition
     final mainNutrient = _getMainNutrientForUser(user);
     if (mainNutrient == null) {
-      return 'This product ranks ${target.rank} of ${comparisonSet.length}.';
+      return 'This product ranks ${target.rank} of ${comparisonSet.length}$conditionSuffix.';
     }
 
     // Calculate nutrient values for comparison
@@ -156,7 +163,7 @@ class ProductRankingService {
         .firstOrNull;
 
     if (targetEval == null) {
-      return 'This product ranks ${target.rank} of ${comparisonSet.length}.';
+      return 'This product ranks ${target.rank} of ${comparisonSet.length}$conditionSuffix.';
     }
 
     final thisValue = targetEval.valuePer100g;
@@ -173,10 +180,12 @@ class ProductRankingService {
       thisIsWorst: thisIsWorst,
       rank: target.rank,
       totalProducts: comparisonSet.length,
+      healthCondition: conditionName,
       languageCode: languageCode,
     );
 
-    return resultData['explanation'] ?? 'This product ranks ${target.rank} of ${comparisonSet.length}.';
+    return resultData['explanation'] ??
+        'This product ranks ${target.rank} of ${comparisonSet.length}$conditionSuffix.';
   }
 
   ({String key, String name, String unit})? _getMainNutrientForUser(UserHealthProfile user) {
@@ -217,5 +226,22 @@ class ProductRankingService {
       default:
         return '';
     }
+  }
+
+  String _getConditionName(UserHealthProfile user) {
+    if (user.conditions.isEmpty) return '';
+
+    final conditions = user.conditions.map((c) {
+      switch (c) {
+        case HealthCondition.hypertension:
+          return 'hypertension';
+        case HealthCondition.diabetes:
+          return 'diabetes';
+        case HealthCondition.heartCondition:
+          return 'heart condition';
+      }
+    }).toList();
+
+    return conditions.join(', ');
   }
 }

@@ -239,11 +239,9 @@
   "scoreEnvironmentDesc": "Moderate environmental impact.",
   "scoreProcess": "Process",
   "scoreProcessDesc": "Processed food with relatively simple ingredients.",
-  "extraKnowledgeTitle": "Extra Knowledge",
-  "extraKnowledgeDesc": "More filling and flavorful due to oil, but has higher calories and fat.",
   "compareButton": "Compare",
 
-  "similarProductsTitle": "Similar Products",
+  "similarProductsTitle": "Product Ranking",
   "productCount": "{count} products",
   "@productCount": {
     "placeholders": {

@@ -638,17 +638,10 @@ class AppLocalizationsTl extends AppLocalizations {
       'Processed food with relatively simple ingredients.';
 
   @override
-  String get extraKnowledgeTitle => 'Karagdagang Kaalaman';
-
-  @override
-  String get extraKnowledgeDesc =>
-      'Mas nakakabusog at mas malasa dahil sa mantika, ngunit may mas mataas na calories at taba.';
-
-  @override
   String get compareButton => 'Ihambing';
 
   @override
-  String get similarProductsTitle => 'Kahalintulad na Produkto';
+  String get similarProductsTitle => 'Pagraranggo ng Produkto';
 
   @override
   String productCount(int count) {

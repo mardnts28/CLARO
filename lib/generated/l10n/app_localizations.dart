@@ -1274,18 +1274,6 @@ abstract class AppLocalizations {
   /// **'Processed food with relatively simple ingredients.'**
   String get scoreProcessDesc;
 
-  /// No description provided for @extraKnowledgeTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Extra Knowledge'**
-  String get extraKnowledgeTitle;
-
-  /// No description provided for @extraKnowledgeDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'More filling and flavorful due to oil, but has higher calories and fat.'**
-  String get extraKnowledgeDesc;
-
   /// No description provided for @compareButton.
   ///
   /// In en, this message translates to:
@@ -1295,7 +1283,7 @@ abstract class AppLocalizations {
   /// No description provided for @similarProductsTitle.
   ///
   /// In en, this message translates to:
-  /// **'Similar Products'**
+  /// **'Product Ranking'**
   String get similarProductsTitle;
 
   /// No description provided for @productCount.

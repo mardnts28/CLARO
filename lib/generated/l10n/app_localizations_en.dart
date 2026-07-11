@@ -631,17 +631,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Processed food with relatively simple ingredients.';
 
   @override
-  String get extraKnowledgeTitle => 'Extra Knowledge';
-
-  @override
-  String get extraKnowledgeDesc =>
-      'More filling and flavorful due to oil, but has higher calories and fat.';
-
-  @override
   String get compareButton => 'Compare';
 
   @override
-  String get similarProductsTitle => 'Similar Products';
+  String get similarProductsTitle => 'Product Ranking';
 
   @override
   String productCount(int count) {

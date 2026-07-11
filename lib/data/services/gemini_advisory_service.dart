@@ -137,6 +137,11 @@ class GeminiAdvisoryService {
     _cache.removeWhere((k, _) => k.startsWith('$scanEventId::'));
   }
 
+  /// Generates the per-nutrient ranking explanation shown on the
+  /// comparison card. [healthCondition] is the user's condition name
+  /// (e.g. "hypertension", or a comma-joined list for multiple
+  /// conditions) so the explanation can tie the nutrient back to *why*
+  /// it matters for this user, not just report the raw numbers.
   Future<Map<String, String>> generateRankingExplanation({
     required String nutrientName,
     required String nutrientUnit,
@@ -147,6 +152,7 @@ class GeminiAdvisoryService {
     required bool thisIsWorst,
     required int rank,
     required int totalProducts,
+    String healthCondition = '',
     String languageCode = 'en',
   }) async {
     final prompt = AdvisoryPromptBuilder.buildRankingExplanation(
@@ -159,6 +165,7 @@ class GeminiAdvisoryService {
       thisIsWorst: thisIsWorst,
       rank: rank,
       totalProducts: totalProducts,
+      healthCondition: healthCondition,
       languageCode: languageCode,
     );
 
@@ -179,6 +186,7 @@ class GeminiAdvisoryService {
         thisIsBest: thisIsBest,
         thisIsWorst: thisIsWorst,
         rank: rank,
+        healthCondition: healthCondition,
       );
       return {'explanation': explanation, 'source': 'Fallback'};
     } catch (_) {
@@ -191,6 +199,7 @@ class GeminiAdvisoryService {
         thisIsBest: thisIsBest,
         thisIsWorst: thisIsWorst,
         rank: rank,
+        healthCondition: healthCondition,
       );
       return {'explanation': explanation, 'source': 'Fallback'};
     }
