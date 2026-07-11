@@ -13,7 +13,7 @@
 import 'gemini_advisory_service.dart';
 import '../models/health_advisory.dart';
 import '../models/health_profile.dart';
-import '../models/product.dart';
+import '../../models/product_model.dart';
 import '../models/product_detail_result.dart';
 import '../models/ranked_product_result.dart';
 import '../../core/utils/who_calculator.dart';

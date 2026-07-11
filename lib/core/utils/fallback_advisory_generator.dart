@@ -10,6 +10,7 @@ import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
 import '../constants/who_fda_thresholds.dart';
 import 'serving_size_calculator.dart';
+import '../../models/product_model.dart';
 
 // notNeeded added for Phase 3 (product_ranking_service.dart): used when a
 // product falls below the top-N cutoff and deliberately skips the AI call

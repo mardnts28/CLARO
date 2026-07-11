@@ -7,7 +7,7 @@
 // ProductRankingService.getProductDetail when the user taps into one.
 
 import '../models/health_profile.dart';
-import '../models/product.dart';
+import '../../models/product_model.dart';
 import '../models/ranked_product_result.dart';
 import '../repositories/product_repository.dart';
 import 'product_ranking_service.dart';
@@ -32,7 +32,7 @@ class ProductComparisonService {
     required UserHealthProfile user,
   }) async {
     final alternatives = await _productRepository.getSimilarProducts(
-      scannedProduct.subCategory,
+      scannedProduct.category,
       excludeId: scannedProduct.id,
     );
 

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
+import '../services/auth_service.dart';
 import 'product_detail_screen.dart';
 import 'camera_scanner_screen.dart';
 import 'history_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
+import '../data/models/ranked_product_result.dart';
+import '../data/models/health_profile.dart';
+import '../data/services/backend_locator.dart';
 
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
@@ -17,7 +21,10 @@ class MultiScanResultsScreen extends StatefulWidget {
 }
 
 class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
-  late List<Product> _rankedProducts;
+  final _authService = AuthService();
+
+  bool _loading = true;
+  List<RankedProductResult> _ranked = [];
 
   @override
   void initState() {
@@ -25,38 +32,39 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     _rankProducts();
   }
 
-  // Helper to calculate a suitability score for ranking.
-  // Higher score = More suitable/healthy.
-  int _calculateSuitabilityScore(Product p) {
-    // We want to match the screenshot order if these specific 5 items are scanned:
-    // 1. Nissin Cup Noodles Batchoy (id: nissin_cup_noodles_batchoy) -> Top
-    // 2. Lucky Me Pancit Canton Original (id: lucky_me_canton_original)
-    // 3. Argentina Corned Beef (id: argentina_corned_beef)
-    // 4. Mega Sardines in Tomato Sauce (id: mega_sardines_tomato)
-    // 5. 555 Fried Sardines in Tomato Sauce (id: 555_fried_sardines_hot_spicy or similar)
-    //
-    // For this specific situation, we return predefined mock ranking scores so the
-    // list order is sorted exactly as in the screenshot:
-    if (p.id == 'nissin_cup_noodles_batchoy') return 100;
-    if (p.id == 'lucky_me_canton_original') return 90;
-    if (p.id == 'argentina_corned_beef') return 80;
-    if (p.id == 'mega_sardines_tomato') return 70;
-    if (p.id == '555_fried_sardines_hot_spicy' || p.id.contains('555')) return 60;
-
-    // Default dynamic suitability rank fallback logic (e.g. lower sodium is better):
+  // Ranks the scanned products via WhoCalculator (through
+  // ProductRankingService.rankProducts), against the current user's saved
+  // health profile. Free/pure-Dart -- no Gemini call happens here; that
+  // only happens per-product once the user taps into a detail screen.
+  Future<void> _rankProducts() async {
     try {
-      final sodiumStr = p.nutritionalFacts.sodium.replaceAll(RegExp(r'[^0-9]'), '');
-      final sodiumVal = int.tryParse(sodiumStr) ?? 500;
-      return 1000 - sodiumVal; // Less sodium = higher score
-    } catch (_) {
-      return 50;
-    }
-  }
+      final uid = _authService.currentUser?.uid;
+      // No conditions/allergies on record (e.g. not logged in) still
+      // ranks meaningfully -- WhoCalculator falls back to general
+      // WHO/FDA thresholds when a profile has no flagged conditions.
+      final profile = uid == null
+          ? const UserHealthProfile(
+              userId: '',
+              displayName: '',
+              conditions: [],
+              allergies: [],
+            )
+          : await BackendLocator.userRepository.getHealthProfile(uid);
 
-  void _rankProducts() {
-    // Sort in descending order of suitability score (highest suitability first)
-    _rankedProducts = List.from(widget.detectedProducts)
-      ..sort((a, b) => _calculateSuitabilityScore(b).compareTo(_calculateSuitabilityScore(a)));
+      final ranked = BackendLocator.productRankingService.rankProducts(
+        products: widget.detectedProducts,
+        user: profile,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _ranked = ranked;
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error ranking scanned products: $e');
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -121,15 +129,17 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
 
           // ── Product list ──────────────────────────────────────────
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-              itemCount: _rankedProducts.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, i) {
-                final product = _rankedProducts[i];
-                return _buildProductCard(context, product);
-              },
-            ),
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+                    itemCount: _ranked.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, i) {
+                      final ranked = _ranked[i];
+                      return _buildProductCard(context, ranked);
+                    },
+                  ),
           ),
         ],
       ),
@@ -158,18 +168,22 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     );
   }
 
-  Widget _buildProductCard(BuildContext context, Product p) {
+  Widget _buildProductCard(BuildContext context, RankedProductResult ranked) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final p = ranked.evaluation.product;
 
     return GestureDetector(
       onTap: () {
-        // Navigate to the individual detail screen when clicked
+        // Navigate to the individual detail screen, passing the full
+        // ranked set so the detail screen can show the comparison matrix
+        // and ranking explanation for this scan event too.
         Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => ProductDetailScreen(
               product: p,
+              comparisonSet: _ranked,
             ),
           ),
         );
@@ -190,6 +204,24 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         ),
         child: Row(
           children: [
+            Container(
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              margin: const EdgeInsets.only(right: 10),
+              decoration: BoxDecoration(
+                color: colorScheme.primary.withOpacity(0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '${ranked.rank}',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
+              ),
+            ),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

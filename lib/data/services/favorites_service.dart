@@ -6,7 +6,7 @@
 // and use its return value to update the icon immediately, rather than
 // re-fetching favorite status separately.
 
-import '../models/product.dart';
+import '../../models/product_model.dart';
 import '../repositories/favorites_repository.dart';
 import '../repositories/product_repository.dart';
 

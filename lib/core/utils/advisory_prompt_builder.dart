@@ -6,6 +6,7 @@ import '../../data/models/ranked_product_result.dart';
 import '../constants/who_fda_thresholds.dart';
 import 'comparison_calculator.dart';
 import 'serving_size_calculator.dart';
+import '../../models/product_model.dart';
 
 class AdvisoryPromptBuilder {
   static String build({

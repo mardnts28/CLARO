@@ -6,15 +6,30 @@ import '../services/auth_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'compare_products_screen.dart';
+import '../data/models/health_profile.dart';
+import '../data/models/health_advisory.dart';
+import '../data/models/product_evaluation.dart';
+import '../data/models/ranked_product_result.dart';
+import '../data/models/comparison_matrix.dart';
+import '../core/constants/who_fda_thresholds.dart';
+import '../data/services/backend_locator.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
   final double confidence;
 
+  // Optional: the full set of products this one is being compared against
+  // (populated when navigated from CompareProductsScreen or
+  // MultiScanResultsScreen). Must include an entry for `product` itself.
+  // When null/omitted, this is a solo scan -- advisory-only, no comparison
+  // matrix, matching the original Phase 2 solo flow.
+  final List<RankedProductResult>? comparisonSet;
+
   const ProductDetailScreen({
     super.key,
     required this.product,
     this.confidence = 0.95,
+    this.comparisonSet,
   });
 
   @override
@@ -25,13 +40,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _isFavorite = false;
   FdaVerificationResult? _fdaResult;
   final _authService = AuthService();
-  List<String> _personalWarnings = [];
+
+  // Backend-derived health advisory state (WhoCalculator + GeminiAdvisoryService,
+  // via ProductRankingService.getProductDetail -- see backend_locator.dart).
+  bool _advisoryLoading = true;
+  ProductEvaluation? _evaluation;
+  HealthAdvisory? _advisory;
+  ComparisonMatrix? _comparisonMatrix;
+  String? _rankingExplanation;
+
+  // Placeholder scan-event id used only for GeminiAdvisoryService's
+  // per-scan-event response cache. Once a real scan-session id is threaded
+  // through from the camera/multi-scan flow, pass that in instead.
+  late final String _scanEventId =
+      '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}';
+
+  bool _advisoryStarted = false;
 
   @override
   void initState() {
     super.initState();
     _loadFdaVerification();
-    _loadUserHealthProfile();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_advisoryStarted) {
+      _advisoryStarted = true;
+      _loadAdvisory();
+    }
   }
 
   Future<void> _loadFdaVerification() async {
@@ -49,64 +87,69 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  Future<void> _loadUserHealthProfile() async {
+  /// Loads the user's health profile (via UserRepository, which already
+  /// maps Firestore's English/Tagalog condition labels onto the backend's
+  /// HealthCondition enum -- see firestore_label_mappings.dart) and runs
+  /// the real WhoCalculator/GeminiAdvisoryService pipeline for this
+  /// product, replacing the old hand-rolled warning strings.
+  Future<void> _loadAdvisory() async {
     try {
       final uid = _authService.currentUser?.uid;
-      if (uid == null) return;
-      final doc = await _authService.db.collection('users').doc(uid).get();
-      final data = doc.data();
-      if (data == null) return;
-
-      final conditions = (data['conditions'] as List<dynamic>?)?.cast<String>() ?? [];
-      final allergens = (data['allergens'] as List<dynamic>?)?.cast<String>() ?? [];
-
-      final warnings = <String>[];
-      final p = widget.product;
-
-      // Check allergen matches
-      for (final userAllergen in allergens) {
-        for (final productAllergen in p.allergens) {
-          if (productAllergen.toLowerCase().contains(userAllergen.toLowerCase()) ||
-              userAllergen.toLowerCase().contains(productAllergen.toLowerCase())) {
-            warnings.add('⚠️ May $productAllergen ka na allergen – naglalaman ang produktong ito nito.');
-          }
-        }
+      if (uid == null) {
+        if (mounted) setState(() => _advisoryLoading = false);
+        return;
       }
 
-      // Check condition-based warnings
-      if (conditions.contains('Diabetes')) {
-        final sugar = p.nutritionalFacts.sugars;
-        if (p.nutritionalFacts.sugarsG > 0) {
-          warnings.add('⚠️ May diabetes ka – suriin ang sugar content ($sugar) ng produktong ito.');
-        }
+      final profile = await BackendLocator.userRepository.getHealthProfile(uid);
+
+      // If a comparisonSet was handed to us (from Compare / multi-scan),
+      // use it as-is -- it's already ranked. Otherwise this is a solo
+      // scan: rank just this one product so we still get a proper
+      // ProductEvaluation out of WhoCalculator.
+      List<RankedProductResult> ranked;
+      if (widget.comparisonSet != null && widget.comparisonSet!.length > 1) {
+        ranked = widget.comparisonSet!;
+      } else {
+        ranked = BackendLocator.productRankingService.rankProducts(
+          products: [widget.product],
+          user: profile,
+        );
       }
-      if (conditions.contains('Alta-presyon')) {
-        final sodium = p.nutritionalFacts.sodium;
-        if (p.nutritionalFacts.sodiumMg > 0) {
-          warnings.add('⚠️ May alta-presyon ka – suriin ang sodium content ($sodium) ng produktong ito.');
-        }
-      }
-      if (conditions.contains('Sakit sa puso')) {
-        final fat = p.nutritionalFacts.totalFat;
-        if (p.nutritionalFacts.totalFatG > 0) {
-          warnings.add('⚠️ May sakit sa puso ka – suriin ang fat content ($fat) ng produktong ito.');
-        }
-      }
+
+      final target = ranked.firstWhere(
+        (r) => r.evaluation.product.id == widget.product.id,
+        orElse: () => ranked.first,
+      );
+
+      final languageCode =
+          mounted ? Localizations.localeOf(context).languageCode : 'en';
+
+      final detail = await BackendLocator.productRankingService.getProductDetail(
+        target: target,
+        comparisonSet: ranked.length > 1 ? ranked : null,
+        user: profile,
+        scanEventId: _scanEventId,
+        languageCode: languageCode,
+      );
 
       if (mounted) {
         setState(() {
-          _personalWarnings = warnings;
+          _evaluation = target.evaluation;
+          _advisory = detail.advisory;
+          _comparisonMatrix = detail.comparisonMatrix;
+          _rankingExplanation = detail.rankingExplanation;
+          _advisoryLoading = false;
         });
       }
     } catch (e) {
-      debugPrint('Error loading health profile: $e');
+      debugPrint('Error loading health advisory: $e');
+      if (mounted) setState(() => _advisoryLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = widget.product;
-    final hasAllergens = p.allergens.isNotEmpty;
     final topPadding = MediaQuery.of(context).padding.top;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -276,54 +319,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                     ),
                   ),
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.green, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.02),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.verified_user_outlined,
-                            color: Colors.green, size: 36),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                loc.safeToConsume,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                loc.safeToConsumeSubtitle,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: colorScheme.onSurface,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  _buildAdvisoryBanner(context, loc),
 
                   const SizedBox(height: 12),
 
@@ -343,29 +339,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         const SizedBox(height: 12),
 
-                        // Green checkmark notice
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.check,
-                                color: Colors.green, size: 20),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                loc.diabetesSafeReminder,
-                                style: GoogleFonts.inter(
-                                  color: Colors.green,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.4,
+                        // Reassurance line — only when nothing was flagged
+                        // for this user's conditions.
+                        if (!_advisoryLoading &&
+                            _evaluation != null &&
+                            _evaluation!.overallLevel == AdvisoryLevel.suitable &&
+                            !_evaluation!.allergenAssessment.hasDirectAllergen)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.check,
+                                  color: Colors.green, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  loc.diabetesSafeReminder,
+                                  style: GoogleFonts.inter(
+                                    color: Colors.green,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.4,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
 
-                        // Allergen warning (red)
-                        if (hasAllergens) ...[
+                        // Allergen warning (red) — only when this product
+                        // matches one of THIS user's saved allergies
+                        // (WhoCalculator.assessAllergens), not just when
+                        // the product happens to list any allergen at all.
+                        if (_evaluation != null &&
+                            _evaluation!.allergenAssessment.hasDirectAllergen) ...[
                           const SizedBox(height: 12),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -375,7 +380,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  loc.containsAllergens(p.allergens.join(', ')),
+                                  loc.containsAllergens(
+                                    _evaluation!.allergenAssessment.matchedContains
+                                        .map((a) => a.displayLabel)
+                                        .join(', '),
+                                  ),
                                   style: GoogleFonts.inter(
                                     color: Colors.redAccent,
                                     fontSize: 13,
@@ -388,8 +397,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                         ],
 
-                        // ── Personalized Health Warnings ──
-                        if (_personalWarnings.isNotEmpty) ...[
+                        // ── Personalized Health Warnings (per flagged nutrient) ──
+                        if (_evaluation != null &&
+                            _evaluation!.nutrientEvaluations
+                                .any((e) => e.level != AdvisoryLevel.suitable)) ...[
                           const SizedBox(height: 12),
                           Container(
                             width: double.infinity,
@@ -411,18 +422,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 8),
-                                ..._personalWarnings.map((w) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 4),
-                                  child: Text(
-                                    w,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: Colors.red[900],
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                )),
+                                ..._evaluation!.nutrientEvaluations
+                                    .where((e) => e.level != AdvisoryLevel.suitable)
+                                    .map((e) => Padding(
+                                          padding: const EdgeInsets.only(bottom: 4),
+                                          child: Text(
+                                            '⚠️ ${_nutrientLabel(e.nutrientKey)}: '
+                                            '${e.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(e.nutrientKey)} '
+                                            '(${e.whoDailyLimitPercentage.toStringAsFixed(0)}% of WHO daily limit per serving)',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              color: e.level == AdvisoryLevel.caution
+                                                  ? Colors.red[900]
+                                                  : Colors.orange[900],
+                                              fontWeight: FontWeight.w600,
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        )),
                               ],
                             ),
                           ),
@@ -430,7 +447,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                         const SizedBox(height: 14),
 
-                        // Serving recommendation box
+                        // Serving recommendation box — from the AI/fallback
+                        // advisory when available, generic copy otherwise.
                         Container(
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(
@@ -442,7 +460,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 color: Colors.green, width: 1.2),
                           ),
                           child: Text(
-                            loc.servingRecommendation,
+                            _advisory?.safeServingSize ?? loc.servingRecommendation,
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               color: colorScheme.onSurface,
@@ -537,6 +555,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
 
                   const SizedBox(height: 20),
+
+                  // ── 6b. Comparison vs. other scanned/compared products ──
+                  // Only rendered when this product was viewed as part of
+                  // a comparison set (Compare button / multi-scan), per
+                  // ProductDetailResult.hasComparison.
+                  if (_comparisonMatrix != null && !_comparisonMatrix!.isEmpty)
+                    _buildComparisonCard(context, loc),
+
+                  if (_comparisonMatrix != null && !_comparisonMatrix!.isEmpty)
+                    const SizedBox(height: 20),
 
                   // ── 7. Scores (Individual White Cards) ─────────────
                   Padding(
@@ -684,6 +712,211 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       floatingActionButton: const VoiceAssistantFab(),
     );
+  }
+
+  // ── Health advisory banner (WhoCalculator + GeminiAdvisoryService) ──────
+  Widget _buildAdvisoryBanner(BuildContext context, AppLocalizations loc) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    if (_advisoryLoading) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const SizedBox(
+          height: 20,
+          child: LinearProgressIndicator(),
+        ),
+      );
+    }
+
+    final level = _evaluation?.overallLevel ?? AdvisoryLevel.suitable;
+    late final Color color;
+    late final IconData icon;
+    switch (level) {
+      case AdvisoryLevel.suitable:
+        color = Colors.green;
+        icon = Icons.verified_user_outlined;
+        break;
+      case AdvisoryLevel.moderate:
+        color = Colors.amber[800]!;
+        icon = Icons.info_outline;
+        break;
+      case AdvisoryLevel.caution:
+        color = Colors.red;
+        icon = Icons.warning_amber_rounded;
+        break;
+    }
+
+    final title = _advisory?.warningText ??
+        (level == AdvisoryLevel.suitable ? loc.safeToConsume : loc.reminderLabel);
+    final subtitle = _advisory?.explanation ?? loc.safeToConsumeSubtitle;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 36),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.outfit(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: colorScheme.onSurface,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Nutrient comparison card (ComparisonMatrixBuilder output) ───────────
+  Widget _buildComparisonCard(BuildContext context, AppLocalizations loc) {
+    final matrix = _comparisonMatrix!;
+    final productId = widget.product.id;
+
+    return _buildCard(
+      context: context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            loc.similarProductsTitle,
+            style: GoogleFonts.outfit(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          if (_rankingExplanation != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _rankingExplanation!,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+          ],
+          const SizedBox(height: 12),
+          ...matrix.nutrientRows.map((row) {
+            final cell = row.cells.firstWhere((c) => c.productId == productId);
+            final Color dotColor;
+            switch (cell.highlight) {
+              case ComparisonHighlight.favorable:
+                dotColor = Colors.green;
+                break;
+              case ComparisonHighlight.unfavorable:
+                dotColor = Colors.red;
+                break;
+              case ComparisonHighlight.neutral:
+                dotColor = Colors.grey;
+                break;
+            }
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      row.nutrient.displayLabel,
+                      style: GoogleFonts.inter(fontSize: 13),
+                    ),
+                  ),
+                  Text(
+                    '${cell.value.toStringAsFixed(1)}${row.nutrient.unit} / 100g',
+                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            );
+          }),
+          for (final row in matrix.allergenRows)
+            if (row.cells.any((c) =>
+                c.productId == productId && c.presence != AllergenPresence.none))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      row.allergen.displayLabel,
+                      style: GoogleFonts.inter(fontSize: 13, color: Colors.redAccent),
+                    ),
+                  ],
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  String _nutrientLabel(String nutrientKey) {
+    switch (nutrientKey) {
+      case 'sodiumMg':
+        return 'Sodium';
+      case 'sugarsG':
+        return 'Sugars';
+      case 'saturatedFatG':
+        return 'Saturated Fat';
+      default:
+        return nutrientKey;
+    }
+  }
+
+  String _nutrientUnit(String nutrientKey) {
+    switch (nutrientKey) {
+      case 'sodiumMg':
+        return 'mg';
+      case 'sugarsG':
+      case 'saturatedFatG':
+        return 'g';
+      default:
+        return '';
+    }
   }
 
   // ── Helper card builder to make cards completely uniform ────────────────

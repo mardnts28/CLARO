@@ -6,6 +6,7 @@
 
 import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
+import '../../models/product_model.dart';
 import '../constants/who_fda_thresholds.dart';
 import 'who_calculator.dart';
 

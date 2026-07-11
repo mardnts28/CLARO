@@ -79,7 +79,7 @@ class NutrientComparisonRow {
   });
 }
 
-enum AllergenPresence { none, mayContain, contains }
+enum AllergenPresence { none, contains }
 
 class AllergenComparisonCell {
   final String productId;

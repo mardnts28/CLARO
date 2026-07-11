@@ -1,4 +1,6 @@
 import 'dart:ui';
+import '../data/models/health_profile.dart';
+import '../core/utils/nutrition_calculator.dart';
 
 class Product {
   final String id;
@@ -121,4 +123,117 @@ class DetectionResult {
     required this.confidence,
     required this.boundingBox,
   });
+}
+
+// ============================================================================
+// Backend Compatibility Extensions
+// ============================================================================
+// These extensions provide the fields and structure expected by the backend
+// logic (lib/core and lib/data) while keeping product_model.dart as the
+// single source of truth for product data.
+
+/// NutritionInfo class expected by backend logic (per-100g values)
+class NutritionInfo {
+  final double caloriesKcal;
+  final double sodiumMg;
+  final double sugarsG;
+  final double saturatedFatG;
+  final double totalCarbohydratesG;
+  final double dietaryFiberG;
+  final double potassiumMg;
+  final double totalFatG;
+  final double proteinG;
+
+  const NutritionInfo({
+    required this.caloriesKcal,
+    required this.sodiumMg,
+    required this.sugarsG,
+    required this.saturatedFatG,
+    required this.totalCarbohydratesG,
+    required this.dietaryFiberG,
+    required this.potassiumMg,
+    required this.totalFatG,
+    required this.proteinG,
+  });
+}
+
+/// Extension on Product to provide backend-compatible fields
+extension ProductBackendAdapter on Product {
+  /// Parses serving size string to extract grams (e.g., "56g" -> 56.0)
+  double get servingSizeG {
+    final regex = RegExp(r'(\d+(?:\.\d+)?)\s*[gG]');
+    final match = regex.firstMatch(nutritionalFacts.servingSize);
+    if (match == null) return 0.0;
+    return double.tryParse(match.group(1) ?? '') ?? 0.0;
+  }
+
+  /// Calculates per-100g nutrition values from per-serving values
+  NutritionInfo get nutritionPer100g {
+    final per100g = nutritionalFacts.per100gValues;
+    if (per100g == null) {
+      // Fallback: return per-serving values if calculation fails
+      return NutritionInfo(
+        caloriesKcal: nutritionalFacts.caloriesKcal,
+        sodiumMg: nutritionalFacts.sodiumMg,
+        sugarsG: nutritionalFacts.sugarsG,
+        saturatedFatG: nutritionalFacts.saturatedFatG,
+        totalCarbohydratesG: nutritionalFacts.carbsG,
+        dietaryFiberG: nutritionalFacts.fiberG,
+        potassiumMg: nutritionalFacts.potassiumMg,
+        totalFatG: nutritionalFacts.totalFatG,
+        proteinG: nutritionalFacts.proteinG,
+      );
+    }
+    return NutritionInfo(
+      caloriesKcal: per100g['caloriesKcal'] ?? nutritionalFacts.caloriesKcal,
+      sodiumMg: per100g['sodiumMg'] ?? nutritionalFacts.sodiumMg,
+      sugarsG: per100g['sugarsG'] ?? nutritionalFacts.sugarsG,
+      saturatedFatG: per100g['saturatedFatG'] ?? nutritionalFacts.saturatedFatG,
+      totalCarbohydratesG: per100g['carbsG'] ?? nutritionalFacts.carbsG,
+      dietaryFiberG: per100g['fiberG'] ?? nutritionalFacts.fiberG,
+      potassiumMg: per100g['potassiumMg'] ?? nutritionalFacts.potassiumMg,
+      totalFatG: per100g['totalFatG'] ?? nutritionalFacts.totalFatG,
+      proteinG: per100g['proteinG'] ?? nutritionalFacts.proteinG,
+    );
+  }
+
+  /// Converts string allergens to AllergenType enums
+  List<AllergenType> get containsAllergens {
+    return allergens.map((allergenStr) {
+      final normalized = allergenStr.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+      switch (normalized) {
+        case 'fish':
+        case 'isda':
+          return AllergenType.fish;
+        case 'milk':
+        case 'gatas':
+          return AllergenType.dairy;
+        case 'egg':
+        case 'itlog':
+          return AllergenType.eggs;
+        case 'soy':
+        case 'soya':
+        case 'soybean':
+          return AllergenType.soy;
+        case 'wheat':
+        case 'trigo':
+          return AllergenType.wheatGluten;
+        case 'shellfish':
+        case 'lamangdagat':
+        case 'lamang-dagat':
+          return AllergenType.shellfish;
+        case 'peanut':
+        case 'mani':
+          return AllergenType.peanuts;
+        default:
+          return AllergenType.msg; // Fallback for unrecognized allergens
+      }
+    }).toList();
+  }
+
+  /// Use variant as subCategory for backend compatibility
+  String get subCategory => variant;
+
+  /// Convert string FDA status to enum-like behavior
+  String get fdaStatusBackend => fdaStatus;
 }

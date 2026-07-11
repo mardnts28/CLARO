@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
-import '../services/product_db_service.dart';
+import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import 'product_detail_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
+import '../data/models/ranked_product_result.dart';
+import '../data/services/backend_locator.dart';
 
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
@@ -19,23 +21,24 @@ class CompareProductsScreen extends StatefulWidget {
 }
 
 class _CompareProductsScreenState extends State<CompareProductsScreen> {
-  final ProductDbService _db = ProductDbService();
   final TextEditingController _searchCtrl = TextEditingController();
+  final _authService = AuthService();
 
-  static const _primaryRed = Color(0xFF8B1A1A);
+  bool _loading = true;
+  String? _error;
 
-  late List<Product> _allInCategory;
-  List<Product> _filtered = [];
+  // Full ranked comparison set (scanned product + alternatives in the same
+  // category), from ProductComparisonService.compareWithAlternatives --
+  // backed by WhoCalculator.rankProducts under the hood. Free/pure-Dart,
+  // no Gemini call happens just to build this list.
+  List<RankedProductResult> _allRanked = [];
+  List<RankedProductResult> _filtered = [];
 
   @override
   void initState() {
     super.initState();
-    _allInCategory = _db.getProductsByCategory(
-      widget.sourceProduct.category,
-      excludeId: widget.sourceProduct.id,
-    );
-    _filtered = List.from(_allInCategory);
     _searchCtrl.addListener(_onSearch);
+    _loadRanking();
   }
 
   @override
@@ -44,16 +47,50 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     super.dispose();
   }
 
+  Future<void> _loadRanking() async {
+    try {
+      final uid = _authService.currentUser?.uid;
+      if (uid == null) {
+        setState(() {
+          _loading = false;
+          _error = 'no_user';
+        });
+        return;
+      }
+
+      final profile = await BackendLocator.userRepository.getHealthProfile(uid);
+      final ranked = await BackendLocator.productComparisonService.compareWithAlternatives(
+        scannedProduct: widget.sourceProduct,
+        user: profile,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _allRanked = ranked;
+        _filtered = List.from(ranked);
+        _loading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading product comparison: $e');
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
   void _onSearch() {
     final q = _searchCtrl.text.toLowerCase().trim();
     setState(() {
       _filtered = q.isEmpty
-          ? List.from(_allInCategory)
-          : _allInCategory
-              .where((p) =>
-                  p.name.toLowerCase().contains(q) ||
-                  p.brand.toLowerCase().contains(q) ||
-                  p.variant.toLowerCase().contains(q))
+          ? List.from(_allRanked)
+          : _allRanked
+              .where((r) =>
+                  r.evaluation.product.name.toLowerCase().contains(q) ||
+                  r.evaluation.product.brand.toLowerCase().contains(q) ||
+                  r.evaluation.product.variant.toLowerCase().contains(q))
               .toList();
     });
   }
@@ -128,7 +165,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  loc.productCount(_allInCategory.length),
+                  loc.productCount(_allRanked.length),
                   style: GoogleFonts.inter(
                       fontSize: 12, color: colorScheme.onSurfaceVariant),
                 ),
@@ -185,34 +222,53 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
+
+          // ── Ranked-by-suitability label ───────────────────────────
+          if (!_loading && _error == null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Text(
+                loc.rankedBySuitability,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 4),
 
           // ── Product list ──────────────────────────────────────────
           Expanded(
-            child: _filtered.isEmpty
-                ? _buildEmpty()
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    itemCount: _filtered.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, i) {
-                      final product = _filtered[i];
-                      final isCurrent =
-                          product.id == widget.sourceProduct.id;
-                      return _ProductCard(
-                        product: product,
-                        isCurrent: isCurrent,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ProductDetailScreen(
-                              product: product,
+            child: _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _filtered.isEmpty
+                    ? _buildEmpty()
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        itemCount: _filtered.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (context, i) {
+                          final ranked = _filtered[i];
+                          final isCurrent =
+                              ranked.evaluation.product.id == widget.sourceProduct.id;
+                          return _ProductCard(
+                            ranked: ranked,
+                            isCurrent: isCurrent,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ProductDetailScreen(
+                                  product: ranked.evaluation.product,
+                                  comparisonSet: _allRanked,
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                          );
+                        },
+                      ),
           ),
         ],
       ),
@@ -250,23 +306,50 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   }
 }
 
-
 // ── Individual product list card ─────────────────────────────────────────────
 class _ProductCard extends StatelessWidget {
-  final Product product;
+  final RankedProductResult ranked;
   final bool isCurrent;
   final VoidCallback onTap;
 
   const _ProductCard({
-    required this.product,
+    required this.ranked,
     required this.isCurrent,
     required this.onTap,
   });
+
+  Color _labelColor() {
+    switch (ranked.suitabilityRankLabel) {
+      case SuitabilityRankLabel.mostSuitable:
+        return Colors.green;
+      case SuitabilityRankLabel.middle:
+        return Colors.amber.shade800;
+      case SuitabilityRankLabel.leastSuitable:
+        return Colors.deepOrange;
+      case SuitabilityRankLabel.forcedLast:
+        return Colors.red;
+    }
+  }
+
+  String _labelText() {
+    switch (ranked.suitabilityRankLabel) {
+      case SuitabilityRankLabel.mostSuitable:
+        return 'Most Suitable';
+      case SuitabilityRankLabel.middle:
+        return 'Middle';
+      case SuitabilityRankLabel.leastSuitable:
+        return 'Least Suitable';
+      case SuitabilityRankLabel.forcedLast:
+        return 'Allergen Warning';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final product = ranked.evaluation.product;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -288,6 +371,26 @@ class _ProductCard extends StatelessWidget {
         ),
         child: Row(
           children: [
+            // Rank badge
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _labelColor().withOpacity(0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: _labelColor()),
+              ),
+              child: Text(
+                '${ranked.rank}',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: _labelColor(),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
             // Product name + size
             Expanded(
               child: Column(
@@ -327,10 +430,30 @@ class _ProductCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    product.nutritionalFacts.servingSize,
-                    style: GoogleFonts.inter(
-                        fontSize: 12, color: colorScheme.onSurfaceVariant),
+                  Row(
+                    children: [
+                      Text(
+                        product.nutritionalFacts.servingSize,
+                        style: GoogleFonts.inter(
+                            fontSize: 12, color: colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _labelColor().withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          _labelText(),
+                          style: GoogleFonts.inter(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: _labelColor(),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   // Nutrition quick-stats row

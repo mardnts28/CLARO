@@ -23,6 +23,34 @@ enum AllergenType {
   msg, // not a true allergen, but frequently flagged as a sensitivity
 }
 
+// Human-readable labels for AllergenType, for UI display (e.g. warning
+// banners). Kept alongside the enum so any screen can reuse it instead of
+// re-deriving its own copy.
+extension AllergenTypeDisplay on AllergenType {
+  String get displayLabel {
+    switch (this) {
+      case AllergenType.shellfish:
+        return 'Shellfish';
+      case AllergenType.fish:
+        return 'Fish';
+      case AllergenType.peanuts:
+        return 'Peanuts';
+      case AllergenType.treeNuts:
+        return 'Tree Nuts';
+      case AllergenType.soy:
+        return 'Soy';
+      case AllergenType.dairy:
+        return 'Dairy/Milk';
+      case AllergenType.eggs:
+        return 'Eggs';
+      case AllergenType.wheatGluten:
+        return 'Wheat/Gluten';
+      case AllergenType.msg:
+        return 'MSG';
+    }
+  }
+}
+
 class UserHealthProfile {
   final String userId;
   final String displayName;

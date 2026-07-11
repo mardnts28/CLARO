@@ -1,59 +1,61 @@
 // lib/data/repositories/product_repository.dart
 //
 // Interface-first design so your scoring/advisory/comparison logic never
-// talks to mock data or Firestore directly -- it only ever talks to this
-// interface. When the real dataset/Firestore/OpenFoodFactsService is ready,
-// swap MockProductRepository() -> FirebaseProductRepository() in one place
-// (likely wherever your Provider is constructed) and nothing else changes.
+// talks to the product data source directly -- it only ever talks to this
+// interface.
+//
+// Backed by ProductDbService (services/product_db_service.dart), which is
+// the actual in-app product catalog the scanning/search screens already
+// use. This repository does not own a second copy of the data -- it just
+// adapts ProductDbService's synchronous, UI-facing API to the
+// Future-based, backend-facing ProductRepository contract that the
+// ranking/comparison/advisory logic depends on.
+//
+// Uses models/product_model.dart's Product -- the single source of truth
+// for product data -- throughout. No separate backend Product model.
 
-import '../models/product.dart';
-import 'mock_data/mock_products.dart';
+import '../../models/product_model.dart';
+import '../../services/product_db_service.dart';
 
 abstract class ProductRepository {
   Future<Product> getProductById(String id);
   Future<List<Product>> getAllProducts();
-  // Renamed from getSameCategoryProducts(ProductCategory) -- matching on the
-  // broad packaging category (cannedFood/instantNoodles) mixed unrelated
-  // products (e.g. sardines with spaghetti sauce). This now matches on the
-  // finer-grained subCategory field instead, so "Compare" alternatives are
-  // actually comparable products.
-  Future<List<Product>> getSimilarProducts(String subCategory, {String? excludeId});
+  // Matches on Product.category (e.g. "Canned Fish", "Instant Noodles") --
+  // the grouping field ProductDbService and the UI's own compare screen
+  // already use. [excludeId] is fully excluded from the result (not just
+  // moved to the end), since callers use this to fetch ALTERNATIVES to a
+  // product they already have.
+  Future<List<Product>> getSimilarProducts(String category, {String? excludeId});
 }
 
-class MockProductRepository implements ProductRepository {
-  // Simulates network latency so your UI's loading states get exercised
-  // during development instead of only being written and never tested.
-  static const _simulatedDelay = Duration(milliseconds: 300);
+class ProductDbRepository implements ProductRepository {
+  ProductDbRepository({ProductDbService? productDbService})
+      : _db = productDbService ?? ProductDbService();
+
+  final ProductDbService _db;
 
   @override
   Future<Product> getProductById(String id) async {
-    await Future.delayed(_simulatedDelay);
-    final match = mockProductsJson.firstWhere(
-      (p) => p['id'] == id,
-      orElse: () => throw Exception('Product not found: $id'),
-    );
-    return Product.fromJson(match);
+    final match = _db.getProductById(id);
+    if (match == null) {
+      throw Exception('Product not found: $id');
+    }
+    return match;
   }
 
   @override
   Future<List<Product>> getAllProducts() async {
-    await Future.delayed(_simulatedDelay);
-    return mockProductsJson.map((json) => Product.fromJson(json)).toList();
+    return _db.getAllProducts();
   }
 
   @override
   Future<List<Product>> getSimilarProducts(
-    String subCategory, {
+    String category, {
     String? excludeId,
   }) async {
-    await Future.delayed(_simulatedDelay);
-    return mockProductsJson
-        .map((json) => Product.fromJson(json))
-        .where((p) => p.subCategory == subCategory && p.id != excludeId)
+    return _db
+        .getProductsByCategory(category, excludeId: excludeId)
+        .where((p) => p.id != excludeId)
         .toList();
   }
 }
-
-// TODO (Phase 6): implement once teammate's Firestore/Open Food Facts
-// integration is ready.
-// class FirebaseProductRepository implements ProductRepository { ... }

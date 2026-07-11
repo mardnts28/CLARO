@@ -12,7 +12,7 @@
 
 import '../../core/constants/who_fda_thresholds.dart';
 import 'health_profile.dart';
-import 'product.dart';
+import '../../models/product_model.dart';
 
 // Result of classifying ONE nutrient against ONE condition's threshold band.
 class NutrientEvaluation {
@@ -36,15 +36,11 @@ class NutrientEvaluation {
 // Result of checking a product's allergens against the user's allergy list.
 class AllergenAssessment {
   final List<AllergenType> matchedContains; // definite match -> forced last
-  final List<AllergenType> matchedMayContain; // cross-contamination warning
   final bool hasDirectAllergen;
-  final bool hasCrossContaminationRisk;
 
   const AllergenAssessment({
     required this.matchedContains,
-    required this.matchedMayContain,
     required this.hasDirectAllergen,
-    required this.hasCrossContaminationRisk,
   });
 }
 

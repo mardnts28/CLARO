@@ -6,8 +6,8 @@
 
 import '../constants/who_fda_thresholds.dart';
 import '../../data/models/health_profile.dart';
-import '../../data/models/product.dart';
 import '../../data/models/product_evaluation.dart';
+import '../../models/product_model.dart';
 
 class WhoCalculator {
   // Classify nutrient based on WHO daily limit percentage per serving
@@ -52,15 +52,10 @@ class WhoCalculator {
     final matchedContains = product.containsAllergens
         .where((a) => user.allergies.contains(a))
         .toList();
-    final matchedMayContain = product.mayContainAllergens
-        .where((a) => user.allergies.contains(a))
-        .toList();
 
     return AllergenAssessment(
       matchedContains: matchedContains,
-      matchedMayContain: matchedMayContain,
       hasDirectAllergen: matchedContains.isNotEmpty,
-      hasCrossContaminationRisk: matchedMayContain.isNotEmpty,
     );
   }
 

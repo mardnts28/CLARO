@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'firebase_options.dart';
 import 'generated/l10n/app_localizations.dart';
 import 'services/theme_service.dart';
@@ -18,6 +19,12 @@ import 'screens/otp_verification_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Loads .env (declared as an asset in pubspec.yaml) into dotenv.env so
+  // BackendLocator can read GEMINI_API_KEY from it. Must happen before
+  // anything touches dotenv.env -- see data/services/backend_locator.dart.
+  await dotenv.load(fileName: '.env');
+
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

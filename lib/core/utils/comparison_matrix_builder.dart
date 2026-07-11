@@ -9,7 +9,7 @@
 
 import '../../data/models/comparison_matrix.dart';
 import '../../data/models/health_profile.dart';
-import '../../data/models/product.dart';
+import '../../models/product_model.dart';
 import '../../data/models/product_evaluation.dart';
 import '../constants/who_fda_thresholds.dart';
 import 'who_calculator.dart';
@@ -32,14 +32,9 @@ class ComparisonMatrixBuilder {
     final allergenRows = <AllergenComparisonRow>[];
     for (final allergen in user.allergies) {
       final cells = comparisonSet.map((e) {
-        final AllergenPresence presence;
-        if (e.product.containsAllergens.contains(allergen)) {
-          presence = AllergenPresence.contains;
-        } else if (e.product.mayContainAllergens.contains(allergen)) {
-          presence = AllergenPresence.mayContain;
-        } else {
-          presence = AllergenPresence.none;
-        }
+        final presence = e.product.containsAllergens.contains(allergen)
+            ? AllergenPresence.contains
+            : AllergenPresence.none;
         return AllergenComparisonCell(productId: e.product.id, presence: presence);
       }).toList();
 
