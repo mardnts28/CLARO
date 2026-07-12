@@ -54,16 +54,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // Placeholder scan-event id used only for GeminiAdvisoryService's
   // per-scan-event response cache. Once a real scan-session id is threaded
   // through from the camera/multi-scan flow, pass that in instead.
-  late final String _scanEventId =
-      '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}';
+  late String _scanEventId;
 
   bool _advisoryStarted = false;
+
+  // Local state for the current product to allow updates from Compare
+  late Product _currentProduct;
+  List<RankedProductResult>? _currentComparisonSet;
 
   @override
   void initState() {
     super.initState();
+    _currentProduct = widget.product;
+    _currentComparisonSet = widget.comparisonSet;
+    _scanEventId = '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}';
     _loadFdaVerification();
     _loadFavoriteStatus();
+  }
+
+  /// Updates the currently displayed product and reloads all associated data.
+  /// Called when returning from Compare with a selected product.
+  void _updateProduct(Product newProduct, List<RankedProductResult>? newComparisonSet) {
+    setState(() {
+      _currentProduct = newProduct;
+      _currentComparisonSet = newComparisonSet;
+      _scanEventId = '${newProduct.id}_${DateTime.now().millisecondsSinceEpoch}';
+      _advisoryLoading = true;
+      _evaluation = null;
+      _advisory = null;
+      _comparisonMatrix = null;
+      _rankingExplanation = null;
+      _fdaResult = null;
+      _isFavorite = false;
+      _favoriteBusy = true; // Prevent interaction while loading new product's favorite status
+    });
+    _loadFdaVerification();
+    _loadFavoriteStatus();
+    _loadAdvisory();
   }
 
   @override
@@ -78,11 +105,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _loadFdaVerification() async {
     // Try verification using CPR number first, fall back to fuzzy match by product name
     FdaVerificationResult result = await FdaVerificationService()
-        .verifyByCprNumber(widget.product.fdaRegistrationNumber);
+        .verifyByCprNumber(_currentProduct.fdaRegistrationNumber);
 
     if (result.isUnverified) {
       result = await FdaVerificationService()
-          .verifyByProductName(widget.product.name);
+          .verifyByProductName(_currentProduct.name);
     }
 
     if (mounted) {
@@ -96,11 +123,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     final isFav = await BackendLocator.favoritesService.isFavorite(
       userId: uid,
-      productId: widget.product.id,
+      productId: _currentProduct.id,
     );
 
     if (mounted) {
-      setState(() => _isFavorite = isFav);
+      setState(() {
+        _isFavorite = isFav;
+        _favoriteBusy = false;
+      });
     }
   }
 
@@ -119,7 +149,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     try {
       final newState = await BackendLocator.favoritesService.toggleFavorite(
         userId: uid,
-        productId: widget.product.id,
+        productId: _currentProduct.id,
       );
       if (mounted) {
         setState(() {
@@ -159,17 +189,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       // scan: rank just this one product so we still get a proper
       // ProductEvaluation out of WhoCalculator.
       List<RankedProductResult> ranked;
-      if (widget.comparisonSet != null && widget.comparisonSet!.length > 1) {
-        ranked = widget.comparisonSet!;
+      if (_currentComparisonSet != null && _currentComparisonSet!.length > 1) {
+        ranked = _currentComparisonSet!;
       } else {
         ranked = BackendLocator.productRankingService.rankProducts(
-          products: [widget.product],
+          products: [_currentProduct],
           user: profile,
         );
       }
 
       final target = ranked.firstWhere(
-        (r) => r.evaluation.product.id == widget.product.id,
+        (r) => r.evaluation.product.id == _currentProduct.id,
         orElse: () => ranked.first,
       );
 
@@ -201,7 +231,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final p = widget.product;
+    final p = _currentProduct;
     final topPadding = MediaQuery.of(context).padding.top;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -698,8 +728,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       width: double.infinity,
                       height: 50,
                       child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
+                        onPressed: () async {
+                          final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (_) => CompareProductsScreen(
@@ -707,6 +737,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                             ),
                           );
+                          if (result != null && result is Map<String, dynamic>) {
+                            final newProduct = result['product'] as Product;
+                            final newComparisonSet = result['comparisonSet'] as List<RankedProductResult>?;
+                            _updateProduct(newProduct, newComparisonSet);
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colorScheme.primary,

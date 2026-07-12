@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
-import 'product_detail_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../data/models/ranked_product_result.dart';
@@ -436,14 +435,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                           return _ProductCard(
                             ranked: ranked,
                             isCurrent: isCurrent,
-                            onTap: () => Navigator.push(
+                            onTap: () => Navigator.pop(
                               context,
-                              MaterialPageRoute(
-                                builder: (_) => ProductDetailScreen(
-                                  product: ranked.evaluation.product,
-                                  comparisonSet: _allRanked,
-                                ),
-                              ),
+                              {
+                                'product': ranked.evaluation.product,
+                                'comparisonSet': _allRanked,
+                              },
                             ),
                           );
                         },
