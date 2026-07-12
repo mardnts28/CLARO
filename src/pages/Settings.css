@@ -1,0 +1,53 @@
+.activity-log-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 180px); /* adjust based on navbar + title height */
+}
+
+.activity-table-scroll {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.activity-table thead {
+  background: #f7f7f7;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.activity-table th {
+  text-align: left;
+  padding: 14px 24px;
+  font-size: 13.5px;
+  color: #444;
+  font-weight: 700;
+  border-bottom: 1px solid #eee;
+}
+
+.activity-table td {
+  padding: 16px 24px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 14px;
+  vertical-align: top;
+  color: #333;
+}
+
+.activity-cell {
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+.details-cell {
+  color: #6b6b6b;
+  font-size: 13.5px;
+}

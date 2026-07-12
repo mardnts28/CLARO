@@ -1,0 +1,87 @@
+.details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid #e5d8d5;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+}
+
+.details-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 32px 36px;
+  max-width: 520px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.details-product {
+  font-size: 19px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 2px;
+}
+
+.details-product-desc {
+  color: #6b6b6b;
+  font-size: 14px;
+  margin: 0 0 20px;
+}
+
+.details-row {
+  margin-bottom: 14px;
+}
+
+.details-label {
+  display: block;
+  font-size: 13px;
+  color: #8a8a8a;
+  margin-bottom: 3px;
+}
+
+.details-value {
+  font-size: 14.5px;
+  color: #1a1a1a;
+  font-weight: 500;
+}
+
+.details-actions {
+  display: flex;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.reject-btn,
+.approve-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.reject-btn {
+  background: #fbe2e2;
+  color: #c23b3b;
+  border-color: #f5c2c2;
+}
+
+.approve-btn {
+  background: #e2f7e6;
+  color: #1a7f37;
+  border-color: #bfe8c8;
+}
