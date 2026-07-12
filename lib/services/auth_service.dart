@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'haptic_service.dart';
+import 'package:intl/intl.dart';
 
 class AuthService {
   FirebaseAuth? _auth;
@@ -333,50 +334,58 @@ class AuthService {
   /// This method logs the full response and rethrows on failure so the
   /// caller (_prepareAndSendOtp) can record emailSent=false AND you can
   /// see exactly why in the console instead of it failing silently.
-  Future<void> _sendOtpEmail(String email, String code, Timestamp expiresAt) async {
-    final expiry = expiresAt.toDate();
-    final formattedTime =
-        '${expiry.hour.toString().padLeft(2, '0')}:${expiry.minute.toString().padLeft(2, '0')}';
+  Future<void> _sendOtpEmail(
+  String email,
+  String code,
+  Timestamp expiresAt,
+) async {
+  final expiry = expiresAt.toDate();
 
-    final templateParams = {
-      'service_id': 'service_5y6zi4d',
-      'template_id': 'template_te10bxg',
-      'user_id': 'wJyfTyTAuJIC6XQvn',
-      if (_emailJsPrivateKey.isNotEmpty) 'accessToken': _emailJsPrivateKey,
-      'template_params': {
-        'to_email': email,
-        'passcode': code,
-        'time': formattedTime,
+  // Format as 12-hour time (e.g. 7:18 PM)
+  final formattedTime = DateFormat('h:mm a').format(expiry);
+
+  final templateParams = {
+    'service_id': 'service_5y6zi4d',
+    'template_id': 'template_te10bxg',
+    'user_id': 'wJyfTyTAuJIC6XQvn',
+    if (_emailJsPrivateKey.isNotEmpty)
+      'accessToken': _emailJsPrivateKey,
+    'template_params': {
+      'to_email': email,
+      'passcode': code,
+      'time': formattedTime,
+    },
+  };
+
+  late final http.Response response;
+
+  try {
+    response = await http.post(
+      Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+      headers: {
+        'origin': 'http://localhost',
+        'Content-Type': 'application/json',
       },
-    };
-
-    late final http.Response response;
-    try {
-      response = await http.post(
-        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
-        headers: {
-          'origin': 'http://localhost',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(templateParams),
-      );
-    } catch (e) {
-      // Network-level failure (no internet permission, DNS failure, etc.)
-      debugPrint('OTP email network error: $e');
-      rethrow;
-    }
-
-    debugPrint('OTP email response: ${response.statusCode} - ${response.body}');
-
-    if (response.statusCode != 200) {
-      throw Exception(
-        'EmailJS rejected the request (${response.statusCode}): ${response.body}. '
-            'If this is a 403, enable "Allow EmailJS API calls from non-browser '
-            'applications" in EmailJS dashboard -> Account -> Security, or set '
-            '_emailJsPrivateKey if you have one.',
-      );
-    }
+      body: jsonEncode(templateParams),
+    );
+  } catch (e) {
+    debugPrint('OTP email network error: $e');
+    rethrow;
   }
+
+  debugPrint(
+    'OTP email response: ${response.statusCode} - ${response.body}',
+  );
+
+  if (response.statusCode != 200) {
+    throw Exception(
+      'EmailJS rejected the request (${response.statusCode}): ${response.body}. '
+      'If this is a 403, enable "Allow EmailJS API calls from non-browser '
+      'applications" in EmailJS dashboard -> Account -> Security, or set '
+      '_emailJsPrivateKey if you have one.',
+    );
+  }
+}
 
   /// TEMPORARY: Verifies credentials, generates an OTP, stores it keyed by uid, and
   /// emails it using direct Firestore operations. The user is signed OUT again

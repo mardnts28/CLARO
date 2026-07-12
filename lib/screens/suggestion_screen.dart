@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
+import 'review_history_screen.dart';
 
 class SuggestionScreen extends StatefulWidget {
   const SuggestionScreen({super.key});
@@ -154,6 +155,19 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
         elevation: 0,
         iconTheme: IconThemeData(color: colorScheme.primary),
         title: Text(loc.suggestion, style: TextStyle(color: colorScheme.primary)),
+        actions: [
+          IconButton(
+            // TODO(l10n): add loc.reviewHistoryTooltip and use it here
+            tooltip: 'My review history',
+            icon: Icon(Icons.history, color: colorScheme.primary),
+            onPressed: () {
+              HapticService().vibrate();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ReviewHistoryScreen()),
+              );
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),

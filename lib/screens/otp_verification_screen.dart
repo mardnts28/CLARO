@@ -31,7 +31,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final _otpController = TextEditingController();
   bool _isVerifying = false;
   bool _isResending = false;
-  int _remainingSeconds = 60;
+  int _remainingSeconds = 300;
   int _attempts = 0;
   Timer? _timer;
 
@@ -49,19 +49,22 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   void _startTimer() {
-    _remainingSeconds = 60;
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      setState(() {
-        if (_remainingSeconds > 0) {
-          _remainingSeconds--;
-        } else {
-          timer.cancel();
-        }
-      });
+  _remainingSeconds = 300; // 5 minutes
+
+  _timer?.cancel();
+
+  _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    if (!mounted) return;
+
+    setState(() {
+      if (_remainingSeconds > 0) {
+        _remainingSeconds--;
+      } else {
+        timer.cancel();
+      }
     });
-  }
+  });
+}
 
   Future<void> _verifyOtp() async {
     HapticService().vibrate();
@@ -268,9 +271,12 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         const SizedBox(width: 8),
                         Text(
                           _remainingSeconds > 0
-                              ? 'Resend in $_remainingSeconds s'
+                              ? 'Resend in ${(_remainingSeconds ~/ 60).toString().padLeft(2, '0')}:${(_remainingSeconds % 60).toString().padLeft(2, '0')}'
                               : 'You can resend now',
-                          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+                          style: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
