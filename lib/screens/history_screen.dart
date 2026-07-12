@@ -40,6 +40,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   final _authService = AuthService();
   StreamSubscription<void>? _subscription;
+  StreamSubscription<List<Product>>? _favoritesSubscription;
 
   String _activeTab = 'Lahat'; // 'Lahat', 'Paborito', 'Kumpara'
   String _searchQuery = '';
@@ -61,29 +62,47 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
     });
-    _loadFavoriteProducts();
+    _subscribeFavorites();
   }
 
   @override
   void dispose() {
     _subscription?.cancel();
+    _favoritesSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
-  Future<void> _loadFavoriteProducts() async {
+  // Live Firestore stream -- this is the single source of truth for the
+  // Favorites tab now. It's what makes favoriting correct from EVERY
+  // navigation path (All tab, Compare tab -> saved comparison -> ranked
+  // list, multi-scan results, etc.) without each screen needing to call
+  // back into History to trigger a refresh. The previous pattern relied on
+  // each screen remembering to do that after its own specific
+  // Navigator.push returned -- _buildScanCard did it, _buildCompareCard
+  // didn't, and multi_scan_results_screen.dart's path to ProductDetailScreen
+  // had no connection to History at all. That asymmetry was the actual bug.
+  void _subscribeFavorites() {
     final uid = _authService.currentUser?.uid;
     if (uid == null) {
       if (mounted) setState(() => _favoritesLoading = false);
       return;
     }
-    final products = await BackendLocator.favoritesService.getFavoriteProducts(uid);
-    if (mounted) {
-      setState(() {
-        _favoriteProducts = products;
-        _favoritesLoading = false;
-      });
-    }
+    _favoritesSubscription =
+        BackendLocator.favoritesService.watchFavoriteProducts(uid).listen(
+      (products) {
+        if (mounted) {
+          setState(() {
+            _favoriteProducts = products;
+            _favoritesLoading = false;
+          });
+        }
+      },
+      onError: (e) {
+        debugPrint('Error watching favorites: $e');
+        if (mounted) setState(() => _favoritesLoading = false);
+      },
+    );
   }
 
   Future<void> _toggleFavoriteForItem(HistoryItem item) async {
@@ -91,29 +110,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final productId = item.productId;
     if (uid == null || productId == null) return;
 
-    // Optimistic update so the tap feels responsive.
-    final wasFavorite = _favoriteProducts.any((p) => p.id == productId);
-    setState(() {
-      if (wasFavorite) {
-        _favoriteProducts.removeWhere((p) => p.id == productId);
-      } else {
-        // For optimistic add, we'd need the full product. Since we don't have it
-        // in the HistoryItem, we'll skip optimistic add and just show loading state.
-        // The actual toggle will refresh the list.
-      }
-    });
-
     try {
       await BackendLocator.favoritesService.toggleFavorite(
         userId: uid,
         productId: productId,
       );
-      // Refresh the full favorites list to get the correct state
-      await _loadFavoriteProducts();
+      // No manual refresh needed -- _favoritesSubscription above picks this
+      // up automatically, the same way it picks up every other navigation
+      // path's favorite toggles.
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
-      // Revert by refreshing the list
-      await _loadFavoriteProducts();
     }
   }
 
@@ -232,9 +238,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 builder: (_) => ProductDetailScreen(product: product),
               ),
             );
-            // The heart button on the detail screen may have changed this
-            // product's favorite state -- refresh so this list reflects it.
-            _loadFavoriteProducts();
+            // Favorites no longer need a manual refresh here --
+            // _favoritesSubscription (Firestore stream) keeps this screen's
+            // Favorites tab in sync in real time regardless of what
+            // happened on the screen(s) we navigated to.
           }
         },
         child: Container(

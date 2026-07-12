@@ -5,6 +5,8 @@
 // talk to this abstraction, so swapping to real Firestore later is a
 // one-line change (MockFavoritesRepository() -> FirebaseFavoritesRepository()).
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 abstract class FavoritesRepository {
@@ -17,6 +19,15 @@ abstract class FavoritesRepository {
   // returns the NEW state, so the UI can update the icon in one call
   // without a separate isFavorite() check first.
   Future<bool> toggleFavorite({required String userId, required String productId});
+
+  /// Real-time stream of a user's favorited productIds. Any screen that
+  /// shows favorite status should subscribe to this rather than doing a
+  /// one-off fetch tied to a specific Navigator.push/pop pair -- that
+  /// pattern is exactly what caused favoriting from a saved comparison's
+  /// ranked list to not show up in the Favorites tab: whichever screen you
+  /// favorited from, and however you navigated back, is irrelevant to a
+  /// live stream -- it reflects Firestore directly.
+  Stream<List<String>> watchFavoriteProductIds(String userId);
 }
 
 class MockFavoritesRepository implements FavoritesRepository {
@@ -26,6 +37,9 @@ class MockFavoritesRepository implements FavoritesRepository {
   // local storage) comes later; this exists so the heart-button UI has
   // something real to call and test against right now.
   final Map<String, Set<String>> _favoritesByUser = {};
+
+  final StreamController<void> _changes = StreamController<void>.broadcast();
+  void _notifyChanged() => _changes.add(null);
 
   @override
   Future<List<String>> getFavoriteProductIds(String userId) async {
@@ -43,25 +57,36 @@ class MockFavoritesRepository implements FavoritesRepository {
   Future<void> addFavorite({required String userId, required String productId}) async {
     await Future.delayed(_simulatedDelay);
     _favoritesByUser.putIfAbsent(userId, () => <String>{}).add(productId);
+    _notifyChanged();
   }
 
   @override
   Future<void> removeFavorite({required String userId, required String productId}) async {
     await Future.delayed(_simulatedDelay);
     _favoritesByUser[userId]?.remove(productId);
+    _notifyChanged();
   }
 
   @override
   Future<bool> toggleFavorite({required String userId, required String productId}) async {
     await Future.delayed(_simulatedDelay);
     final favorites = _favoritesByUser.putIfAbsent(userId, () => <String>{});
+    final bool result;
     if (favorites.contains(productId)) {
       favorites.remove(productId);
-      return false; // now NOT a favorite
+      result = false; // now NOT a favorite
     } else {
       favorites.add(productId);
-      return true; // now IS a favorite
+      result = true; // now IS a favorite
     }
+    _notifyChanged();
+    return result;
+  }
+
+  @override
+  Stream<List<String>> watchFavoriteProductIds(String userId) async* {
+    yield _favoritesByUser[userId]?.toList() ?? [];
+    yield* _changes.stream.map((_) => _favoritesByUser[userId]?.toList() ?? []);
   }
 }
 
@@ -118,5 +143,12 @@ class FirebaseFavoritesRepository implements FavoritesRepository {
       });
       return true; // now IS a favorite
     }
+  }
+
+  @override
+  Stream<List<String>> watchFavoriteProductIds(String userId) {
+    return _favoritesCollection(userId)
+        .snapshots(includeMetadataChanges: true)
+        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toList());
   }
 }
