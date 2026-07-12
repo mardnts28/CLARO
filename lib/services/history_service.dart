@@ -157,7 +157,11 @@ class HistoryService {
     }
   }
 
-  Future<void> addComparisonRecord(String category, String title) async {
+  Future<void> addComparisonRecord({
+    required String category,
+    required String title,
+    String? sourceProductId,
+  }) async {
     final userId = _currentUserId;
     if (userId == null) {
       debugPrint('HistoryService.addComparisonRecord: no signed-in user, skipping.');
@@ -171,6 +175,7 @@ class HistoryService {
       subtitle: 'Category: $category',
       timestamp: now,
       type: HistoryType.comparison,
+      sourceProductId: sourceProductId,
     );
 
     _items = [item, ..._items];

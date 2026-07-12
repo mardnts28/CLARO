@@ -16,6 +16,9 @@ class HistoryItem {
   final HistoryType type;
   final String? productId;
 
+  // For comparison items, store the source product ID to enable reopening
+  final String? sourceProductId;
+
   // Legacy per-record favorite flag. The History screen's "Paborito" tab no
   // longer reads this -- it filters against BackendLocator.favoritesService
   // (the product-level, cross-device source of truth) instead. This field
@@ -30,6 +33,7 @@ class HistoryItem {
     required this.timestamp,
     required this.type,
     this.productId,
+    this.sourceProductId,
     this.isFavorite = false,
   });
 
@@ -39,6 +43,7 @@ class HistoryItem {
     DateTime? timestamp,
     HistoryType? type,
     String? productId,
+    String? sourceProductId,
     bool? isFavorite,
   }) {
     return HistoryItem(
@@ -48,6 +53,7 @@ class HistoryItem {
       timestamp: timestamp ?? this.timestamp,
       type: type ?? this.type,
       productId: productId ?? this.productId,
+      sourceProductId: sourceProductId ?? this.sourceProductId,
       isFavorite: isFavorite ?? this.isFavorite,
     );
   }

@@ -3,19 +3,29 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
+import '../services/history_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/services/backend_locator.dart';
 import '../core/utils/rank_label_helper.dart';
 import '../data/models/health_profile.dart';
+import 'product_detail_screen.dart';
 
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
   /// and to highlight it in the list.
   final Product sourceProduct;
 
-  const CompareProductsScreen({super.key, required this.sourceProduct});
+  /// Whether to save this comparison session to history. Set to false when
+  /// reopening a previously saved comparison to avoid duplicate entries.
+  final bool saveToHistory;
+
+  const CompareProductsScreen({
+    super.key,
+    required this.sourceProduct,
+    this.saveToHistory = true,
+  });
 
   @override
   State<CompareProductsScreen> createState() => _CompareProductsScreenState();
@@ -24,6 +34,7 @@ class CompareProductsScreen extends StatefulWidget {
 class _CompareProductsScreenState extends State<CompareProductsScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   final _authService = AuthService();
+  final HistoryService _historyService = HistoryService();
 
   bool _loading = true;
   String? _error;
@@ -85,6 +96,16 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         _filtered = List.from(ranked);
         _loading = false;
       });
+
+      // Save comparison session to history immediately after successful generation
+      // Only save if this is a new comparison (not viewing a saved one)
+      if (widget.saveToHistory) {
+        _historyService.addComparisonRecord(
+          category: widget.sourceProduct.category,
+          title: '${widget.sourceProduct.name} Comparison Result',
+          sourceProductId: widget.sourceProduct.id,
+        );
+      }
     } catch (e) {
       debugPrint('Error loading product comparison: $e');
       if (mounted) {
@@ -435,13 +456,29 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                           return _ProductCard(
                             ranked: ranked,
                             isCurrent: isCurrent,
-                            onTap: () => Navigator.pop(
-                              context,
-                              {
-                                'product': ranked.evaluation.product,
-                                'comparisonSet': _allRanked,
-                              },
-                            ),
+                            onTap: () async {
+                              if (widget.saveToHistory) {
+                                // Normal flow: return result to caller (ProductDetailScreen)
+                                Navigator.pop(
+                                  context,
+                                  {
+                                    'product': ranked.evaluation.product,
+                                    'comparisonSet': _allRanked,
+                                  },
+                                );
+                              } else {
+                                // Saved comparison flow: navigate directly to ProductDetailScreen
+                                await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ProductDetailScreen(
+                                      product: ranked.evaluation.product,
+                                      comparisonSet: _allRanked,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
                           );
                         },
                       ),

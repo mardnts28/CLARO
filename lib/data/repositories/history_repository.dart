@@ -107,6 +107,7 @@ class FirebaseHistoryRepository implements HistoryRepository {
           ? HistoryType.comparison
           : HistoryType.scan,
       productId: data['productId'] as String?,
+      sourceProductId: data['sourceProductId'] as String?,
       isFavorite: data['isFavorite'] as bool? ?? false,
     );
   }
@@ -118,6 +119,7 @@ class FirebaseHistoryRepository implements HistoryRepository {
       'timestamp': Timestamp.fromDate(item.timestamp),
       'type': item.type == HistoryType.comparison ? 'comparison' : 'scan',
       'productId': item.productId,
+      'sourceProductId': item.sourceProductId,
       'isFavorite': item.isFavorite,
     };
   }

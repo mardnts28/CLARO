@@ -7,9 +7,11 @@ import '../services/auth_service.dart';
 import '../data/services/backend_locator.dart';
 import 'camera_scanner_screen.dart';
 import 'product_detail_screen.dart';
+import 'compare_products_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
+import '../models/product_model.dart';
 
 class HistoryScreen extends StatefulWidget {
   final bool embeddedMode;
@@ -42,14 +44,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _activeTab = 'Lahat'; // 'Lahat', 'Paborito', 'Kumpara'
   String _searchQuery = '';
 
-  // Favorites now live in BackendLocator.favoritesService (keyed by
-  // productId), NOT in HistoryItem.isFavorite -- that field only ever
-  // tracked a boolean on the specific history record that toggled it, so it
-  // was invisible to the product-detail screen's heart button and vice
-  // versa. This set is the single source of truth this screen renders
-  // against; HistoryItem.isFavorite is left alone in HistoryService but no
-  // longer read here.
-  Set<String> _favoriteProductIds = {};
+  // Favorites are loaded directly from BackendLocator.favoritesService
+  // as full Product objects, independent of scan history. This shows all
+  // favorited products regardless of how they were discovered (scan, compare, etc.).
+  List<Product> _favoriteProducts = [];
   bool _favoritesLoading = true;
 
   static const _tabs = ['Lahat', 'Paborito', 'Kumpara'];
@@ -63,7 +61,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
     });
-    _loadFavoriteProductIds();
+    _loadFavoriteProducts();
   }
 
   @override
@@ -73,16 +71,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.dispose();
   }
 
-  Future<void> _loadFavoriteProductIds() async {
+  Future<void> _loadFavoriteProducts() async {
     final uid = _authService.currentUser?.uid;
     if (uid == null) {
       if (mounted) setState(() => _favoritesLoading = false);
       return;
     }
-    final ids = await BackendLocator.favoritesRepository.getFavoriteProductIds(uid);
+    final products = await BackendLocator.favoritesService.getFavoriteProducts(uid);
     if (mounted) {
       setState(() {
-        _favoriteProductIds = ids.toSet();
+        _favoriteProducts = products;
         _favoritesLoading = false;
       });
     }
@@ -94,35 +92,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (uid == null || productId == null) return;
 
     // Optimistic update so the tap feels responsive.
-    final wasFavorite = _favoriteProductIds.contains(productId);
+    final wasFavorite = _favoriteProducts.any((p) => p.id == productId);
     setState(() {
-      wasFavorite
-          ? _favoriteProductIds.remove(productId)
-          : _favoriteProductIds.add(productId);
+      if (wasFavorite) {
+        _favoriteProducts.removeWhere((p) => p.id == productId);
+      } else {
+        // For optimistic add, we'd need the full product. Since we don't have it
+        // in the HistoryItem, we'll skip optimistic add and just show loading state.
+        // The actual toggle will refresh the list.
+      }
     });
 
     try {
-      final newState = await BackendLocator.favoritesService.toggleFavorite(
+      await BackendLocator.favoritesService.toggleFavorite(
         userId: uid,
         productId: productId,
       );
-      if (mounted) {
-        setState(() {
-          newState
-              ? _favoriteProductIds.add(productId)
-              : _favoriteProductIds.remove(productId);
-        });
-      }
+      // Refresh the full favorites list to get the correct state
+      await _loadFavoriteProducts();
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
-      if (mounted) {
-        // Revert the optimistic flip since the write didn't actually happen.
-        setState(() {
-          wasFavorite
-              ? _favoriteProductIds.add(productId)
-              : _favoriteProductIds.remove(productId);
-        });
-      }
+      // Revert by refreshing the list
+      await _loadFavoriteProducts();
     }
   }
 
@@ -206,7 +197,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ? _dbService.getProductById(item.productId!)
         : null;
     final isFavorite =
-        item.productId != null && _favoriteProductIds.contains(item.productId);
+        item.productId != null && _favoriteProducts.any((p) => p.id == item.productId);
+
+    // For Favorites tab, use unfavorite logic instead of delete
+    final isFavoritesTab = _activeTab == 'Paborito';
 
     return Dismissible(
       key: Key(item.id),
@@ -220,7 +214,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
         child: Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
       ),
-      onDismissed: (_) => _historyService.deleteRecord(item.id),
+      onDismissed: (_) {
+        if (isFavoritesTab && item.productId != null) {
+          // Use unfavorite logic for Favorites tab
+          _toggleFavoriteForItem(item);
+        } else {
+          // Use delete logic for All tab
+          _historyService.deleteRecord(item.id);
+        }
+      },
       child: GestureDetector(
         onTap: () async {
           if (product != null) {
@@ -232,7 +234,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             );
             // The heart button on the detail screen may have changed this
             // product's favorite state -- refresh so this list reflects it.
-            _loadFavoriteProductIds();
+            _loadFavoriteProducts();
           }
         },
         child: Container(
@@ -329,32 +331,51 @@ class _HistoryScreenState extends State<HistoryScreen> {
         child: Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
       ),
       onDismissed: (_) => _historyService.deleteRecord(item.id),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: theme.dividerColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Compare icon placeholder — same size as product image thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 52,
-                height: 52,
-                color: colorScheme.primary.withOpacity(0.12),
-                child: Center(
-                  child: Icon(Icons.compare_arrows_rounded,
+      child: GestureDetector(
+        onTap: () async {
+          // Reopen the comparison by navigating to CompareProductsScreen
+          // Set saveToHistory: false to avoid creating duplicate history entries
+          if (item.sourceProductId != null) {
+            final sourceProduct = _dbService.getProductById(item.sourceProductId!);
+            if (sourceProduct != null) {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => CompareProductsScreen(
+                    sourceProduct: sourceProduct,
+                    saveToHistory: false,
+                  ),
+                ),
+              );
+            }
+          }
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: theme.dividerColor),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // Compare icon placeholder — same size as product image thumbnail
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 52,
+                  height: 52,
+                  color: colorScheme.primary.withOpacity(0.12),
+                  child: Center(
+                    child: Icon(Icons.compare_arrows_rounded,
                       color: colorScheme.primary, size: 28),
                 ),
               ),
@@ -387,6 +408,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
@@ -461,18 +483,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final loc = AppLocalizations.of(context)!;
     final topPadding = MediaQuery.of(context).padding.top;
     final items = _activeTab == 'Paborito'
-        // HistoryService.getItems(filter: 'Paborito') filters by the old,
-        // disconnected item.isFavorite flag -- bypass it and filter the
-        // unfiltered list against the real favorited-product set instead.
-        // Only scan items have a productId, so comparison records are
-        // naturally excluded, matching FavoritesService's product-based
-        // model.
-        ? _historyService
-            .getItems(filter: 'Lahat', searchQuery: _searchQuery)
-            .where((item) =>
-                item.type == HistoryType.scan &&
-                item.productId != null &&
-                _favoriteProductIds.contains(item.productId))
+        // Favorites are loaded directly from BackendLocator.favoritesService
+        // as full Product objects, independent of scan history. Convert them to
+        // HistoryItem-like objects for display in the existing card UI.
+        ? _favoriteProducts
+            .where((product) =>
+                _searchQuery.isEmpty ||
+                product.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+            .map((product) => HistoryItem(
+                  id: 'fav_${product.id}',
+                  title: product.name,
+                  subtitle: product.nutritionalFacts.servingSize,
+                  timestamp: DateTime.now(), // Could use favorited timestamp if tracked
+                  type: HistoryType.scan,
+                  productId: product.id,
+                ))
             .toList()
         : _historyService.getItems(filter: _activeTab, searchQuery: _searchQuery);
     final grouped = _groupItems(items);
