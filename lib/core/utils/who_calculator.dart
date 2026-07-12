@@ -13,7 +13,7 @@ class WhoCalculator {
   // Classify nutrient based on WHO daily limit percentage per serving
   // Suitable: ≤10%, Moderate: >10-20%, Caution: >20%
   static AdvisoryLevel classifyByWhoPercentage(double whoPercentage) {
-    if (whoPercentage <= 10) return AdvisoryLevel.suitable;
+    if (whoPercentage <= 5) return AdvisoryLevel.suitable;
     if (whoPercentage > 20) return AdvisoryLevel.caution;
     return AdvisoryLevel.moderate;
   }
