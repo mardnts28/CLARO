@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/history_service.dart';
 import '../services/product_db_service.dart';
+import '../services/auth_service.dart';
+import '../data/services/backend_locator.dart';
 import 'camera_scanner_screen.dart';
 import 'product_detail_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 
 class HistoryScreen extends StatefulWidget {
   final bool embeddedMode;
@@ -17,13 +20,37 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
+  // ── DEV-ONLY: seeds two real catalog products into this user's Firestore
+  // history so the screen has something to show while testing. Gated by
+  // kDebugMode so it never compiles into a release build. Delete this
+  // method + the "Seed (dev)" button in build() once you're done testing.
+  Future<void> _seedTestHistory() async {
+    final db = ProductDbService();
+    final tuna = db.getProductById('century_tuna_flakes_oil');
+    final canton = db.getProductById('lucky_me_canton_hot_chili');
+
+    if (tuna != null) await _historyService.addScanRecord(tuna);
+    if (canton != null) await _historyService.addScanRecord(canton);
+  }
+
   final HistoryService _historyService = HistoryService();
   final ProductDbService _dbService = ProductDbService();
   final TextEditingController _searchController = TextEditingController();
+  final _authService = AuthService();
   StreamSubscription<void>? _subscription;
 
   String _activeTab = 'Lahat'; // 'Lahat', 'Paborito', 'Kumpara'
   String _searchQuery = '';
+
+  // Favorites now live in BackendLocator.favoritesService (keyed by
+  // productId), NOT in HistoryItem.isFavorite -- that field only ever
+  // tracked a boolean on the specific history record that toggled it, so it
+  // was invisible to the product-detail screen's heart button and vice
+  // versa. This set is the single source of truth this screen renders
+  // against; HistoryItem.isFavorite is left alone in HistoryService but no
+  // longer read here.
+  Set<String> _favoriteProductIds = {};
+  bool _favoritesLoading = true;
 
   static const _tabs = ['Lahat', 'Paborito', 'Kumpara'];
 
@@ -36,6 +63,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text);
     });
+    _loadFavoriteProductIds();
   }
 
   @override
@@ -43,6 +71,59 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _subscription?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadFavoriteProductIds() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid == null) {
+      if (mounted) setState(() => _favoritesLoading = false);
+      return;
+    }
+    final ids = await BackendLocator.favoritesRepository.getFavoriteProductIds(uid);
+    if (mounted) {
+      setState(() {
+        _favoriteProductIds = ids.toSet();
+        _favoritesLoading = false;
+      });
+    }
+  }
+
+  Future<void> _toggleFavoriteForItem(HistoryItem item) async {
+    final uid = _authService.currentUser?.uid;
+    final productId = item.productId;
+    if (uid == null || productId == null) return;
+
+    // Optimistic update so the tap feels responsive.
+    final wasFavorite = _favoriteProductIds.contains(productId);
+    setState(() {
+      wasFavorite
+          ? _favoriteProductIds.remove(productId)
+          : _favoriteProductIds.add(productId);
+    });
+
+    try {
+      final newState = await BackendLocator.favoritesService.toggleFavorite(
+        userId: uid,
+        productId: productId,
+      );
+      if (mounted) {
+        setState(() {
+          newState
+              ? _favoriteProductIds.add(productId)
+              : _favoriteProductIds.remove(productId);
+        });
+      }
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+      if (mounted) {
+        // Revert the optimistic flip since the write didn't actually happen.
+        setState(() {
+          wasFavorite
+              ? _favoriteProductIds.add(productId)
+              : _favoriteProductIds.remove(productId);
+        });
+      }
+    }
   }
 
   // ── Group items by date label (Ngayon / Kahapon / Mas Maaga) ──────────────
@@ -124,6 +205,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final product = item.productId != null
         ? _dbService.getProductById(item.productId!)
         : null;
+    final isFavorite =
+        item.productId != null && _favoriteProductIds.contains(item.productId);
 
     return Dismissible(
       key: Key(item.id),
@@ -139,14 +222,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
       onDismissed: (_) => _historyService.deleteRecord(item.id),
       child: GestureDetector(
-        onTap: () {
+        onTap: () async {
           if (product != null) {
-            Navigator.push(
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => ProductDetailScreen(product: product),
               ),
             );
+            // The heart button on the detail screen may have changed this
+            // product's favorite state -- refresh so this list reflects it.
+            _loadFavoriteProductIds();
           }
         },
         child: Container(
@@ -210,10 +296,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
               // Favorite heart toggle
               GestureDetector(
-                onTap: () => _historyService.toggleFavorite(item.id),
+                onTap: () => _toggleFavoriteForItem(item),
                 child: Icon(
-                  item.isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: item.isFavorite
+                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                  color: isFavorite
                       ? colorScheme.primary
                       : colorScheme.onSurfaceVariant.withOpacity(0.4),
                   size: 22,
@@ -374,8 +460,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final topPadding = MediaQuery.of(context).padding.top;
-    final items = _historyService.getItems(
-        filter: _activeTab, searchQuery: _searchQuery);
+    final items = _activeTab == 'Paborito'
+        // HistoryService.getItems(filter: 'Paborito') filters by the old,
+        // disconnected item.isFavorite flag -- bypass it and filter the
+        // unfiltered list against the real favorited-product set instead.
+        // Only scan items have a productId, so comparison records are
+        // naturally excluded, matching FavoritesService's product-based
+        // model.
+        ? _historyService
+            .getItems(filter: 'Lahat', searchQuery: _searchQuery)
+            .where((item) =>
+                item.type == HistoryType.scan &&
+                item.productId != null &&
+                _favoriteProductIds.contains(item.productId))
+            .toList()
+        : _historyService.getItems(filter: _activeTab, searchQuery: _searchQuery);
     final grouped = _groupItems(items);
 
     return Scaffold(
@@ -432,7 +531,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Row: title + clear button
+                // Row: title + clear button (+ dev-only seed button)
                 Row(
                   children: [
                     Expanded(
@@ -444,6 +543,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             color: colorScheme.onSurface),
                       ),
                     ),
+                    if (kDebugMode) ...[
+                      GestureDetector(
+                        onTap: _seedTestHistory,
+                        child: const Text(
+                          'Seed (dev)',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.orange,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
                     GestureDetector(
                       onTap: _showClearAllDialog,
                       child: Text(
@@ -561,16 +673,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
           // ── Scrollable content ───────────────────────────────────────────
           Expanded(
-            child: grouped.isEmpty
-                ? _buildEmptyState()
-                : ListView(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 4),
-                    children: grouped.entries
-                        .map((e) =>
-                            _buildGroupSection(e.key, e.value))
-                        .toList(),
-                  ),
+            child: ((_activeTab == 'Paborito' && _favoritesLoading) ||
+                    _historyService.isLoading)
+                ? const Center(child: CircularProgressIndicator())
+                : grouped.isEmpty
+                    ? _buildEmptyState()
+                    : ListView(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
+                        children: grouped.entries
+                            .map((e) =>
+                                _buildGroupSection(e.key, e.value))
+                            .toList(),
+                      ),
           ),
         ],
       ),

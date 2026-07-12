@@ -39,6 +39,7 @@ class ProductDetailScreen extends StatefulWidget {
 
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _isFavorite = false;
+  bool _favoriteBusy = false;
   FdaVerificationResult? _fdaResult;
   final _authService = AuthService();
 
@@ -62,6 +63,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   void initState() {
     super.initState();
     _loadFdaVerification();
+    _loadFavoriteStatus();
   }
 
   @override
@@ -85,6 +87,55 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     if (mounted) {
       setState(() => _fdaResult = result);
+    }
+  }
+
+  Future<void> _loadFavoriteStatus() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid == null) return;
+
+    final isFav = await BackendLocator.favoritesService.isFavorite(
+      userId: uid,
+      productId: widget.product.id,
+    );
+
+    if (mounted) {
+      setState(() => _isFavorite = isFav);
+    }
+  }
+
+  Future<void> _toggleFavorite() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid == null || _favoriteBusy) return;
+
+    // Optimistic update -- flip the icon immediately so the tap feels
+    // responsive, then reconcile with what the repository actually did.
+    final previous = _isFavorite;
+    setState(() {
+      _isFavorite = !previous;
+      _favoriteBusy = true;
+    });
+
+    try {
+      final newState = await BackendLocator.favoritesService.toggleFavorite(
+        userId: uid,
+        productId: widget.product.id,
+      );
+      if (mounted) {
+        setState(() {
+          _isFavorite = newState;
+          _favoriteBusy = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error toggling favorite: $e');
+      // Revert the optimistic flip since the write didn't actually happen.
+      if (mounted) {
+        setState(() {
+          _isFavorite = previous;
+          _favoriteBusy = false;
+        });
+      }
     }
   }
 
@@ -194,7 +245,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: GestureDetector(
-                    onTap: () => setState(() => _isFavorite = !_isFavorite),
+                    onTap: _toggleFavorite,
                     child: Icon(
                       _isFavorite ? Icons.favorite : Icons.favorite_border,
                       color: colorScheme.secondary,

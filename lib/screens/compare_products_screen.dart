@@ -9,6 +9,7 @@ import '../widgets/voice_assistant_fab.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/services/backend_locator.dart';
 import '../core/utils/rank_label_helper.dart';
+import '../data/models/health_profile.dart';
 
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
@@ -34,6 +35,18 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   // no Gemini call happens just to build this list.
   List<RankedProductResult> _allRanked = [];
   List<RankedProductResult> _filtered = [];
+
+  // Full profile (so we know every condition the user has, for the filter
+  // sheet) and the fixed set of products from the initial compare fetch (so
+  // re-ranking on filter change is free/pure-Dart -- no re-fetch of
+  // alternatives, no Gemini call, no chance of the alternatives list itself
+  // changing underneath the user when they switch filters).
+  UserHealthProfile? _profile;
+  List<Product> _comparisonProducts = [];
+
+  // null == "Overall" (current/default behavior, all of the user's
+  // conditions). Non-null == ranking narrowed to that single condition.
+  HealthCondition? _selectedCondition;
 
   @override
   void initState() {
@@ -67,6 +80,8 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
 
       if (!mounted) return;
       setState(() {
+        _profile = profile;
+        _comparisonProducts = ranked.map((r) => r.evaluation.product).toList();
         _allRanked = ranked;
         _filtered = List.from(ranked);
         _loading = false;
@@ -82,18 +97,124 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     }
   }
 
-  void _onSearch() {
+  List<RankedProductResult> _computeFiltered(List<RankedProductResult> source) {
     final q = _searchCtrl.text.toLowerCase().trim();
+    if (q.isEmpty) return List.from(source);
+    return source
+        .where((r) =>
+            r.evaluation.product.name.toLowerCase().contains(q) ||
+            r.evaluation.product.brand.toLowerCase().contains(q) ||
+            r.evaluation.product.variant.toLowerCase().contains(q))
+        .toList();
+  }
+
+  void _onSearch() {
     setState(() {
-      _filtered = q.isEmpty
-          ? List.from(_allRanked)
-          : _allRanked
-              .where((r) =>
-                  r.evaluation.product.name.toLowerCase().contains(q) ||
-                  r.evaluation.product.brand.toLowerCase().contains(q) ||
-                  r.evaluation.product.variant.toLowerCase().contains(q))
-              .toList();
+      _filtered = _computeFiltered(_allRanked);
     });
+  }
+
+  /// Re-ranks the SAME comparison set (no new DB fetch, no new Gemini call)
+  /// against a health profile narrowed to just [condition] -- or the full
+  /// profile when [condition] is null ("Overall"). Runs through the exact
+  /// same WhoCalculator.rankProducts pipeline as the default ranking; the
+  /// only thing that changes is which condition(s) are on the profile
+  /// passed in, so a single-condition filter naturally focuses the score on
+  /// that condition's nutrient(s) without any separate ranking logic.
+  void _selectConditionFilter(HealthCondition? condition) {
+    final profile = _profile;
+    if (profile == null) return;
+
+    final effectiveProfile = condition == null
+        ? profile
+        : UserHealthProfile(
+            userId: profile.userId,
+            displayName: profile.displayName,
+            conditions: [condition],
+            allergies: profile.allergies,
+            voiceAssistant: profile.voiceAssistant,
+          );
+
+    final reRanked = BackendLocator.productRankingService.rankProducts(
+      products: _comparisonProducts,
+      user: effectiveProfile,
+    );
+
+    setState(() {
+      _selectedCondition = condition;
+      _allRanked = reRanked;
+      _filtered = _computeFiltered(reRanked);
+    });
+  }
+
+  String _conditionLabel(HealthCondition condition) {
+    switch (condition) {
+      case HealthCondition.hypertension:
+        return 'Hypertension';
+      case HealthCondition.diabetes:
+        return 'Diabetes';
+      case HealthCondition.heartCondition:
+        return 'Heart condition';
+    }
+  }
+
+  void _showFilterSheet() {
+    final profile = _profile;
+    if (profile == null || profile.conditions.length <= 1) return;
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+                child: Text(
+                  'Filter ranking by condition',
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+              RadioListTile<HealthCondition?>(
+                value: null,
+                groupValue: _selectedCondition,
+                activeColor: colorScheme.primary,
+                title: const Text('Overall (all conditions)'),
+                onChanged: (value) {
+                  Navigator.pop(sheetContext);
+                  _selectConditionFilter(value);
+                },
+              ),
+              for (final condition in profile.conditions)
+                RadioListTile<HealthCondition?>(
+                  value: condition,
+                  groupValue: _selectedCondition,
+                  activeColor: colorScheme.primary,
+                  title: Text(_conditionLabel(condition)),
+                  onChanged: (value) {
+                    Navigator.pop(sheetContext);
+                    _selectConditionFilter(value);
+                  },
+                ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -136,6 +257,31 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                     color: colorScheme.primary,
                   ),
                 ),
+                const Spacer(),
+                if ((_profile?.conditions.length ?? 0) > 1)
+                  GestureDetector(
+                    onTap: _showFilterSheet,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Icon(Icons.filter_list,
+                            color: colorScheme.primary, size: 24),
+                        if (_selectedCondition != null)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: colorScheme.secondary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -170,6 +316,38 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   style: GoogleFonts.inter(
                       fontSize: 12, color: colorScheme.onSurfaceVariant),
                 ),
+                if (_selectedCondition != null) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _selectConditionFilter(null),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: colorScheme.secondary.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _conditionLabel(_selectedCondition!),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: colorScheme.secondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.close,
+                              size: 14, color: colorScheme.secondary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

@@ -5,6 +5,8 @@
 // talk to this abstraction, so swapping to real Firestore later is a
 // one-line change (MockFavoritesRepository() -> FirebaseFavoritesRepository()).
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 abstract class FavoritesRepository {
   Future<List<String>> getFavoriteProductIds(String userId);
   Future<bool> isFavorite({required String userId, required String productId});
@@ -63,6 +65,58 @@ class MockFavoritesRepository implements FavoritesRepository {
   }
 }
 
-// TODO (Phase 6): implement once the real Firebase project + Firestore
-// collections exist.
-// class FirebaseFavoritesRepository implements FavoritesRepository { ... }
+// Backed by `users/{userId}/favorites`, a per-user subcollection -- one doc
+// per favorited product, doc ID == productId (so add/remove/isFavorite are
+// all simple, race-free doc-id lookups rather than array-membership
+// updates). This is what makes favorites persist across restarts and sync
+// across a user's devices.
+class FirebaseFavoritesRepository implements FavoritesRepository {
+  FirebaseFavoritesRepository({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
+
+  final FirebaseFirestore _firestore;
+
+  CollectionReference<Map<String, dynamic>> _favoritesCollection(String userId) =>
+      _firestore.collection('users').doc(userId).collection('favorites');
+
+  @override
+  Future<List<String>> getFavoriteProductIds(String userId) async {
+    final snapshot = await _favoritesCollection(userId).get();
+    return snapshot.docs.map((doc) => doc.id).toList();
+  }
+
+  @override
+  Future<bool> isFavorite({required String userId, required String productId}) async {
+    final doc = await _favoritesCollection(userId).doc(productId).get();
+    return doc.exists;
+  }
+
+  @override
+  Future<void> addFavorite({required String userId, required String productId}) async {
+    await _favoritesCollection(userId).doc(productId).set({
+      'productId': productId,
+      'addedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  @override
+  Future<void> removeFavorite({required String userId, required String productId}) async {
+    await _favoritesCollection(userId).doc(productId).delete();
+  }
+
+  @override
+  Future<bool> toggleFavorite({required String userId, required String productId}) async {
+    final docRef = _favoritesCollection(userId).doc(productId);
+    final doc = await docRef.get();
+    if (doc.exists) {
+      await docRef.delete();
+      return false; // now NOT a favorite
+    } else {
+      await docRef.set({
+        'productId': productId,
+        'addedAt': FieldValue.serverTimestamp(),
+      });
+      return true; // now IS a favorite
+    }
+  }
+}

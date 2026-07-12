@@ -1,79 +1,89 @@
+// lib/services/history_service.dart
+//
+// UI-facing facade over HistoryRepository (data/repositories/history_repository.dart).
+// Keeps the same synchronous getItems()/singleton/onUpdate-stream contract
+// the History screen already depends on, so the screen itself needed almost
+// no changes -- but the data underneath is now Firestore
+// (`users/{userId}/history`) instead of an in-memory mock list, so history
+// persists across restarts and syncs across a user's devices.
+
 import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+
+import '../data/repositories/history_repository.dart';
+import '../data/services/backend_locator.dart';
+import '../models/history_item.dart';
 import '../models/product_model.dart';
 import 'product_db_service.dart';
 
-enum HistoryType { scan, comparison }
-
-class HistoryItem {
-  final String id;
-  final String title;
-  final String subtitle;
-  final DateTime timestamp;
-  final HistoryType type;
-  final String? productId;
-  bool isFavorite;
-
-  HistoryItem({
-    required this.id,
-    required this.title,
-    required this.subtitle,
-    required this.timestamp,
-    required this.type,
-    this.productId,
-    this.isFavorite = false,
-  });
-}
+// HistoryItem/HistoryType now live in models/history_item.dart, but every
+// existing `import '../services/history_service.dart'` (history_screen.dart,
+// camera_scanner_screen.dart, etc.) still expects to get them from here.
+export '../models/history_item.dart';
 
 class HistoryService {
   static final HistoryService _instance = HistoryService._internal();
   factory HistoryService() => _instance;
 
   final StreamController<void> _updateController = StreamController<void>.broadcast();
+
+  /// Fires whenever the cached history list changes -- either because a
+  /// Firestore snapshot came in, or because of an optimistic local update.
+  /// The History screen listens to this and calls setState().
   Stream<void> get onUpdate => _updateController.stream;
 
-  final List<HistoryItem> _items = [];
+  final HistoryRepository _repository;
 
-  HistoryService._internal() {
-    _loadMockHistory();
+  List<HistoryItem> _items = [];
+  bool _loading = true;
+  String? _currentUserId;
+
+  StreamSubscription<List<HistoryItem>>? _historySubscription;
+  StreamSubscription<User?>? _authSubscription;
+
+  /// True while the initial Firestore snapshot for the current user hasn't
+  /// arrived yet. The History screen can use this to show a spinner instead
+  /// of a premature "no history yet" empty state.
+  bool get isLoading => _loading;
+
+  HistoryService._internal({HistoryRepository? repository})
+      : _repository = repository ?? BackendLocator.historyRepository {
+    // Re-subscribe to the right user's `users/{uid}/history` collection
+    // whenever auth state changes (sign in, sign out, account switch),
+    // rather than only reading the uid once at construction time.
+    _authSubscription =
+        FirebaseAuth.instance.authStateChanges().listen(_onAuthChanged);
+    _onAuthChanged(FirebaseAuth.instance.currentUser);
   }
 
-  void _loadMockHistory() {
-    final now = DateTime.now();
-    // Match the today (Ngayon) and yesterday (Kahapon) entries from the screenshots
-    _items.addAll([
-      HistoryItem(
-        id: 'mock_scan_1',
-        title: 'Century Tuna Flakes in Vegetable Oil',
-        subtitle: '180 g',
-        timestamp: DateTime(now.year, now.month, now.day, 10, 30),
-        type: HistoryType.scan,
-        productId: 'century_tuna_flakes_oil',
-        isFavorite: true, // Show red heart in Paborito
-      ),
-      HistoryItem(
-        id: 'mock_comp_1',
-        title: 'Century Tuna Variant Comparison',
-        subtitle: '180 g',
-        timestamp: DateTime(now.year, now.month, now.day, 10, 30),
-        type: HistoryType.comparison,
-      ),
-      HistoryItem(
-        id: 'mock_scan_2',
-        title: 'Lucky Me! Pancit Canton Original',
-        subtitle: '80g',
-        timestamp: DateTime(now.year, now.month, now.day - 1, 15, 45),
-        type: HistoryType.scan,
-        productId: 'lucky_me_canton_original',
-        isFavorite: false,
-      ),
-      HistoryItem(
-        id: 'mock_comp_2',
-        title: 'Instant Noodles Comparison',
-        subtitle: '80g',
-        timestamp: DateTime(now.year, now.month, now.day - 1, 16, 00),
-        type: HistoryType.comparison,
-      ),
-    ]);
+  void _onAuthChanged(User? user) {
+    _historySubscription?.cancel();
+    _currentUserId = user?.uid;
+
+    if (_currentUserId == null) {
+      _items = [];
+      _loading = false;
+      _updateController.add(null);
+      return;
+    }
+
+    _loading = true;
+    _updateController.add(null);
+
+    _historySubscription = _repository.watchHistory(_currentUserId!).listen(
+      (items) {
+        _items = items;
+        _loading = false;
+        _updateController.add(null);
+      },
+      onError: (Object e, StackTrace st) {
+        debugPrint('HistoryService: failed to load history: $e');
+        _loading = false;
+        _updateController.add(null);
+      },
+    );
   }
 
   List<HistoryItem> getItems({
@@ -103,58 +113,152 @@ class HistoryService {
     return sorted;
   }
 
-  void addScanRecord(Product product) {
+  /// Fire-and-forget by design (callers like camera_scanner_screen.dart
+  /// don't await this) -- errors are caught and logged rather than thrown,
+  /// so a transient Firestore failure can't crash the scan flow.
+  Future<void> addScanRecord(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      debugPrint('HistoryService.addScanRecord: no signed-in user, skipping.');
+      return;
+    }
+
     final now = DateTime.now();
-    // Check if we already scanned this product recently (e.g. within last minute) to avoid duplicates
+    // Check if we already scanned this product recently (e.g. within last
+    // minute) to avoid duplicates. Uses the local cache rather than a
+    // Firestore query so this stays instant even offline.
     final exists = _items.any((item) =>
         item.productId == product.id &&
         item.type == HistoryType.scan &&
         now.difference(item.timestamp).inMinutes < 2);
+    if (exists) return;
 
-    if (!exists) {
-      _items.add(HistoryItem(
-        id: 'scan_${now.millisecondsSinceEpoch}',
-        title: product.name,
-        subtitle: product.nutritionalFacts.servingSize,
-        timestamp: now,
-        type: HistoryType.scan,
-        productId: product.id,
-      ));
+    final item = HistoryItem(
+      id: 'scan_${now.millisecondsSinceEpoch}',
+      title: product.name,
+      subtitle: product.nutritionalFacts.servingSize,
+      timestamp: now,
+      type: HistoryType.scan,
+      productId: product.id,
+    );
+
+    // Optimistic insert -- Firestore's local cache will normally echo this
+    // back via the snapshot listener almost immediately anyway, but this
+    // guarantees the UI updates even if that round-trip is slow.
+    _items = [item, ..._items];
+    _updateController.add(null);
+
+    try {
+      await _repository.addItem(userId: userId, item: item);
+    } catch (e) {
+      debugPrint('HistoryService.addScanRecord failed: $e');
+      _items = _items.where((i) => i.id != item.id).toList();
       _updateController.add(null);
     }
   }
 
-  void addComparisonRecord(String category, String title) {
+  Future<void> addComparisonRecord(String category, String title) async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      debugPrint('HistoryService.addComparisonRecord: no signed-in user, skipping.');
+      return;
+    }
+
     final now = DateTime.now();
-    _items.add(HistoryItem(
+    final item = HistoryItem(
       id: 'comp_${now.millisecondsSinceEpoch}',
       title: title,
       subtitle: 'Category: $category',
       timestamp: now,
       type: HistoryType.comparison,
-    ));
-    _updateController.add(null);
-  }
+    );
 
-  void toggleFavorite(String id) {
-    final index = _items.indexWhere((item) => item.id == id);
-    if (index != -1) {
-      _items[index].isFavorite = !_items[index].isFavorite;
+    _items = [item, ..._items];
+    _updateController.add(null);
+
+    try {
+      await _repository.addItem(userId: userId, item: item);
+    } catch (e) {
+      debugPrint('HistoryService.addComparisonRecord failed: $e');
+      _items = _items.where((i) => i.id != item.id).toList();
       _updateController.add(null);
     }
   }
 
-  void deleteRecord(String id) {
-    _items.removeWhere((item) => item.id == id);
+  /// Flips the legacy per-record favorite flag. Kept for backward
+  /// compatibility -- the History screen's Favorites tab actually reads
+  /// BackendLocator.favoritesRepository (product-level) instead, see
+  /// history_screen.dart.
+  Future<void> toggleFavorite(String id) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+
+    final index = _items.indexWhere((item) => item.id == id);
+    if (index == -1) return;
+
+    final newValue = !_items[index].isFavorite;
+    _items[index].isFavorite = newValue;
     _updateController.add(null);
+
+    try {
+      await _repository.setFavoriteFlag(
+        userId: userId,
+        itemId: id,
+        isFavorite: newValue,
+      );
+    } catch (e) {
+      debugPrint('HistoryService.toggleFavorite failed: $e');
+      final revertIndex = _items.indexWhere((item) => item.id == id);
+      if (revertIndex != -1) {
+        _items[revertIndex].isFavorite = !newValue;
+        _updateController.add(null);
+      }
+    }
   }
 
-  void clearAllHistory() {
-    _items.clear();
+  Future<void> deleteRecord(String id) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+
+    final removedIndex = _items.indexWhere((item) => item.id == id);
+    if (removedIndex == -1) return;
+    final removed = _items[removedIndex];
+
+    _items = _items.where((item) => item.id != id).toList();
     _updateController.add(null);
+
+    try {
+      await _repository.deleteItem(userId: userId, itemId: id);
+    } catch (e) {
+      debugPrint('HistoryService.deleteRecord failed: $e');
+      // Restore on failure (e.g. Dismissible swipe while offline and the
+      // delete never lands) so the record isn't silently lost from the UI.
+      _items = [..._items, removed];
+      _updateController.add(null);
+    }
+  }
+
+  Future<void> clearAllHistory() async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+
+    final backup = List<HistoryItem>.from(_items);
+    _items = [];
+    _updateController.add(null);
+
+    try {
+      await _repository.clearAll(userId);
+    } catch (e) {
+      debugPrint('HistoryService.clearAllHistory failed: $e');
+      _items = backup;
+      _updateController.add(null);
+    }
   }
 
   // ── Analytics & Usage Tracking ──
+  // Unchanged: still synchronous, and still reads the local product catalog
+  // via ProductDbService -- only the history data feeding it now comes from
+  // Firestore instead of a hardcoded list.
 
   /// Calculates the most frequently scanned products, returning products mapped to count
   List<MapEntry<Product, int>> getMostScannedProducts({int limit = 5}) {
@@ -191,5 +295,13 @@ class HistoryService {
       }
     }
     return favs;
+  }
+
+  /// Call from app teardown/tests only -- the real instance lives for the
+  /// app's lifetime via the singleton factory.
+  void dispose() {
+    _authSubscription?.cancel();
+    _historySubscription?.cancel();
+    _updateController.close();
   }
 }
