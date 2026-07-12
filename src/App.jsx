@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import OTPVerification from "./pages/OTPVerification";
 import Dashboard from "./pages/Dashboard";
+import Profile from "./pages/Profile";
 import Reports from "./pages/Reports";
 import ReportDetails from "./pages/ReportDetails";
 import ReviewDetails from "./pages/ReviewDetails"
@@ -21,6 +22,7 @@ function App() {
         <Route path="/reports/:id" element={<ProtectedRoute><ReportDetails /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/app-review" element={<ProtectedRoute><AppReview /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/app-review/:id" element={<ProtectedRoute><ReviewDetails /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>

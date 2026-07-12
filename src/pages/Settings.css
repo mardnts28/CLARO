@@ -51,3 +51,16 @@
   color: #6b6b6b;
   font-size: 13.5px;
 }
+.details-label-text {
+  display: block;
+  color: #1a1a1a;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.details-id-text {
+  display: block;
+  color: #9a9a9a;
+  font-size: 12px;
+  margin-top: 2px;
+}

@@ -72,7 +72,19 @@ export default function Settings() {
                       </div>
                     </td>
                     <td className="activity-cell">{log.activity}</td>
-                    <td className="details-cell">Report ID: {log.reportId}</td>
+                    <td className="details-cell">
+                        {log.label ? (
+                            <>
+                            <span className="details-label-text">{log.label}</span>
+                            <span className="details-id-text">
+                                {log.type === "review" ? "Review ID: " : "Report ID: "}
+                                {log.targetId || log.reportId}
+                            </span>
+                            </>
+                        ) : (
+                            <>{log.type === "review" ? "Review ID: " : "Report ID: "}{log.targetId || log.reportId}</>
+                        )}
+                        </td>
                   </tr>
                 ))}
               </tbody>

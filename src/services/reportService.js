@@ -23,9 +23,10 @@ export async function getReportById(reportId) {
   const snap = await getDoc(ref);
   if (!snap.exists()) throw { code: "report/not-found" };
 
-  await logActivity("Viewed Report", reportId);
+  const data = snap.data();
+  await logActivity("Viewed Report", reportId, "report", data.productName);
 
-  return { id: snap.id, ...snap.data() };
+  return { id: snap.id, ...data };
 }
 
 export async function approveReport(reportId) {
@@ -43,15 +44,19 @@ export async function approveReport(reportId) {
     approvedAt: Timestamp.now(),
   });
 
-  await logActivity("Approved Report", reportId);
+  await logActivity("Approved Report", reportId, "report", reportData.productName);
 }
 
 export async function rejectReport(reportId) {
   const reportRef = doc(db, "reports", reportId);
+  const reportSnap = await getDoc(reportRef);
+  const reportData = reportSnap.exists() ? reportSnap.data() : {};
+
   await updateDoc(reportRef, { status: "Rejected" });
 
-  await logActivity("Rejected Report", reportId);
+  await logActivity("Rejected Report", reportId, "report", reportData.productName);
 }
+
 
 export async function getDashboardStats() {
   const reports = await getAllReports();

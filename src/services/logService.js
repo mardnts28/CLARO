@@ -9,19 +9,19 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase/firebase";
 
-export async function logActivity(activity, targetId, type = "report") {
+export async function logActivity(activity, targetId, type = "report", label = "") {
   const user = auth.currentUser;
 
   await addDoc(collection(db, "activity_logs"), {
     activity,
     targetId,
-    type, // "report" | "review"
+    type,
+    label, // human-readable reference (product name or review snippet)
     adminUid: user?.uid || "unknown",
     adminName: user?.email || "Unknown Admin",
     timestamp: Timestamp.now(),
   });
 }
-
 export async function getActivityLogs(count = 20) {
   const q = query(
     collection(db, "activity_logs"),
