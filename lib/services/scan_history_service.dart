@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
-import 'product_db_service.dart';
+import '../data/services/backend_locator.dart';
 
 class ScanHistoryService {
   static final ScanHistoryService _instance = ScanHistoryService._internal();
@@ -48,18 +48,20 @@ class ScanHistoryService {
           .get();
 
       final List<Product> history = [];
-      final dbService = ProductDbService();
 
       for (var doc in snapshot.docs) {
         final data = doc.data();
         final productId = data['product_id'] as String?;
         if (productId != null) {
-          final product = dbService.getProductById(productId);
-          if (product != null) {
+          try {
+            final product =
+                await BackendLocator.productRepository.getProductById(productId);
             // Avoid duplicates in the returned list
             if (!history.any((p) => p.id == product.id)) {
               history.add(product);
             }
+          } catch (e) {
+            debugPrint('ScanHistoryService: product not found for $productId: $e');
           }
         }
       }

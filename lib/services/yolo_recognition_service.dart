@@ -3,7 +3,8 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import '../models/product_model.dart';
-import 'product_db_service.dart';
+import '../data/repositories/product_repository.dart';
+import '../data/services/backend_locator.dart';
 
 // Since tflite_flutter can sometimes require specific build settings per OS, 
 // we construct a class that safely tries to load it, falling back to 
@@ -11,7 +12,8 @@ import 'product_db_service.dart';
 class YoloRecognitionService {
   static final YoloRecognitionService _instance = YoloRecognitionService._internal();
   factory YoloRecognitionService() => _instance;
-  YoloRecognitionService._internal();
+  YoloRecognitionService._internal()
+      : _productRepository = BackendLocator.productRepository;
 
   bool _isModelLoaded = false;
   bool get isModelLoaded => _isModelLoaded;
@@ -19,7 +21,11 @@ class YoloRecognitionService {
   bool _isSimulatedMode = true;
   bool get isSimulatedMode => _isSimulatedMode;
 
-  final ProductDbService _db = ProductDbService();
+  // Reads real catalog products through the repository abstraction (backed
+  // by Firestore's `fda_products` collection once BackendLocator flips over
+  // in Phase 3) rather than a hardcoded product list, so simulated
+  // detections always resolve to product IDs that actually exist.
+  final ProductRepository _productRepository;
   final Random _random = Random();
 
   // Initialize and load the YOLOv8 model
@@ -75,24 +81,18 @@ class YoloRecognitionService {
       final numDetected = forceScanCount ?? (_random.nextInt(3) + 1);
       List<Product> products = [];
 
-      if (numDetected == 5) {
-        // Load the exact 5 items from the suitability ranking screenshot:
-        final exactIds = [
-          'nissin_cup_noodles_batchoy',
-          'lucky_me_canton_original',
-          'argentina_corned_beef',
-          'mega_sardines_tomato',
-          '555_fried_sardines_hot_spicy',
-        ];
-        for (final id in exactIds) {
-          final p = _db.getProductById(id);
-          if (p != null) products.add(p);
+      // Pull a random sample of real catalog products from Firestore rather
+      // than referencing specific hardcoded document IDs, which aren't
+      // guaranteed to exist in any given fda_products collection.
+      try {
+        final allProducts = await _productRepository.getAllProducts();
+        if (allProducts.isNotEmpty) {
+          final shuffled = List<Product>.from(allProducts)..shuffle(_random);
+          products =
+              shuffled.take(numDetected.clamp(1, shuffled.length)).toList();
         }
-      }
-
-      // If the list is empty (e.g. forced standard count or IDs not found), load random mock products
-      if (products.isEmpty) {
-        products = _db.getRandomMockProducts(numDetected);
+      } catch (e) {
+        debugPrint('YoloRecognitionService: failed to load products: $e');
       }
 
       final List<DetectionResult> results = [];
