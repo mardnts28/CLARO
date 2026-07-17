@@ -197,6 +197,10 @@
     }
   },
   "emptyHistory": "No scan history yet. Scan a product to start!",
+  "historyToday": "Today",
+  "historyYesterday": "Yesterday",
+  "historyLastWeek": "Last Week",
+  "historyLastMonth": "Last Month",
 
   "resultsTitle": "Results",
   "rankedBySuitability": "Ranked based on suitability",

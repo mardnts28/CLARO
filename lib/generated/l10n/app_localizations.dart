@@ -1076,6 +1076,30 @@ abstract class AppLocalizations {
   /// **'No scan history yet. Scan a product to start!'**
   String get emptyHistory;
 
+  /// No description provided for @historyToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get historyToday;
+
+  /// No description provided for @historyYesterday.
+  ///
+  /// In en, this message translates to:
+  /// **'Yesterday'**
+  String get historyYesterday;
+
+  /// No description provided for @historyLastWeek.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Week'**
+  String get historyLastWeek;
+
+  /// No description provided for @historyLastMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Last Month'**
+  String get historyLastMonth;
+
   /// No description provided for @resultsTitle.
   ///
   /// In en, this message translates to:

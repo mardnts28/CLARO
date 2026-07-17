@@ -142,26 +142,36 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  // ── Group items by date label (Ngayon / Kahapon / Mas Maaga) ──────────────
+  // ── Group items by date label ──────────────
   Map<String, List<HistoryItem>> _groupItems(List<HistoryItem> items) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
+    final lastWeek = today.subtract(const Duration(days: 7));
+
+    final loc = AppLocalizations.of(context)!;
 
     final Map<String, List<HistoryItem>> grouped = {
-      'Ngayon': [],
-      'Kahapon': [],
-      'Mas Maaga': [],
+      loc.historyToday: [],
+      loc.historyYesterday: [],
+      loc.historyLastWeek: [],
+      loc.historyLastMonth: [],
     };
 
     for (final item in items) {
       final d = DateTime(item.timestamp.year, item.timestamp.month, item.timestamp.day);
+      
+      // "no last year" -> ignore items from previous years
+      if (d.year < now.year) continue;
+
       if (d == today) {
-        grouped['Ngayon']!.add(item);
+        grouped[loc.historyToday]!.add(item);
       } else if (d == yesterday) {
-        grouped['Kahapon']!.add(item);
+        grouped[loc.historyYesterday]!.add(item);
+      } else if (d.isAfter(lastWeek) || d == lastWeek) {
+        grouped[loc.historyLastWeek]!.add(item);
       } else {
-        grouped['Mas Maaga']!.add(item);
+        grouped[loc.historyLastMonth]!.add(item);
       }
     }
 

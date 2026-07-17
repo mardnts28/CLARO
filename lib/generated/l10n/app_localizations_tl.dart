@@ -530,6 +530,18 @@ class AppLocalizationsTl extends AppLocalizations {
       'Wala pang kasaysayan ng scan. I-scan ang isang produkto upang magsimula!';
 
   @override
+  String get historyToday => 'Ngayon';
+
+  @override
+  String get historyYesterday => 'Kahapon';
+
+  @override
+  String get historyLastWeek => 'Nakaraang Linggo';
+
+  @override
+  String get historyLastMonth => 'Nakaraang Buwan';
+
+  @override
   String get resultsTitle => 'Resulta';
 
   @override

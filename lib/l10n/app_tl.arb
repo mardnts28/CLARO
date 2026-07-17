@@ -197,6 +197,10 @@
     }
   },
   "emptyHistory": "Wala pang kasaysayan ng scan. I-scan ang isang produkto upang magsimula!",
+  "historyToday": "Ngayon",
+  "historyYesterday": "Kahapon",
+  "historyLastWeek": "Nakaraang Linggo",
+  "historyLastMonth": "Nakaraang Buwan",
 
   "resultsTitle": "Resulta",
   "rankedBySuitability": "Naka-rank batay sa suitability",

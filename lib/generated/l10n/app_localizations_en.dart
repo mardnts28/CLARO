@@ -523,6 +523,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get emptyHistory => 'No scan history yet. Scan a product to start!';
 
   @override
+  String get historyToday => 'Today';
+
+  @override
+  String get historyYesterday => 'Yesterday';
+
+  @override
+  String get historyLastWeek => 'Last Week';
+
+  @override
+  String get historyLastMonth => 'Last Month';
+
+  @override
   String get resultsTitle => 'Results';
 
   @override
