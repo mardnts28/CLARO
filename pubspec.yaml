@@ -29,6 +29,7 @@ dependencies:
   permission_handler: ^11.3.1
   google_fonts: ^6.2.1
   flutter_svg: ^2.0.10
+  image_picker: ^1.1.2
   image: ^4.2.0
   encrypt: ^5.0.3
   crypto: ^3.0.3

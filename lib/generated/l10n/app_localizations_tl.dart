@@ -514,6 +514,9 @@ class AppLocalizationsTl extends AppLocalizations {
   String get tabCompare => 'Kumpara';
 
   @override
+  String get tabReports => 'Mga Ulat';
+
+  @override
   String get emptyFavorites =>
       'Wala pang mga paboritong produkto. I-tap ang ❤️ upang mag-save.';
 
@@ -828,4 +831,74 @@ class AppLocalizationsTl extends AppLocalizations {
   @override
   String get storageTipConsume =>
       'Ubusin sa loob ng 2-3 araw pagkatapos buksan.';
+
+  @override
+  String get notFoundTitle => 'Walang nahanap na produkto';
+
+  @override
+  String get notFoundBody => 'Hindi namin matukoy ang produktong ito.';
+
+  @override
+  String get notFoundHint =>
+      'Maaari kang mag-scan muli o i-report ang produktong ito.';
+
+  @override
+  String get scanAgainButton => 'Mag-scan muli';
+
+  @override
+  String get reportProductButton => 'I-report ang produkto';
+
+  @override
+  String get reportTitle => 'Iulat ang hindi matukoy produkto';
+
+  @override
+  String get reportSubtitle =>
+      'Maari mo kaming tulungan sa pagbigay ng detalye tungkol sa produktong ito.';
+
+  @override
+  String get reportProductPhoto => 'Litrato ng Produkto';
+
+  @override
+  String get reportChangePhoto => 'Baguhin ang Litrato';
+
+  @override
+  String get reportProductName => 'Pangalan ng Produkto';
+
+  @override
+  String get reportProductDescription => 'Deskripsyon ng Produkto';
+
+  @override
+  String get reportEditButton => 'I-Edit';
+
+  @override
+  String get reportInfoNote =>
+      'Ang iyong report ay makakatulong magdagdag ng maraming produkto at mas magbigay ng mabuting impormasyon para sa lahat.';
+
+  @override
+  String get reportSubmitButton => 'I-submit';
+
+  @override
+  String get reportSuccessTitle => 'Naipadala na ang report!';
+
+  @override
+  String get reportSuccessBody =>
+      'Maraming Salamat! Matagumpay na naipadala ang iyong ulat.';
+
+  @override
+  String get reportGoHome => 'Bumalik sa Home';
+
+  @override
+  String get filterConditionTitle => 'I-filter ang ranking base sa kondisyon';
+
+  @override
+  String get conditionOverall => 'Pangkalahatan (lahat ng kondisyon)';
+
+  @override
+  String get conditionDiabetes => 'Diabetes';
+
+  @override
+  String get conditionHypertension => 'Alta-presyon';
+
+  @override
+  String get conditionHeartCondition => 'Sakit sa puso';
 }

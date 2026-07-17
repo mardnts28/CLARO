@@ -1052,6 +1052,12 @@ abstract class AppLocalizations {
   /// **'Compare'**
   String get tabCompare;
 
+  /// No description provided for @tabReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get tabReports;
+
   /// No description provided for @emptyFavorites.
   ///
   /// In en, this message translates to:
@@ -1627,6 +1633,138 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Consume within 2-3 days after opening.'**
   String get storageTipConsume;
+
+  /// No description provided for @notFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No product found'**
+  String get notFoundTitle;
+
+  /// No description provided for @notFoundBody.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t identify this product.'**
+  String get notFoundBody;
+
+  /// No description provided for @notFoundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can scan again or report this product.'**
+  String get notFoundHint;
+
+  /// No description provided for @scanAgainButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan again'**
+  String get scanAgainButton;
+
+  /// No description provided for @reportProductButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Report the product'**
+  String get reportProductButton;
+
+  /// No description provided for @reportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report unidentified product'**
+  String get reportTitle;
+
+  /// No description provided for @reportSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'You can help us by providing details about this product.'**
+  String get reportSubtitle;
+
+  /// No description provided for @reportProductPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Photo'**
+  String get reportProductPhoto;
+
+  /// No description provided for @reportChangePhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Change Photo'**
+  String get reportChangePhoto;
+
+  /// No description provided for @reportProductName.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Name'**
+  String get reportProductName;
+
+  /// No description provided for @reportProductDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Description'**
+  String get reportProductDescription;
+
+  /// No description provided for @reportEditButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get reportEditButton;
+
+  /// No description provided for @reportInfoNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Your report will help us add more products and provide better information for everyone.'**
+  String get reportInfoNote;
+
+  /// No description provided for @reportSubmitButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get reportSubmitButton;
+
+  /// No description provided for @reportSuccessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report sent!'**
+  String get reportSuccessTitle;
+
+  /// No description provided for @reportSuccessBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Thank you! Your report has been successfully submitted.'**
+  String get reportSuccessBody;
+
+  /// No description provided for @reportGoHome.
+  ///
+  /// In en, this message translates to:
+  /// **'Go back to Home'**
+  String get reportGoHome;
+
+  /// No description provided for @filterConditionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter ranking by condition'**
+  String get filterConditionTitle;
+
+  /// No description provided for @conditionOverall.
+  ///
+  /// In en, this message translates to:
+  /// **'Overall (all conditions)'**
+  String get conditionOverall;
+
+  /// No description provided for @conditionDiabetes.
+  ///
+  /// In en, this message translates to:
+  /// **'Diabetes'**
+  String get conditionDiabetes;
+
+  /// No description provided for @conditionHypertension.
+  ///
+  /// In en, this message translates to:
+  /// **'Hypertension'**
+  String get conditionHypertension;
+
+  /// No description provided for @conditionHeartCondition.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart condition'**
+  String get conditionHeartCondition;
 }
 
 class _AppLocalizationsDelegate

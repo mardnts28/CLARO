@@ -186,6 +186,7 @@
   "tabAll": "All",
   "tabFavorites": "Favorites",
   "tabCompare": "Compare",
+  "tabReports": "Reports",
   "emptyFavorites": "No favorite products yet. Tap ❤️ to save.",
   "emptyComparisons": "No product comparisons yet.",
   "noSearchResults": "No results for \"{query}\"",
@@ -323,5 +324,30 @@
   "storageTitle": "Storage Method",
   "storageTipCool": "Store in a cool and dry place before opening.",
   "storageTipRefrigerate": "Transfer to a sealed container and refrigerate once opened.",
-  "storageTipConsume": "Consume within 2-3 days after opening."
+  "storageTipConsume": "Consume within 2-3 days after opening.",
+
+  "notFoundTitle": "No product found",
+  "notFoundBody": "We couldn't identify this product.",
+  "notFoundHint": "You can scan again or report this product.",
+  "scanAgainButton": "Scan again",
+  "reportProductButton": "Report the product",
+
+  "reportTitle": "Report unidentified product",
+  "reportSubtitle": "You can help us by providing details about this product.",
+  "reportProductPhoto": "Product Photo",
+  "reportChangePhoto": "Change Photo",
+  "reportProductName": "Product Name",
+  "reportProductDescription": "Product Description",
+  "reportEditButton": "Edit",
+  "reportInfoNote": "Your report will help us add more products and provide better information for everyone.",
+  "reportSubmitButton": "Submit",
+  "reportSuccessTitle": "Report sent!",
+  "reportSuccessBody": "Thank you! Your report has been successfully submitted.",
+  "reportGoHome": "Go back to Home",
+  
+  "filterConditionTitle": "Filter ranking by condition",
+  "conditionOverall": "Overall (all conditions)",
+  "conditionDiabetes": "Diabetes",
+  "conditionHypertension": "Hypertension",
+  "conditionHeartCondition": "Heart condition"
 }

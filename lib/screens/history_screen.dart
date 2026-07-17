@@ -11,7 +11,8 @@ import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import '../models/product_model.dart';
-
+import '../models/report_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 class HistoryScreen extends StatefulWidget {
   final bool embeddedMode;
   const HistoryScreen({super.key, this.embeddedMode = false});
@@ -70,7 +71,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
   List<Product> _favoriteProducts = [];
   bool _favoritesLoading = true;
 
-  static const _tabs = ['Lahat', 'Paborito', 'Kumpara'];
+  static const _tabs = ['Lahat', 'Paborito', 'Kumpara', 'Mga Ulat'];
+
+  StreamSubscription<QuerySnapshot>? _reportsSubscription;
+  List<ReportModel> _reports = [];
+  bool _reportsLoading = true;
 
   @override
   void initState() {
@@ -82,14 +87,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
       setState(() => _searchQuery = _searchController.text);
     });
     _subscribeFavorites();
+    _subscribeReports();
   }
 
   @override
   void dispose() {
     _subscription?.cancel();
     _favoritesSubscription?.cancel();
+    _reportsSubscription?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _subscribeReports() {
+    final uid = _authService.currentUser?.uid;
+    if (uid == null) {
+      if (mounted) setState(() => _reportsLoading = false);
+      return;
+    }
+
+    _reportsSubscription = FirebaseFirestore.instance
+        .collection('reports')
+        .where('reportedBy', isEqualTo: uid)
+        .snapshots()
+        .listen((snapshot) {
+      if (mounted) {
+        setState(() {
+          _reports = snapshot.docs
+              .map((doc) => ReportModel.fromFirestore(doc))
+              .toList();
+          // Sort descending by date
+          _reports.sort((a, b) => b.dateSubmitted.compareTo(a.dateSubmitted));
+          _reportsLoading = false;
+        });
+      }
+    }, onError: (e) {
+      debugPrint('Error watching reports: $e');
+      if (mounted) setState(() => _reportsLoading = false);
+    });
   }
 
   // Live Firestore stream -- this is the single source of truth for the
@@ -172,6 +207,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
         grouped[loc.historyLastWeek]!.add(item);
       } else {
         grouped[loc.historyLastMonth]!.add(item);
+      }
+    }
+
+    // Remove empty groups
+    grouped.removeWhere((_, list) => list.isEmpty);
+    return grouped;
+  }
+
+  // ── Group reports by date label ──────────────
+  Map<String, List<ReportModel>> _groupReports(List<ReportModel> reports) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final lastWeek = today.subtract(const Duration(days: 7));
+
+    final loc = AppLocalizations.of(context)!;
+
+    final Map<String, List<ReportModel>> grouped = {
+      loc.historyToday: [],
+      loc.historyYesterday: [],
+      loc.historyLastWeek: [],
+      loc.historyLastMonth: [],
+    };
+
+    for (final report in reports) {
+      final d = DateTime(report.dateSubmitted.year, report.dateSubmitted.month, report.dateSubmitted.day);
+      
+      // "no last year" -> ignore items from previous years
+      if (d.year < now.year) continue;
+
+      if (d == today) {
+        grouped[loc.historyToday]!.add(report);
+      } else if (d == yesterday) {
+        grouped[loc.historyYesterday]!.add(report);
+      } else if (d.isAfter(lastWeek) || d == lastWeek) {
+        grouped[loc.historyLastWeek]!.add(report);
+      } else {
+        grouped[loc.historyLastMonth]!.add(report);
       }
     }
 
@@ -489,6 +562,121 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  Widget _buildReportGroupSection(String label, List<ReportModel> reports) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 18),
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.onSurface),
+        ),
+        const SizedBox(height: 10),
+        ...reports.map((report) => _buildReportCard(report)),
+      ],
+    );
+  }
+
+  Widget _buildReportCard(ReportModel report) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    
+    // Status Badge colors
+    Color statusBg;
+    Color statusText;
+    final status = report.status.toLowerCase();
+    
+    if (status == 'approved') {
+      statusBg = Colors.green.withOpacity(0.15);
+      statusText = Colors.green[700]!;
+    } else if (status == 'rejected') {
+      statusBg = Colors.red.withOpacity(0.15);
+      statusText = Colors.red[700]!;
+    } else { // pending
+      statusBg = Colors.orange.withOpacity(0.15);
+      statusText = Colors.orange[800]!;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          )
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  report.productName.isEmpty ? 'Unknown Product' : report.productName,
+                  style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  report.status,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: statusText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (report.productDescription.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              report.productDescription,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                  fontSize: 13, color: colorScheme.onSurfaceVariant),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 14, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 6),
+              Text(
+                _formatTime(report.dateSubmitted),
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: colorScheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _navItem(IconData icon, String label, bool active,
       {VoidCallback? onTap}) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -704,6 +892,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       if (tab == 'Lahat') tabLabel = loc.tabAll;
                       if (tab == 'Paborito') tabLabel = loc.tabFavorites;
                       if (tab == 'Kumpara') tabLabel = loc.tabCompare;
+                      if (tab == 'Mga Ulat') tabLabel = loc.tabReports;
 
                       return Expanded(
                         child: GestureDetector(
@@ -754,19 +943,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
           // ── Scrollable content ───────────────────────────────────────────
           Expanded(
-            child: ((_activeTab == 'Paborito' && _favoritesLoading) ||
-                    _historyService.isLoading)
-                ? const Center(child: CircularProgressIndicator())
-                : grouped.isEmpty
-                    ? _buildEmptyState()
-                    : ListView(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 4),
-                        children: grouped.entries
-                            .map((e) =>
-                                _buildGroupSection(e.key, e.value))
-                            .toList(),
-                      ),
+            child: _activeTab == 'Mga Ulat'
+                ? (_reportsLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _groupReports(_reports).isEmpty
+                        ? _buildEmptyState()
+                        : ListView(
+                            key: const ValueKey('reports_list'),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
+                            children: _groupReports(_reports)
+                                .entries
+                                .map((e) =>
+                                    _buildReportGroupSection(e.key, e.value))
+                                .toList(),
+                          ))
+                : ((_activeTab == 'Paborito' && _favoritesLoading) ||
+                        _historyService.isLoading)
+                    ? const Center(child: CircularProgressIndicator())
+                    : grouped.isEmpty
+                        ? _buildEmptyState()
+                        : ListView(
+                            key: const ValueKey('history_list'),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 4),
+                            children: grouped.entries
+                                .map((e) =>
+                                    _buildGroupSection(e.key, e.value))
+                                .toList(),
+                          ),
           ),
         ],
       ),

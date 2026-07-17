@@ -509,6 +509,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tabCompare => 'Compare';
 
   @override
+  String get tabReports => 'Reports';
+
+  @override
   String get emptyFavorites => 'No favorite products yet. Tap ❤️ to save.';
 
   @override
@@ -819,4 +822,73 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get storageTipConsume => 'Consume within 2-3 days after opening.';
+
+  @override
+  String get notFoundTitle => 'No product found';
+
+  @override
+  String get notFoundBody => 'We couldn\'t identify this product.';
+
+  @override
+  String get notFoundHint => 'You can scan again or report this product.';
+
+  @override
+  String get scanAgainButton => 'Scan again';
+
+  @override
+  String get reportProductButton => 'Report the product';
+
+  @override
+  String get reportTitle => 'Report unidentified product';
+
+  @override
+  String get reportSubtitle =>
+      'You can help us by providing details about this product.';
+
+  @override
+  String get reportProductPhoto => 'Product Photo';
+
+  @override
+  String get reportChangePhoto => 'Change Photo';
+
+  @override
+  String get reportProductName => 'Product Name';
+
+  @override
+  String get reportProductDescription => 'Product Description';
+
+  @override
+  String get reportEditButton => 'Edit';
+
+  @override
+  String get reportInfoNote =>
+      'Your report will help us add more products and provide better information for everyone.';
+
+  @override
+  String get reportSubmitButton => 'Submit';
+
+  @override
+  String get reportSuccessTitle => 'Report sent!';
+
+  @override
+  String get reportSuccessBody =>
+      'Thank you! Your report has been successfully submitted.';
+
+  @override
+  String get reportGoHome => 'Go back to Home';
+
+  @override
+  String get filterConditionTitle => 'Filter ranking by condition';
+
+  @override
+  String get conditionOverall => 'Overall (all conditions)';
+
+  @override
+  String get conditionDiabetes => 'Diabetes';
+
+  @override
+  String get conditionHypertension => 'Hypertension';
+
+  @override
+  String get conditionHeartCondition => 'Heart condition';
 }

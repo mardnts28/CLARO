@@ -9,7 +9,7 @@ import '../services/nutrition_service.dart';
 import '../services/history_service.dart';
 import '../data/services/backend_locator.dart';
 import 'product_detail_screen.dart';
-import 'unknown_product_submission_screen.dart';
+import 'product_not_found_screen.dart';
 import 'multi_scan_results_screen.dart';
 import '../models/product_model.dart';
 import '../generated/l10n/app_localizations.dart';
@@ -42,6 +42,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   bool _simulateDark = false;
   bool _simulateBlur = false;
   bool _simulateMultiScan = false;
+  bool _simulateUnrecognized = false;
 
   @override
   void initState() {
@@ -147,10 +148,20 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       }
 
       // YOLO detection
-      final detections = await _yoloService.detectProducts(
+      List<DetectionResult> detections = await _yoloService.detectProducts(
         imagePath,
         forceScanCount: _simulateMultiScan ? 5 : null,
       );
+
+      if (_simulateUnrecognized) {
+        detections = [
+          DetectionResult(
+            label: 'unregistered_mock_product_123',
+            confidence: 0.94,
+            boundingBox: const Rect.fromLTWH(0.25, 0.25, 0.5, 0.5),
+          )
+        ];
+      }
 
       setState(() {
         _isProcessing = false;
@@ -206,80 +217,27 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               );
             }
           }
+        } else {
+          // YOLO detected objects but none matched a product in Firestore
+          // → treat same as "not found"
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProductNotFoundScreen(
+                capturedImagePath: imagePath,
+              ),
+            ),
+          );
         }
       } else {
-        // No product recognized → fallback
+        // No product recognized → navigate to full-page "not found" screen
         if (!mounted) return;
-        final theme = Theme.of(context);
-        final colorScheme = theme.colorScheme;
-
-        showModalBottomSheet(
-          context: context,
-          backgroundColor: theme.cardColor,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          builder: (_) => Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.search_off_rounded, size: 56, color: colorScheme.outline),
-                const SizedBox(height: 16),
-                Text(AppLocalizations.of(context)!.productNotRecognizedTitle,
-                    style: GoogleFonts.outfit(
-                        fontSize: 20, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
-                const SizedBox(height: 8),
-                Text(
-                  AppLocalizations.of(context)!.productNotRecognizedDesc,
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, height: 1.5),
-                ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(color: colorScheme.outline),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(AppLocalizations.of(context)!.tryAgainButton,
-                            style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  const UnknownProductSubmissionScreen(),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: colorScheme.onPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: Text(AppLocalizations.of(context)!.submitLabel,
-                            style: GoogleFonts.outfit(
-                                fontWeight: FontWeight.w600)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductNotFoundScreen(
+              capturedImagePath: imagePath,
             ),
           ),
         );
@@ -561,6 +519,17 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             _buildSimToggle('Simulate Multi-Scan (5 items)', _simulateMultiScan, (v) {
               setState(() {
                 _simulateMultiScan = v;
+                if (v) _simulateUnrecognized = false;
+              });
+            }),
+            _buildSimToggle('Simulate Unrecognized Product', _simulateUnrecognized, (v) {
+              setState(() {
+                _simulateUnrecognized = v;
+                if (v) {
+                  _simulateMultiScan = false;
+                  _simulateDark = false;
+                  _simulateBlur = false;
+                }
               });
             }),
           ],

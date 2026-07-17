@@ -1,168 +1,186 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:image_picker/image_picker.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
+import '../services/auth_service.dart';
 
+/// Simplified report screen for unidentified products.
+///
+/// Flow (matches CLARO design):
+///  1. Shows the captured photo (or a placeholder) with a "Change Photo" button
+///  2. Shows the detected product name (editable) with an "Edit" button
+///  3. An info card explaining the value of reporting
+///  4. A prominent "Submit" button
+///  5. On success → dialog with "Go back to Home"
 class UnknownProductSubmissionScreen extends StatefulWidget {
-  const UnknownProductSubmissionScreen({super.key});
+  /// Path to the image captured during the failed scan.
+  final String? capturedImagePath;
+
+  const UnknownProductSubmissionScreen({super.key, this.capturedImagePath});
 
   @override
-  State<UnknownProductSubmissionScreen> createState() => _UnknownProductSubmissionScreenState();
+  State<UnknownProductSubmissionScreen> createState() =>
+      _UnknownProductSubmissionScreenState();
 }
 
-class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissionScreen> {
-  final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _brandController = TextEditingController();
-  final _variantController = TextEditingController();
-  final _ingredientsController = TextEditingController();
-  
-  String _selectedCategory = "Canned Fish";
-  bool _isUploadingImage = false;
-  bool _hasImage = false;
+class _UnknownProductSubmissionScreenState
+    extends State<UnknownProductSubmissionScreen> {
+  late TextEditingController _nameCtrl;
+  late TextEditingController _descCtrl;
+  String? _imagePath;
+  bool _isEditingName = false;
+  bool _isEditingDesc = false;
   bool _isSubmitting = false;
 
-  final List<String> _categories = [
-    "Canned Fish",
-    "Canned Meat",
-    "Instant Noodles",
-    "Other Canned Food",
-    "Other Noodles"
-  ];
+  final _authService = AuthService();
+  final _picker = ImagePicker();
 
-  void _simulateImageCapture() {
-    final loc = AppLocalizations.of(context)!;
-    setState(() {
-      _isUploadingImage = true;
-    });
-
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (!mounted) return;
-      setState(() {
-        _isUploadingImage = false;
-        _hasImage = true;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(loc.imageCaptureSuccess, style: GoogleFonts.inter(color: Colors.black)),
-          backgroundColor: const Color(0xFF00c6ff),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    });
-  }
-
-  void _handleSubmit() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final loc = AppLocalizations.of(context)!;
-    if (!_hasImage) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(loc.imageRequiredError, style: GoogleFonts.inter(color: Colors.white)),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _isSubmitting = true;
-      });
-
-      Future.delayed(const Duration(seconds: 1), () {
-        if (!mounted) return;
-        setState(() {
-          _isSubmitting = false;
-        });
-
-        // Show thank you modal/sheet
-        showModalBottomSheet(
-          context: context,
-          backgroundColor: theme.cardColor,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          builder: (context) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.green.withOpacity(0.1),
-                    ),
-                    child: const Icon(
-                      Icons.check_circle_outline,
-                      size: 64,
-                      color: Colors.green,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    loc.submissionReceivedTitle,
-                    style: GoogleFonts.outfit(
-                      color: colorScheme.onSurface,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    loc.submissionReceivedDesc,
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      color: colorScheme.onSurfaceVariant,
-                      fontSize: 14,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context); // close sheet
-                        Navigator.pop(context); // back to scanner screen
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: colorScheme.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      child: Text(
-                        loc.returnToScanner,
-                        style: GoogleFonts.outfit(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    _imagePath = widget.capturedImagePath;
+    _nameCtrl = TextEditingController(text: '');
+    _descCtrl = TextEditingController(text: '');
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _brandController.dispose();
-    _variantController.dispose();
-    _ingredientsController.dispose();
+    _nameCtrl.dispose();
+    _descCtrl.dispose();
     super.dispose();
+  }
+
+  // ── Pick / replace photo ───────────────────────────────────────────────
+  Future<void> _changePhoto() async {
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (picked != null && mounted) {
+        setState(() => _imagePath = picked.path);
+      }
+    } catch (e) {
+      debugPrint('Image pick error: $e');
+    }
+  }
+
+  // ── Submit report to Firestore ─────────────────────────────────────────
+  Future<void> _handleSubmit() async {
+    if (_isSubmitting) return;
+    setState(() => _isSubmitting = true);
+
+    try {
+      final user = _authService.currentUser;
+      final uid = user?.uid ?? 'anonymous';
+      final email = user?.email ?? '';
+      final name = user?.displayName ?? email.split('@').first;
+
+      await FirebaseFirestore.instance.collection('reports').add({
+        'dateSubmitted': FieldValue.serverTimestamp(),
+        'productDescription': _descCtrl.text.trim(),
+        'productName': _nameCtrl.text.trim(),
+        'reportedBy': uid,
+        'status': 'Pending',
+        'userEmail': email,
+        'userName': name,
+        // Keep imagePath around even if not in the requested schema so we don't lose the photo
+        'imagePath': _imagePath ?? '', 
+      });
+
+      if (!mounted) return;
+      _showSuccessDialog();
+    } catch (e) {
+      debugPrint('Report submission error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _showSuccessDialog() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Title
+              Text(
+                loc.reportSuccessTitle,
+                style: GoogleFonts.outfit(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Body
+              Text(
+                loc.reportSuccessBody,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Go Home button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(); // close dialog
+                    // Pop all the way back to the home screen
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  icon: const Icon(Icons.home, size: 20),
+                  label: Text(
+                    loc.reportGoHome,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -170,231 +188,442 @@ class _UnknownProductSubmissionScreenState extends State<UnknownProductSubmissio
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: colorScheme.primary),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          loc.submitSkuHeader,
-          style: GoogleFonts.outfit(
-            color: colorScheme.primary,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                loc.trainModelHeadline,
-                style: GoogleFonts.outfit(
-                  color: colorScheme.onSurface,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Back button ──────────────────────────────────────
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 8, top: 8),
+                child: IconButton(
+                  icon: Icon(Icons.arrow_back,
+                      color: colorScheme.primary, size: 26),
+                  onPressed: () => Navigator.pop(context),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                loc.trainModelSubtitle,
-                style: GoogleFonts.inter(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 13,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 28),
+            ),
 
-              // Image Capture Target Box
-              GestureDetector(
-                onTap: _simulateImageCapture,
-                child: Container(
-                  height: 160,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _hasImage 
-                          ? Colors.green.withOpacity(0.5) 
-                          : theme.dividerColor,
-                      width: 1.5,
+            // ── Scrollable content ───────────────────────────────
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+
+                    // Title
+                    Text(
+                      loc.reportTitle,
+                      style: GoogleFonts.outfit(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
-                  ),
-                  child: _isUploadingImage
-                      ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
-                      : _hasImage
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.check_circle_outline, color: Colors.green, size: 48),
-                                const SizedBox(height: 12),
-                                Text(
-                                  loc.labelImageAttached,
-                                  style: GoogleFonts.outfit(
-                                    color: colorScheme.onSurface,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  loc.tapToReplace,
-                                  style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant.withOpacity(0.5), fontSize: 11),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.add_a_photo_outlined, color: colorScheme.primary, size: 40),
-                                const SizedBox(height: 12),
-                                Text(
-                                  loc.captureProductLabel,
-                                  style: GoogleFonts.outfit(
-                                    color: colorScheme.onSurface,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  loc.ensureReadableNote,
-                                  style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant.withOpacity(0.7), fontSize: 11),
-                                ),
-                              ],
-                            ),
-                ),
-              ),
-              const SizedBox(height: 24),
+                    const SizedBox(height: 8),
 
-              // Product Name
-              TextFormField(
-                controller: _nameController,
-                style: GoogleFonts.inter(color: colorScheme.onSurface),
-                decoration: _buildInputDecoration(loc.productNameLabel, Icons.info_outline),
-                validator: (value) {
-                  if (value == null || value.isEmpty) return loc.productNameEmpty;
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Brand Name
-              TextFormField(
-                controller: _brandController,
-                style: GoogleFonts.inter(color: colorScheme.onSurface),
-                decoration: _buildInputDecoration(loc.brandNameLabel, Icons.branding_watermark_outlined),
-                validator: (value) {
-                  if (value == null || value.isEmpty) return loc.brandNameEmpty;
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Variant
-              TextFormField(
-                controller: _variantController,
-                style: GoogleFonts.inter(color: colorScheme.onSurface),
-                decoration: _buildInputDecoration(loc.productVariantLabel, Icons.style_outlined),
-                validator: (value) {
-                  if (value == null || value.isEmpty) return loc.productVariantEmpty;
-                  return null;
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Category dropdown
-              DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                dropdownColor: theme.cardColor,
-                style: GoogleFonts.inter(color: colorScheme.onSurface),
-                decoration: _buildInputDecoration(loc.productCategoryLabel, Icons.category_outlined),
-                items: _categories.map((cat) {
-                  return DropdownMenuItem<String>(
-                    value: cat,
-                    child: Text(cat, style: GoogleFonts.inter(color: colorScheme.onSurface)),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    setState(() {
-                      _selectedCategory = val;
-                    });
-                  }
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Ingredients
-              TextFormField(
-                controller: _ingredientsController,
-                maxLines: 4,
-                style: GoogleFonts.inter(color: colorScheme.onSurface),
-                decoration: _buildInputDecoration(loc.ingredientsListLabel, Icons.receipt_long_outlined),
-              ),
-              const SizedBox(height: 36),
-
-              // Submit Button
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _handleSubmit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                    // Subtitle
+                    Text(
+                      loc.reportSubtitle,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.5,
+                      ),
                     ),
-                  ),
-                  child: _isSubmitting
-                      ? CircularProgressIndicator(color: colorScheme.onPrimary)
-                      : Text(
-                          loc.submitTrainingButton,
-                          style: GoogleFonts.outfit(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                    const SizedBox(height: 24),
+
+                    // ── Product Photo section ────────────────────
+                    Text(
+                      loc.reportProductPhoto,
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Photo preview
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            width: 140,
+                            height: 140,
+                            color: colorScheme.surfaceContainerHighest
+                                .withValues(alpha: 0.3),
+                            child: _imagePath != null &&
+                                    File(_imagePath!).existsSync()
+                                ? Image.file(
+                                    File(_imagePath!),
+                                    fit: BoxFit.cover,
+                                  )
+                                : Center(
+                                    child: Icon(
+                                      Icons.image_outlined,
+                                      size: 48,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
                           ),
                         ),
+
+                        const SizedBox(width: 16),
+
+                        // Change Photo button
+                        OutlinedButton.icon(
+                          onPressed: _changePhoto,
+                          icon: Icon(Icons.camera_alt_outlined,
+                              size: 18, color: colorScheme.primary),
+                          label: Text(
+                            loc.reportChangePhoto,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                                color:
+                                    colorScheme.primary.withValues(alpha: 0.4)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // ── Product Name section ─────────────────────
+                    Text(
+                      loc.reportProductName,
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _isEditingName
+                              ? TextField(
+                                  controller: _nameCtrl,
+                                  autofocus: true,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(
+                                          color: colorScheme.primary),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(
+                                          color: colorScheme.primary,
+                                          width: 1.5),
+                                    ),
+                                  ),
+                                  onSubmitted: (_) =>
+                                      setState(() => _isEditingName = false),
+                                )
+                              : Text(
+                                  _nameCtrl.text.isEmpty
+                                      ? '—'
+                                      : _nameCtrl.text,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          onPressed: () =>
+                              setState(() => _isEditingName = !_isEditingName),
+                          icon: Icon(
+                            _isEditingName ? Icons.check : Icons.edit_outlined,
+                            size: 16,
+                            color: colorScheme.primary,
+                          ),
+                          label: Text(
+                            _isEditingName
+                                ? 'OK'
+                                : loc.reportEditButton,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                                color:
+                                    colorScheme.primary.withValues(alpha: 0.4)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // ── Product Description section ─────────────
+                    Text(
+                      loc.reportProductDescription,
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _isEditingDesc
+                              ? TextField(
+                                  controller: _descCtrl,
+                                  autofocus: true,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                  decoration: InputDecoration(
+                                    isDense: true,
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 12, vertical: 10),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(
+                                          color: colorScheme.primary),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      borderSide: BorderSide(
+                                          color: colorScheme.primary,
+                                          width: 1.5),
+                                    ),
+                                  ),
+                                  onSubmitted: (_) =>
+                                      setState(() => _isEditingDesc = false),
+                                )
+                              : Text(
+                                  _descCtrl.text.isEmpty
+                                      ? '—'
+                                      : _descCtrl.text,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 10),
+                        OutlinedButton.icon(
+                          onPressed: () =>
+                              setState(() => _isEditingDesc = !_isEditingDesc),
+                          icon: Icon(
+                            _isEditingDesc ? Icons.check : Icons.edit_outlined,
+                            size: 16,
+                            color: colorScheme.primary,
+                          ),
+                          label: Text(
+                            _isEditingDesc
+                                ? 'OK'
+                                : loc.reportEditButton,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                                color:
+                                    colorScheme.primary.withValues(alpha: 0.4)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // ── Info note card ────────────────────────────
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: colorScheme.primary.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.info_outline,
+                              color: colorScheme.primary, size: 22),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              loc.reportInfoNote,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: colorScheme.onSurface,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // ── Submit button ─────────────────────────────
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting ? null : _handleSubmit,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isSubmitting
+                            ? SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(
+                                  color: colorScheme.onPrimary,
+                                  strokeWidth: 2.5,
+                                ),
+                              )
+                            : Text(
+                                loc.reportSubmitButton,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 40),
+                  ],
                 ),
               ),
-              const SizedBox(height: 40),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
+
       floatingActionButton: const VoiceAssistantFab(),
+
+      // ── Bottom Navigation Bar ──────────────────────────────────────
+      bottomNavigationBar: _buildBottomNav(context, colorScheme, theme),
     );
   }
 
-  InputDecoration _buildInputDecoration(String label, IconData icon) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return InputDecoration(
-      labelText: label,
-      labelStyle: GoogleFonts.inter(color: colorScheme.onSurfaceVariant, fontSize: 13),
-      prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
-      filled: true,
-      fillColor: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: theme.dividerColor),
+  Widget _buildBottomNav(
+    BuildContext context,
+    ColorScheme colorScheme,
+    ThemeData theme,
+  ) {
+    final loc = AppLocalizations.of(context)!;
+    final navPillColor = theme.brightness == Brightness.dark
+        ? colorScheme.primary.withValues(alpha: 0.2)
+        : const Color(0xFFF6CDCD);
+
+    final items = [
+      (icon: Icons.home_outlined, label: loc.home, active: false),
+      (icon: Icons.qr_code_scanner, label: loc.scan, active: true),
+      (icon: Icons.history_outlined, label: loc.history, active: false),
+      (icon: Icons.person_outline, label: loc.profile, active: false),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: items.map((item) {
+            return Expanded(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: item.active ? navPillColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(item.icon, color: colorScheme.primary, size: 22),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colorScheme.primary,
+                        fontWeight:
+                            item.active ? FontWeight.bold : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
       ),
     );
   }

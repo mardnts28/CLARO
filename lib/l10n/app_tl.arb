@@ -186,6 +186,7 @@
   "tabAll": "Lahat",
   "tabFavorites": "Paborito",
   "tabCompare": "Kumpara",
+  "tabReports": "Mga Ulat",
   "emptyFavorites": "Wala pang mga paboritong produkto. I-tap ang ❤️ upang mag-save.",
   "emptyComparisons": "Wala pang mga pag-uugnayan ng produkto.",
   "noSearchResults": "Walang resulta para sa \"{query}\"",
@@ -323,5 +324,30 @@
   "storageTitle": "Paraan ng Pag-iimbak",
   "storageTipCool": "Itago sa malamig at tuyong lugar bago buksan.",
   "storageTipRefrigerate": "Ilipat sa sealed container at i-refrigerate kapag bukas na.",
-  "storageTipConsume": "Ubusin sa loob ng 2-3 araw pagkatapos buksan."
+  "storageTipConsume": "Ubusin sa loob ng 2-3 araw pagkatapos buksan.",
+
+  "notFoundTitle": "Walang nahanap na produkto",
+  "notFoundBody": "Hindi namin matukoy ang produktong ito.",
+  "notFoundHint": "Maaari kang mag-scan muli o i-report ang produktong ito.",
+  "scanAgainButton": "Mag-scan muli",
+  "reportProductButton": "I-report ang produkto",
+
+  "reportTitle": "Iulat ang hindi matukoy produkto",
+  "reportSubtitle": "Maari mo kaming tulungan sa pagbigay ng detalye tungkol sa produktong ito.",
+  "reportProductPhoto": "Litrato ng Produkto",
+  "reportChangePhoto": "Baguhin ang Litrato",
+  "reportProductName": "Pangalan ng Produkto",
+  "reportProductDescription": "Deskripsyon ng Produkto",
+  "reportEditButton": "I-Edit",
+  "reportInfoNote": "Ang iyong report ay makakatulong magdagdag ng maraming produkto at mas magbigay ng mabuting impormasyon para sa lahat.",
+  "reportSubmitButton": "I-submit",
+  "reportSuccessTitle": "Naipadala na ang report!",
+  "reportSuccessBody": "Maraming Salamat! Matagumpay na naipadala ang iyong ulat.",
+  "reportGoHome": "Bumalik sa Home",
+  
+  "filterConditionTitle": "I-filter ang ranking base sa kondisyon",
+  "conditionOverall": "Pangkalahatan (lahat ng kondisyon)",
+  "conditionDiabetes": "Diabetes",
+  "conditionHypertension": "Alta-presyon",
+  "conditionHeartCondition": "Sakit sa puso"
 }

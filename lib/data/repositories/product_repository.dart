@@ -84,7 +84,7 @@ class FirestoreProductRepository implements ProductRepository {
   }
 
   Product _productFromDoc(String docId, Map<String, dynamic> data) {
-    final isRegistered = data['registration_status'] as bool? ?? false;
+    final isRegistered = _parseRegistrationStatus(data['registration_status']);
     final validUntil = (data['validity_date'] as Timestamp?)?.toDate();
     final cprNumber = data['cpr_number'] as String? ?? '';
 
@@ -118,6 +118,15 @@ class FirestoreProductRepository implements ProductRepository {
       return 'EXPIRED';
     }
     return 'ACTIVE';
+  }
+
+  bool _parseRegistrationStatus(dynamic raw) {
+    if (raw is bool) return raw;
+    if (raw is String) {
+      final s = raw.toLowerCase().trim();
+      return s == 'verified' || s == 'active' || s == 'registered' || s == 'true';
+    }
+    return false;
   }
 
   // "canned_fish" -> "Canned Fish"

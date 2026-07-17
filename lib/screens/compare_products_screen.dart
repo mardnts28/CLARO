@@ -168,22 +168,24 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   }
 
   String _conditionLabel(HealthCondition condition) {
+    final loc = AppLocalizations.of(context)!;
     switch (condition) {
       case HealthCondition.hypertension:
-        return 'Hypertension';
+        return loc.conditionHypertension;
       case HealthCondition.diabetes:
-        return 'Diabetes';
+        return loc.conditionDiabetes;
       case HealthCondition.heartCondition:
-        return 'Heart condition';
+        return loc.conditionHeartCondition;
     }
   }
 
   void _showFilterSheet() {
     final profile = _profile;
-    if (profile == null || profile.conditions.length <= 1) return;
+    if (profile == null) return;
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     showModalBottomSheet(
       context: context,
@@ -200,7 +202,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
                 child: Text(
-                  'Filter ranking by condition',
+                  loc.filterConditionTitle,
                   style: GoogleFonts.outfit(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -212,13 +214,13 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                 value: null,
                 groupValue: _selectedCondition,
                 activeColor: colorScheme.primary,
-                title: const Text('Overall (all conditions)'),
+                title: Text(loc.conditionOverall),
                 onChanged: (value) {
                   Navigator.pop(sheetContext);
                   _selectConditionFilter(value);
                 },
               ),
-              for (final condition in profile.conditions)
+              for (final condition in HealthCondition.values)
                 RadioListTile<HealthCondition?>(
                   value: condition,
                   groupValue: _selectedCondition,
@@ -278,7 +280,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   ),
                 ),
                 const Spacer(),
-                if ((_profile?.conditions.length ?? 0) > 1)
+                if (_profile != null)
                   GestureDetector(
                     onTap: _showFilterSheet,
                     child: Stack(

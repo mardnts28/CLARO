@@ -115,10 +115,20 @@ class FdaVerificationService {
   }
 
   FdaVerificationResult _buildResult(Map<String, dynamic> data) {
-    // registration_status is a bool in Firestore (not the 'ACTIVE'/'EXPIRED'
-    // string this used to assume), and validity_date is a Firestore
-    // Timestamp (not a parseable date string).
-    final isRegistered = data['registration_status'] as bool? ?? false;
+    // registration_status can be a bool (true/false) OR a String
+    // ("verified", "ACTIVE", "active", "registered") depending on how
+    // documents were added to Firestore. Handle both gracefully.
+    final rawStatus = data['registration_status'];
+    final bool isRegistered;
+    if (rawStatus is bool) {
+      isRegistered = rawStatus;
+    } else if (rawStatus is String) {
+      final s = rawStatus.toLowerCase().trim();
+      isRegistered = s == 'verified' || s == 'active' || s == 'registered' || s == 'true';
+    } else {
+      isRegistered = false;
+    }
+
     final validityTimestamp = data['validity_date'] as Timestamp?;
     final validUntil = validityTimestamp?.toDate();
 
