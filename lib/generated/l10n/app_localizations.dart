@@ -1483,6 +1483,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Worst'**
   String get worstLabelShort;
+
+  /// No description provided for @analysisBasisTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis Basis'**
+  String get analysisBasisTitle;
+
+  /// No description provided for @analysisBasisSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Based on WHO daily limit, per 1 serving ({servingSize})'**
+  String analysisBasisSubtitle(String servingSize);
+
+  /// No description provided for @bpSodiumLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Blood pressure - Sodium'**
+  String get bpSodiumLabel;
+
+  /// No description provided for @diabetesSugarsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Diabetes - Total sugars'**
+  String get diabetesSugarsLabel;
+
+  /// No description provided for @heartSatFatLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart disease - Saturated fats'**
+  String get heartSatFatLabel;
+
+  /// No description provided for @dailySuffix.
+  ///
+  /// In en, this message translates to:
+  /// **'daily'**
+  String get dailySuffix;
+
+  /// No description provided for @ofWhoLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'of WHO limit'**
+  String get ofWhoLimit;
+
+  /// No description provided for @allergenDetectedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Allergen Detected'**
+  String get allergenDetectedBadge;
+
+  /// No description provided for @allergenWarningNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically alerts if this is your saved allergen.'**
+  String get allergenWarningNote;
+
+  /// No description provided for @suitableLegend.
+  ///
+  /// In en, this message translates to:
+  /// **'Suitable ≤5%'**
+  String get suitableLegend;
+
+  /// No description provided for @moderateLegend.
+  ///
+  /// In en, this message translates to:
+  /// **'Moderate 6-20%'**
+  String get moderateLegend;
+
+  /// No description provided for @cautionLegend.
+  ///
+  /// In en, this message translates to:
+  /// **'Caution >20%'**
+  String get cautionLegend;
+
+  /// No description provided for @forMoreDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'For more details'**
+  String get forMoreDetails;
+
+  /// No description provided for @moreDetailsScreenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'More Details'**
+  String get moreDetailsScreenTitle;
+
+  /// No description provided for @ingredientsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ingredients'**
+  String get ingredientsTitle;
+
+  /// No description provided for @containsAllergenPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Contains {allergen} - allergen'**
+  String containsAllergenPrefix(String allergen);
+
+  /// No description provided for @storageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Method'**
+  String get storageTitle;
+
+  /// No description provided for @storageTipCool.
+  ///
+  /// In en, this message translates to:
+  /// **'Store in a cool and dry place before opening.'**
+  String get storageTipCool;
+
+  /// No description provided for @storageTipRefrigerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer to a sealed container and refrigerate once opened.'**
+  String get storageTipRefrigerate;
+
+  /// No description provided for @storageTipConsume.
+  ///
+  /// In en, this message translates to:
+  /// **'Consume within 2-3 days after opening.'**
+  String get storageTipConsume;
 }
 
 class _AppLocalizationsDelegate

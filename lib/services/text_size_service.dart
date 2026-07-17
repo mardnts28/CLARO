@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'auth_service.dart';
 
 /// Service for managing personalized text size across the app.

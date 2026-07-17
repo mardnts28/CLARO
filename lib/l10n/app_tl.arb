@@ -284,5 +284,40 @@
   "submitTrainingButton": "IPADALA PARA SA TRAINING",
 
   "bestLabelShort": "Best",
-  "worstLabelShort": "Worst"
+  "worstLabelShort": "Worst",
+  "analysisBasisTitle": "Batayan ng Pagsusuri",
+  "analysisBasisSubtitle": "Batay sa WHO daily limit, bawat 1 serving ({servingSize})",
+  "@analysisBasisSubtitle": {
+    "placeholders": {
+      "servingSize": {
+        "type": "String"
+      }
+    }
+  },
+  "bpSodiumLabel": "Presyon ng dugo - Sodium",
+  "diabetesSugarsLabel": "Diabetes - Total sugars",
+  "heartSatFatLabel": "Sakit sa puso - Saturated fats",
+  "dailySuffix": "araw-araw",
+  "ofWhoLimit": "ng WHO limit",
+  "allergenDetectedBadge": "Allergen Detected",
+  "allergenWarningNote": "Awtomatikong nagdudulot ng babala kung saved allergen mo ito.",
+  "suitableLegend": "Suitable ≤5%",
+  "moderateLegend": "Moderate 6-20%",
+  "cautionLegend": "Caution >20%",
+
+  "forMoreDetails": "Higit pang detalye",
+  "moreDetailsScreenTitle": "Higit pang Detalye",
+  "ingredientsTitle": "Mga Sangkap",
+  "containsAllergenPrefix": "Naglalaman ng {allergen} - allergen",
+  "@containsAllergenPrefix": {
+    "placeholders": {
+      "allergen": {
+        "type": "String"
+      }
+    }
+  },
+  "storageTitle": "Paraan ng Pag-iimbak",
+  "storageTipCool": "Itago sa malamig at tuyong lugar bago buksan.",
+  "storageTipRefrigerate": "Ilipat sa sealed container at i-refrigerate kapag bukas na.",
+  "storageTipConsume": "Ubusin sa loob ng 2-3 araw pagkatapos buksan."
 }

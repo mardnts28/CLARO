@@ -284,5 +284,40 @@
   "submitTrainingButton": "SUBMIT FOR TRAINING",
 
   "bestLabelShort": "Best",
-  "worstLabelShort": "Worst"
+  "worstLabelShort": "Worst",
+  "analysisBasisTitle": "Analysis Basis",
+  "analysisBasisSubtitle": "Based on WHO daily limit, per 1 serving ({servingSize})",
+  "@analysisBasisSubtitle": {
+    "placeholders": {
+      "servingSize": {
+        "type": "String"
+      }
+    }
+  },
+  "bpSodiumLabel": "Blood pressure - Sodium",
+  "diabetesSugarsLabel": "Diabetes - Total sugars",
+  "heartSatFatLabel": "Heart disease - Saturated fats",
+  "dailySuffix": "daily",
+  "ofWhoLimit": "of WHO limit",
+  "allergenDetectedBadge": "Allergen Detected",
+  "allergenWarningNote": "Automatically alerts if this is your saved allergen.",
+  "suitableLegend": "Suitable ≤5%",
+  "moderateLegend": "Moderate 6-20%",
+  "cautionLegend": "Caution >20%",
+
+  "forMoreDetails": "For more details",
+  "moreDetailsScreenTitle": "More Details",
+  "ingredientsTitle": "Ingredients",
+  "containsAllergenPrefix": "Contains {allergen} - allergen",
+  "@containsAllergenPrefix": {
+    "placeholders": {
+      "allergen": {
+        "type": "String"
+      }
+    }
+  },
+  "storageTitle": "Storage Method",
+  "storageTipCool": "Store in a cool and dry place before opening.",
+  "storageTipRefrigerate": "Transfer to a sealed container and refrigerate once opened.",
+  "storageTipConsume": "Consume within 2-3 days after opening."
 }

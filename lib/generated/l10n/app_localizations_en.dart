@@ -741,4 +741,70 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get worstLabelShort => 'Worst';
+
+  @override
+  String get analysisBasisTitle => 'Analysis Basis';
+
+  @override
+  String analysisBasisSubtitle(String servingSize) {
+    return 'Based on WHO daily limit, per 1 serving ($servingSize)';
+  }
+
+  @override
+  String get bpSodiumLabel => 'Blood pressure - Sodium';
+
+  @override
+  String get diabetesSugarsLabel => 'Diabetes - Total sugars';
+
+  @override
+  String get heartSatFatLabel => 'Heart disease - Saturated fats';
+
+  @override
+  String get dailySuffix => 'daily';
+
+  @override
+  String get ofWhoLimit => 'of WHO limit';
+
+  @override
+  String get allergenDetectedBadge => 'Allergen Detected';
+
+  @override
+  String get allergenWarningNote =>
+      'Automatically alerts if this is your saved allergen.';
+
+  @override
+  String get suitableLegend => 'Suitable ≤5%';
+
+  @override
+  String get moderateLegend => 'Moderate 6-20%';
+
+  @override
+  String get cautionLegend => 'Caution >20%';
+
+  @override
+  String get forMoreDetails => 'For more details';
+
+  @override
+  String get moreDetailsScreenTitle => 'More Details';
+
+  @override
+  String get ingredientsTitle => 'Ingredients';
+
+  @override
+  String containsAllergenPrefix(String allergen) {
+    return 'Contains $allergen - allergen';
+  }
+
+  @override
+  String get storageTitle => 'Storage Method';
+
+  @override
+  String get storageTipCool => 'Store in a cool and dry place before opening.';
+
+  @override
+  String get storageTipRefrigerate =>
+      'Transfer to a sealed container and refrigerate once opened.';
+
+  @override
+  String get storageTipConsume => 'Consume within 2-3 days after opening.';
 }

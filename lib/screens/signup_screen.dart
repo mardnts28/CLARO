@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'login_screen.dart';
-import 'onboarding_screen.dart';
-import 'home_screen.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';

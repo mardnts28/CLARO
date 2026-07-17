@@ -749,4 +749,71 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get worstLabelShort => 'Worst';
+
+  @override
+  String get analysisBasisTitle => 'Batayan ng Pagsusuri';
+
+  @override
+  String analysisBasisSubtitle(String servingSize) {
+    return 'Batay sa WHO daily limit, bawat 1 serving ($servingSize)';
+  }
+
+  @override
+  String get bpSodiumLabel => 'Presyon ng dugo - Sodium';
+
+  @override
+  String get diabetesSugarsLabel => 'Diabetes - Total sugars';
+
+  @override
+  String get heartSatFatLabel => 'Sakit sa puso - Saturated fats';
+
+  @override
+  String get dailySuffix => 'araw-araw';
+
+  @override
+  String get ofWhoLimit => 'ng WHO limit';
+
+  @override
+  String get allergenDetectedBadge => 'Allergen Detected';
+
+  @override
+  String get allergenWarningNote =>
+      'Awtomatikong nagdudulot ng babala kung saved allergen mo ito.';
+
+  @override
+  String get suitableLegend => 'Suitable ≤5%';
+
+  @override
+  String get moderateLegend => 'Moderate 6-20%';
+
+  @override
+  String get cautionLegend => 'Caution >20%';
+
+  @override
+  String get forMoreDetails => 'Higit pang detalye';
+
+  @override
+  String get moreDetailsScreenTitle => 'Higit pang Detalye';
+
+  @override
+  String get ingredientsTitle => 'Mga Sangkap';
+
+  @override
+  String containsAllergenPrefix(String allergen) {
+    return 'Naglalaman ng $allergen - allergen';
+  }
+
+  @override
+  String get storageTitle => 'Paraan ng Pag-iimbak';
+
+  @override
+  String get storageTipCool => 'Itago sa malamig at tuyong lugar bago buksan.';
+
+  @override
+  String get storageTipRefrigerate =>
+      'Ilipat sa sealed container at i-refrigerate kapag bukas na.';
+
+  @override
+  String get storageTipConsume =>
+      'Ubusin sa loob ng 2-3 araw pagkatapos buksan.';
 }

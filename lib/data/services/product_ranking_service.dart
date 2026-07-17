@@ -11,7 +11,6 @@
 // Dart); only the advisory/explanation text costs a Gemini call.
 
 import 'gemini_advisory_service.dart';
-import '../models/health_advisory.dart';
 import '../models/health_profile.dart';
 import '../../models/product_model.dart';
 import '../models/product_detail_result.dart';

@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import '../generated/l10n/app_localizations.dart';
 import 'signup_screen.dart';
-import 'onboarding_screen.dart';
-import 'otp_verification_screen.dart';
-import 'home_screen.dart';
 import 'forgot_password_screen.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';

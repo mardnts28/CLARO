@@ -56,6 +56,7 @@ class GeminiAdvisoryService {
       final advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.notNeeded,
+        languageCode: languageCode,
       );
       _cache[key] = advisory;
       return advisory;
@@ -75,12 +76,13 @@ class GeminiAdvisoryService {
           .generateContent([Content.text(prompt)])
           .timeout(_timeout);
 
-      advisory = _parseResponse(response.text, evaluation);
+      advisory = _parseResponse(response.text, evaluation, languageCode);
     } on TimeoutException catch (e) {
       print('GEMINI TIMEOUT: $e');
       advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.timeout,
+        languageCode: languageCode,
       );
     } catch (e, stack) {
       print('GEMINI ERROR: $e');
@@ -88,6 +90,7 @@ class GeminiAdvisoryService {
       advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.apiError,
+        languageCode: languageCode,
       );
     }
 
@@ -95,12 +98,13 @@ class GeminiAdvisoryService {
     return advisory;
   }
 
-  HealthAdvisory _parseResponse(String? text, ProductEvaluation evaluation) {
+  HealthAdvisory _parseResponse(String? text, ProductEvaluation evaluation, String languageCode) {
     if (text == null || text.trim().isEmpty) {
       print('EMPTY RESPONSE from Gemini');
       return FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.emptyResponse,
+        languageCode: languageCode,
       );
     }
     try {
@@ -129,6 +133,7 @@ class GeminiAdvisoryService {
       return FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.parseError,
+        languageCode: languageCode,
       );
     }
   }
@@ -182,6 +187,7 @@ class GeminiAdvisoryService {
         rank: rank,
         totalProducts: totalProducts,
         healthCondition: healthCondition,
+        languageCode: languageCode,
       );
       return {'explanation': explanation, 'source': 'Fallback'};
     } catch (_) {
@@ -194,6 +200,7 @@ class GeminiAdvisoryService {
         rank: rank,
         totalProducts: totalProducts,
         healthCondition: healthCondition,
+        languageCode: languageCode,
       );
       return {'explanation': explanation, 'source': 'Fallback'};
     }

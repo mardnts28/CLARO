@@ -21,16 +21,20 @@ class FallbackAdvisoryGenerator {
   static HealthAdvisory generate(
     ProductEvaluation evaluation, {
     required FallbackReason reason,
+    String languageCode = 'en',
   }) {
     final allergen = evaluation.allergenAssessment;
+    final isTagalog = languageCode == 'tl';
 
     if (allergen.hasDirectAllergen) {
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.caution,
-        warningText: 'Contains an allergen you flagged',
-        explanation:
-            'This product contains an ingredient matching an allergy on your '
-            'profile. We recommend avoiding this product.',
+        warningText: isTagalog
+            ? 'Naglalaman ng allergen na iyong tinukoy'
+            : 'Contains an allergen you flagged',
+        explanation: isTagalog
+            ? 'Ang produktong ito ay naglalaman ng sangkap na tumutugma sa allergy sa iyong profile. Inirerekomenda naming iwasan ang produktong ito.'
+            : 'This product contains an ingredient matching an allergy on your profile. We recommend avoiding this product.',
         safeServingSize: null,
         source: AdvisorySource.fallbackRuleBased,
         generatedAt: DateTime.now(),
@@ -44,10 +48,12 @@ class FallbackAdvisoryGenerator {
     if (flagged.isEmpty) {
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.suitable,
-        warningText: 'Suitable for your health profile',
-        explanation:
-            'The nutrients we checked for your condition(s) are within the '
-            'recommended range for this product.',
+        warningText: isTagalog
+            ? 'Angkop'
+            : 'Suitable',
+        explanation: isTagalog
+            ? 'Ang mga nutrients na sinuri namin para sa iyong kundisyon ay pasok sa inirerekomendang limitasyon.'
+            : 'The nutrients we checked for your condition(s) are within the recommended range for this product.',
         safeServingSize: null,
         source: AdvisorySource.fallbackRuleBased,
         generatedAt: DateTime.now(),
@@ -58,9 +64,9 @@ class FallbackAdvisoryGenerator {
       (a, b) => _severityRank(b.level) > _severityRank(a.level) ? b : a,
     );
 
-    final nutrientName = _nutrientLabel(worst.nutrientKey);
+    final nutrientName = _nutrientLabel(worst.nutrientKey, isTagalog);
     final severityWord =
-        worst.level == AdvisoryLevel.caution ? 'High' : 'Moderate';
+        worst.level == AdvisoryLevel.caution ? (isTagalog ? 'Mataas' : 'High') : (isTagalog ? 'Katamtaman' : 'Moderate');
 
     // Calculate safe serving
     final product = evaluation.product;
@@ -72,15 +78,21 @@ class FallbackAdvisoryGenerator {
     );
 
     // Build concise advisory following the new format
-    final explanation = 'Contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
-        '${_nutrientLabel(worst.nutrientKey)} per serving (${product.servingSizeG}g), '
-        'which is ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the recommended healthy daily limit. '
-        'This may affect your ${_conditionLabel(worst.condition)}. '
-        '${safeServing != null ? 'Consider limiting to $safeServing.' : ''}';
+    final explanation = isTagalog
+        ? 'Naglalaman ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng '
+          '$nutrientName bawat serving (${product.servingSizeG}g), '
+          'na katumbas ng ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng inirerekomendang limitasyon sa isang araw. '
+          'Maaari itong makaapekto sa iyong ${_conditionLabel(worst.condition, isTagalog)}. '
+          '${safeServing != null ? 'Isaalang-alang ang paglimita sa $safeServing.' : ''}'
+        : 'Contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
+          '$nutrientName per serving (${product.servingSizeG}g), '
+          'which is ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the recommended healthy daily limit. '
+          'This may affect your ${_conditionLabel(worst.condition, isTagalog)}. '
+          '${safeServing != null ? 'Consider limiting to $safeServing.' : ''}';
 
     return HealthAdvisory(
       overallLevel: evaluation.overallLevel,
-      warningText: '$severityWord in $nutrientName',
+      warningText: isTagalog ? '$severityWord sa $nutrientName' : '$severityWord in $nutrientName',
       explanation: explanation,
       safeServingSize: safeServing,
       source: AdvisorySource.fallbackRuleBased,
@@ -99,14 +111,14 @@ class FallbackAdvisoryGenerator {
     }
   }
 
-  static String _nutrientLabel(String key) {
+  static String _nutrientLabel(String key, bool isTagalog) {
     switch (key) {
       case 'sodiumMg':
-        return 'sodium';
+        return isTagalog ? 'sodium' : 'sodium'; // generally untranslated
       case 'sugarsG':
-        return 'sugar';
+        return isTagalog ? 'asukal' : 'sugar';
       case 'saturatedFatG':
-        return 'saturated fat';
+        return isTagalog ? 'saturated fat' : 'saturated fat';
       default:
         return key;
     }
@@ -125,14 +137,14 @@ class FallbackAdvisoryGenerator {
     }
   }
 
-  static String _conditionLabel(HealthCondition c) {
+  static String _conditionLabel(HealthCondition c, bool isTagalog) {
     switch (c) {
       case HealthCondition.hypertension:
-        return 'hypertension';
+        return isTagalog ? 'altapresyon (hypertension)' : 'hypertension';
       case HealthCondition.diabetes:
         return 'diabetes';
       case HealthCondition.heartCondition:
-        return 'heart condition';
+        return isTagalog ? 'kondisyon sa puso' : 'heart condition';
     }
   }
 
@@ -151,9 +163,12 @@ class FallbackAdvisoryGenerator {
     required int rank,
     required int totalProducts,
     String healthCondition = '',
+    String languageCode = 'en',
   }) {
-    final conditionClause =
-        healthCondition.isNotEmpty ? ' given your $healthCondition' : '';
+    final isTagalog = languageCode == 'tl';
+    final conditionClause = healthCondition.isNotEmpty 
+        ? (isTagalog ? ' base sa iyong ${healthCondition}' : ' given your $healthCondition')
+        : '';
 
     // Always format to a fixed number of decimals -- raw doubles (e.g.
     // 12.345678923) were leaking straight into the sentence before.
@@ -170,8 +185,12 @@ class FallbackAdvisoryGenerator {
         : null;
 
     final comparisonClause = percentageDiffStr != null
-        ? ', which is $percentageDiffStr% more than the best option (${bestValueStr}$nutrientUnit per 100g)'
-        : ' (the best option in this comparison has ${bestValueStr}$nutrientUnit per 100g)';
+        ? (isTagalog 
+            ? ', na $percentageDiffStr% mas mataas kumpara sa pinakamagandang opsyon (${bestValueStr}$nutrientUnit kada 100g)' 
+            : ', which is $percentageDiffStr% more than the best option (${bestValueStr}$nutrientUnit per 100g)')
+        : (isTagalog
+            ? ' (ang pinakamagandang opsyon sa pinagkukumparahan na ito ay may ${bestValueStr}$nutrientUnit kada 100g)'
+            : ' (the best option in this comparison has ${bestValueStr}$nutrientUnit per 100g)');
 
     // Derived from rank/totalProducts ONLY, never from a separately
     // computed "lowest value of this one nutrient" check -- that mismatch
@@ -183,11 +202,17 @@ class FallbackAdvisoryGenerator {
     final isWorstRank = rank == totalProducts;
 
     if (isBestRank) {
-      return 'This product ranks $rank of $totalProducts (top choice) with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
+      return isTagalog
+          ? 'Ang produktong ito ay nangunguna ($rank sa $totalProducts) (pinakamagandang opsyon) na may ${thisValueStr}$nutrientUnit na $nutrientName kada 100g$conditionClause$comparisonClause.'
+          : 'This product ranks $rank of $totalProducts (top choice) with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
     } else if (isWorstRank) {
-      return 'This product ranks $rank of $totalProducts (least recommended) with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
+      return isTagalog
+          ? 'Ang produktong ito ay pang-$rank sa $totalProducts (pinakakonting angkop) na may ${thisValueStr}$nutrientUnit na $nutrientName kada 100g$conditionClause$comparisonClause.'
+          : 'This product ranks $rank of $totalProducts (least suitable) with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
     } else {
-      return 'This product ranks $rank of $totalProducts with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
+      return isTagalog
+          ? 'Ang produktong ito ay pang-$rank sa $totalProducts na may ${thisValueStr}$nutrientUnit na $nutrientName kada 100g$conditionClause$comparisonClause.'
+          : 'This product ranks $rank of $totalProducts with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
     }
   }
 }
