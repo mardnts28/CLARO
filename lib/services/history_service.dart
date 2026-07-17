@@ -16,7 +16,6 @@ import '../data/repositories/history_repository.dart';
 import '../data/services/backend_locator.dart';
 import '../models/history_item.dart';
 import '../models/product_model.dart';
-import 'product_db_service.dart';
 
 // HistoryItem/HistoryType now live in models/history_item.dart, but every
 // existing `import '../services/history_service.dart'` (history_screen.dart,
@@ -261,12 +260,13 @@ class HistoryService {
   }
 
   // ── Analytics & Usage Tracking ──
-  // Unchanged: still synchronous, and still reads the local product catalog
-  // via ProductDbService -- only the history data feeding it now comes from
-  // Firestore instead of a hardcoded list.
+  // Now async: product lookups go through BackendLocator.productRepository
+  // (Firestore-backed), so both methods below await the Future instead of
+  // assuming an instant sync return. Callers need to await these and show
+  // a loading state while the products resolve.
 
   /// Calculates the most frequently scanned products, returning products mapped to count
-  List<MapEntry<Product, int>> getMostScannedProducts({int limit = 5}) {
+  Future<List<MapEntry<Product, int>>> getMostScannedProducts({int limit = 5}) async {
     final Map<String, int> counts = {};
     for (final item in _items) {
       if (item.type == HistoryType.scan && item.productId != null) {
@@ -274,28 +274,32 @@ class HistoryService {
       }
     }
 
-    final db = ProductDbService();
     final List<MapEntry<Product, int>> list = [];
-    counts.forEach((prodId, count) {
-      final p = db.getProductById(prodId);
-      if (p != null) {
-        list.add(MapEntry(p, count));
+    for (final entry in counts.entries) {
+      try {
+        final p = await BackendLocator.productRepository.getProductById(entry.key);
+        list.add(MapEntry(p, entry.value));
+      } catch (e) {
+        debugPrint('HistoryService.getMostScannedProducts: product not found for ${entry.key}: $e');
       }
-    });
+    }
 
     list.sort((a, b) => b.value.compareTo(a.value));
     return list.take(limit).toList();
   }
 
   /// Gets all products marked as favorites
-  List<Product> getFavoriteProducts() {
-    final db = ProductDbService();
+  Future<List<Product>> getFavoriteProducts() async {
     final List<Product> favs = [];
     for (final item in _items) {
       if (item.type == HistoryType.scan && item.isFavorite && item.productId != null) {
-        final p = db.getProductById(item.productId!);
-        if (p != null && !favs.any((f) => f.id == p.id)) {
-          favs.add(p);
+        try {
+          final p = await BackendLocator.productRepository.getProductById(item.productId!);
+          if (!favs.any((f) => f.id == p.id)) {
+            favs.add(p);
+          }
+        } catch (e) {
+          debugPrint('HistoryService.getFavoriteProducts: product not found for ${item.productId}: $e');
         }
       }
     }

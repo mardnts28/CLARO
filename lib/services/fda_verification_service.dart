@@ -50,15 +50,22 @@ class FdaVerificationService {
       return const FdaVerificationResult(status: FdaStatus.unverified);
     }
     try {
-      final doc =
-          await _db.collection('fda_products').doc(cprNumber).get();
-      if (!doc.exists) {
+      // fda_products documents use auto-generated IDs, not the CPR number --
+      // cpr_number is a regular field, so this has to be a query, not a
+      // direct .doc() lookup.
+      final query = await _db
+          .collection('fda_products')
+          .where('cpr_number', isEqualTo: cprNumber)
+          .limit(1)
+          .get();
+
+      if (query.docs.isEmpty) {
         return FdaVerificationResult(
           status: FdaStatus.unverified,
           cprNumber: cprNumber,
         );
       }
-      return _buildResult(doc.data()!);
+      return _buildResult(query.docs.first.data());
     } catch (_) {
       return const FdaVerificationResult(status: FdaStatus.unverified);
     }
@@ -108,21 +115,27 @@ class FdaVerificationService {
   }
 
   FdaVerificationResult _buildResult(Map<String, dynamic> data) {
-    final statusStr =
-        (data['registration_status'] as String? ?? '').toUpperCase();
-    final validityStr = data['validity_date'] as String? ?? '';
+    // registration_status is a bool in Firestore (not the 'ACTIVE'/'EXPIRED'
+    // string this used to assume), and validity_date is a Firestore
+    // Timestamp (not a parseable date string).
+    final isRegistered = data['registration_status'] as bool? ?? false;
+    final validityTimestamp = data['validity_date'] as Timestamp?;
+    final validUntil = validityTimestamp?.toDate();
 
+    // registration_status: true means the product is actively verified/
+    // registered, so status is 'active' unless validity_date has already
+    // passed, in which case it's 'expired'. registration_status: false
+    // covers unverified, expired-in-FDA's-own-records, and pending all at
+    // once (the source data doesn't distinguish between them), so it maps
+    // to 'unverified' -- the label that doesn't claim more than the data
+    // actually tells us.
     FdaStatus status;
-    if (statusStr == 'ACTIVE') {
-      // Also check validity date hasn't passed
-      final validUntil = DateTime.tryParse(validityStr);
+    if (isRegistered) {
       if (validUntil != null && DateTime.now().isAfter(validUntil)) {
         status = FdaStatus.expired;
       } else {
         status = FdaStatus.active;
       }
-    } else if (statusStr == 'EXPIRED') {
-      status = FdaStatus.expired;
     } else {
       status = FdaStatus.unverified;
     }
@@ -130,10 +143,21 @@ class FdaVerificationService {
     return FdaVerificationResult(
       status: status,
       cprNumber: data['cpr_number'] as String? ?? '',
-      validityDate: validityStr,
+      // Kept as a String on FdaVerificationResult for backward compatibility
+      // with existing callers; formatted here rather than passing the raw
+      // Timestamp through.
+      validityDate: validUntil != null ? _formatDate(validUntil) : '',
       manufacturer: data['manufacturer'] as String? ?? '',
       productName: data['product_name'] as String? ?? '',
       brand: data['brand'] as String? ?? '',
     );
+  }
+
+  String _formatDate(DateTime date) {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 }

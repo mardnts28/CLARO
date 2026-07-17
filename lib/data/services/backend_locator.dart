@@ -26,7 +26,7 @@ class BackendLocator {
   // variable name than GEMINI_API_KEY.
   static String get _geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
 
-  static final ProductRepository productRepository = ProductDbRepository();
+  static final ProductRepository productRepository = FirestoreProductRepository();
 
   static final UserRepository userRepository = FirebaseUserRepository();
 

@@ -5,9 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/yolo_recognition_service.dart';
 import '../services/image_validation_service.dart';
-import '../services/product_db_service.dart';
 import '../services/nutrition_service.dart';
 import '../services/history_service.dart';
+import '../data/services/backend_locator.dart';
 import 'product_detail_screen.dart';
 import 'unknown_product_submission_screen.dart';
 import 'multi_scan_results_screen.dart';
@@ -33,7 +33,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
   final YoloRecognitionService _yoloService = YoloRecognitionService();
   final ImageValidationService _validationService = ImageValidationService();
-  final ProductDbService _dbService = ProductDbService();
 
   // Laser animation
   late AnimationController _laserController;
@@ -166,10 +165,13 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       if (detections.isNotEmpty) {
         final List<Product> products = [];
         for (var det in detections) {
-          final prod = _dbService.getProductById(det.label);
-          if (prod != null) {
+          try {
+            final prod =
+                await BackendLocator.productRepository.getProductById(det.label);
             final enriched = await NutritionService().getProductByName(prod.name);
             products.add(enriched ?? prod);
+          } catch (e) {
+            debugPrint('CameraScannerScreen: product lookup failed for ${det.label}: $e');
           }
         }
 

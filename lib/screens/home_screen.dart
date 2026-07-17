@@ -9,6 +9,7 @@ import 'profile_screen.dart';
 import 'camera_scanner_screen.dart';
 import 'history_screen.dart';
 
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -28,13 +29,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _healthExpanded = false;
   bool _ecoExpanded = false;
   bool _processExpanded = false;
-
-  @override
-  void initState() {
-    super.initState();
-    HomeTabController.tabNotifier.addListener(_handleTabChange);
-    _loadUserName();
-  }
 
   @override
   void dispose() {

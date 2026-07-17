@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
-import 'product_db_service.dart';
+import '../data/services/backend_locator.dart';
 
 class NutritionService {
   static final NutritionService _instance = NutritionService._internal();
@@ -17,7 +17,7 @@ class NutritionService {
   /// Returns a Product for the given product name.
   /// 1. Check Firestore cache (24hr)
   /// 2. Query Open Food Facts API
-  /// 3. Fall back to local ProductDbService
+  /// 3. Fall back to the local fda_products catalog (via BackendLocator.productRepository)
   Future<Product?> getProductByName(String productName) async {
     final normalizedName = productName.trim().toLowerCase();
 
@@ -32,8 +32,8 @@ class NutritionService {
       return fromApi;
     }
 
-    // Step 3: Fallback to local Ever Plus / ProductDbService
-    return _getFromLocalDb(productName);
+    // Step 3: Fallback to the local fda_products catalog
+    return await _getFromLocalDb(productName);
   }
 
   // ─── Step 1: Firestore cache ────────────────────────────────────────────
@@ -149,13 +149,20 @@ class NutritionService {
   }
 
   // ─── Step 3: Local fallback ─────────────────────────────────────────────
-  Product? _getFromLocalDb(String productName) {
+  // Note: this scope is deliberately kept minimal for Phase 3 (just enough
+  // to compile against the repository instead of the retired
+  // ProductDbService). Matching this against fda_products' actual
+  // brand + product_name fields with a confidence check is Phase 4 work.
+  Future<Product?> _getFromLocalDb(String productName) async {
     final lower = productName.toLowerCase();
     try {
-      return ProductDbService().getAllProducts().firstWhere(
-            (p) => p.name.toLowerCase().contains(lower) ||
-                lower.contains(p.name.toLowerCase().split(' ').first.toLowerCase()),
-          );
+      final allProducts = await BackendLocator.productRepository.getAllProducts();
+      return allProducts.firstWhere(
+        (p) =>
+            p.name.isNotEmpty &&
+            (p.name.toLowerCase().contains(lower) ||
+                lower.contains(p.name.toLowerCase().split(' ').first.toLowerCase())),
+      );
     } catch (_) {
       return null;
     }

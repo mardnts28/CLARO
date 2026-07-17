@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/history_service.dart';
-import '../services/product_db_service.dart';
 import '../services/auth_service.dart';
 import '../data/services/backend_locator.dart';
 import 'camera_scanner_screen.dart';
@@ -27,17 +26,37 @@ class _HistoryScreenState extends State<HistoryScreen> {
   // kDebugMode so it never compiles into a release build. Delete this
   // method + the "Seed (dev)" button in build() once you're done testing.
   Future<void> _seedTestHistory() async {
-    final db = ProductDbService();
-    final tuna = db.getProductById('century_tuna_flakes_oil');
-    final canton = db.getProductById('lucky_me_canton_hot_chili');
-
-    if (tuna != null) await _historyService.addScanRecord(tuna);
-    if (canton != null) await _historyService.addScanRecord(canton);
+    try {
+      // No hardcoded slugs anymore -- those only existed in the retired
+      // mock catalog. Grab a couple of real documents straight out of
+      // fda_products instead, so this still works no matter what's in it.
+      final products = await BackendLocator.productRepository.getAllProducts();
+      for (final product in products.take(2)) {
+        await _historyService.addScanRecord(product);
+      }
+    } catch (e) {
+      debugPrint('HistoryScreen: seed test history failed: $e');
+    }
   }
 
   final HistoryService _historyService = HistoryService();
-  final ProductDbService _dbService = ProductDbService();
   final TextEditingController _searchController = TextEditingController();
+
+  // Caches in-flight/completed product lookups by product ID so the list
+  // doesn't re-hit Firestore on every rebuild (search typing, tab switches,
+  // favorites stream updates, etc.) -- each ID is only ever fetched once.
+  final Map<String, Future<Product?>> _productLookupCache = {};
+
+  Future<Product?> _lookupProduct(String productId) {
+    return _productLookupCache.putIfAbsent(productId, () async {
+      try {
+        return await BackendLocator.productRepository.getProductById(productId);
+      } catch (e) {
+        debugPrint('HistoryScreen: product not found for $productId: $e');
+        return null;
+      }
+    });
+  }
   final _authService = AuthService();
   StreamSubscription<void>? _subscription;
   StreamSubscription<List<Product>>? _favoritesSubscription;
@@ -199,9 +218,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildScanCard(HistoryItem item) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final product = item.productId != null
-        ? _dbService.getProductById(item.productId!)
-        : null;
     final isFavorite =
         item.productId != null && _favoriteProducts.any((p) => p.id == item.productId);
 
@@ -229,94 +245,117 @@ class _HistoryScreenState extends State<HistoryScreen> {
           _historyService.deleteRecord(item.id);
         }
       },
-      child: GestureDetector(
-        onTap: () async {
-          if (product != null) {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductDetailScreen(product: product),
+      // Product lookup is now an async Firestore read instead of an
+      // instant in-memory one, so the tile itself carries its own loading
+      // state via FutureBuilder rather than the whole screen blocking.
+      child: FutureBuilder<Product?>(
+        future: item.productId != null ? _lookupProduct(item.productId!) : null,
+        builder: (context, snapshot) {
+          final product = snapshot.data;
+          final isLoadingProduct = item.productId != null &&
+              snapshot.connectionState != ConnectionState.done;
+
+          return GestureDetector(
+            onTap: () async {
+              if (product != null) {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ProductDetailScreen(product: product),
+                  ),
+                );
+                // Favorites no longer need a manual refresh here --
+                // _favoritesSubscription (Firestore stream) keeps this screen's
+                // Favorites tab in sync in real time regardless of what
+                // happened on the screen(s) we navigated to.
+              }
+            },
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: theme.dividerColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-            );
-            // Favorites no longer need a manual refresh here --
-            // _favoritesSubscription (Firestore stream) keeps this screen's
-            // Favorites tab in sync in real time regardless of what
-            // happened on the screen(s) we navigated to.
-          }
+              child: Row(
+                children: [
+                  // Product image, loading spinner, or placeholder
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: 52,
+                      height: 52,
+                      color: colorScheme.surfaceContainerHighest,
+                      child: isLoadingProduct
+                          ? Center(
+                              child: SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                            )
+                          : (product != null
+                              ? Image.asset(
+                                  product.imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Icon(
+                                      Icons.inventory_2_outlined,
+                                      color: colorScheme.primary,
+                                      size: 30),
+                                )
+                              : Icon(Icons.inventory_2_outlined,
+                                  color: colorScheme.primary, size: 30)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Product name + time
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurface),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formatTime(item.timestamp),
+                          style: GoogleFonts.inter(
+                              fontSize: 12, color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Favorite heart toggle
+                  GestureDetector(
+                    onTap: () => _toggleFavoriteForItem(item),
+                    child: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant.withOpacity(0.4),
+                      size: 22,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
         },
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: theme.dividerColor),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // Product image or placeholder
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 52,
-                  height: 52,
-                  color: colorScheme.surfaceContainerHighest,
-                  child: product != null
-                      ? Image.asset(
-                          product.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(
-                              Icons.inventory_2_outlined,
-                              color: colorScheme.primary,
-                              size: 30),
-                        )
-                      : Icon(Icons.inventory_2_outlined,
-                          color: colorScheme.primary, size: 30),
-                ),
-              ),
-              const SizedBox(width: 12),
-              // Product name + time
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: colorScheme.onSurface),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _formatTime(item.timestamp),
-                      style: GoogleFonts.inter(
-                          fontSize: 12, color: colorScheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              // Favorite heart toggle
-              GestureDetector(
-                onTap: () => _toggleFavoriteForItem(item),
-                child: Icon(
-                  isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: isFavorite
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant.withOpacity(0.4),
-                  size: 22,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -343,8 +382,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           // Reopen the comparison by navigating to CompareProductsScreen
           // Set saveToHistory: false to avoid creating duplicate history entries
           if (item.sourceProductId != null) {
-            final sourceProduct = _dbService.getProductById(item.sourceProductId!);
-            if (sourceProduct != null) {
+            final sourceProduct = await _lookupProduct(item.sourceProductId!);
+            if (sourceProduct != null && mounted) {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
