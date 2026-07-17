@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
@@ -7,13 +8,51 @@ import '../widgets/voice_assistant_fab.dart';
 /// A screen showing additional product details:
 /// - Ingredients list with allergen warnings
 /// - Storage instructions / tips
-class MoreDetailsScreen extends StatelessWidget {
+class MoreDetailsScreen extends StatefulWidget {
   final Product product;
 
   const MoreDetailsScreen({super.key, required this.product});
 
   @override
+  State<MoreDetailsScreen> createState() => _MoreDetailsScreenState();
+}
+
+class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
+  String? _dynamicStorageText;
+  bool _loadingStorage = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchStorageInstructions();
+  }
+
+  Future<void> _fetchStorageInstructions() async {
+    if (widget.product.category.isEmpty) {
+      if (mounted) setState(() => _loadingStorage = false);
+      return;
+    }
+    
+    try {
+      final docId = widget.product.category.toLowerCase().replaceAll(' ', '_');
+      final doc = await FirebaseFirestore.instance.collection('categories').doc(docId).get();
+      if (doc.exists && mounted) {
+        setState(() {
+          _dynamicStorageText = doc.data()?['default_storage'];
+          _loadingStorage = false;
+        });
+      } else if (mounted) {
+        setState(() => _loadingStorage = false);
+      }
+    } catch (e) {
+      debugPrint('Error fetching storage instructions: $e');
+      if (mounted) setState(() => _loadingStorage = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final product = widget.product;
     final loc = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -114,23 +153,36 @@ class MoreDetailsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 16),
-                  _buildStorageTip(
-                    context: context,
-                    icon: Icons.wb_sunny_outlined,
-                    text: loc.storageTipCool,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildStorageTip(
-                    context: context,
-                    icon: Icons.ac_unit,
-                    text: loc.storageTipRefrigerate,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildStorageTip(
-                    context: context,
-                    icon: Icons.access_time,
-                    text: loc.storageTipConsume,
-                  ),
+                  if (_loadingStorage)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (_dynamicStorageText != null && _dynamicStorageText!.isNotEmpty)
+                    _buildStorageTip(
+                      context: context,
+                      icon: Icons.info_outline,
+                      text: _dynamicStorageText!,
+                    )
+                  else ...[
+                    _buildStorageTip(
+                      context: context,
+                      icon: Icons.wb_sunny_outlined,
+                      text: loc.storageTipCool,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildStorageTip(
+                      context: context,
+                      icon: Icons.ac_unit,
+                      text: loc.storageTipRefrigerate,
+                    ),
+                    const SizedBox(height: 14),
+                    _buildStorageTip(
+                      context: context,
+                      icon: Icons.access_time,
+                      text: loc.storageTipConsume,
+                    ),
+                  ],
                 ],
               ),
             ),
