@@ -73,6 +73,22 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       await user.reauthenticateWithCredential(credential);
       await user.updatePassword(newPassword);
 
+      // updatePassword() issues a fresh ID token. Firestore's security
+      // rules can take a brief moment to recognize that new token, so a
+      // read made right after this (e.g. PersonalInfoScreen reloading
+      // its data on return) can momentarily fail with permission-denied
+      // even though nothing is actually wrong — the same race condition
+      // AuthService already retries around in isSessionValid() and
+      // _checkMfaEnabled(). Forcing a token refresh here, before we pop
+      // back, gets ahead of that window instead of leaving the next
+      // screen to hit it cold.
+      try {
+        await user.getIdToken(true);
+      } catch (_) {
+        // Non-fatal — the password change itself already succeeded.
+        // PersonalInfoScreen's own retry logic is the real safety net.
+      }
+
       setState(() => _isLoading = false);
 
       if (mounted) {
@@ -151,14 +167,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                   onPressed: _isLoading ? null : _handleChangePassword,
                   child: _isLoading
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
                       : const Text(
-                          'Baguhin ang Password',
-                          style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
+                    'Baguhin ang Password',
+                    style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],

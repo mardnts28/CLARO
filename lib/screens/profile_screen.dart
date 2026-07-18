@@ -36,6 +36,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    // Listen to the shared name notifier so this header updates
+    // instantly if the name is changed elsewhere (e.g.
+    // PersonalInfoScreen), without requiring a manual refresh.
+    //
+    // Previously, ProfileScreen and HomeScreen are sibling tabs kept
+    // alive inside HomeScreen's IndexedStack — editing the name on
+    // PersonalInfoScreen (pushed on top) only updated Firestore, and
+    // returning here never recreated this widget or told it anything
+    // had changed, so the old name stayed on screen until a manual
+    // pull-to-refresh.
+    AuthService.userNameNotifier.addListener(_handleNameChanged);
+  }
+
+  @override
+  void dispose() {
+    AuthService.userNameNotifier.removeListener(_handleNameChanged);
+    super.dispose();
+  }
+
+  void _handleNameChanged() {
+    if (!mounted) return;
+    setState(() => _userName = AuthService.userNameNotifier.value);
   }
 
   Future<void> _loadUserData() async {
@@ -64,6 +86,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : 1.0;
               });
               setAppThemeMode(parseThemeMode(themeString));
+              // Keep the shared notifier in sync so HomeScreen's
+              // greeting reflects whatever this screen just loaded.
+              AuthService.userNameNotifier.value = _userName;
             }
             return;
           }
@@ -89,6 +114,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : 1.0;
             });
             setAppThemeMode(parseThemeMode(themeString));
+            AuthService.userNameNotifier.value = _userName;
           }
         }
       }
@@ -225,12 +251,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildMenuItemWithArrow(
             icon: Icons.person_outline,
             label: loc.personalInfo,
-            onTap: () {
+            onTap: () async {
               HapticService().vibrate();
-              Navigator.push(
+              // Await the push and reload afterwards. Previously this
+              // navigated without awaiting, so any name/age/conditions/
+              // allergens edits made on PersonalInfoScreen never
+              // refreshed here on return — the old values stayed on
+              // screen until a manual pull-to-refresh. The name itself
+              // is also kept in sync live via AuthService.userNameNotifier,
+              // but this reload covers everything else shown on this
+              // screen too.
+              await Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
               );
+              if (mounted) await _loadUserData();
             },
           ),
         ],

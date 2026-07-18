@@ -31,8 +31,34 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _processExpanded = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Keep local state in sync with whatever tab HomeTabController
+    // currently holds, and listen for future changes.
+    _selectedIndex = HomeTabController.tabNotifier.value;
+    HomeTabController.tabNotifier.addListener(_handleTabChange);
+
+    // Previously this screen had no initState() at all, so the
+    // greeting only ever loaded the user's name via pull-to-refresh
+    // (_onRefresh) — on first launch it just sat at the 'User' default
+    // until the user manually refreshed. Loading it here fixes that.
+    _loadUserName();
+
+    // Listen to the shared name notifier so this greeting updates
+    // instantly if the name is changed elsewhere (e.g.
+    // PersonalInfoScreen), without requiring a manual refresh.
+    AuthService.userNameNotifier.addListener(_handleNameChanged);
+  }
+
+  void _handleNameChanged() {
+    if (!mounted) return;
+    setState(() => _userName = AuthService.userNameNotifier.value);
+  }
+
+  @override
   void dispose() {
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
+    AuthService.userNameNotifier.removeListener(_handleNameChanged);
     super.dispose();
   }
 
@@ -61,6 +87,9 @@ class _HomeScreenState extends State<HomeScreen> {
               _userName = data['name'] ?? 'User';
               if (_userName.isEmpty) _userName = 'User';
             });
+            // Keep the shared notifier in sync so ProfileScreen (and any
+            // other listener) reflects whatever this screen just loaded.
+            AuthService.userNameNotifier.value = _userName;
           }
         }
       }

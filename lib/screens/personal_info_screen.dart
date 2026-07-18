@@ -41,56 +41,111 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     super.dispose();
   }
 
+  /// Loads the current user's profile (name, age, conditions,
+  /// allergens) from Firestore, retrying on transient permission-denied
+  /// errors.
+  ///
+  /// IMPORTANT: right after a password change, updatePassword() issues
+  /// the user a fresh ID token. Firestore's security rules can take a
+  /// brief moment to recognize that new token, so a read made shortly
+  /// after can throw permission-denied even though the user is fully
+  /// authenticated and the document is intact — the exact same race
+  /// AuthService already retries around in isSessionValid() and
+  /// _checkMfaEnabled(). Previously this method only tried the server
+  /// once, fell back to a single plain .get() on any error, and if that
+  /// SECOND read also hit the same propagation delay, the outer catch
+  /// swallowed it — leaving name/age/conditions/allergens silently
+  /// blank in the UI even though Firestore still had the data. This
+  /// version retries a few times before giving up, matching the
+  /// established pattern elsewhere in the app.
   Future<void> _loadUserData() async {
-    try {
-      final uid = _authService.currentUser?.uid;
-      if (uid != null) {
-        late DocumentSnapshot userDoc;
-        try {
-          userDoc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
-        } catch (_) {
-          userDoc = await _authService.db.collection('users').doc(uid).get();
-        }
-        if (userDoc.exists) {
-          final data = userDoc.data() as Map<String, dynamic>?;
-          if (data != null) {
-            setState(() {
-              _userName = data['name'] ?? 'User';
-              if (_userName.isEmpty) _userName = 'User';
-              _nameController.text = _userName;
-
-              _userAge = data['age'] ?? '';
-              _ageController.text = _userAge;
-
-              final conditionsList = data['conditions'] as List<dynamic>? ?? [];
-              _conditions = {
-                'Diabetes': conditionsList.contains('Diabetes'),
-                'Alta-presyon': conditionsList.contains('Alta-presyon'),
-                'Sakit sa puso': conditionsList.contains('Sakit sa puso'),
-                'Mababang Paningin': conditionsList.contains('Mababang Paningin'),
-                'Wala': conditionsList.contains('Wala'),
-              };
-
-              final allergensList = data['allergens'] as List<dynamic>? ?? [];
-              _allergens = {
-                'Isda': allergensList.contains('Isda'),
-                'Gatas': allergensList.contains('Gatas'),
-                'Itlog': allergensList.contains('Itlog'),
-                'Soya': allergensList.contains('Soya'),
-                'Trigo': allergensList.contains('Trigo'),
-                'Lamang-Dagat': allergensList.contains('Lamang-Dagat'),
-                'Mani': allergensList.contains('Mani'),
-              };
-
-              _isLoading = false;
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading user data: $e');
+    final uid = _authService.currentUser?.uid;
+    if (uid == null) {
       setState(() => _isLoading = false);
+      return;
     }
+
+    DocumentSnapshot? userDoc;
+    int retryCount = 0;
+    while (retryCount < 3) {
+      try {
+        userDoc = await _authService.db
+            .collection('users')
+            .doc(uid)
+            .get(const GetOptions(source: Source.server));
+        break;
+      } catch (e) {
+        if (e.toString().contains('permission-denied')) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          retryCount++;
+          continue;
+        }
+        // Non-retryable error — fall back to whatever's cached locally
+        // rather than giving up entirely.
+        try {
+          userDoc = await _authService.db.collection('users').doc(uid).get();
+        } catch (e2) {
+          debugPrint('Error loading user data (fallback failed): $e2');
+        }
+        break;
+      }
+    }
+
+    if (userDoc == null) {
+      debugPrint('Error loading user data: exhausted retries on permission-denied');
+      // One last attempt against the cache before giving up, so a
+      // transient server issue doesn't blank out data we already have
+      // locally.
+      try {
+        userDoc = await _authService.db.collection('users').doc(uid).get();
+      } catch (e) {
+        debugPrint('Error loading user data (final fallback failed): $e');
+      }
+    }
+
+    if (userDoc != null && userDoc.exists) {
+      final data = userDoc.data() as Map<String, dynamic>?;
+      if (data != null) {
+        setState(() {
+          _userName = data['name'] ?? 'User';
+          if (_userName.isEmpty) _userName = 'User';
+          _nameController.text = _userName;
+
+          _userAge = data['age'] ?? '';
+          _ageController.text = _userAge;
+
+          final conditionsList = data['conditions'] as List<dynamic>? ?? [];
+          _conditions = {
+            'Diabetes': conditionsList.contains('Diabetes'),
+            'Alta-presyon': conditionsList.contains('Alta-presyon'),
+            'Sakit sa puso': conditionsList.contains('Sakit sa puso'),
+            'Mababang Paningin': conditionsList.contains('Mababang Paningin'),
+            'Wala': conditionsList.contains('Wala'),
+          };
+
+          final allergensList = data['allergens'] as List<dynamic>? ?? [];
+          _allergens = {
+            'Isda': allergensList.contains('Isda'),
+            'Gatas': allergensList.contains('Gatas'),
+            'Itlog': allergensList.contains('Itlog'),
+            'Soya': allergensList.contains('Soya'),
+            'Trigo': allergensList.contains('Trigo'),
+            'Lamang-Dagat': allergensList.contains('Lamang-Dagat'),
+            'Mani': allergensList.contains('Mani'),
+          };
+        });
+        // Keep the app-wide name notifier in sync so HomeScreen's
+        // greeting and ProfileScreen's header reflect whatever this
+        // screen just loaded, without needing a manual refresh.
+        AuthService.userNameNotifier.value = _userName;
+      }
+    }
+
+    // Always clear the loading flag, even if the doc didn't exist or
+    // every read attempt failed — previously this was only set inside
+    // the success branch, so a failed/empty read left the screen stuck
+    // on its loading spinner indefinitely.
+    if (mounted) setState(() => _isLoading = false);
   }
 
   /// Pull-to-refresh handler. Re-fetches the user's personal info,
@@ -110,6 +165,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       final ok = await _authService.updateUserData({'name': newName});
       setState(() => _isSavingName = false);
       if (ok) {
+        // Update the shared notifier immediately so HomeScreen's
+        // greeting and ProfileScreen's header reflect the change right
+        // away, rather than waiting on the Firestore round-trip below.
+        AuthService.userNameNotifier.value = newName;
         await _loadUserData();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateSuccess)));
       } else {
@@ -477,9 +536,17 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           ),
           Divider(height: 0, color: theme.dividerColor),
           GestureDetector(
-            onTap: () {
+            onTap: () async {
               HapticService().vibrate();
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+              // Await the push and reload afterwards. Under normal
+              // circumstances this PersonalInfoScreen instance still
+              // holds its previously-loaded state when we return, so
+              // this reload is mostly a safety net — but it guarantees
+              // the screen is always showing fresh data after a
+              // password change, rather than relying on the instance
+              // never having been recreated in between.
+              await Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+              if (mounted) await _loadUserData();
             },
             behavior: HitTestBehavior.opaque,
             child: Padding(
