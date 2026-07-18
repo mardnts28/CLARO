@@ -15,7 +15,14 @@ class OtpVerificationScreen extends StatefulWidget {
   });
 
   final String email;
-  final String password;
+
+  /// Null when this challenge came from Google sign-in (there's no
+  /// password to re-verify with). Non-null for email/password logins.
+  /// The resend flow branches on this: with a password we can safely
+  /// re-run buildOtpChallenge (sign out + back in); without one we use
+  /// resendOtpForCurrentSession, which assumes the current Firebase
+  /// session is still valid.
+  final String? password;
   final String uid;
   final String? otpCode;
   final bool emailSent;
@@ -47,22 +54,22 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   void _startTimer() {
-  _remainingSeconds = 300; // 5 minutes
+    _remainingSeconds = 300; // 5 minutes
 
-  _timer?.cancel();
+    _timer?.cancel();
 
-  _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-    if (!mounted) return;
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
 
-    setState(() {
-      if (_remainingSeconds > 0) {
-        _remainingSeconds--;
-      } else {
-        timer.cancel();
-      }
+      setState(() {
+        if (_remainingSeconds > 0) {
+          _remainingSeconds--;
+        } else {
+          timer.cancel();
+        }
+      });
     });
-  });
-}
+  }
 
   Future<void> _verifyOtp() async {
     HapticService().vibrate();
@@ -115,10 +122,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (!mounted) return;
     setState(() => _isResending = true);
     try {
-      // Re-runs the full challenge (re-verifies credentials, issues a new
-      // uid-keyed OTP). Note: this generates a NEW uid-keyed doc for the
-      // same uid, overwriting the old one, so widget.uid stays valid.
-      final otpData = await _authService.buildOtpChallenge(email: widget.email, password: widget.password);
+      // Email/password logins re-verify credentials via buildOtpChallenge
+      // (sign out + back in). Google-originated challenges have no
+      // password, so we instead re-send an OTP for the session that's
+      // already signed in via resendOtpForCurrentSession.
+      final Map<String, dynamic>? otpData = widget.password != null
+          ? await _authService.buildOtpChallenge(
+          email: widget.email, password: widget.password!)
+          : await _authService.resendOtpForCurrentSession(
+          uid: widget.uid, email: widget.email);
+
       if (!mounted) return;
       if (otpData == null || otpData['code'] == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to resend the verification code.')));

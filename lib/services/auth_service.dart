@@ -334,57 +334,57 @@ class AuthService {
   /// caller (_prepareAndSendOtp) can record emailSent=false AND you can
   /// see exactly why in the console instead of it failing silently.
   Future<void> _sendOtpEmail(
-  String email,
-  String code,
-  Timestamp expiresAt,
-) async {
-  final expiry = expiresAt.toDate();
+      String email,
+      String code,
+      Timestamp expiresAt,
+      ) async {
+    final expiry = expiresAt.toDate();
 
-  // Format as 12-hour time (e.g. 7:18 PM)
-  final formattedTime = DateFormat('h:mm a').format(expiry);
+    // Format as 12-hour time (e.g. 7:18 PM)
+    final formattedTime = DateFormat('h:mm a').format(expiry);
 
-  final templateParams = {
-    'service_id': 'service_5y6zi4d',
-    'template_id': 'template_te10bxg',
-    'user_id': 'wJyfTyTAuJIC6XQvn',
-    if (_emailJsPrivateKey.isNotEmpty)
-      'accessToken': _emailJsPrivateKey,
-    'template_params': {
-      'to_email': email,
-      'passcode': code,
-      'time': formattedTime,
-    },
-  };
-
-  late final http.Response response;
-
-  try {
-    response = await http.post(
-      Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
-      headers: {
-        'origin': 'http://localhost',
-        'Content-Type': 'application/json',
+    final templateParams = {
+      'service_id': 'service_5y6zi4d',
+      'template_id': 'template_te10bxg',
+      'user_id': 'wJyfTyTAuJIC6XQvn',
+      if (_emailJsPrivateKey.isNotEmpty)
+        'accessToken': _emailJsPrivateKey,
+      'template_params': {
+        'to_email': email,
+        'passcode': code,
+        'time': formattedTime,
       },
-      body: jsonEncode(templateParams),
-    );
-  } catch (e) {
-    debugPrint('OTP email network error: $e');
-    rethrow;
-  }
+    };
 
-  debugPrint(
-    'OTP email response: ${response.statusCode} - ${response.body}',
-  );
+    late final http.Response response;
 
-  if (response.statusCode != 200) {
-    throw Exception(
-      'EmailJS rejected the request (${response.statusCode}): ${response.body}. '
-      'If this is a 403, enable "Allow EmailJS API calls from non-browser '
-      'applications" in EmailJS dashboard -> Account -> Security, or set '
-      '_emailJsPrivateKey if you have one.',
+    try {
+      response = await http.post(
+        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+        headers: {
+          'origin': 'http://localhost',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(templateParams),
+      );
+    } catch (e) {
+      debugPrint('OTP email network error: $e');
+      rethrow;
+    }
+
+    debugPrint(
+      'OTP email response: ${response.statusCode} - ${response.body}',
     );
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'EmailJS rejected the request (${response.statusCode}): ${response.body}. '
+            'If this is a 403, enable "Allow EmailJS API calls from non-browser '
+            'applications" in EmailJS dashboard -> Account -> Security, or set '
+            '_emailJsPrivateKey if you have one.',
+      );
+    }
   }
-}
 
   /// TEMPORARY: Verifies credentials, generates an OTP, stores it keyed by uid, and
   /// emails it using direct Firestore operations. The user is signed OUT again
@@ -416,6 +416,26 @@ class AuthService {
     } catch (e) {
       debugPrint('buildOtpChallenge failed: $e');
       isAuthenticating.value = false;
+      return null;
+    }
+  }
+
+  /// Re-sends a fresh OTP for a user who is already signed in to
+  /// Firebase Auth — this covers the Google-sign-in MFA case (where
+  /// there's no password to re-verify with) as well as any other flow
+  /// where re-authenticating with a password isn't possible. Unlike
+  /// buildOtpChallenge, this does NOT sign the user out and back in; it
+  /// relies on the current Firebase session still being the right one,
+  /// which holds true for as long as isAuthenticating +
+  /// pendingMfaChallenge keep AuthGate parked on the OTP screen.
+  Future<Map<String, dynamic>?> resendOtpForCurrentSession({
+    required String uid,
+    required String email,
+  }) async {
+    try {
+      return await _prepareAndSendOtp(uid, email);
+    } catch (e) {
+      debugPrint('resendOtpForCurrentSession failed: $e');
       return null;
     }
   }
@@ -459,7 +479,22 @@ class AuthService {
     await _firebaseDb.collection('login_otps').doc(uid).delete();
   }
 
-  Future<String?> signInWithGoogle() async {
+  /// Signs in with Google and returns one of:
+  ///  - null: success, no MFA required, session established.
+  ///  - String: an error message to show the user.
+  ///  - Map: {'status': 'MFA_REQUIRED', ...} — the caller must NOT
+  ///    navigate to Home/Onboarding. AuthGate will show
+  ///    OtpVerificationScreen automatically (isAuthenticating stays true
+  ///    and pendingMfaChallenge is set), exactly like the email/password
+  ///    login() flow above.
+  ///
+  /// IMPORTANT: previously this method returned null (success) as soon
+  /// as signInWithCredential succeeded, without ever checking whether
+  /// the account had MFA enabled. That meant a user with MFA turned on
+  /// could sign in with Google and land straight on the Home screen,
+  /// completely bypassing the OTP step. The check below closes that gap
+  /// using the same fail-closed logic as login().
+  Future<dynamic> signInWithGoogle() async {
     isAuthenticating.value = true;
     try {
       // Clear previous sign-in state to ensure the account picker shows up
@@ -482,6 +517,7 @@ class AuthService {
 
       final userCredential = await _firebaseAuth.signInWithCredential(credential);
       final uid = userCredential.user!.uid;
+      final email = userCredential.user!.email ?? '';
 
       final userDoc = await _firebaseDb.collection('users').doc(uid).get();
 
@@ -489,11 +525,38 @@ class AuthService {
         final displayName = userCredential.user!.displayName ?? '';
         await _firebaseDb.collection('users').doc(uid).set({
           'uid': uid,
-          'email': userCredential.user!.email,
+          'email': email,
           'name': displayName,
           'createdAt': Timestamp.now(),
         });
       }
+
+      // Same fail-closed MFA check used by login(). See _checkMfaEnabled
+      // doc: null means "could not be determined", which must NEVER be
+      // treated as "MFA disabled".
+      final mfaCheck = await _checkMfaEnabled(uid);
+
+      if (mfaCheck == null) {
+        isAuthenticating.value = false;
+        await signOut();
+        return 'Could not verify your account\'s security settings. Please check your connection and try again.';
+      }
+
+      if (mfaCheck) {
+        final challenge = await _prepareAndSendOtp(uid, email);
+        pendingMfaChallenge.value = {
+          'uid': uid,
+          'code': challenge['code'],
+          'emailSent': challenge['emailSent'],
+          'email': email,
+          // No password for a Google-originated session — the OTP
+          // screen's resend logic uses resendOtpForCurrentSession()
+          // instead of buildOtpChallenge() when this is null.
+          'password': null,
+        };
+        return {'status': 'MFA_REQUIRED', ...challenge};
+      }
+
       await _updateSessionId(uid);
       isAuthenticating.value = false;
       return null;

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'login_screen.dart';
+import 'onboarding_screen.dart';
+import 'home_screen.dart';
+import 'otp_verification_screen.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
@@ -12,9 +15,9 @@ import '../services/haptic_service.dart';
 class _SanitizingTextInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
+      TextEditingValue oldValue,
+      TextEditingValue newValue,
+      ) {
     final sanitized = newValue.text.replaceAll(RegExp(r'[\r\n\t]'), '');
     if (sanitized == newValue.text) return newValue;
     final delta = newValue.text.length - sanitized.length;
@@ -24,6 +27,14 @@ class _SanitizingTextInputFormatter extends TextInputFormatter {
       selection: TextSelection.collapsed(offset: newOffset),
     );
   }
+}
+
+/// A single, checkable password/email requirement shown in the live
+/// "requirements panel" beneath a field while it's focused.
+class _Requirement {
+  final String label;
+  final bool Function(String value) isMet;
+  const _Requirement(this.label, this.isMet);
 }
 
 class SignupScreen extends StatefulWidget {
@@ -57,18 +68,45 @@ class _SignupScreenState extends State<SignupScreen> {
   // (e.g. "email already in use", network failure, Google sign-in).
   String? _formError;
 
+  // ---- Live requirements panel definitions ----
+
+  final List<_Requirement> _emailRequirements = [
+    _Requirement('A valid email address (e.g. name@example.com)',
+            (v) => ValidationService.validateEmail(v.trim().toLowerCase()) == null),
+  ];
+
+  final List<_Requirement> _passwordRequirements = [
+    _Requirement('At least 8 characters', (v) => v.length >= 8),
+    _Requirement('One uppercase letter', (v) => RegExp(r'[A-Z]').hasMatch(v)),
+    _Requirement('One lowercase letter', (v) => RegExp(r'[a-z]').hasMatch(v)),
+    _Requirement('One number', (v) => RegExp(r'[0-9]').hasMatch(v)),
+    _Requirement('One special character (!@#\$%^&* etc.)',
+            (v) => RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(v)),
+  ];
+
+  List<_Requirement> get _confirmPasswordRequirements => [
+    _Requirement('Matches the password above',
+            (v) => v.isNotEmpty && v == _rawPassword),
+  ];
+
   @override
   void initState() {
     super.initState();
+
     // Validate as soon as the user leaves a field (inline validation),
-    // rather than only on submit.
+    // rather than only on submit. We also rebuild on focus GAIN so the
+    // live requirements panel can appear the moment the field is tapped,
+    // and rebuild on focus LOSS so the panel disappears/updates.
     _emailFocus.addListener(() {
+      setState(() {});
       if (!_emailFocus.hasFocus) _validateEmail(showIfEmpty: false);
     });
     _passwordFocus.addListener(() {
+      setState(() {});
       if (!_passwordFocus.hasFocus) _validatePassword(showIfEmpty: false);
     });
     _confirmPasswordFocus.addListener(() {
+      setState(() {});
       if (!_confirmPasswordFocus.hasFocus) {
         _validateConfirmPassword(showIfEmpty: false);
       }
@@ -77,19 +115,24 @@ class _SignupScreenState extends State<SignupScreen> {
     // Once an error is showing for a field, re-check on every keystroke
     // so it clears the moment the user fixes it — this is the
     // "inline validation" feedback loop working both directions.
+    // We also rebuild on every keystroke so the live requirements panel
+    // ticks items off in real time while the user types.
     _emailController.addListener(() {
       if (_emailError != null) _validateEmail(showIfEmpty: false);
+      setState(() {});
     });
     _passwordController.addListener(() {
       if (_passwordError != null) _validatePassword(showIfEmpty: false);
       if (_confirmPasswordError != null) {
         _validateConfirmPassword(showIfEmpty: false);
       }
+      setState(() {});
     });
     _confirmPasswordController.addListener(() {
       if (_confirmPasswordError != null) {
         _validateConfirmPassword(showIfEmpty: false);
       }
+      setState(() {});
     });
   }
 
@@ -171,6 +214,85 @@ class _SignupScreenState extends State<SignupScreen> {
     return 'Something went wrong while creating your account. Please try again.';
   }
 
+  /// Resets the whole form back to its initial empty state. Used by the
+  /// pull-to-refresh gesture on the signup page.
+  Future<void> _refreshForm() async {
+    _emailController.clear();
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+      _confirmPasswordError = null;
+      _formError = null;
+    });
+    HapticService().vibrate();
+  }
+
+  /// Shows a blocking "account created" confirmation dialog. Navigation
+  /// only proceeds once the user taps "Okay".
+  Future<void> _showAccountCreatedDialog() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: const Text('Account created'),
+          content: const Text(
+            'Your account has been created successfully.',
+          ),
+          actions: [
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Okay'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Sends the signed-in user to Onboarding or Home, clearing the nav
+  /// stack so they can't swipe/back into the auth screens again.
+  Future<void> _routeAfterAuth() async {
+    final onboarded = await _authService.hasCompletedOnboarding();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => onboarded ? const HomeScreen() : const OnboardingScreen(),
+      ),
+          (route) => false,
+    );
+  }
+
+  /// Navigates explicitly to the OTP screen when a Google sign-in comes
+  /// back with MFA required. This screen is reached via
+  /// Navigator.pushReplacement, which means AuthGate isn't mounted here
+  /// — the same root cause as the earlier "stuck on signup" bug — so we
+  /// can't rely on it to swap in OtpVerificationScreen on its own. We
+  /// use the full challenge AuthService already stored in
+  /// AuthService.pendingMfaChallenge (uid, code, emailSent, email; no
+  /// password for a Google-originated challenge).
+  void _navigateToOtpScreen() {
+    final challenge = AuthService.pendingMfaChallenge.value;
+    if (!mounted || challenge == null) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => OtpVerificationScreen(
+          email: challenge['email']?.toString() ?? '',
+          password: challenge['password'] as String?,
+          uid: challenge['uid'].toString(),
+          otpCode: challenge['code']?.toString(),
+          emailSent: challenge['emailSent'] == true,
+        ),
+      ),
+          (route) => false,
+    );
+  }
+
   Future<void> _handleSignUp() async {
     // Re-run all validators together on submit so every relevant field
     // shows its error at once (inline), instead of one snackbar at a time.
@@ -199,10 +321,19 @@ class _SignupScreenState extends State<SignupScreen> {
 
       if (error != null) {
         setState(() => _formError = _friendlyFormError(error));
+        return;
       }
-      // On success, AuthGate handles navigation automatically.
-      // Controllers are intentionally left untouched here — if navigation
-      // is delayed for any reason, the user never sees their data vanish.
+
+      // Success: confirm with the user, then route to Onboarding
+      // (brand-new signups have never completed onboarding).
+      setState(() => _isLoading = false);
+      await _showAccountCreatedDialog();
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+            (route) => false,
+      );
+      return;
     } catch (e) {
       if (!mounted) return;
       setState(() => _formError = _friendlyFormError(e.toString()));
@@ -219,12 +350,31 @@ class _SignupScreenState extends State<SignupScreen> {
     });
 
     try {
-      final error = await _authService.signInWithGoogle();
+      final result = await _authService.signInWithGoogle();
       if (!mounted) return;
-      if (error != null) {
-        setState(() => _formError = _friendlyFormError(error));
+
+      if (result == null) {
+        // Google sign-in succeeded, no MFA required. Previously this
+        // relied on AuthGate to notice the auth-state change and
+        // redirect automatically, but this screen is reached via
+        // Navigator.pushReplacement from LoginScreen — meaning it lives
+        // OUTSIDE AuthGate's widget tree, so nothing was listening and
+        // the user got stuck here even though Firebase had already
+        // logged them in. We now navigate explicitly instead of
+        // waiting on AuthGate.
+        await _routeAfterAuth();
+        return;
       }
-      // AuthGate handles navigation automatically.
+
+      if (result is String) {
+        setState(() => _formError = _friendlyFormError(result));
+        return;
+      }
+
+      // MFA_REQUIRED map: the signed-in Google account has MFA enabled.
+      // Navigate to the OTP screen explicitly (see _navigateToOtpScreen
+      // doc — AuthGate can't be relied on here).
+      _navigateToOtpScreen();
     } catch (e) {
       if (!mounted) return;
       setState(() => _formError = _friendlyFormError(e.toString()));
@@ -257,176 +407,196 @@ class _SignupScreenState extends State<SignupScreen> {
         useMaterial3: true,
       ),
       child: Builder(
-        builder: (context) {
-          final colorScheme = Theme.of(context).colorScheme;
+          builder: (context) {
+            final colorScheme = Theme.of(context).colorScheme;
 
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.noScaling,
-            ),
-            child: Scaffold(
-              backgroundColor: colorScheme.surface,
-              body: SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Column(
-                          children: [
-                            Image.asset('assets/images/logo.png', height: 90),
-                            const SizedBox(height: 8),
-                            Text(
-                              'CLARO',
-                              style: TextStyle(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                                letterSpacing: 3,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-                      Text(
-                        'Welcome!',
-                        style: TextStyle(
-                            fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.primary),
-                      ),
-                      Text(
-                        'Sign up to start',
-                        style: TextStyle(fontSize: 13, color: colorScheme.primary),
-                      ),
-                      const SizedBox(height: 24),
-
-                      if (_formError != null) ...[
-                        _buildFormErrorBanner(context, _formError!),
-                        const SizedBox(height: 14),
-                      ],
-
-                      _buildTextField(
-                        context,
-                        controller: _emailController,
-                        focusNode: _emailFocus,
-                        hint: 'Email',
-                        icon: Icons.email_outlined,
-                        errorText: _emailError,
-                        keyboardType: TextInputType.emailAddress,
-                        inputFormatters: [_SanitizingTextInputFormatter()],
-                        textInputAction: TextInputAction.next,
-                      ),
-                      const SizedBox(height: 14),
-                      _buildTextField(
-                        context,
-                        controller: _passwordController,
-                        focusNode: _passwordFocus,
-                        hint: 'Password',
-                        icon: Icons.lock_outline,
-                        obscure: !_showPassword,
-                        errorText: _passwordError,
-                        inputFormatters: [_SanitizingTextInputFormatter()],
-                        textInputAction: TextInputAction.next,
-                        suffix: IconButton(
-                          icon: Icon(
-                            _showPassword ? Icons.visibility : Icons.visibility_off,
-                            size: 20,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () =>
-                              setState(() => _showPassword = !_showPassword),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      _buildTextField(
-                        context,
-                        controller: _confirmPasswordController,
-                        focusNode: _confirmPasswordFocus,
-                        hint: 'Confirm Password',
-                        icon: Icons.lock_outline,
-                        obscure: !_showConfirmPassword,
-                        errorText: _confirmPasswordError,
-                        inputFormatters: [_SanitizingTextInputFormatter()],
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _handleSignUp(),
-                        suffix: IconButton(
-                          icon: Icon(
-                            _showConfirmPassword
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            size: 20,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () => setState(
-                                  () => _showConfirmPassword = !_showConfirmPassword),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
-                          ),
-                          onPressed: _isLoading ? null : _handleSignUp,
-                          child: _isLoading
-                              ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2),
-                          )
-                              : const Text(
-                            'Sign up',
-                            style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      _buildDivider(context),
-                      const SizedBox(height: 16),
-                      _buildGoogleButton(context),
-                      const SizedBox(height: 24),
-                      Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Text('Already have an account? ',
-                                style: TextStyle(fontSize: 13)),
-                            GestureDetector(
-                              onTap: () {
-                                HapticService().vibrate();
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => const LoginScreen()),
-                                );
-                              },
-                              child: Text(
-                                'Login',
-                                style: TextStyle(
-                                    fontSize: 13,
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.noScaling,
+              ),
+              child: Scaffold(
+                backgroundColor: colorScheme.surface,
+                body: SafeArea(
+                  child: RefreshIndicator(
+                    color: colorScheme.primary,
+                    onRefresh: _refreshForm,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Column(
+                              children: [
+                                Image.asset('assets/images/logo.png', height: 90),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'CLARO',
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
                                     color: colorScheme.primary,
+                                    letterSpacing: 3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          Text(
+                            'Welcome!',
+                            style: TextStyle(
+                                fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                          ),
+                          Text(
+                            'Sign up to start',
+                            style: TextStyle(fontSize: 13, color: colorScheme.primary),
+                          ),
+                          const SizedBox(height: 24),
+
+                          if (_formError != null) ...[
+                            _buildFormErrorBanner(context, _formError!),
+                            const SizedBox(height: 14),
+                          ],
+
+                          _buildTextField(
+                            context,
+                            controller: _emailController,
+                            focusNode: _emailFocus,
+                            hint: 'Email',
+                            icon: Icons.email_outlined,
+                            errorText: _emailError,
+                            keyboardType: TextInputType.emailAddress,
+                            inputFormatters: [_SanitizingTextInputFormatter()],
+                            textInputAction: TextInputAction.next,
+                          ),
+                          _buildRequirementsPanel(
+                            visible: _emailFocus.hasFocus,
+                            requirements: _emailRequirements,
+                            value: _cleanEmail,
+                          ),
+                          const SizedBox(height: 14),
+                          _buildTextField(
+                            context,
+                            controller: _passwordController,
+                            focusNode: _passwordFocus,
+                            hint: 'Password',
+                            icon: Icons.lock_outline,
+                            obscure: !_showPassword,
+                            errorText: _passwordError,
+                            inputFormatters: [_SanitizingTextInputFormatter()],
+                            textInputAction: TextInputAction.next,
+                            suffix: IconButton(
+                              icon: Icon(
+                                _showPassword ? Icons.visibility : Icons.visibility_off,
+                                size: 20,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () =>
+                                  setState(() => _showPassword = !_showPassword),
+                            ),
+                          ),
+                          _buildRequirementsPanel(
+                            visible: _passwordFocus.hasFocus,
+                            requirements: _passwordRequirements,
+                            value: _rawPassword,
+                          ),
+                          const SizedBox(height: 14),
+                          _buildTextField(
+                            context,
+                            controller: _confirmPasswordController,
+                            focusNode: _confirmPasswordFocus,
+                            hint: 'Confirm Password',
+                            icon: Icons.lock_outline,
+                            obscure: !_showConfirmPassword,
+                            errorText: _confirmPasswordError,
+                            inputFormatters: [_SanitizingTextInputFormatter()],
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _handleSignUp(),
+                            suffix: IconButton(
+                              icon: Icon(
+                                _showConfirmPassword
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
+                                size: 20,
+                                color: Colors.grey,
+                              ),
+                              onPressed: () => setState(
+                                      () => _showConfirmPassword = !_showConfirmPassword),
+                            ),
+                          ),
+                          _buildRequirementsPanel(
+                            visible: _confirmPasswordFocus.hasFocus,
+                            requirements: _confirmPasswordRequirements,
+                            value: _rawConfirmPassword,
+                          ),
+                          const SizedBox(height: 24),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: _isLoading ? null : _handleSignUp,
+                              child: _isLoading
+                                  ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                    color: Colors.white, strokeWidth: 2),
+                              )
+                                  : const Text(
+                                'Sign up',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white,
                                     fontWeight: FontWeight.bold),
                               ),
                             ),
-                          ],
-                        ),
+                          ),
+                          const SizedBox(height: 24),
+                          _buildDivider(context),
+                          const SizedBox(height: 16),
+                          _buildGoogleButton(context),
+                          const SizedBox(height: 24),
+                          Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('Already have an account? ',
+                                    style: TextStyle(fontSize: 13)),
+                                GestureDetector(
+                                  onTap: () {
+                                    HapticService().vibrate();
+                                    Navigator.pushReplacement(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (_) => const LoginScreen()),
+                                    );
+                                  },
+                                  child: Text(
+                                    'Login',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        }
+            );
+          }
       ),
     );
   }
@@ -457,20 +627,85 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
-  Widget _buildTextField(
-    BuildContext context, {
-    required TextEditingController controller,
-    required FocusNode focusNode,
-    required String hint,
-    required IconData icon,
-    bool obscure = false,
-    Widget? suffix,
-    String? errorText,
-    TextInputType? keyboardType,
-    List<TextInputFormatter>? inputFormatters,
-    TextInputAction? textInputAction,
-    ValueChanged<String>? onSubmitted,
+  /// Live requirements checklist shown beneath a field while it's
+  /// focused. Ticks items off in real time and collapses away once every
+  /// requirement is satisfied (or the field loses focus).
+  Widget _buildRequirementsPanel({
+    required bool visible,
+    required List<_Requirement> requirements,
+    required String value,
   }) {
+    final allMet = requirements.every((r) => r.isMet(value));
+    final show = visible && !allMet;
+
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      alignment: Alignment.topCenter,
+      child: !show
+          ? const SizedBox(width: double.infinity)
+          : Builder(
+        builder: (context) {
+          final colorScheme = Theme.of(context).colorScheme;
+          return Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: requirements.map((r) {
+                final met = r.isMet(value);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        met ? Icons.check_circle : Icons.radio_button_unchecked,
+                        size: 14,
+                        color: met ? Colors.green : colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          r.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: met ? Colors.green : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTextField(
+      BuildContext context, {
+        required TextEditingController controller,
+        required FocusNode focusNode,
+        required String hint,
+        required IconData icon,
+        bool obscure = false,
+        Widget? suffix,
+        String? errorText,
+        TextInputType? keyboardType,
+        List<TextInputFormatter>? inputFormatters,
+        TextInputAction? textInputAction,
+        ValueChanged<String>? onSubmitted,
+      }) {
     final colorScheme = Theme.of(context).colorScheme;
     return TextField(
       controller: controller,

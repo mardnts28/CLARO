@@ -29,13 +29,28 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // Force sign out on every app launch to satisfy the "re-login on exit" requirement.
-  // This also covers re-install and update naturally.
-  await AuthService().signOut();
-
   final prefs = await SharedPreferences.getInstance();
   final packageInfo = await PackageInfo.fromPlatform();
   final currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+  final lastRunVersion = prefs.getString('last_run_version');
+
+  // Only force a sign-out when this launch follows an app UPDATE
+  // (the recorded version/build differs from the current one). A
+  // normal relaunch -- closing and reopening the app with no update --
+  // must NOT sign the user out. Previously this ran unconditionally on
+  // every cold start, which meant any time Android killed the
+  // backgrounded process (common: low memory, long background time,
+  // aggressive OEM battery managers) the user would be dumped back to
+  // LoginScreen on reopen even though nothing about their session had
+  // actually changed.
+  //
+  // Reinstall doesn't need explicit handling here: uninstalling wipes
+  // this app's SharedPreferences AND Firebase Auth's local persistence
+  // together, so a fresh install already starts with lastRunVersion ==
+  // null and no logged-in user -- there's nothing to sign out of.
+  if (lastRunVersion != null && lastRunVersion != currentVersion) {
+    await AuthService().signOut();
+  }
   await prefs.setString('last_run_version', currentVersion);
 
   await initializeThemeMode();

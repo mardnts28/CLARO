@@ -643,14 +643,14 @@ class AppLocalizationsTl extends AppLocalizations {
   String get scoreEnvironment => 'Kalikasan';
 
   @override
-  String get scoreEnvironmentDesc => 'Moderate environmental impact.';
+  String get scoreEnvironmentDesc => 'Katamtamang epekto sa kalikasan.';
 
   @override
   String get scoreProcess => 'Proseso';
 
   @override
   String get scoreProcessDesc =>
-      'Processed food with relatively simple ingredients.';
+      'Naprosesong pagkain na may medyo simpleng sangkap.';
 
   @override
   String get compareButton => 'Ihambing';

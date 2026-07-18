@@ -3,6 +3,21 @@ import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import 'home_screen.dart';
 
+/// NOTE ON LANGUAGE: this screen intentionally hardcodes every string in
+/// English rather than calling AppLocalizations.of(context) -- it must
+/// NOT follow the app-wide language toggle (Settings > Language), the
+/// same way LoginScreen and SignupScreen are hardcoded.
+///
+/// IMPORTANT: the keys in _conditions / _allergens (e.g. 'Diabetes',
+/// 'Alta-presyon', 'Isda') are NOT just UI labels -- they are the exact
+/// values written to Firestore in saveOnboardingData() and read back by
+/// the backend's health-advisory pipeline (see
+/// firestore_label_mappings.dart, referenced from product_detail_screen
+/// .dart). Renaming these keys would silently break condition/allergen
+/// matching for any user who already completed onboarding under the old
+/// keys. So those internal keys are left untouched; only the on-screen
+/// text was translated, via the *DisplayEn maps below, which are purely
+/// cosmetic and never written anywhere.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -21,6 +36,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   static const _red = Color(0xFF8B1A1A);
   static const _lightRed = Color(0xFFFDF0F0);
 
+  // Internal storage keys -- DO NOT translate these, see class doc above.
   final Map<String, bool> _conditions = {
     'Diabetes': false,
     'Alta-presyon': false,
@@ -57,6 +73,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Mani': 'assets/images/mani.png',
   };
 
+  // Cosmetic-only English display labels for the internal keys above.
+  // These are what actually render on screen; the keys themselves keep
+  // going to Firestore unchanged.
+  final Map<String, String> _conditionDisplayEn = {
+    'Diabetes': 'Diabetes',
+    'Alta-presyon': 'Hypertension',
+    'Sakit sa puso': 'Heart Condition',
+    'Mababang Paningin': 'Low Vision',
+    'Wala': 'None',
+  };
+
+  final Map<String, String> _allergenDisplayEn = {
+    'Isda': 'Fish',
+    'Gatas': 'Milk',
+    'Itlog': 'Egg',
+    'Soya': 'Soy',
+    'Trigo': 'Wheat',
+    'Lamang-Dagat': 'Shellfish',
+    'Mani': 'Peanut',
+  };
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -76,7 +113,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // Validate name
       if (_nameController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pakisulat ang iyong pangalan')),
+          const SnackBar(content: Text('Please enter your name.')),
         );
         return;
       }
@@ -84,7 +121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // Validate age
       if (_ageController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Pakisulat ang iyong edad')),
+          const SnackBar(content: Text('Please enter your age.')),
         );
         return;
       }
@@ -203,7 +240,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _buildLogo(theme),
           const SizedBox(height: 32),
           Text(
-            'Pakilagay ang iyong impormasyon upang magamit ang app',
+            'Please enter your information to use the app',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 16, color: colorScheme.onSurface, fontWeight: FontWeight.w500),
           ),
@@ -212,7 +249,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             controller: _nameController,
             style: TextStyle(color: colorScheme.onSurface),
             decoration: InputDecoration(
-              hintText: 'Pangalan',
+              hintText: 'Name',
               hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
               enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
               focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
@@ -224,14 +261,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             keyboardType: TextInputType.number,
             style: TextStyle(color: colorScheme.onSurface),
             decoration: InputDecoration(
-              hintText: 'Edad',
+              hintText: 'Age',
               hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
               enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
               focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
             ),
           ),
           const Spacer(),
-          _buildButton('Sunod', _nextPage, theme),
+          _buildButton('Next', _nextPage, theme),
         ],
       ),
     );
@@ -247,7 +284,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _buildLogo(theme),
           const SizedBox(height: 20),
           Text(
-            'Malinaw. Lokal. Maaasahan.',
+            'Clear. Local. Trusted.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 18,
@@ -257,7 +294,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Ang iyong AI na katulong\npara sa mas malusog na pamimili.',
+            'Your AI helper for healthier shopping.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: colorScheme.onSurface, height: 1.5),
           ),
@@ -270,14 +307,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             mainAxisSpacing: 16,
             childAspectRatio: 1.4,
             children: [
-              _buildFeatureCard('assets/images/scan.png', 'I-scan ang Produkto', theme),
-              _buildFeatureCard('assets/images/nutrisyon.png', 'Nutrisyon ng Produkto', theme),
-              _buildFeatureCard('assets/images/gabay.png', 'Gabay sa Kalusugan', theme),
-              _buildFeatureCard('assets/images/compare.png', 'Paghahambing ng Produkto', theme),
+              _buildFeatureCard('assets/images/scan.png', 'Scan Product', theme),
+              _buildFeatureCard('assets/images/nutrisyon.png', 'Product Nutrition', theme),
+              _buildFeatureCard('assets/images/gabay.png', 'Health Guidance', theme),
+              _buildFeatureCard('assets/images/compare.png', 'Product Comparison', theme),
             ],
           ),
           const Spacer(),
-          _buildButton('Magsimula', _nextPage, theme),
+          _buildButton('Get Started', _nextPage, theme),
         ],
       ),
     );
@@ -293,16 +330,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _buildLogo(theme),
           const SizedBox(height: 12),
           Text(
-            'Sagutan ang mga sumusunod para sa mas ligtas at mas angkop na rekomendasyon para sa iyo',
+            'Answer the following for safer and more personalized recommendations for you',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: colorScheme.onSurface, height: 1.5),
           ),
           const SizedBox(height: 20),
           _buildSelectionCard(
             icon: Icons.favorite_border,
-            title: 'May kondisyon ka ba sa kalusugan?',
-            subtitle: 'Pumili ng lahat ng naaangkop sa iyo',
-            note: 'Maaari mo itong baguhin sa iyong profile settings.',
+            title: 'Do you have any health conditions?',
+            subtitle: 'Choose all that apply to you',
+            note: 'You can change this later in your profile settings.',
             noteIcon: Icons.info_outline,
             child: _buildConditionsGrid(theme),
           ),
@@ -310,8 +347,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _buildSelectionCard(
             icon: Icons.warning_amber_rounded,
             iconColor: const Color(0xFFB45309),
-            title: 'May mga allergen ba na dapat iwasan?',
-            subtitle: 'Pumili ng lahat ng naaangkop sa iyo',
+            title: 'Are there any allergens you should avoid?',
+            subtitle: 'Choose all that apply to you',
             child: _buildAllergensGrid(theme),
           ),
           const SizedBox(height: 16),
@@ -332,12 +369,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Prayoridad namin ang iyong kaligtasan',
+                        'We prioritize your safety',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.primary),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Gagamitin namin ang impormasyong ito upang magbigay ng health insights at mas ligtas na mga rekomendasyon.',
+                        'We will use this information to provide health insights and safer recommendations.',
                         style: TextStyle(fontSize: 12, color: colorScheme.onSurface, height: 1.4),
                       ),
                     ],
@@ -347,7 +384,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildButton('Magsimula', _nextPage, theme),
+          _buildButton('Get Started', _nextPage, theme),
           const SizedBox(height: 12),
           Center(
             child: Text(
@@ -378,7 +415,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return GestureDetector(
           onTap: () => _toggleCondition(key),
           child: _buildToggleItem(
-            label: key,
+            label: _conditionDisplayEn[key] ?? key,
             selected: selected,
             isWala: isWala,
             imagePath: isWala ? null : _conditionIcons[key],
@@ -403,7 +440,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return GestureDetector(
           onTap: () => _toggleAllergen(key),
           child: _buildToggleItem(
-            label: key,
+            label: _allergenDisplayEn[key] ?? key,
             selected: selected,
             imagePath: _allergenIcons[key],
             theme: theme,

@@ -241,9 +241,9 @@
   "scoreNutrition": "Nutrisyon",
   "scoreNutritionDesc": "Magandang pinagkukunan ng protina ngunit mas mataas sa taba at calories.",
   "scoreEnvironment": "Kalikasan",
-  "scoreEnvironmentDesc": "Moderate environmental impact.",
+  "scoreEnvironmentDesc": "Katamtamang epekto sa kalikasan.",
   "scoreProcess": "Proseso",
-  "scoreProcessDesc": "Processed food with relatively simple ingredients.",
+  "scoreProcessDesc": "Naprosesong pagkain na may medyo simpleng sangkap.",
   "compareButton": "Ihambing",
 
   "similarProductsTitle": "Pagraranggo ng Produkto",
