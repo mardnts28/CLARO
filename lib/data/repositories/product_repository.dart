@@ -32,11 +32,13 @@ abstract class ProductRepository {
 // Reads directly from the `fda_products` collection. Wired up as
 // BackendLocator.productRepository as of Phase 3.
 //
-// Deliberately leaves imageUrl / allergens / ingredients /
-// servingInstructions / nutritionalFacts at their defaults for now -- those
-// get filled in during Phase 4 (Open Food Facts), Phase 5 (fallback
-// collection), and Phase 6 (Cloudinary). Every product returned from here is
-// "thin" until then.
+// imageUrl is read directly from the fda_products document's `imageURL`
+// field (a Cloudinary URL) -- Firestore stays the single source of truth for
+// product data, Cloudinary is only ever an image host. Every other field
+// below (allergens / ingredients / servingInstructions / nutritionalFacts)
+// still deliberately left at defaults for now -- those get filled in during
+// Phase 4 (Open Food Facts) and Phase 5 (fallback collection). Every product
+// returned from here is "thin" on those fields until then.
 class FirestoreProductRepository implements ProductRepository {
   FirestoreProductRepository({FirebaseFirestore? firestore})
       : _db = firestore ?? FirebaseFirestore.instance;
@@ -84,7 +86,7 @@ class FirestoreProductRepository implements ProductRepository {
   }
 
   Product _productFromDoc(String docId, Map<String, dynamic> data) {
-    final isRegistered = _parseRegistrationStatus(data['registration_status']);
+    final isRegistered = data['registration_status'] as bool? ?? false;
     final validUntil = (data['validity_date'] as Timestamp?)?.toDate();
     final cprNumber = data['cpr_number'] as String? ?? '';
 
@@ -100,7 +102,7 @@ class FirestoreProductRepository implements ProductRepository {
       fdaRegistrationNumber: cprNumber,
       cprNumber: cprNumber,
       fdaValidityDate: validUntil != null ? _formatIsoDate(validUntil) : '',
-      imageUrl: '',
+      imageUrl: data['imageURL'] as String? ?? '',
       allergens: const [],
       ingredients: const [],
       servingInstructions: '',
@@ -118,15 +120,6 @@ class FirestoreProductRepository implements ProductRepository {
       return 'EXPIRED';
     }
     return 'ACTIVE';
-  }
-
-  bool _parseRegistrationStatus(dynamic raw) {
-    if (raw is bool) return raw;
-    if (raw is String) {
-      final s = raw.toLowerCase().trim();
-      return s == 'verified' || s == 'active' || s == 'registered' || s == 'true';
-    }
-    return false;
   }
 
   // "canned_fish" -> "Canned Fish"
