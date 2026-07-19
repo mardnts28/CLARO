@@ -16,6 +16,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../models/product_model.dart';
+import '../../services/nutrition_service.dart';
 
 abstract class ProductRepository {
   Future<Product> getProductById(String id);
@@ -34,11 +35,16 @@ abstract class ProductRepository {
 //
 // imageUrl is read directly from the fda_products document's `imageURL`
 // field (a Cloudinary URL) -- Firestore stays the single source of truth for
-// product data, Cloudinary is only ever an image host. Every other field
-// below (allergens / ingredients / servingInstructions / nutritionalFacts)
-// still deliberately left at defaults for now -- those get filled in during
-// Phase 4 (Open Food Facts) and Phase 5 (fallback collection). Every product
-// returned from here is "thin" on those fields until then.
+// product data, Cloudinary is only ever an image host.
+//
+// allergens / ingredients / nutritionalFacts aren't stored in fda_products
+// at all -- they're filled in by NutritionService, which looks them up on
+// Open Food Facts and caches the result in Firestore (`nutrition_cache`),
+// keyed by this repository's document id, so OFF only gets called once ever
+// per product. Every getProductById / getAllProducts call below goes
+// through that enrichment step, so every screen sees the same data.
+// servingInstructions has no source yet (Phase 5 fallback collection) and
+// stays at its default.
 class FirestoreProductRepository implements ProductRepository {
   FirestoreProductRepository({FirebaseFirestore? firestore})
       : _db = firestore ?? FirebaseFirestore.instance;
@@ -57,15 +63,20 @@ class FirestoreProductRepository implements ProductRepository {
     if (!doc.exists) {
       throw Exception('Product not found: $id');
     }
-    return _productFromDoc(doc.id, doc.data()!);
+    final base = _productFromDoc(doc.id, doc.data()!);
+    return NutritionService().enrichProduct(base);
   }
 
   @override
   Future<List<Product>> getAllProducts() async {
     final snapshot = await _db.collection(_collection).get();
-    return snapshot.docs
+    final base = snapshot.docs
         .map((doc) => _productFromDoc(doc.id, doc.data()))
         .toList();
+    // Enriched in parallel -- each lookup is either a single cheap Firestore
+    // doc read (cache hit) or a one-time Open Food Facts call (cache miss),
+    // so this stays fast even for a full-catalog fetch.
+    return Future.wait(base.map((p) => NutritionService().enrichProduct(p)));
   }
 
   @override

@@ -36,6 +36,46 @@ class Product {
     this.servingInstructions = '',
     required this.nutritionalFacts,
   });
+
+  /// Returns a copy with the given fields replaced. Used to merge data from
+  /// a secondary source (e.g. Open Food Facts nutrition enrichment) onto a
+  /// product that already carries FDA-sourced fields (id, imageUrl,
+  /// fdaStatus, cprNumber, etc.) without discarding those fields.
+  Product copyWith({
+    String? id,
+    String? name,
+    String? brand,
+    String? variant,
+    String? category,
+    String? imageUrl,
+    String? fdaStatus,
+    String? fdaRegistrationNumber,
+    String? fdaValidityDate,
+    String? fdaManufacturer,
+    String? cprNumber,
+    List<String>? allergens,
+    List<String>? ingredients,
+    String? servingInstructions,
+    NutritionalFacts? nutritionalFacts,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      brand: brand ?? this.brand,
+      variant: variant ?? this.variant,
+      category: category ?? this.category,
+      imageUrl: imageUrl ?? this.imageUrl,
+      fdaStatus: fdaStatus ?? this.fdaStatus,
+      fdaRegistrationNumber: fdaRegistrationNumber ?? this.fdaRegistrationNumber,
+      fdaValidityDate: fdaValidityDate ?? this.fdaValidityDate,
+      fdaManufacturer: fdaManufacturer ?? this.fdaManufacturer,
+      cprNumber: cprNumber ?? this.cprNumber,
+      allergens: allergens ?? this.allergens,
+      ingredients: ingredients ?? this.ingredients,
+      servingInstructions: servingInstructions ?? this.servingInstructions,
+      nutritionalFacts: nutritionalFacts ?? this.nutritionalFacts,
+    );
+  }
 }
 
 class NutritionalFacts {
@@ -55,6 +95,13 @@ class NutritionalFacts {
   final double fiberG;
   final double sugarsG;
   final double addedSugarsG;
+
+  /// True once real nutrition data has been found for this product (from
+  /// Open Food Facts, live or cached). False means the numeric fields above
+  /// are just unset defaults (0), not a confirmed "this product has 0g of
+  /// everything" -- the UI should show an "unavailable" state rather than
+  /// the zero values in that case.
+  final bool hasNutritionData;
 
   // Computed getters for UI rendering (retains compatibility with old fields)
   String get calories => '${caloriesKcal.toStringAsFixed(0)} kcal';
@@ -97,6 +144,7 @@ class NutritionalFacts {
     String? dietaryFiber,
     String? sugars,
     String? protein,
+    this.hasNutritionData = false,
   })  : caloriesKcal = caloriesKcal ?? (calories != null ? double.tryParse(calories.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),
         proteinG = proteinG ?? (protein != null ? double.tryParse(protein.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),
         carbsG = carbsG ?? (totalCarbohydrate != null ? double.tryParse(totalCarbohydrate.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),

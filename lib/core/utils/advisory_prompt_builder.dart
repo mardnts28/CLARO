@@ -49,9 +49,13 @@ class AdvisoryPromptBuilder {
 
     String factsBlock;
     if (allergen.hasDirectAllergen) {
+      final allergenLabels = allergen.matchedContains.map(_allergenLabel).join(', ');
+      final ingredientList = allergen.matchedIngredients.isNotEmpty
+          ? allergen.matchedIngredients.join(', ')
+          : allergenLabels;
       factsBlock =
-          'This product CONTAINS an allergen the user is allergic to: '
-          '${allergen.matchedContains.map(_allergenLabel).join(', ')}.';
+          'This product CONTAINS an allergen the user is allergic to: $allergenLabels. '
+          'Specific matching ingredients: $ingredientList.';
     } else if (worst == null) {
       factsBlock =
           'All evaluated nutrients are within the suitable range for this user\'s condition(s).';

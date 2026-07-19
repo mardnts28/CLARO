@@ -590,6 +590,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get totalNutritionTitle => 'Total Nutrition';
 
   @override
+  String get nutritionDataUnavailable =>
+      'Open Food Facts nutrient data unavailable';
+
+  @override
   String get nutriCalories => 'Calories';
 
   @override

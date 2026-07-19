@@ -388,10 +388,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                               ),
                             )
-                          : (product != null
-                              ? Image.asset(
+                          : (product != null && product.imageUrl.isNotEmpty
+                              ? Image.network(
                                   product.imageUrl,
                                   fit: BoxFit.cover,
+                                  loadingBuilder: (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return Center(
+                                      child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: colorScheme.primary,
+                                        ),
+                                      ),
+                                    );
+                                  },
                                   errorBuilder: (_, __, ___) => Icon(
                                       Icons.inventory_2_outlined,
                                       color: colorScheme.primary,

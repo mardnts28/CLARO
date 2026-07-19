@@ -37,10 +37,12 @@ class NutrientEvaluation {
 class AllergenAssessment {
   final List<AllergenType> matchedContains; // definite match -> forced last
   final bool hasDirectAllergen;
+  final List<String> matchedIngredients; // specific ingredient strings that matched
 
   const AllergenAssessment({
     required this.matchedContains,
     required this.hasDirectAllergen,
+    this.matchedIngredients = const [],
   });
 }
 

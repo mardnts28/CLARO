@@ -55,14 +55,64 @@ class WhoCalculator {
   }
 
   static AllergenAssessment assessAllergens(Product product, UserHealthProfile user) {
+    // Check explicit allergens list
     final matchedContains = product.containsAllergens
         .where((a) => user.allergies.contains(a))
         .toList();
 
+    // Check ingredients for allergen-derived components (case-insensitive partial match)
+    final matchedIngredients = <AllergenType>[];
+    final matchedIngredientStrings = <String>[];
+    for (final allergy in user.allergies) {
+      final allergyKeywords = _getAllergenKeywords(allergy);
+      for (final ingredient in product.ingredients) {
+        final ingredientLower = ingredient.toLowerCase();
+        for (final keyword in allergyKeywords) {
+          if (ingredientLower.contains(keyword)) {
+            if (!matchedIngredients.contains(allergy)) {
+              matchedIngredients.add(allergy);
+            }
+            if (!matchedIngredientStrings.contains(ingredient)) {
+              matchedIngredientStrings.add(ingredient);
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    // Combine both sources of allergen matches
+    final allMatches = {...matchedContains, ...matchedIngredients}.toList();
+
     return AllergenAssessment(
-      matchedContains: matchedContains,
-      hasDirectAllergen: matchedContains.isNotEmpty,
+      matchedContains: allMatches,
+      hasDirectAllergen: allMatches.isNotEmpty,
+      matchedIngredients: matchedIngredientStrings,
     );
+  }
+
+  /// Returns case-insensitive keywords for each allergen type to match against ingredients
+  static List<String> _getAllergenKeywords(AllergenType allergen) {
+    switch (allergen) {
+      case AllergenType.shellfish:
+        return ['shellfish', 'shrimp', 'crab', 'lobster', 'crustacean', 'lamang dagat', 'lamang-dagat'];
+      case AllergenType.fish:
+        return ['fish', 'isda', 'anchovy', 'tuna', 'salmon', 'cod'];
+      case AllergenType.peanuts:
+        return ['peanut', 'mani', 'groundnut', 'arachis'];
+      case AllergenType.treeNuts:
+        return ['nut', 'almond', 'walnut', 'cashew', 'pecan', 'hazelnut', 'pistachio', 'macadamia'];
+      case AllergenType.soy:
+        return ['soy', 'soya', 'soybean', 'tofu', 'tempeh'];
+      case AllergenType.dairy:
+        return ['milk', 'dairy', 'cream', 'cheese', 'yogurt', 'butter', 'gatas', 'lactose', 'casein', 'whey'];
+      case AllergenType.eggs:
+        return ['egg', 'itlog', 'albumin', 'ovalbumin'];
+      case AllergenType.wheatGluten:
+        return ['wheat', 'gluten', 'trigo', 'flour', 'barley', 'rye'];
+      case AllergenType.msg:
+        return ['msg', 'monosodium glutamate', 'yeast extract', 'hydrolyzed'];
+    }
   }
 
   static ProductEvaluation evaluateProduct(Product product, UserHealthProfile user) {

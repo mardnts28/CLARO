@@ -597,6 +597,10 @@ class AppLocalizationsTl extends AppLocalizations {
   String get totalNutritionTitle => 'Kabuuang Nutrisyon';
 
   @override
+  String get nutritionDataUnavailable =>
+      'Hindi available ang datos ng nutrisyon (Open Food Facts)';
+
+  @override
   String get nutriCalories => 'Calories';
 
   @override

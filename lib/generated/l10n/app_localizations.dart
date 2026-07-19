@@ -1196,6 +1196,12 @@ abstract class AppLocalizations {
   /// **'Total Nutrition'**
   String get totalNutritionTitle;
 
+  /// No description provided for @nutritionDataUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Food Facts nutrient data unavailable'**
+  String get nutritionDataUnavailable;
+
   /// No description provided for @nutriCalories.
   ///
   /// In en, this message translates to:

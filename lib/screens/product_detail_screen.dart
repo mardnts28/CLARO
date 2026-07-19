@@ -15,6 +15,7 @@ import '../data/models/comparison_matrix.dart';
 import '../core/constants/who_fda_thresholds.dart';
 import '../core/utils/rank_label_helper.dart';
 import '../core/utils/who_calculator.dart';
+import '../core/utils/nutrition_availability.dart';
 import '../data/services/backend_locator.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -48,6 +49,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // Backend-derived health advisory state (WhoCalculator + GeminiAdvisoryService,
   // via ProductRankingService.getProductDetail -- see backend_locator.dart).
   bool _advisoryLoading = true;
+  bool _nutritionUnavailable = false;
   ProductEvaluation? _evaluation;
   HealthAdvisory? _advisory;
   ComparisonMatrix? _comparisonMatrix;
@@ -82,6 +84,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _currentComparisonSet = newComparisonSet;
       _scanEventId = '${newProduct.id}_${DateTime.now().millisecondsSinceEpoch}';
       _advisoryLoading = true;
+      _nutritionUnavailable = false;
       _evaluation = null;
       _advisory = null;
       _comparisonMatrix = null;
@@ -181,6 +184,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final uid = _authService.currentUser?.uid;
       if (uid == null) {
         if (mounted) setState(() => _advisoryLoading = false);
+        return;
+      }
+
+      // WhoCalculator/GeminiAdvisoryService/ProductRankingService assume
+      // real nutrition data for every product involved -- a product with no
+      // real data (all-zero defaults) would otherwise silently score as
+      // "Suitable" and skew ranking/comparison for every product alongside
+      // it. Detect that up front and skip the whole pipeline rather than
+      // feed it bad data; none of those services themselves are touched.
+      final productsInvolved = _currentComparisonSet != null && _currentComparisonSet!.length > 1
+          ? _currentComparisonSet!.map((r) => r.evaluation.product)
+          : [_currentProduct];
+      if (!NutritionAvailability.allAvailable(productsInvolved)) {
+        if (mounted) {
+          setState(() {
+            _nutritionUnavailable = true;
+            _advisoryLoading = false;
+          });
+        }
         return;
       }
 
@@ -492,6 +514,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         const SizedBox(height: 20),
 
+                        if (!p.nutritionalFacts.hasNutritionData)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(Icons.info_outline,
+                                    size: 18, color: colorScheme.onSurfaceVariant),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    loc.nutritionDataUnavailable,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else ...[
                         // Nutrient rows
                         ...(() {
                           final evals = <DisplayNutrientEval>[
@@ -709,6 +753,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ],
                         ),
+                        ],
                       ],
                     ),
                   ),
@@ -768,6 +813,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                         ),
                         const SizedBox(height: 14),
+                        if (!p.nutritionalFacts.hasNutritionData)
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  size: 18, color: colorScheme.onSurfaceVariant),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  loc.nutritionDataUnavailable,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        else ...[
                         Row(
                           children: [
                             _nutriCard(context, loc.nutriCalories, p.nutritionalFacts.calories),
@@ -806,6 +869,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             Expanded(child: const SizedBox()),
                           ],
                         ),
+                        ],
                       ],
                     ),
                   ),
@@ -932,6 +996,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: const SizedBox(
           height: 20,
           child: LinearProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_nutritionUnavailable) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: colorScheme.outline.withOpacity(0.4)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline, color: colorScheme.onSurfaceVariant, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                loc.nutritionDataUnavailable,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ],
         ),
       );
     }

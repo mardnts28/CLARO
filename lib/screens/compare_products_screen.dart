@@ -9,6 +9,7 @@ import '../widgets/voice_assistant_fab.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/services/backend_locator.dart';
 import '../core/utils/rank_label_helper.dart';
+import '../core/utils/nutrition_availability.dart';
 import '../data/models/health_profile.dart';
 import 'product_detail_screen.dart';
 
@@ -37,6 +38,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   final HistoryService _historyService = HistoryService();
 
   bool _loading = true;
+  bool _nutritionUnavailable = false;
   String? _error;
 
   // Full ranked comparison set (scanned product + alternatives in the same
@@ -83,6 +85,22 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
       }
 
       final profile = await BackendLocator.userRepository.getHealthProfile(uid);
+
+      // ProductComparisonService (WhoCalculator under the hood) scores this
+      // product against alternatives -- if it has no real nutrition data
+      // (all-zero defaults), that comparison is meaningless. Detect that up
+      // front rather than run a comparison that would misrepresent it.
+      // ProductComparisonService / WhoCalculator themselves are untouched.
+      if (!NutritionAvailability.isAvailable(widget.sourceProduct)) {
+        if (mounted) {
+          setState(() {
+            _nutritionUnavailable = true;
+            _loading = false;
+          });
+        }
+        return;
+      }
+
       final ranked = await BackendLocator.productComparisonService.compareWithAlternatives(
         scannedProduct: widget.sourceProduct,
         user: profile,
@@ -426,7 +444,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
           const SizedBox(height: 6),
 
           // ── Ranked-by-suitability label ───────────────────────────
-          if (!_loading && _error == null)
+          if (!_loading && _error == null && !_nutritionUnavailable)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
               child: Text(
@@ -445,7 +463,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : _filtered.isEmpty
+                : _nutritionUnavailable
+                    ? _buildNutritionUnavailable()
+                    : _filtered.isEmpty
                     ? _buildEmpty()
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -490,6 +510,29 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
 
       // ── Floating mic button (matching design) ─────────────────────
       floatingActionButton: const VoiceAssistantFab(),
+    );
+  }
+
+  Widget _buildNutritionUnavailable() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.info_outline,
+                size: 48, color: colorScheme.onSurfaceVariant.withOpacity(0.6)),
+            const SizedBox(height: 16),
+            Text(
+              loc.nutritionDataUnavailable,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(fontSize: 14, color: colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

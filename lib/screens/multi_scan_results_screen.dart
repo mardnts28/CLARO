@@ -9,6 +9,7 @@ import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/models/health_profile.dart';
+import '../core/utils/nutrition_availability.dart';
 import '../data/services/backend_locator.dart';
 
 class MultiScanResultsScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   final _authService = AuthService();
 
   bool _loading = true;
+  bool _nutritionUnavailable = false;
   List<RankedProductResult> _ranked = [];
 
   @override
@@ -38,6 +40,22 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   // only happens per-product once the user taps into a detail screen.
   Future<void> _rankProducts() async {
     try {
+      // WhoCalculator.rankProducts scores/sorts this whole list relative to
+      // each other -- a product with no real nutrition data (all-zero
+      // defaults) would silently rank as "healthiest" and skew every other
+      // product's comparison too. Detect that up front and skip ranking
+      // entirely rather than feed it bad data; WhoCalculator/
+      // ProductRankingService themselves are untouched.
+      if (!NutritionAvailability.allAvailable(widget.detectedProducts)) {
+        if (mounted) {
+          setState(() {
+            _nutritionUnavailable = true;
+            _loading = false;
+          });
+        }
+        return;
+      }
+
       final uid = _authService.currentUser?.uid;
       // No conditions/allergies on record (e.g. not logged in) still
       // ranks meaningfully -- WhoCalculator falls back to general
@@ -131,7 +149,29 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
-                : ListView.separated(
+                : _nutritionUnavailable
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.info_outline,
+                                  size: 40, color: colorScheme.onSurfaceVariant),
+                              const SizedBox(height: 12),
+                              Text(
+                                loc.nutritionDataUnavailable,
+                                textAlign: TextAlign.center,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
                     itemCount: _ranked.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),

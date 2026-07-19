@@ -27,14 +27,22 @@ class FallbackAdvisoryGenerator {
     final isTagalog = languageCode == 'tl';
 
     if (allergen.hasDirectAllergen) {
+      // Build detailed explanation with specific matching ingredients
+      final allergenLabels = allergen.matchedContains.map(_allergenLabel).join(', ');
+      final ingredientList = allergen.matchedIngredients.isNotEmpty
+          ? allergen.matchedIngredients.join(', ')
+          : allergenLabels;
+
+      final explanation = isTagalog
+          ? 'Ang produktong ito ay naglalaman ng $ingredientList, na tumutugma sa iyong naitalang food allergy ($allergenLabels). Inirerekomenda naming kumain nang maingat o iwasan ang produktong ito.'
+          : 'This product contains $ingredientList, which match your recorded food allergy ($allergenLabels). Consume with caution or avoid this product.';
+
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.caution,
         warningText: isTagalog
             ? 'Naglalaman ng allergen na iyong tinukoy'
             : 'Contains an allergen you flagged',
-        explanation: isTagalog
-            ? 'Ang produktong ito ay naglalaman ng sangkap na tumutugma sa allergy sa iyong profile. Inirerekomenda naming iwasan ang produktong ito.'
-            : 'This product contains an ingredient matching an allergy on your profile. We recommend avoiding this product.',
+        explanation: explanation,
         safeServingSize: null,
         source: AdvisorySource.fallbackRuleBased,
         generatedAt: DateTime.now(),
@@ -145,6 +153,29 @@ class FallbackAdvisoryGenerator {
         return 'diabetes';
       case HealthCondition.heartCondition:
         return isTagalog ? 'kondisyon sa puso' : 'heart condition';
+    }
+  }
+
+  static String _allergenLabel(AllergenType a) {
+    switch (a) {
+      case AllergenType.shellfish:
+        return 'shellfish';
+      case AllergenType.fish:
+        return 'fish';
+      case AllergenType.peanuts:
+        return 'peanuts';
+      case AllergenType.treeNuts:
+        return 'tree nuts';
+      case AllergenType.soy:
+        return 'soy';
+      case AllergenType.dairy:
+        return 'dairy/milk';
+      case AllergenType.eggs:
+        return 'eggs';
+      case AllergenType.wheatGluten:
+        return 'wheat/gluten';
+      case AllergenType.msg:
+        return 'MSG';
     }
   }
 

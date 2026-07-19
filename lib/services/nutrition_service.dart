@@ -2,8 +2,16 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
-import '../data/services/backend_locator.dart';
 
+/// Fills in nutrition data (nutritionalFacts, allergens, ingredients) that
+/// `fda_products` doesn't carry, by looking it up on Open Food Facts and
+/// caching the result in Firestore -- so OFF only ever gets called once per
+/// product, not on every scan/view.
+///
+/// This is called from FirestoreProductRepository, so every screen that
+/// fetches a Product (detail, favorites, history, compare, ranking, scan)
+/// gets nutrition-enriched products consistently, without each screen having
+/// to remember to call this itself.
 class NutritionService {
   static final NutritionService _instance = NutritionService._internal();
   factory NutritionService() => _instance;
@@ -11,62 +19,67 @@ class NutritionService {
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _cacheCollection = 'nutrition_cache';
-  static const Duration _cacheDuration = Duration(hours: 24);
+
+  // Packaged-food nutrition facts don't change day to day, so a positive
+  // cache hit (found: true) is treated as good indefinitely -- no TTL, no
+  // repeat API calls for a product OFF already answered for. A "not found"
+  // result gets a much shorter recheck window, since OFF's catalog grows
+  // over time and a product missing today may exist there later.
+  static const Duration _notFoundRecheckDuration = Duration(days: 30);
 
   // ─── Main entry point ──────────────────────────────────────────────────
-  /// Returns a Product for the given product name.
-  /// 1. Check Firestore cache (24hr)
-  /// 2. Query Open Food Facts API
-  /// 3. Fall back to the local fda_products catalog (via BackendLocator.productRepository)
-  Future<Product?> getProductByName(String productName) async {
-    final normalizedName = productName.trim().toLowerCase();
+  /// Returns [product] with nutritionalFacts/allergens/ingredients filled in
+  /// from cache or Open Food Facts, merged onto the FDA-sourced fields
+  /// already on [product] (id, imageUrl, fdaStatus, cprNumber, category,
+  /// etc. are always preserved). If nothing is found, returns [product]
+  /// unchanged -- nutrition fields simply stay at their zero/empty defaults.
+  /// Never throws: enrichment failures shouldn't break a product fetch.
+  Future<Product> enrichProduct(Product product) async {
+    if (product.name.isEmpty) return product;
 
-    // Step 1: Check Firestore cache
-    final cached = await _getFromCache(normalizedName);
-    if (cached != null) return cached;
+    final docRef = _db.collection(_cacheCollection).doc(product.id);
 
-    // Step 2: Try Open Food Facts
-    final fromApi = await _fetchFromOpenFoodFacts(productName);
-    if (fromApi != null) {
-      await _saveToCache(normalizedName, fromApi);
-      return fromApi;
-    }
-
-    // Step 3: Fallback to the local fda_products catalog
-    return await _getFromLocalDb(productName);
-  }
-
-  // ─── Step 1: Firestore cache ────────────────────────────────────────────
-  Future<Product?> _getFromCache(String normalizedName) async {
     try {
-      final query = await _db
-          .collection(_cacheCollection)
-          .where('product_name', isEqualTo: normalizedName)
-          .limit(1)
-          .get();
-
-      if (query.docs.isEmpty) return null;
-
-      final doc = query.docs.first.data();
-      final cachedAt = (doc['cached_at'] as Timestamp?)?.toDate();
-      if (cachedAt == null ||
-          DateTime.now().difference(cachedAt) > _cacheDuration) {
-        // Cache expired — delete it
-        await query.docs.first.reference.delete();
-        return null;
+      final cached = await docRef.get();
+      if (cached.exists) {
+        final data = cached.data()!;
+        if (data['found'] == true) {
+          return _mergeCacheDoc(product, data);
+        }
+        // found == false: only skip the API call if the negative result is
+        // still within its recheck window.
+        final cachedAt = (data['cached_at'] as Timestamp?)?.toDate();
+        final stillFresh = cachedAt != null &&
+            DateTime.now().difference(cachedAt) < _notFoundRecheckDuration;
+        if (stillFresh) return product;
       }
-
-      return _productFromCacheDoc(doc);
-    } catch (e) {
-      // Cache read failure — continue to API
-      return null;
+    } catch (_) {
+      // Cache read failure -- fall through and try the API directly.
     }
+
+    final fetched = await _fetchFromOpenFoodFacts(product.name, product.brand);
+
+    if (fetched == null) {
+      await _saveNotFound(docRef);
+      return product;
+    }
+
+    await _saveToCache(docRef, fetched);
+    return product.copyWith(
+      nutritionalFacts: fetched.nutritionalFacts,
+      allergens: fetched.allergens,
+      ingredients: fetched.ingredients,
+    );
   }
 
-  // ─── Step 2: Open Food Facts API ────────────────────────────────────────
-  Future<Product?> _fetchFromOpenFoodFacts(String productName) async {
+  // ─── Open Food Facts API ────────────────────────────────────────────────
+  Future<_NutritionResult?> _fetchFromOpenFoodFacts(
+    String productName,
+    String brand,
+  ) async {
     try {
-      final encoded = Uri.encodeComponent(productName);
+      final searchTerm = brand.isNotEmpty ? '$brand $productName' : productName;
+      final encoded = Uri.encodeComponent(searchTerm);
       final url = Uri.parse(
         'https://world.openfoodfacts.org/cgi/search.pl'
         '?search_terms=$encoded'
@@ -89,11 +102,45 @@ class NutritionService {
       final p = products.first as Map<String, dynamic>;
       final nutriments = p['nutriments'] as Map<String, dynamic>? ?? {};
 
-      double safeNum(String key) {
+      // Whether ANY nutrient value was actually present in the OFF response
+      // (as opposed to just defaulted to 0), so we don't report/cache a
+      // product as having nutrition data when it doesn't.
+      bool sawAnyValue = false;
+
+      double? rawNum(String key) {
         final v = nutriments[key];
-        if (v == null) return 0.0;
-        if (v is num) return v.toDouble();
-        return double.tryParse(v.toString()) ?? 0.0;
+        if (v == null) return null;
+        final parsed = v is num ? v.toDouble() : double.tryParse(v.toString());
+        if (parsed != null) sawAnyValue = true;
+        return parsed;
+      }
+
+      // OFF only populates "*_serving" keys when the product's serving size
+      // was known at entry time -- a large share of products (especially
+      // less-curated regional entries) only ever get the near-universal
+      // "*_100g" keys filled in. Previously this code read *_serving only,
+      // so those products silently came back as all-zero "found" data.
+      //
+      // Fix: fall back to the *_100g figure, scaled by the product's actual
+      // serving size, so the value stored still means "per serving" like the
+      // rest of the app (NutritionAvailability / nutrition_calculator.dart)
+      // assumes. If no serving size is known at all, treat "100g" itself as
+      // the serving (a common convention) instead of guessing.
+      final servingSizeRaw = (p['serving_size'] ?? '') as String;
+      final parsedServingGrams = _parseGrams(servingSizeRaw);
+      final effectiveServingSize =
+          servingSizeRaw.isNotEmpty ? servingSizeRaw : '100g';
+      final scaleTo100g =
+          (parsedServingGrams != null && parsedServingGrams > 0)
+              ? parsedServingGrams / 100.0
+              : 1.0;
+
+      double valueFor(String key) {
+        final perServing = rawNum('${key}_serving');
+        if (perServing != null) return perServing;
+        final per100g = rawNum('${key}_100g');
+        if (per100g != null) return per100g * scaleTo100g;
+        return 0.0;
       }
 
       // Parse allergens
@@ -116,30 +163,32 @@ class NutritionService {
               .toList()
           : <String>[];
 
-      final name = (p['product_name'] ?? productName) as String;
-      final brand = (p['brands'] ?? '') as String;
-      final servingSize = (p['serving_size'] ?? '') as String;
+      final nutritionalFacts = NutritionalFacts(
+        servingSize: effectiveServingSize,
+        caloriesKcal: valueFor('energy-kcal'),
+        proteinG: valueFor('proteins'),
+        carbsG: valueFor('carbohydrates'),
+        totalFatG: valueFor('fat'),
+        saturatedFatG: valueFor('saturated-fat'),
+        transFatG: valueFor('trans-fat'),
+        sodiumMg: valueFor('sodium') * 1000, // OFF returns sodium in g
+        potassiumMg: valueFor('potassium') * 1000,
+        calciumMg: valueFor('calcium') * 1000,
+        ironMg: valueFor('iron') * 1000,
+        fiberG: valueFor('fiber'),
+        sugarsG: valueFor('sugars'),
+        addedSugarsG: valueFor('added-sugars'),
+        // Only claim "real data" if we actually parsed at least one
+        // nutrient value -- a name/brand match with an empty nutriments
+        // object (OFF returns plenty of those) is NOT nutrition data, and
+        // must not be cached as if it were (see NutritionAvailability).
+        hasNutritionData: sawAnyValue,
+      );
 
-      return Product(
-        id: (p['id'] ?? name.toLowerCase().replaceAll(' ', '_')) as String,
-        name: name,
-        brand: brand,
-        nutritionalFacts: NutritionalFacts(
-          servingSize: servingSize,
-          caloriesKcal: safeNum('energy-kcal_serving'),
-          proteinG: safeNum('proteins_serving'),
-          carbsG: safeNum('carbohydrates_serving'),
-          totalFatG: safeNum('fat_serving'),
-          saturatedFatG: safeNum('saturated-fat_serving'),
-          transFatG: safeNum('trans-fat_serving'),
-          sodiumMg: safeNum('sodium_serving') * 1000, // OFF returns in g
-          potassiumMg: safeNum('potassium_serving') * 1000,
-          calciumMg: safeNum('calcium_serving') * 1000,
-          ironMg: safeNum('iron_serving') * 1000,
-          fiberG: safeNum('fiber_serving'),
-          sugarsG: safeNum('sugars_serving'),
-          addedSugarsG: safeNum('added-sugars_serving'),
-        ),
+      if (!sawAnyValue) return null;
+
+      return _NutritionResult(
+        nutritionalFacts: nutritionalFacts,
         allergens: allergens,
         ingredients: ingredientsList,
       );
@@ -148,32 +197,26 @@ class NutritionService {
     }
   }
 
-  // ─── Step 3: Local fallback ─────────────────────────────────────────────
-  // Note: this scope is deliberately kept minimal for Phase 3 (just enough
-  // to compile against the repository instead of the retired
-  // ProductDbService). Matching this against fda_products' actual
-  // brand + product_name fields with a confidence check is Phase 4 work.
-  Future<Product?> _getFromLocalDb(String productName) async {
-    final lower = productName.toLowerCase();
-    try {
-      final allProducts = await BackendLocator.productRepository.getAllProducts();
-      return allProducts.firstWhere(
-        (p) =>
-            p.name.isNotEmpty &&
-            (p.name.toLowerCase().contains(lower) ||
-                lower.contains(p.name.toLowerCase().split(' ').first.toLowerCase())),
-      );
-    } catch (_) {
-      return null;
-    }
+  /// Extracts a gram quantity from an OFF serving_size string, e.g.
+  /// "56g", "56 g (Approx. 1/3 cup)" -> 56.0. Mirrors the parsing already
+  /// used by core/utils/nutrition_calculator.dart so both stay consistent.
+  double? _parseGrams(String servingSize) {
+    if (servingSize.isEmpty) return null;
+    final match = RegExp(r'(\d+(?:\.\d+)?)\s*[gG]').firstMatch(servingSize);
+    if (match == null) return null;
+    return double.tryParse(match.group(1) ?? '');
   }
 
-  // ─── Save to Firestore cache ─────────────────────────────────────────────
-  Future<void> _saveToCache(String normalizedName, Product product) async {
+  // ─── Firestore cache ─────────────────────────────────────────────────────
+  Future<void> _saveToCache(
+    DocumentReference<Map<String, dynamic>> docRef,
+    _NutritionResult result,
+  ) async {
     try {
-      final nf = product.nutritionalFacts;
-      await _db.collection(_cacheCollection).add({
-        'product_name': normalizedName,
+      final nf = result.nutritionalFacts;
+      await docRef.set({
+        'found': true,
+        'serving_size': nf.servingSize,
         'calories_kcal': nf.caloriesKcal,
         'protein_g': nf.proteinG,
         'carbs_g': nf.carbsG,
@@ -187,18 +230,31 @@ class NutritionService {
         'fiber_g': nf.fiberG,
         'sugars_g': nf.sugarsG,
         'added_sugars_g': nf.addedSugarsG,
-        'allergens': product.allergens,
-        'ingredients': product.ingredients.join(', '),
+        'allergens': result.allergens,
+        'ingredients': result.ingredients.join(', '),
         'source': 'open_food_facts',
         'cached_at': FieldValue.serverTimestamp(),
       });
     } catch (_) {
-      // Cache write failure is non-fatal
+      // Cache write failure is non-fatal -- the caller still gets the data
+      // for this call, it'll just re-hit the API next time.
     }
   }
 
-  // ─── Build Product from cache document ──────────────────────────────────
-  Product _productFromCacheDoc(Map<String, dynamic> doc) {
+  Future<void> _saveNotFound(
+    DocumentReference<Map<String, dynamic>> docRef,
+  ) async {
+    try {
+      await docRef.set({
+        'found': false,
+        'cached_at': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      // Non-fatal.
+    }
+  }
+
+  Product _mergeCacheDoc(Product product, Map<String, dynamic> doc) {
     double n(String key) => (doc[key] as num? ?? 0).toDouble();
     final allergens = List<String>.from(doc['allergens'] as List? ?? []);
     final ingText = (doc['ingredients'] as String?) ?? '';
@@ -206,11 +262,9 @@ class NutritionService {
         ? ingText.split(',').map((e) => e.trim()).toList()
         : <String>[];
 
-    return Product(
-      id: doc['product_name'] as String,
-      name: doc['product_name'] as String,
-      brand: '',
+    return product.copyWith(
       nutritionalFacts: NutritionalFacts(
+        servingSize: (doc['serving_size'] as String?) ?? '',
         caloriesKcal: n('calories_kcal'),
         proteinG: n('protein_g'),
         carbsG: n('carbs_g'),
@@ -224,9 +278,22 @@ class NutritionService {
         fiberG: n('fiber_g'),
         sugarsG: n('sugars_g'),
         addedSugarsG: n('added_sugars_g'),
+        hasNutritionData: true,
       ),
       allergens: allergens,
       ingredients: ingList,
     );
   }
+}
+
+class _NutritionResult {
+  final NutritionalFacts nutritionalFacts;
+  final List<String> allergens;
+  final List<String> ingredients;
+
+  _NutritionResult({
+    required this.nutritionalFacts,
+    required this.allergens,
+    required this.ingredients,
+  });
 }
