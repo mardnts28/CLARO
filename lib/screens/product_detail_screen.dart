@@ -66,12 +66,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late Product _currentProduct;
   List<RankedProductResult>? _currentComparisonSet;
 
+  late double _selectedSizeG;
+  late List<double> _availableSizes;
+
+  void _initSizes(Product product) {
+    final originalG = product.servingSizeG > 0 ? product.servingSizeG : 100.0;
+    final sizeSet = <double>{originalG, ...product.availableSizes};
+    _availableSizes = sizeSet.toList()..sort();
+    _selectedSizeG = originalG;
+  }
+
+  double get _sizeScale {
+    final original = _currentProduct.servingSizeG > 0
+        ? _currentProduct.servingSizeG
+        : 100.0;
+    return _selectedSizeG / original;
+  }
+
   @override
   void initState() {
     super.initState();
     _currentProduct = widget.product;
     _currentComparisonSet = widget.comparisonSet;
     _scanEventId = '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}';
+    _initSizes(_currentProduct);
     _loadFdaVerification();
     _loadFavoriteStatus();
   }
@@ -83,6 +101,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _currentProduct = newProduct;
       _currentComparisonSet = newComparisonSet;
       _scanEventId = '${newProduct.id}_${DateTime.now().millisecondsSinceEpoch}';
+      _initSizes(newProduct);
       _advisoryLoading = true;
       _nutritionUnavailable = false;
       _evaluation = null;
@@ -330,39 +349,80 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         // Product image (Cloudinary-hosted, via imageURL from
                         // Firestore) with graceful placeholder fallback for
                         // missing/invalid URLs.
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            width: 80,
-                            height: 80,
-                            color: theme.cardColor.withOpacity(0.5),
-                            child: p.imageUrl.isEmpty
-                                ? Icon(Icons.dining_outlined,
-                                    size: 40, color: colorScheme.outline)
-                                : Image.network(
-                                    p.imageUrl,
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
-                                    loadingBuilder: (context, child, progress) {
-                                      if (progress == null) return child;
-                                      return Center(
-                                        child: SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: colorScheme.outline,
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    errorBuilder: (context, error, stackTrace) {
-                                      return Icon(Icons.dining_outlined,
-                                          size: 40, color: colorScheme.outline);
-                                    },
+                        Column(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: 80,
+                                height: 80,
+                                color: theme.cardColor.withOpacity(0.5),
+                                child: p.imageUrl.isEmpty
+                                    ? Icon(Icons.dining_outlined,
+                                        size: 40, color: colorScheme.outline)
+                                    : Image.network(
+                                        p.imageUrl,
+                                        width: 80,
+                                        height: 80,
+                                        fit: BoxFit.cover,
+                                        loadingBuilder: (context, child, progress) {
+                                          if (progress == null) return child;
+                                          return Center(
+                                            child: SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: colorScheme.outline,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return Icon(Icons.dining_outlined,
+                                              size: 40, color: colorScheme.outline);
+                                        },
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            // ── Size dropdown ──
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: theme.dividerColor),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<double>(
+                                  value: _selectedSizeG,
+                                  isDense: true,
+                                  icon: Icon(Icons.arrow_drop_down,
+                                      size: 18, color: colorScheme.onSurfaceVariant),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: colorScheme.onSurface,
                                   ),
-                          ),
+                                  items: _availableSizes.map((size) {
+                                    final label = size == size.roundToDouble()
+                                        ? '${size.toInt()}g'
+                                        : '${size.toStringAsFixed(1)}g';
+                                    return DropdownMenuItem(
+                                      value: size,
+                                      child: Text(label),
+                                    );
+                                  }).toList(),
+                                  onChanged: (newSize) {
+                                    if (newSize != null) {
+                                      setState(() => _selectedSizeG = newSize);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -500,7 +560,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    loc.analysisBasisSubtitle(p.nutritionalFacts.servingSize),
+                                    loc.analysisBasisSubtitle('${_selectedSizeG == _selectedSizeG.roundToDouble() ? _selectedSizeG.toInt().toString() : _selectedSizeG.toStringAsFixed(1)}g'),
                                     style: GoogleFonts.inter(
                                       fontSize: 12,
                                       color: colorScheme.onSurfaceVariant,
@@ -542,7 +602,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             // 1. Sodium (Hypertension)
                             (() {
                               final val100g = p.nutritionPer100g.sodiumMg;
-                              final valServing = (val100g / 100) * (p.servingSizeG > 0 ? p.servingSizeG : 100.0);
+                              final valServing = (val100g / 100) * _selectedSizeG;
                               final limit = 2000.0;
                               final pct = (valServing / limit) * 100;
                               return DisplayNutrientEval(
@@ -558,7 +618,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             // 2. Sugars (Diabetes)
                             (() {
                               final val100g = p.nutritionPer100g.sugarsG;
-                              final valServing = (val100g / 100) * (p.servingSizeG > 0 ? p.servingSizeG : 100.0);
+                              final valServing = (val100g / 100) * _selectedSizeG;
                               final limit = 50.0;
                               final pct = (valServing / limit) * 100;
                               return DisplayNutrientEval(
@@ -574,7 +634,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             // 3. Saturated Fats (Heart disease)
                             (() {
                               final val100g = p.nutritionPer100g.saturatedFatG;
-                              final valServing = (val100g / 100) * (p.servingSizeG > 0 ? p.servingSizeG : 100.0);
+                              final valServing = (val100g / 100) * _selectedSizeG;
                               final limit = 22.2;
                               final pct = (valServing / limit) * 100;
                               return DisplayNutrientEval(
@@ -833,39 +893,33 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         else ...[
                         Row(
                           children: [
-                            _nutriCard(context, loc.nutriCalories, p.nutritionalFacts.calories),
+                            _nutriCard(context, loc.nutriCalories, '${(p.nutritionalFacts.caloriesKcal * _sizeScale).toStringAsFixed(0)} kcal'),
                             const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriSodium, p.nutritionalFacts.sodium),
+                            _nutriCard(context, loc.nutriSodium, '${(p.nutritionalFacts.sodiumMg * _sizeScale).toStringAsFixed(0)}mg'),
                             const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriSugar, p.nutritionalFacts.sugars),
+                            _nutriCard(context, loc.nutriSugar, '${(p.nutritionalFacts.sugarsG * _sizeScale).toStringAsFixed(1)}g'),
                             const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriProtein, p.nutritionalFacts.protein),
+                            _nutriCard(context, loc.nutriProtein, '${(p.nutritionalFacts.proteinG * _sizeScale).toStringAsFixed(1)}g'),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _nutriCard(context, loc.nutriTotalFat, p.nutritionalFacts.totalFat),
+                            _nutriCard(context, loc.nutriTotalFat, '${(p.nutritionalFacts.totalFatG * _sizeScale).toStringAsFixed(1)}g'),
                             const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriSatFat, p.nutritionalFacts.saturatedFat),
+                            _nutriCard(context, loc.nutriSatFat, '${(p.nutritionalFacts.saturatedFatG * _sizeScale).toStringAsFixed(1)}g'),
                             const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriTransFat, p.nutritionalFacts.transFat),
+                            _nutriCard(context, loc.nutriTransFat, '${(p.nutritionalFacts.transFatG * _sizeScale).toStringAsFixed(1)}g'),
                             const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriFiber, p.nutritionalFacts.dietaryFiber),
+                            _nutriCard(context, loc.nutriFiber, '${(p.nutritionalFacts.fiberG * _sizeScale).toStringAsFixed(1)}g'),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _nutriCard(context, loc.nutriPotassium, p.nutritionalFacts.potassiumMg > 0
-                                ? '${p.nutritionalFacts.potassiumMg.toStringAsFixed(0)}mg'
-                                : '0mg'),
-                            _nutriCard(context, loc.nutriCalcium, p.nutritionalFacts.calciumMg > 0
-                                ? '${p.nutritionalFacts.calciumMg.toStringAsFixed(0)}mg'
-                                : '0mg'),
-                            _nutriCard(context, loc.nutriIron, p.nutritionalFacts.ironMg > 0
-                                ? '${p.nutritionalFacts.ironMg.toStringAsFixed(1)}mg'
-                                : '0.0mg'),
+                            _nutriCard(context, loc.nutriPotassium, '${(p.nutritionalFacts.potassiumMg * _sizeScale).toStringAsFixed(0)}mg'),
+                            _nutriCard(context, loc.nutriCalcium, '${(p.nutritionalFacts.calciumMg * _sizeScale).toStringAsFixed(0)}mg'),
+                            _nutriCard(context, loc.nutriIron, '${(p.nutritionalFacts.ironMg * _sizeScale).toStringAsFixed(1)}mg'),
                             Expanded(child: const SizedBox()),
                           ],
                         ),

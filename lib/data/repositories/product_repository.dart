@@ -100,6 +100,11 @@ class FirestoreProductRepository implements ProductRepository {
     final isRegistered = data['registration_status'] as bool? ?? false;
     final validUntil = (data['validity_date'] as Timestamp?)?.toDate();
     final cprNumber = data['cpr_number'] as String? ?? '';
+    final rawSizes = data['available_sizes'] as List? ?? [];
+    final availableSizes = rawSizes
+        .map((e) => _parseGramValue(e))
+        .whereType<double>()
+        .toList();
 
     return Product(
       id: docId,
@@ -117,6 +122,7 @@ class FirestoreProductRepository implements ProductRepository {
       allergens: const [],
       ingredients: const [],
       servingInstructions: '',
+      availableSizes: availableSizes,
       nutritionalFacts: NutritionalFacts(),
     );
   }
@@ -146,5 +152,25 @@ class FirestoreProductRepository implements ProductRepository {
   String _formatIsoDate(DateTime date) {
     String two(int n) => n.toString().padLeft(2, '0');
     return '${date.year}-${two(date.month)}-${two(date.day)}';
+  }
+
+  /// Parses a Firestore available_sizes entry into grams.
+  /// Handles: numbers (100, 155.0), plain strings ("155"),
+  /// gram-suffixed strings ("155g", "155 g"), and kg strings ("1.8kg", "1.8 kg").
+  double? _parseGramValue(dynamic e) {
+    if (e is num) return e.toDouble();
+    if (e is String) {
+      final s = e.trim().toLowerCase();
+      // "1.8kg" or "1.8 kg"
+      final kgMatch = RegExp(r'^([\d.]+)\s*kg$').firstMatch(s);
+      if (kgMatch != null) {
+        final kg = double.tryParse(kgMatch.group(1)!);
+        if (kg != null) return kg * 1000;
+      }
+      // "155g" or "155 g" or plain "155"
+      final gMatch = RegExp(r'^([\d.]+)\s*g?$').firstMatch(s);
+      if (gMatch != null) return double.tryParse(gMatch.group(1)!);
+    }
+    return null;
   }
 }

@@ -17,6 +17,7 @@ class Product {
   final List<String> allergens;
   final List<String> ingredients;
   final String servingInstructions;
+  final List<double> availableSizes;
   final NutritionalFacts nutritionalFacts;
 
   Product({
@@ -34,6 +35,7 @@ class Product {
     this.allergens = const [],
     this.ingredients = const [],
     this.servingInstructions = '',
+    this.availableSizes = const [],
     required this.nutritionalFacts,
   });
 
@@ -56,6 +58,7 @@ class Product {
     List<String>? allergens,
     List<String>? ingredients,
     String? servingInstructions,
+    List<double>? availableSizes,
     NutritionalFacts? nutritionalFacts,
   }) {
     return Product(
@@ -73,6 +76,7 @@ class Product {
       allergens: allergens ?? this.allergens,
       ingredients: ingredients ?? this.ingredients,
       servingInstructions: servingInstructions ?? this.servingInstructions,
+      availableSizes: availableSizes ?? this.availableSizes,
       nutritionalFacts: nutritionalFacts ?? this.nutritionalFacts,
     );
   }

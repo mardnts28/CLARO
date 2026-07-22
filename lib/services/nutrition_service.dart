@@ -25,7 +25,7 @@ class NutritionService {
   // repeat API calls for a product OFF already answered for. A "not found"
   // result gets a much shorter recheck window, since OFF's catalog grows
   // over time and a product missing today may exist there later.
-  static const Duration _notFoundRecheckDuration = Duration(days: 30);
+  static const Duration _notFoundRecheckDuration = Duration.zero;
 
   // ─── Main entry point ──────────────────────────────────────────────────
   /// Returns [product] with nutritionalFacts/allergens/ingredients filled in
@@ -77,30 +77,77 @@ class NutritionService {
     String productName,
     String brand,
   ) async {
-    try {
-      final searchTerm = brand.isNotEmpty ? '$brand $productName' : productName;
-      final encoded = Uri.encodeComponent(searchTerm);
-      final url = Uri.parse(
-        'https://world.openfoodfacts.org/cgi/search.pl'
-        '?search_terms=$encoded'
-        '&search_simple=1'
-        '&action=process'
-        '&json=1'
-        '&page_size=1',
-      );
+    // Build search term list, avoiding redundant brand duplication (e.g. "Purefoods Purefoods Luncheon Meat")
+    final termsToTry = <String>[];
+    
+    if (brand.isNotEmpty && productName.isNotEmpty) {
+      if (productName.toLowerCase().contains(brand.toLowerCase())) {
+        termsToTry.add(productName);
+      } else {
+        termsToTry.add('$brand $productName');
+        termsToTry.add(productName);
+      }
+    } else if (productName.isNotEmpty) {
+      termsToTry.add(productName);
+    } else if (brand.isNotEmpty) {
+      termsToTry.add(brand);
+    }
 
-      final response = await http
-          .get(url, headers: {'User-Agent': 'CLARO-App/1.0'})
-          .timeout(const Duration(seconds: 10));
+    List? products;
+    for (var searchTerm in termsToTry) {
+      try {
+        final encoded = Uri.encodeComponent(searchTerm);
+        final url = Uri.parse(
+          'https://world.openfoodfacts.org/cgi/search.pl'
+          '?search_terms=$encoded'
+          '&search_simple=1'
+          '&action=process'
+          '&json=1'
+          '&fields=id,product_name,brands,serving_size,nutriments,allergens_tags,ingredients_text_en,ingredients_text'
+          '&page_size=10',
+        );
 
-      if (response.statusCode != 200) return null;
+        final response = await http
+            .get(url, headers: {'User-Agent': 'CLARO-App/1.0'})
+            .timeout(const Duration(seconds: 10));
 
-      final data = json.decode(response.body) as Map<String, dynamic>;
-      final products = data['products'] as List?;
-      if (products == null || products.isEmpty) return null;
+        if (response.statusCode != 200) continue;
 
-      final p = products.first as Map<String, dynamic>;
-      final nutriments = p['nutriments'] as Map<String, dynamic>? ?? {};
+        final data = json.decode(response.body) as Map<String, dynamic>;
+        final fetchedProducts = data['products'] as List?;
+        if (fetchedProducts != null && fetchedProducts.isNotEmpty) {
+          products = fetchedProducts;
+          break;
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+
+    if (products == null || products.isEmpty) return null;
+
+    // Find the product in the returned list that has valid nutriments data
+    Map<String, dynamic>? selectedProduct;
+    final targetNorm = '$brand $productName'.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    for (var item in products) {
+      final pMap = item as Map<String, dynamic>;
+      final nutriments = pMap['nutriments'] as Map<String, dynamic>? ?? {};
+      if (nutriments.isEmpty) continue;
+
+      final pName = (pMap['product_name'] ?? '').toString();
+      final pBrand = (pMap['brands'] ?? '').toString();
+      final full = '$pBrand $pName'.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+      if (full.contains(targetNorm) || targetNorm.contains(pName.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ''))) {
+        selectedProduct = pMap;
+        break;
+      }
+    }
+
+    selectedProduct ??= (products.first as Map<String, dynamic>);
+    final p = selectedProduct;
+    final nutriments = p['nutriments'] as Map<String, dynamic>? ?? {};
 
       // Whether ANY nutrient value was actually present in the OFF response
       // (as opposed to just defaulted to 0), so we don't report/cache a
@@ -192,9 +239,6 @@ class NutritionService {
         allergens: allergens,
         ingredients: ingredientsList,
       );
-    } catch (e) {
-      return null;
-    }
   }
 
   /// Extracts a gram quantity from an OFF serving_size string, e.g.
