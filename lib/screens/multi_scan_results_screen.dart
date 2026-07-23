@@ -11,6 +11,7 @@ import '../data/models/ranked_product_result.dart';
 import '../data/models/health_profile.dart';
 import '../core/utils/nutrition_availability.dart';
 import '../data/services/backend_locator.dart';
+import '../widgets/ranked_product_card.dart';
 
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
@@ -27,6 +28,18 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   bool _loading = true;
   bool _nutritionUnavailable = false;
   List<RankedProductResult> _ranked = [];
+
+  // Full profile (so the filter sheet knows every condition the user has)
+  // and the fixed detected-products list (so re-ranking on filter change is
+  // free/pure-Dart -- no re-fetch, no re-detection). Mirrors
+  // compare_products_screen.dart's filter-by-condition behavior; the
+  // product source here (widget.detectedProducts, from image recognition)
+  // and ranking source (ProductRankingService.rankProducts) are unchanged.
+  UserHealthProfile? _profile;
+
+  // null == "Overall" (all of the user's conditions). Non-null == ranking
+  // narrowed to that single condition.
+  HealthCondition? _selectedCondition;
 
   @override
   void initState() {
@@ -76,6 +89,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
 
       if (!mounted) return;
       setState(() {
+        _profile = profile;
         _ranked = ranked;
         _loading = false;
       });
@@ -83,6 +97,108 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
       debugPrint('Error ranking scanned products: $e');
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Re-ranks the SAME detected-products set (no re-scan, no re-detection)
+  /// against a health profile narrowed to just [condition] -- or the full
+  /// profile when [condition] is null ("Overall"). Runs through the exact
+  /// same ProductRankingService.rankProducts pipeline as the default
+  /// ranking; only which condition(s) are on the profile changes.
+  void _selectConditionFilter(HealthCondition? condition) {
+    final profile = _profile;
+    if (profile == null) return;
+
+    final effectiveProfile = condition == null
+        ? profile
+        : UserHealthProfile(
+            userId: profile.userId,
+            displayName: profile.displayName,
+            conditions: [condition],
+            allergies: profile.allergies,
+            voiceAssistant: profile.voiceAssistant,
+          );
+
+    final reRanked = BackendLocator.productRankingService.rankProducts(
+      products: widget.detectedProducts,
+      user: effectiveProfile,
+    );
+
+    setState(() {
+      _selectedCondition = condition;
+      _ranked = reRanked;
+    });
+  }
+
+  String _conditionLabel(HealthCondition condition) {
+    final loc = AppLocalizations.of(context)!;
+    switch (condition) {
+      case HealthCondition.hypertension:
+        return loc.conditionHypertension;
+      case HealthCondition.diabetes:
+        return loc.conditionDiabetes;
+      case HealthCondition.heartCondition:
+        return loc.conditionHeartCondition;
+    }
+  }
+
+  void _showFilterSheet() {
+    final profile = _profile;
+    if (profile == null) return;
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
+                child: Text(
+                  loc.filterConditionTitle,
+                  style: GoogleFonts.outfit(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+              RadioListTile<HealthCondition?>(
+                value: null,
+                groupValue: _selectedCondition,
+                activeColor: colorScheme.primary,
+                title: Text(loc.conditionOverall),
+                onChanged: (value) {
+                  Navigator.pop(sheetContext);
+                  _selectConditionFilter(value);
+                },
+              ),
+              for (final condition in HealthCondition.values)
+                RadioListTile<HealthCondition?>(
+                  value: condition,
+                  groupValue: _selectedCondition,
+                  activeColor: colorScheme.primary,
+                  title: Text(_conditionLabel(condition)),
+                  onChanged: (value) {
+                    Navigator.pop(sheetContext);
+                    _selectConditionFilter(value);
+                  },
+                ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -127,6 +243,34 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         color: colorScheme.primary, size: 24),
                   ),
                 ),
+                // Right Filter Ranking Button (matches compare_products_screen)
+                if (_profile != null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: GestureDetector(
+                      onTap: _showFilterSheet,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(Icons.filter_list,
+                              color: colorScheme.primary, size: 24),
+                          if (_selectedCondition != null)
+                            Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.secondary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -135,13 +279,49 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
           // ── Ranked description label ────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Text(
-              loc.rankedBySuitability,
-              style: GoogleFonts.inter(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500,
-              ),
+            child: Row(
+              children: [
+                Text(
+                  loc.rankedBySuitability,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (_selectedCondition != null) ...[
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () => _selectConditionFilter(null),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: colorScheme.secondary.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: colorScheme.secondary.withOpacity(0.4)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _conditionLabel(_selectedCondition!),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: colorScheme.secondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(Icons.close,
+                              size: 14, color: colorScheme.secondary),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
 
@@ -177,7 +357,24 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, i) {
                       final ranked = _ranked[i];
-                      return _buildProductCard(context, ranked);
+                      return RankedProductCard(
+                        ranked: ranked,
+                        onTap: () {
+                          // Navigate to the individual detail screen, passing
+                          // the full ranked set so the detail screen can show
+                          // the comparison matrix and ranking explanation for
+                          // this scan event too.
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ProductDetailScreen(
+                                product: ranked.evaluation.product,
+                                comparisonSet: _ranked,
+                              ),
+                            ),
+                          );
+                        },
+                      );
                     },
                   ),
           ),
@@ -202,90 +399,6 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
             _navItemScan(context),
             _navItem(Icons.history, 'History', false),
             _navItem(Icons.person_outline, 'Profile', false),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProductCard(BuildContext context, RankedProductResult ranked) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final p = ranked.evaluation.product;
-
-    return GestureDetector(
-      onTap: () {
-        // Navigate to the individual detail screen, passing the full
-        // ranked set so the detail screen can show the comparison matrix
-        // and ranking explanation for this scan event too.
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductDetailScreen(
-              product: p,
-              comparisonSet: _ranked,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          color: theme.cardColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: theme.dividerColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 26,
-              height: 26,
-              alignment: Alignment.center,
-              margin: const EdgeInsets.only(right: 10),
-              decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Text(
-                '${ranked.rank}',
-                style: GoogleFonts.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.primary,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    p.name,
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    p.nutritionalFacts.servingSize,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, color: colorScheme.primary, size: 22),
           ],
         ),
       ),

@@ -682,16 +682,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
-                                      Text(
-                                        e.label,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          color: colorScheme.onSurface,
+                                      Expanded(
+                                        child: Text(
+                                          e.label,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                            color: colorScheme.onSurface,
+                                          ),
                                         ),
                                       ),
+                                      const SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
@@ -735,75 +738,83 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         })(),
 
                         // Allergy row (if any allergens exist in the product)
+                        // -- consolidated into ONE block listing every
+                        // matched allergen together, rather than repeating
+                        // the full title/badge/note layout per allergen.
+                        // With 2+ allergens that per-item layout stacked
+                        // duplicate "may cause allergic reaction" notes and
+                        // made the card grow unbounded; grouping them still
+                        // surfaces every allergen while keeping the card a
+                        // fixed height regardless of how many are detected.
                         if (p.allergens.isNotEmpty)
-                          ...p.allergens.map((allergen) {
-                            final displayName = _getAllergenName(allergen, Localizations.localeOf(context).languageCode);
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Allergy - $displayName',
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Allergy - ${p.allergens.map((a) => _getAllergenName(a, Localizations.localeOf(context).languageCode)).join(', ')}',
                                         style: GoogleFonts.inter(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
                                           color: colorScheme.onSurface,
                                         ),
                                       ),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFFFEBEE),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          loc.allergenDetectedBadge,
-                                          style: GoogleFonts.inter(
-                                            color: const Color(0xFFC62828),
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFEBEE),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        loc.allergenDetectedBadge,
+                                        style: GoogleFonts.inter(
+                                          color: const Color(0xFFC62828),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    loc.allergenWarningNote,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.w500,
                                     ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  loc.allergenWarningNote,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                ],
-                              ),
-                            );
-                          }),
+                                ),
+                              ],
+                            ),
+                          ),
 
                         // Legend section
                         Column(
                           children: [
                             const Divider(height: 24, thickness: 1),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                            Wrap(
+                              alignment: WrapAlignment.center,
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
                                 _buildLegendPill(
                                   label: loc.suitableLegend,
                                   bgColor: const Color(0xFFC8E6C9),
                                   textColor: const Color(0xFF2E7D32),
                                 ),
-                                const SizedBox(width: 8),
                                 _buildLegendPill(
                                   label: loc.moderateLegend,
                                   bgColor: const Color(0xFFFFE0B2),
                                   textColor: const Color(0xFFE65100),
                                 ),
-                                const SizedBox(width: 8),
                                 _buildLegendPill(
                                   label: loc.cautionLegend,
                                   bgColor: const Color(0xFFFFCDD2),

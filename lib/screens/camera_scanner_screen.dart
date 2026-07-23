@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../services/yolo_recognition_service.dart';
 import '../services/image_validation_service.dart';
 import '../services/history_service.dart';
+import '../services/home_tab_controller.dart';
 import '../data/services/backend_locator.dart';
 import 'product_detail_screen.dart';
 import 'product_not_found_screen.dart';
@@ -91,6 +92,24 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Camera init error: $e');
+    }
+  }
+
+  // The X (close) button needs different behavior depending on how this
+  // screen is being shown:
+  // - embeddedMode (Home tab, see home_screen.dart's IndexedStack): this
+  //   screen is never pushed as its own route here, so there is nothing
+  //   for Navigator.maybePop to pop -- it silently no-ops and the user
+  //   stays stuck on the camera. Switching HomeTabController back to the
+  //   Dashboard tab (index 0) is what actually "closes" the scanner in
+  //   this context.
+  // - Pushed directly via MaterialPageRoute (history_screen.dart,
+  //   multi_scan_results_screen.dart): a normal pop is correct here.
+  void _handleClose() {
+    if (widget.embeddedMode) {
+      HomeTabController.switchToTab(0);
+    } else {
+      Navigator.maybePop(context);
     }
   }
 
@@ -268,14 +287,33 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                       : _buildSimulatorView(),
                 ),
 
+                // ── Tap-to-scan area (covers viewfinder center) ─────
+                // NOTE: This must stay directly above the camera preview
+                // and below every interactive UI control (buttons, nav
+                // bar, etc.) in this Stack. Stack hit-tests children from
+                // topmost to bottommost and stops at the first widget
+                // that claims the hit, so anything added AFTER this in
+                // the children list will intercept its own taps before
+                // they ever reach this full-screen capture layer.
+                if (!_isProcessing && !_showCapturedBadge)
+                  Positioned.fill(
+                    child: GestureDetector(
+                      onTap: _performScan,
+                      behavior: HitTestBehavior.opaque,
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+
                 // Dim overlay outside viewfinder
                 Positioned.fill(
-                  child: AnimatedBuilder(
-                    animation: _laserAnimation,
-                    builder: (_, __) => CustomPaint(
-                      painter: _ScannerOverlayPainter(
-                        laserProgress: _laserAnimation.value,
-                        isProcessing: _isProcessing,
+                  child: IgnorePointer(
+                    child: AnimatedBuilder(
+                      animation: _laserAnimation,
+                      builder: (_, __) => CustomPaint(
+                        painter: _ScannerOverlayPainter(
+                          laserProgress: _laserAnimation.value,
+                          isProcessing: _isProcessing,
+                        ),
                       ),
                     ),
                   ),
@@ -311,7 +349,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                   top: topPadding + 16,
                   left: 16,
                   child: GestureDetector(
-                    onTap: () => Navigator.maybePop(context),
+                    onTap: _handleClose,
                     child: Container(
                       width: 44,
                       height: 44,
@@ -434,16 +472,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                           ],
                         ),
                       ),
-                    ),
-                  ),
-
-                // ── Tap-to-scan area (covers viewfinder center) ─────
-                if (!_isProcessing && !_showCapturedBadge)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: _performScan,
-                      behavior: HitTestBehavior.translucent,
-                      child: const SizedBox.expand(),
                     ),
                   ),
               ],

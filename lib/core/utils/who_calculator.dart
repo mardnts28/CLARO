@@ -95,19 +95,19 @@ class WhoCalculator {
   static List<String> _getAllergenKeywords(AllergenType allergen) {
     switch (allergen) {
       case AllergenType.shellfish:
-        return ['shellfish', 'shrimp', 'crab', 'lobster', 'crustacean', 'lamang dagat', 'lamang-dagat'];
+        return ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster', 'squid', 'clams', 'mussels', 'oysters', 'scallops', 'octopus', 'abalone',  'snail',  'crustacean', 'lamang dagat', 'lamang-dagat'];
       case AllergenType.fish:
-        return ['fish', 'isda', 'anchovy', 'tuna', 'salmon', 'cod'];
+        return ['fish', 'isda', 'anchovy', 'mackarel', 'tuna', 'salmon', 'cod', 'trout'];
       case AllergenType.peanuts:
-        return ['peanut', 'mani', 'groundnut', 'arachis'];
+        return ['peanut', 'mani', 'groundnut', 'arachis', 'mandelonas'];
       case AllergenType.treeNuts:
         return ['nut', 'almond', 'walnut', 'cashew', 'pecan', 'hazelnut', 'pistachio', 'macadamia'];
       case AllergenType.soy:
-        return ['soy', 'soya', 'soybean', 'tofu', 'tempeh'];
+        return ['soy', 'soya', 'soybean', 'tofu', 'tempeh', 'tamari', 'shoyu', 'edame', 'miso', 'nato', 'okara'];
       case AllergenType.dairy:
         return ['milk', 'dairy', 'cream', 'cheese', 'yogurt', 'butter', 'gatas', 'lactose', 'casein', 'whey'];
       case AllergenType.eggs:
-        return ['egg', 'itlog', 'albumin', 'ovalbumin'];
+        return ['egg', 'itlog', 'albumin', 'ovalbumin', 'mayonnaise'];
       case AllergenType.wheatGluten:
         return ['wheat', 'gluten', 'trigo', 'flour', 'barley', 'rye'];
       case AllergenType.msg:
