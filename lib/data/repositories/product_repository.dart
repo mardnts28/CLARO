@@ -101,10 +101,11 @@ class FirestoreProductRepository implements ProductRepository {
     final validUntil = (data['validity_date'] as Timestamp?)?.toDate();
     final cprNumber = data['cpr_number'] as String? ?? '';
     final rawSizes = data['available_sizes'] as List? ?? [];
-    final availableSizes = rawSizes
-        .map((e) => _parseGramValue(e))
-        .whereType<double>()
+    final sizeOptions = rawSizes
+        .map(_parseSizeOption)
+        .whereType<ProductSizeOption>()
         .toList();
+    final availableSizes = sizeOptions.map((s) => s.sizeGrams).toList();
 
     return Product(
       id: docId,
@@ -123,6 +124,7 @@ class FirestoreProductRepository implements ProductRepository {
       ingredients: const [],
       servingInstructions: '',
       availableSizes: availableSizes,
+      sizeOptions: sizeOptions,
       nutritionalFacts: NutritionalFacts(),
     );
   }
@@ -172,5 +174,33 @@ class FirestoreProductRepository implements ProductRepository {
       if (gMatch != null) return double.tryParse(gMatch.group(1)!);
     }
     return null;
+  }
+
+  /// Parses one `available_sizes` array entry into a [ProductSizeOption].
+  ///
+  /// Supports two shapes, so existing documents keep working unchanged
+  /// while new/updated ones can attach a per-size Cloudinary photo:
+  /// - Legacy: a bare number/string, e.g. `155` or `"400g"` -- size only,
+  ///   [ProductSizeOption.imageUrl] is left null (falls back to the
+  ///   product's default `imageURL` in the UI).
+  /// - With image: a map, e.g.
+  ///   `{ "size_grams": 155, "image_url": "https://res.cloudinary.com/.../155g.png" }`.
+  ///   Accepts `size_grams`/`size`/`grams` for the size key and
+  ///   `image_url`/`imageURL`/`imageUrl` for the image key, so it's
+  ///   forgiving of whichever naming convention gets used when uploading.
+  ProductSizeOption? _parseSizeOption(dynamic e) {
+    if (e is Map) {
+      final sizeRaw = e['size_grams'] ?? e['size'] ?? e['grams'];
+      final grams = _parseGramValue(sizeRaw);
+      if (grams == null) return null;
+      final imageUrl = (e['image_url'] ?? e['imageURL'] ?? e['imageUrl']) as String?;
+      return ProductSizeOption(
+        sizeGrams: grams,
+        imageUrl: (imageUrl != null && imageUrl.isNotEmpty) ? imageUrl : null,
+      );
+    }
+    final grams = _parseGramValue(e);
+    if (grams == null) return null;
+    return ProductSizeOption(sizeGrams: grams);
   }
 }

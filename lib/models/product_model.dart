@@ -2,6 +2,18 @@ import 'dart:ui';
 import '../data/models/health_profile.dart';
 import '../core/utils/nutrition_calculator.dart';
 
+/// One entry of a product's `available_sizes` array, pairing a package
+/// size (in grams) with the Cloudinary photo of THAT specific package,
+/// when one has been uploaded. [imageUrl] is null for sizes that don't
+/// have their own photo yet -- callers should fall back to
+/// [Product.imageUrl] (the product's default/primary image) in that case.
+class ProductSizeOption {
+  final double sizeGrams;
+  final String? imageUrl;
+
+  const ProductSizeOption({required this.sizeGrams, this.imageUrl});
+}
+
 class Product {
   final String id;
   final String name;
@@ -18,6 +30,12 @@ class Product {
   final List<String> ingredients;
   final String servingInstructions;
   final List<double> availableSizes;
+  // Size -> image pairing parsed from the same `available_sizes` Firestore
+  // field as [availableSizes] (see product_repository.dart's
+  // _productFromDoc). Kept as a separate list rather than folded into
+  // [availableSizes] so every existing caller of the plain-number list
+  // (nutrition scaling, etc.) keeps working unchanged.
+  final List<ProductSizeOption> sizeOptions;
   final NutritionalFacts nutritionalFacts;
 
   Product({
@@ -36,8 +54,20 @@ class Product {
     this.ingredients = const [],
     this.servingInstructions = '',
     this.availableSizes = const [],
+    this.sizeOptions = const [],
     required this.nutritionalFacts,
   });
+
+  /// Image to show for [sizeGrams], falling back to [imageUrl] (the
+  /// product's default photo) when that size has no photo of its own yet.
+  String imageUrlForSize(double sizeGrams) {
+    for (final option in sizeOptions) {
+      if (option.sizeGrams == sizeGrams && (option.imageUrl?.isNotEmpty ?? false)) {
+        return option.imageUrl!;
+      }
+    }
+    return imageUrl;
+  }
 
   /// Returns a copy with the given fields replaced. Used to merge data from
   /// a secondary source (e.g. Open Food Facts nutrition enrichment) onto a
@@ -59,6 +89,7 @@ class Product {
     List<String>? ingredients,
     String? servingInstructions,
     List<double>? availableSizes,
+    List<ProductSizeOption>? sizeOptions,
     NutritionalFacts? nutritionalFacts,
   }) {
     return Product(
@@ -77,6 +108,7 @@ class Product {
       ingredients: ingredients ?? this.ingredients,
       servingInstructions: servingInstructions ?? this.servingInstructions,
       availableSizes: availableSizes ?? this.availableSizes,
+      sizeOptions: sizeOptions ?? this.sizeOptions,
       nutritionalFacts: nutritionalFacts ?? this.nutritionalFacts,
     );
   }

@@ -68,12 +68,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   late double _selectedSizeG;
   late List<double> _availableSizes;
+  late String _displayedImageUrl;
 
   void _initSizes(Product product) {
     final originalG = product.servingSizeG > 0 ? product.servingSizeG : 100.0;
     final sizeSet = <double>{originalG, ...product.availableSizes};
     _availableSizes = sizeSet.toList()..sort();
     _selectedSizeG = originalG;
+    _displayedImageUrl = product.imageUrlForSize(originalG);
   }
 
   double get _sizeScale {
@@ -357,11 +359,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 width: 80,
                                 height: 80,
                                 color: theme.cardColor.withOpacity(0.5),
-                                child: p.imageUrl.isEmpty
+                                child: _displayedImageUrl.isEmpty
                                     ? Icon(Icons.dining_outlined,
                                         size: 40, color: colorScheme.outline)
                                     : Image.network(
-                                        p.imageUrl,
+                                        _displayedImageUrl,
+                                        key: ValueKey(_displayedImageUrl),
                                         width: 80,
                                         height: 80,
                                         fit: BoxFit.cover,
@@ -416,7 +419,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   }).toList(),
                                   onChanged: (newSize) {
                                     if (newSize != null) {
-                                      setState(() => _selectedSizeG = newSize);
+                                      setState(() {
+                                        _selectedSizeG = newSize;
+                                        _displayedImageUrl = p.imageUrlForSize(newSize);
+                                      });
                                     }
                                   },
                                 ),
