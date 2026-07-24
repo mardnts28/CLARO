@@ -743,7 +743,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           });
                         })(),
 
-                        // Allergy row (if any allergens exist in the product)
+                        // Allergy row -- ONLY for allergens that are both
+                        // (a) present in this product AND (b) saved in the
+                        // user's own health profile. `p.allergens` alone is
+                        // every allergen the PRODUCT contains, not the ones
+                        // relevant to this user; cross-reference against
+                        // `_evaluation.allergenAssessment.matchedContains`
+                        // (computed by WhoCalculator.assessAllergens against
+                        // the signed-in user's saved allergies) so a user
+                        // who only lists "milk" doesn't see unrelated
+                        // allergens like crustaceans/fish/soy/coconut that
+                        // simply happen to be in the product.
+                        //
                         // -- consolidated into ONE block listing every
                         // matched allergen together, rather than repeating
                         // the full title/badge/note layout per allergen.
@@ -752,7 +763,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         // made the card grow unbounded; grouping them still
                         // surfaces every allergen while keeping the card a
                         // fixed height regardless of how many are detected.
-                        if (p.allergens.isNotEmpty)
+                        if (_matchedUserAllergenStrings(p).isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 16),
                             child: Column(
@@ -763,7 +774,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        'Allergy - ${p.allergens.map((a) => _getAllergenName(a, Localizations.localeOf(context).languageCode)).join(', ')}',
+                                        'Allergy - ${_matchedUserAllergenStrings(p).map((a) => _getAllergenName(a, Localizations.localeOf(context).languageCode)).join(', ')}',
                                         style: GoogleFonts.inter(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
@@ -788,15 +799,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       ),
                                     ),
                                   ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  loc.allergenWarningNote,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w500,
-                                  ),
                                 ),
                               ],
                             ),
@@ -1548,6 +1550,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ],
       ],
     );
+  }
+
+  // Returns the subset of `product.allergens` (raw Firestore strings) whose
+  // mapped AllergenType is also present in the signed-in user's saved
+  // health-profile allergies -- i.e. what WhoCalculator.assessAllergens
+  // already matched into `_evaluation.allergenAssessment.matchedContains`.
+  // This is what the Allergy card should show, NOT the product's full
+  // allergen list, so a user only sees warnings for their own allergens.
+  List<String> _matchedUserAllergenStrings(Product product) {
+    final matchedTypes = _evaluation?.allergenAssessment.matchedContains;
+    if (matchedTypes == null || matchedTypes.isEmpty) return const [];
+
+    final productAllergenTypes = product.containsAllergens; // parallel to product.allergens
+    final matched = <String>[];
+    for (var i = 0; i < product.allergens.length; i++) {
+      if (matchedTypes.contains(productAllergenTypes[i]) &&
+          !matched.contains(product.allergens[i])) {
+        matched.add(product.allergens[i]);
+      }
+    }
+    return matched;
   }
 
   String _getAllergenName(String allergen, String languageCode) {

@@ -100,39 +100,42 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                       height: 1.5,
                     ),
                   ),
-                  // Allergen warnings
+                  // Allergen warnings -- listed together in a single line
+                  // (comma-separated) rather than one stacked container per
+                  // allergen, so 2+ detected allergens don't grow the card
+                  // with repeated icon/badge rows.
                   if (product.allergens.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    ...product.allergens.map((allergen) {
+                    Builder(builder: (context) {
                       final langCode = Localizations.localeOf(context).languageCode;
-                      final displayName = _getAllergenDisplayName(allergen, langCode);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFEBEE),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFEF9A9A)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.warning_amber_rounded,
-                                  color: Color(0xFFC62828), size: 18),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  loc.containsAllergenPrefix(displayName),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: const Color(0xFFC62828),
-                                  ),
+                      final displayNames = product.allergens
+                          .map((allergen) => _getAllergenDisplayName(allergen, langCode))
+                          .join(', ');
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFEBEE),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFEF9A9A)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.warning_amber_rounded,
+                                color: Color(0xFFC62828), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                loc.containsAllergenPrefix(displayNames),
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFFC62828),
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       );
                     }),
