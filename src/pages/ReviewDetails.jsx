@@ -8,7 +8,7 @@ import {
   replyToReview,
   deleteReview,
 } from "../services/reviewService";
-import { FiChevronDown, FiCheck, FiClock, FiTrash2 } from "react-icons/fi";
+import { FiChevronDown, FiSend, FiCheck, FiClock, FiTrash2 } from "react-icons/fi";
 import "./ReviewDetails.css";
 
 function StatusBadgeSmall({ status }) {
@@ -194,6 +194,15 @@ export default function ReviewDetails() {
           onChange={(e) => setReplyText(e.target.value)}
           rows={4}
         />
+
+        <div className="reply-actions">
+          <button
+            className="reply-to-user-btn"
+            onClick={() => document.querySelector(".reply-textarea").focus()}
+          >
+            <FiSend /> Reply to User
+          </button>
+        </div>
 
         {error && <p className="form-error">{error}</p>}
 
