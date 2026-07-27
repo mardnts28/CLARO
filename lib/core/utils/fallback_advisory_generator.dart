@@ -10,6 +10,7 @@ import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
 import '../constants/who_fda_thresholds.dart';
 import 'serving_size_calculator.dart';
+import 'who_calculator.dart';
 import '../../models/product_model.dart';
 
 // notNeeded added for Phase 3 (product_ranking_service.dart): used when a
@@ -22,6 +23,15 @@ class FallbackAdvisoryGenerator {
     ProductEvaluation evaluation, {
     required FallbackReason reason,
     String languageCode = 'en',
+    // When provided, re-derives every per-serving figure in this text
+    // (and the overall level it reports) against THIS size instead of
+    // `evaluation.product.servingSizeG`. Lets a UI keep its advisory text
+    // in lockstep with a badge/level the user has already recomputed for
+    // a size they picked on a dropdown -- without an extra AI call, and
+    // without duplicating the WHO-percentage math (reuses the exact same
+    // WhoCalculator functions the backend used to build `evaluation` in
+    // the first place, so it can't silently drift out of sync).
+    double? servingSizeGOverride,
   }) {
     final allergen = evaluation.allergenAssessment;
     final isTagalog = languageCode == 'tl';
@@ -49,7 +59,28 @@ class FallbackAdvisoryGenerator {
       );
     }
 
-    final flagged = evaluation.nutrientEvaluations
+    final servingSizeG = servingSizeGOverride ?? evaluation.product.servingSizeG;
+
+    // Re-derive valuePerServing/whoDailyLimitPercentage/level for
+    // `servingSizeG` from each nutrient's stored valuePer100g, using the
+    // same WhoCalculator functions the backend used. When no override is
+    // given this reproduces `evaluation.nutrientEvaluations` exactly, so
+    // existing (no-override) callers see no behavior change.
+    final scaledEvals = evaluation.nutrientEvaluations.map((e) {
+      final valuePerServing = (e.valuePer100g / 100) * servingSizeG;
+      final whoDailyLimit = WhoCalculator.getWhoDailyLimit(e.nutrientKey);
+      final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
+      return NutrientEvaluation(
+        condition: e.condition,
+        nutrientKey: e.nutrientKey,
+        valuePer100g: e.valuePer100g,
+        valuePerServing: valuePerServing,
+        whoDailyLimitPercentage: whoPercentage,
+        level: WhoCalculator.classifyByWhoPercentage(whoPercentage),
+      );
+    }).toList();
+
+    final flagged = scaledEvals
         .where((e) => e.level != AdvisoryLevel.suitable)
         .toList();
 
@@ -71,35 +102,37 @@ class FallbackAdvisoryGenerator {
     final worst = flagged.reduce(
       (a, b) => _severityRank(b.level) > _severityRank(a.level) ? b : a,
     );
+    final overallLevel = flagged.any((e) => e.level == AdvisoryLevel.caution)
+        ? AdvisoryLevel.caution
+        : AdvisoryLevel.moderate;
 
     final nutrientName = _nutrientLabel(worst.nutrientKey, isTagalog);
     final severityWord =
         worst.level == AdvisoryLevel.caution ? (isTagalog ? 'Mataas' : 'High') : (isTagalog ? 'Katamtaman' : 'Moderate');
 
     // Calculate safe serving
-    final product = evaluation.product;
     final safeServing = ServingSizeCalculator.calculate(
       condition: worst.condition,
       nutrientKey: worst.nutrientKey,
       valuePer100g: worst.valuePer100g,
-      servingSizeG: product.servingSizeG,
+      servingSizeG: servingSizeG,
     );
 
     // Build concise advisory following the new format
     final explanation = isTagalog
         ? 'Naglalaman ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng '
-          '$nutrientName bawat serving (${product.servingSizeG}g), '
+          '$nutrientName bawat serving (${servingSizeG.toStringAsFixed(0)}g), '
           'na katumbas ng ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng inirerekomendang limitasyon sa isang araw. '
           'Maaari itong makaapekto sa iyong ${_conditionLabel(worst.condition, isTagalog)}. '
           '${safeServing != null ? 'Isaalang-alang ang paglimita sa $safeServing.' : ''}'
         : 'Contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
-          '$nutrientName per serving (${product.servingSizeG}g), '
+          '$nutrientName per serving (${servingSizeG.toStringAsFixed(0)}g), '
           'which is ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the recommended healthy daily limit. '
           'This may affect your ${_conditionLabel(worst.condition, isTagalog)}. '
           '${safeServing != null ? 'Consider limiting to $safeServing.' : ''}';
 
     return HealthAdvisory(
-      overallLevel: evaluation.overallLevel,
+      overallLevel: overallLevel,
       warningText: isTagalog ? '$severityWord sa $nutrientName' : '$severityWord in $nutrientName',
       explanation: explanation,
       safeServingSize: safeServing,

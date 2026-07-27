@@ -137,7 +137,7 @@ class WhoCalculator {
         final valuePerServing = (valuePer100g / 100) * product.servingSizeG;
         
         // Get WHO daily limit for this nutrient
-        final whoDailyLimit = _getWhoDailyLimit(key);
+        final whoDailyLimit = getWhoDailyLimit(key);
         
         // Calculate percentage of WHO daily limit per serving
         final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
@@ -187,7 +187,10 @@ class WhoCalculator {
     );
   }
 
-  static double _getWhoDailyLimit(String nutrientKey) {
+  // Public (no underscore) so UI code (e.g. re-deriving the advisory badge
+  // for a user-selected pack size instead of the product's label serving)
+  // can reuse the exact same limits instead of duplicating them.
+  static double getWhoDailyLimit(String nutrientKey) {
     switch (nutrientKey) {
       case 'sodiumMg':
         return WhoDailyLimits.sodiumMgPerDay;

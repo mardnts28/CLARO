@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
+import '../data/models/health_profile.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 
@@ -10,8 +11,21 @@ import '../widgets/voice_assistant_fab.dart';
 /// - Storage instructions / tips
 class MoreDetailsScreen extends StatefulWidget {
   final Product product;
+  // Allergens found on THIS product that also match the signed-in user's
+  // saved health-profile allergies -- the same set the Health Advisory
+  // banner and the product detail screen's Analysis Basis card use (both
+  // ultimately from WhoCalculator.assessAllergens), passed in rather than
+  // recomputed here so all three surfaces can never disagree. Empty by
+  // default only so this widget still compiles/renders for any caller
+  // that doesn't have a computed assessment on hand -- the real call site
+  // in product_detail_screen.dart always passes the actual matched set.
+  final List<AllergenType> matchedAllergens;
 
-  const MoreDetailsScreen({super.key, required this.product});
+  const MoreDetailsScreen({
+    super.key,
+    required this.product,
+    this.matchedAllergens = const [],
+  });
 
   @override
   State<MoreDetailsScreen> createState() => _MoreDetailsScreenState();
@@ -100,17 +114,32 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                       height: 1.5,
                     ),
                   ),
-                  // Allergen warnings -- listed together in a single line
-                  // (comma-separated) rather than one stacked container per
-                  // allergen, so 2+ detected allergens don't grow the card
-                  // with repeated icon/badge rows.
-                  if (product.allergens.isNotEmpty) ...[
+                  // Allergen warnings -- ONLY for allergens matched against
+                  // the signed-in user's saved health profile
+                  // (`widget.matchedAllergens`, the same set the Health
+                  // Advisory banner and Analysis Basis card use), NOT every
+                  // allergen the product happens to contain. Listed
+                  // together in a single line (comma-separated) rather than
+                  // one stacked container per allergen, so 2+ detected
+                  // allergens don't grow the card with repeated icon/badge
+                  // rows.
+                  if (widget.matchedAllergens.isNotEmpty) ...[
                     const SizedBox(height: 16),
                     Builder(builder: (context) {
                       final langCode = Localizations.localeOf(context).languageCode;
-                      final displayNames = product.allergens
-                          .map((allergen) => _getAllergenDisplayName(allergen, langCode))
-                          .join(', ');
+                      // Parallel to product.allergens -- lets us prefer the
+                      // product's own (possibly localized) allergen string
+                      // when one exists, same as the product detail screen.
+                      final productAllergenTypes = product.containsAllergens;
+                      final displayNamesList = <String>[];
+                      for (final type in widget.matchedAllergens) {
+                        final rawIndex = productAllergenTypes.indexOf(type);
+                        final label = rawIndex != -1
+                            ? _getAllergenDisplayName(product.allergens[rawIndex], langCode)
+                            : type.displayLabel;
+                        if (!displayNamesList.contains(label)) displayNamesList.add(label);
+                      }
+                      final displayNames = displayNamesList.join(', ');
                       return Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

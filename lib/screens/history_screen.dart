@@ -9,7 +9,6 @@ import 'product_detail_screen.dart';
 import 'compare_products_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
 import '../models/product_model.dart';
 import '../models/report_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -22,24 +21,6 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  // ── DEV-ONLY: seeds two real catalog products into this user's Firestore
-  // history so the screen has something to show while testing. Gated by
-  // kDebugMode so it never compiles into a release build. Delete this
-  // method + the "Seed (dev)" button in build() once you're done testing.
-  Future<void> _seedTestHistory() async {
-    try {
-      // No hardcoded slugs anymore -- those only existed in the retired
-      // mock catalog. Grab a couple of real documents straight out of
-      // fda_products instead, so this still works no matter what's in it.
-      final products = await BackendLocator.productRepository.getAllProducts();
-      for (final product in products.take(2)) {
-        await _historyService.addScanRecord(product);
-      }
-    } catch (e) {
-      debugPrint('HistoryScreen: seed test history failed: $e');
-    }
-  }
-
   final HistoryService _historyService = HistoryService();
   final TextEditingController _searchController = TextEditingController();
 
@@ -825,19 +806,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             color: colorScheme.onSurface),
                       ),
                     ),
-                    if (kDebugMode) ...[
-                      GestureDetector(
-                        onTap: _seedTestHistory,
-                        child: const Text(
-                          'Seed (dev)',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange,
-                              fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
                     GestureDetector(
                       onTap: _showClearAllDialog,
                       child: Text(

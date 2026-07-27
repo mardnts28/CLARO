@@ -15,6 +15,7 @@ import '../data/models/comparison_matrix.dart';
 import '../core/constants/who_fda_thresholds.dart';
 import '../core/utils/rank_label_helper.dart';
 import '../core/utils/who_calculator.dart';
+import '../core/utils/fallback_advisory_generator.dart';
 import '../core/utils/nutrition_availability.dart';
 import '../data/services/backend_locator.dart';
 
@@ -763,7 +764,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         // made the card grow unbounded; grouping them still
                         // surfaces every allergen while keeping the card a
                         // fixed height regardless of how many are detected.
-                        if (_matchedUserAllergenStrings(p).isNotEmpty)
+                        if (_matchedUserAllergenLabels(p, Localizations.localeOf(context).languageCode).isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 16),
                             child: Column(
@@ -774,7 +775,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   children: [
                                     Expanded(
                                       child: Text(
-                                        'Allergy - ${_matchedUserAllergenStrings(p).map((a) => _getAllergenName(a, Localizations.localeOf(context).languageCode)).join(', ')}',
+                                        'Allergy - ${_matchedUserAllergenLabels(p, Localizations.localeOf(context).languageCode).join(', ')}',
                                         style: GoogleFonts.inter(
                                           fontSize: 15,
                                           fontWeight: FontWeight.w600,
@@ -844,7 +845,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (context) => MoreDetailsScreen(product: p),
+                            builder: (context) => MoreDetailsScreen(
+                              product: p,
+                              matchedAllergens: _evaluation?.allergenAssessment.matchedContains ?? const [],
+                            ),
                           ),
                         );
                       },
@@ -1102,7 +1106,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       );
     }
 
-    final level = _evaluation?.overallLevel ?? AdvisoryLevel.suitable;
+    // The backend's `_evaluation.overallLevel` is fixed to the product's
+    // labeled serving size (`product.servingSizeG`) -- deliberately, so
+    // ranking/comparison across products stays size-independent (see
+    // WhoCalculator.evaluateProduct). But on THIS single-product screen,
+    // the nutrient rows below already recalculate live against whichever
+    // size the user picked in the dropdown, so the verdict badge should
+    // agree with them rather than staying frozen on the label size.
+    final level = _currentOverallLevel();
     late final Color color;
     late final IconData icon;
     switch (level) {
@@ -1121,10 +1132,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     final levelLabel = _levelLabel(level);
-    final advisoryTitle = _advisory?.warningText ??
+    final effectiveAdvisory = _effectiveAdvisory(context);
+    final advisoryTitle = effectiveAdvisory?.warningText ??
         (level == AdvisoryLevel.suitable ? loc.safeToConsume : loc.reminderLabel);
     final title = '$levelLabel - $advisoryTitle';
-    final subtitle = _advisory?.explanation ?? loc.safeToConsumeSubtitle;
+    final subtitle = effectiveAdvisory?.explanation ?? loc.safeToConsumeSubtitle;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -1552,25 +1564,110 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // Returns the subset of `product.allergens` (raw Firestore strings) whose
-  // mapped AllergenType is also present in the signed-in user's saved
-  // health-profile allergies -- i.e. what WhoCalculator.assessAllergens
-  // already matched into `_evaluation.allergenAssessment.matchedContains`.
-  // This is what the Allergy card should show, NOT the product's full
-  // allergen list, so a user only sees warnings for their own allergens.
-  List<String> _matchedUserAllergenStrings(Product product) {
+  // Returns a display label for every allergen in
+  // `_evaluation.allergenAssessment.matchedContains` -- the exact set the
+  // Health Advisory banner already uses (via WhoCalculator.assessAllergens),
+  // which matches BOTH allergens explicitly listed in `product.allergens`
+  // AND allergens only detected by scanning ingredient text (e.g. an
+  // ingredient like "whey powder" flags dairy even if "milk"/"dairy" isn't
+  // itself one of the product's listed allergens). Iterating
+  // `matchedContains` directly (instead of trying to map it back onto
+  // `product.allergens`) is what fixes ingredient-only matches silently
+  // being dropped from this card while still showing up correctly in the
+  // Health Advisory banner.
+  //
+  // Prefers the product's own (possibly localized) allergen string when
+  // one exists in `product.allergens` for that type; falls back to the
+  // generic `AllergenTypeDisplay.displayLabel` (same one comparison
+  // screens use) for ingredient-only matches that have no such entry.
+  List<String> _matchedUserAllergenLabels(Product product, String langCode) {
     final matchedTypes = _evaluation?.allergenAssessment.matchedContains;
     if (matchedTypes == null || matchedTypes.isEmpty) return const [];
 
     final productAllergenTypes = product.containsAllergens; // parallel to product.allergens
-    final matched = <String>[];
-    for (var i = 0; i < product.allergens.length; i++) {
-      if (matchedTypes.contains(productAllergenTypes[i]) &&
-          !matched.contains(product.allergens[i])) {
-        matched.add(product.allergens[i]);
-      }
+    final labels = <String>[];
+    for (final type in matchedTypes) {
+      final rawIndex = productAllergenTypes.indexOf(type);
+      final label = rawIndex != -1
+          ? _getAllergenName(product.allergens[rawIndex], langCode)
+          : type.displayLabel;
+      if (!labels.contains(label)) labels.add(label);
     }
-    return matched;
+    return labels;
+  }
+
+  // Re-derives the overall advisory level (the badge on this screen) for
+  // whichever pack size the user currently has selected in the dropdown,
+  // instead of the backend's fixed-label-serving-size `overallLevel`.
+  //
+  // Deliberately reuses `_evaluation.nutrientEvaluations` -- the exact set
+  // of nutrients WhoCalculator.evaluateProduct() already evaluated for
+  // THIS user's saved health conditions -- so this stays in sync with
+  // whatever conditions the user actually has, rather than hardcoding a
+  // fixed nutrient list. Only the per-serving math is redone here, against
+  // `_selectedSizeG` in place of the product's label serving size; the
+  // WHO daily limits and classification thresholds come from the same
+  // WhoCalculator functions the backend used, so this can't drift out of
+  // sync with the server-side thresholds.
+  //
+  // Ranking/comparison screens are untouched -- they always call
+  // WhoCalculator.rankProducts/evaluateProduct directly, which keeps using
+  // the label serving size on purpose (see WhoCalculator comments), so a
+  // product's rank never changes just because someone viewed it here with
+  // a different size selected.
+  AdvisoryLevel _currentOverallLevel() {
+    final evaluation = _evaluation;
+    if (evaluation == null) return AdvisoryLevel.suitable;
+
+    // Allergen match doesn't scale with pack size -- keep the backend's
+    // hard override as-is.
+    if (evaluation.allergenAssessment.hasDirectAllergen) {
+      return AdvisoryLevel.caution;
+    }
+
+    if (evaluation.nutrientEvaluations.isEmpty) {
+      return evaluation.overallLevel;
+    }
+
+    var worst = AdvisoryLevel.suitable;
+    for (final nutrientEval in evaluation.nutrientEvaluations) {
+      final valuePerServing = (nutrientEval.valuePer100g / 100) * _selectedSizeG;
+      final whoDailyLimit = WhoCalculator.getWhoDailyLimit(nutrientEval.nutrientKey);
+      final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
+      final level = WhoCalculator.classifyByWhoPercentage(whoPercentage);
+      if (level == AdvisoryLevel.caution) return AdvisoryLevel.caution;
+      if (level == AdvisoryLevel.moderate) worst = AdvisoryLevel.moderate;
+    }
+    return worst;
+  }
+
+  // Returns the advisory text (title + explanation) to show alongside the
+  // verdict badge, kept consistent with `_currentOverallLevel()`:
+  //
+  // - While the dropdown is still on the product's original label serving
+  //   size, this is just `_advisory` unchanged -- the Gemini-written text
+  //   fetched once in `_loadAdvisory()`, since nothing has been recomputed
+  //   yet and it already matches that level.
+  // - Once the user picks a DIFFERENT size, `_advisory` (written for the
+  //   label size) would silently go stale, so this regenerates the text
+  //   locally via FallbackAdvisoryGenerator using the same scaled
+  //   nutrient math as `_currentOverallLevel()` -- deterministic, free
+  //   (no AI call), and guaranteed to agree with the badge because both
+  //   are derived from the same WhoCalculator functions. Less nuanced
+  //   than the AI phrasing, but always accurate to what's on screen.
+  HealthAdvisory? _effectiveAdvisory(BuildContext context) {
+    final evaluation = _evaluation;
+    if (evaluation == null) return _advisory;
+
+    final labelServingSizeG = evaluation.product.servingSizeG;
+    if (_selectedSizeG == labelServingSizeG) return _advisory;
+
+    return FallbackAdvisoryGenerator.generate(
+      evaluation,
+      reason: FallbackReason.notNeeded,
+      languageCode: Localizations.localeOf(context).languageCode,
+      servingSizeGOverride: _selectedSizeG,
+    );
   }
 
   String _getAllergenName(String allergen, String languageCode) {
