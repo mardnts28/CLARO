@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/images/logoll.png";
-import { loginAdmin, firebaseErrorMessages } from "../services/authService";
+import { loginAdmin, resetPassword, firebaseErrorMessages } from "../services/authService";
 import { generateAndSendOTP } from "../services/otpService";
 import "./Login.css";
 
@@ -12,6 +12,12 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetError, setResetError] = useState("");
 
   function validate() {
     const newErrors = {};
@@ -40,9 +46,15 @@ export default function Login() {
 
     try {
       const admin = await loginAdmin(email.trim(), password);
-      await generateAndSendOTP(admin.uid, admin.email);
+      const { expiresAt } = await generateAndSendOTP(admin.uid, admin.email);
 
-      navigate("/verify-otp", { state: { uid: admin.uid, email: admin.email } });
+      navigate("/verify-otp", {
+        state: {
+          uid: admin.uid,
+          email: admin.email,
+          otpExpiresAt: expiresAt.getTime(),
+        },
+      });
     } catch (err) {
         console.error("FULL ERROR OBJECT:", err);
         console.error("ERROR CODE:", err.code);
@@ -56,6 +68,80 @@ export default function Login() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function openResetForm() {
+    setResetEmail(email.trim());
+    setResetMessage("");
+    setResetError("");
+    setShowResetForm(true);
+  }
+
+  async function handleResetPassword(e) {
+    e.preventDefault();
+    setResetMessage("");
+    setResetError("");
+
+    const trimmed = resetEmail.trim();
+    if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setResetError("Please enter a valid email address.");
+      return;
+    }
+
+    setResetLoading(true);
+    try {
+      await resetPassword(trimmed);
+      setResetMessage("Password reset link sent. Please check your inbox.");
+    } catch (err) {
+      setResetError(firebaseErrorMessages[err.code] || "Failed to send reset email. Please try again.");
+    } finally {
+      setResetLoading(false);
+    }
+  }
+
+  if (showResetForm) {
+    return (
+      <div className="login-page">
+        <div className="login-header">
+          <img src={logo} alt="CLARO Logo" className="login-logo" />
+          <h1 className="brand-name">CLARO</h1>
+        </div>
+
+        <div className="login-card">
+          <h2>Reset Password</h2>
+          <p className="subtitle">
+            Enter your admin email and we'll send you a link to reset your password.
+          </p>
+
+          <form onSubmit={handleResetPassword} noValidate>
+            <div className="input-group">
+              <input
+                type="email"
+                placeholder="Email"
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                className={resetError ? "input-error" : ""}
+              />
+            </div>
+
+            {resetError && <div className="form-error">{resetError}</div>}
+            {resetMessage && <p className="success-msg">{resetMessage}</p>}
+
+            <button type="submit" className="login-btn" disabled={resetLoading}>
+              {resetLoading ? "Sending..." : "Send Reset Link"}
+            </button>
+          </form>
+
+          <button
+            className="resend-btn"
+            type="button"
+            onClick={() => setShowResetForm(false)}
+          >
+            Back to Login
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -97,6 +183,12 @@ export default function Login() {
               {showPassword ? "Hide" : "Show"}
             </button>
             {errors.password && <span className="field-error">{errors.password}</span>}
+          </div>
+
+          <div className="forgot-password-row">
+            <button type="button" className="forgot-password-link" onClick={openResetForm}>
+              Forgot password?
+            </button>
           </div>
 
           {errors.form && <div className="form-error">{errors.form}</div>}

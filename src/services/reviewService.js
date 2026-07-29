@@ -22,6 +22,13 @@ export async function getAllReviews() {
   });
 }
 
+export async function getReviewStats() {
+  const reviews = await getAllReviews();
+  const totalReviews = reviews.length;
+  const newReviews = reviews.filter((r) => r.status === "New").length;
+  return { totalReviews, newReviews };
+}
+
 export async function getReviewById(reviewId) {
   const ref = doc(db, "suhestiyon", reviewId);
   const snap = await getDoc(ref);

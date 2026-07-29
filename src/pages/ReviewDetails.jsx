@@ -189,26 +189,17 @@ export default function ReviewDetails() {
 
         <textarea
           className="reply-textarea"
-          placeholder="Type Reply..."
+          placeholder="Type your reply to the user..."
           value={replyText}
           onChange={(e) => setReplyText(e.target.value)}
           rows={4}
         />
 
-        <div className="reply-actions">
-          <button
-            className="reply-to-user-btn"
-            onClick={() => document.querySelector(".reply-textarea").focus()}
-          >
-            <FiSend /> Reply to User
-          </button>
-        </div>
-
         {error && <p className="form-error">{error}</p>}
 
         <div className="save-row">
           <button className="save-btn" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "SAVE"}
+            <FiSend /> {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>

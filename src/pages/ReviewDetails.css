@@ -157,40 +157,27 @@
   border-color: #8b1e24;
 }
 
-.reply-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 16px;
-}
-
-.reply-to-user-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #e3e0fb;
-  color: #4b3bc2;
-  border: 1px solid #cfc8f5;
-  padding: 8px 16px;
-  border-radius: 7px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
 .save-row {
   display: flex;
   justify-content: flex-end;
 }
 
 .save-btn {
-  background: #dcf6e3;
-  color: #1a7f37;
-  border: 1px solid #bfe8c8;
-  padding: 10px 32px;
-  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #8c1c2b;
+  color: #fff;
+  border: none;
+  padding: 12px 36px;
+  border-radius: 8px;
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 14px;
   cursor: pointer;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: #741724;
 }
 
 .save-btn:disabled {

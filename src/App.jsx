@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
 import OTPVerification from "./pages/OTPVerification";
+import ChangePasswordFirstTime from "./pages/ChangePasswordFirstTime";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Reports from "./pages/Reports";
@@ -16,6 +17,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/verify-otp" element={<OTPVerification />} />
+        <Route path="/change-password" element={<ChangePasswordFirstTime />} />
 
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />

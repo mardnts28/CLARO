@@ -2,7 +2,7 @@ import { doc, setDoc, getDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import emailjs from "@emailjs/browser";
 
-const OTP_EXPIRY_MINUTES = 5;
+export const OTP_EXPIRY_MINUTES = 5;
 const MAX_ATTEMPTS = 5;
 
 // EmailJS config — from https://www.emailjs.com dashboard
@@ -49,7 +49,8 @@ export async function generateAndSendOTP(uid, email) {
     throw err;
   }
 
-  return true;
+  // Return the expiry so the UI can show a live countdown timer
+  return { expiresAt: expiresAt.toDate() };
 }
 
 export async function verifyOTP(uid, enteredOTP) {

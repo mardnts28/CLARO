@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
 import { getDashboardStats, getRecentReports } from "../services/reportService";
-import { FiClipboard } from "react-icons/fi";
+import { getReviewStats } from "../services/reviewService";
+import { FiClipboard, FiStar } from "react-icons/fi";
 import "./Dashboard.css";
 
 function StatusBadge({ status }) {
@@ -17,6 +18,7 @@ function StatusBadge({ status }) {
 export default function Dashboard() {
   const navigate = useNavigate();
   const [stats, setStats] = useState({ totalReports: 0, pendingReports: 0 });
+  const [reviewStats, setReviewStats] = useState({ totalReviews: 0, newReviews: 0 });
   const [recentReports, setRecentReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -24,12 +26,14 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [statsData, recentData] = await Promise.all([
+        const [statsData, recentData, reviewStatsData] = await Promise.all([
           getDashboardStats(),
           getRecentReports(5),
+          getReviewStats(),
         ]);
         setStats(statsData);
         setRecentReports(recentData);
+        setReviewStats(reviewStatsData);
       } catch (err) {
         console.error("DASHBOARD LOAD ERROR:", err);
         setError("Failed to load dashboard data.");
@@ -85,6 +89,19 @@ export default function Dashboard() {
             </span>
           </div>
           <span className="stat-desc">Reports awaiting review</span>
+        </div>
+
+        <div className="stat-card">
+          <span className="stat-label">App Reviews</span>
+          <div className="stat-value-row">
+            <span className="stat-value">{loading ? "—" : reviewStats.totalReviews}</span>
+            <span className="stat-icon stat-icon-purple">
+              <FiStar />
+            </span>
+          </div>
+          <span className="stat-desc">
+            {loading ? "All time reviews" : `${reviewStats.newReviews} new, awaiting response`}
+          </span>
         </div>
       </div>
 

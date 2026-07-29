@@ -112,3 +112,28 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+.forgot-password-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -6px 0 16px;
+}
+
+.forgot-password-link {
+  background: none;
+  border: none;
+  color: #8c1c2b;
+  font-size: 12.5px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.forgot-password-link:hover {
+  text-decoration: underline;
+}
+
+.success-msg {
+  color: #1a7f37;
+  font-size: 13px;
+  margin-bottom: 12px;
+  text-align: center;
+}

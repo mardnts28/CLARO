@@ -1,4 +1,4 @@
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "../firebase/firebase";
 
@@ -10,6 +10,7 @@ export const firebaseErrorMessages = {
   "auth/network-request-failed": "Please check your internet connection.",
   "auth/user-disabled": "This administrator account has been disabled.",
   "auth/invalid-email": "Invalid email format.",
+  "auth/missing-email": "Please enter your email address.",
 };
 
 export async function loginAdmin(email, password) {
@@ -34,4 +35,9 @@ export async function loginAdmin(email, password) {
   }
 
   return { uid: user.uid, ...adminData };
+}
+
+export async function resetPassword(email) {
+  if (!email) throw { code: "auth/missing-email" };
+  await sendPasswordResetEmail(auth, email);
 }

@@ -7,6 +7,18 @@ import {
 import { db, auth } from "../firebase/firebase";
 import { logActivity } from "./logService";
 
+// Used right after login/OTP verification for admins flagged with
+// mustChangePassword: true. The Firebase session is fresh at this point
+// (they just signed in), so no re-authentication is required.
+export async function changePasswordFirstTime(newPassword) {
+  const user = auth.currentUser;
+  if (!user) throw { code: "auth/no-user" };
+
+  await updatePassword(user, newPassword);
+  await updateDoc(doc(db, "admins", user.uid), { mustChangePassword: false });
+  await logActivity("Set New Password (First Login)", user.uid, "profile");
+}
+
 export async function updateUsername(uid, newName) {
   const ref = doc(db, "admins", uid);
   await updateDoc(ref, { name: newName });
