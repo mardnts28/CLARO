@@ -8,7 +8,6 @@ import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/services/backend_locator.dart';
-import '../core/utils/rank_label_helper.dart';
 import '../core/utils/nutrition_availability.dart';
 import '../data/models/health_profile.dart';
 import '../widgets/ranked_product_card.dart';

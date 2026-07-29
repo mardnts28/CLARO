@@ -17,6 +17,8 @@ import '../core/utils/rank_label_helper.dart';
 import '../core/utils/who_calculator.dart';
 import '../core/utils/fallback_advisory_generator.dart';
 import '../core/utils/nutrition_availability.dart';
+import '../core/utils/nutri_score_calculator.dart';
+import '../core/utils/nova_score_calculator.dart';
 import '../data/services/backend_locator.dart';
 
 class ProductDetailScreen extends StatefulWidget {
@@ -953,44 +955,50 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                   const SizedBox(height: 20),
 
-                  // ── 7. Scores (Individual White Cards) ─────────────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      loc.scoresTitle,
-                      style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                  // ── 7. Scores (Individual White Cards: Nutri-Score & NOVA) ─
+                  (() {
+                    final langCode = Localizations.localeOf(context).languageCode;
+                    final nutriResult = NutriScoreCalculator.computeFromProduct(
+                      _currentProduct,
+                      customServingSizeG: _selectedSizeG,
+                    );
+                    final novaResult = NovaScoreCalculator.computeFromProduct(_currentProduct);
 
-                  _scoreCard(
-                    context: context,
-                    label: loc.scoreNutrition,
-                    badge: 'C',
-                    badgeColor: const Color(0xFFFFB300),
-                    description: loc.scoreNutritionDesc,
-                  ),
-                  const SizedBox(height: 8),
-                  _scoreCard(
-                    context: context,
-                    label: loc.scoreEnvironment,
-                    badge: 'B',
-                    badgeColor: const Color(0xFF4CAF50),
-                    description: loc.scoreEnvironmentDesc,
-                  ),
-                  const SizedBox(height: 8),
-                  _scoreCard(
-                    context: context,
-                    label: loc.scoreProcess,
-                    badge: '3',
-                    badgeColor: const Color(0xFFFF9800),
-                    isCircle: true,
-                    description: loc.scoreProcessDesc,
-                  ),
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Text(
+                            loc.scoresTitle,
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+
+                        _scoreCard(
+                          context: context,
+                          label: loc.scoreNutrition,
+                          badge: nutriResult.gradeLetter,
+                          badgeColor: Color(nutriResult.gradeColorHex),
+                          description: nutriResult.description(langCode),
+                        ),
+                        const SizedBox(height: 8),
+                        _scoreCard(
+                          context: context,
+                          label: loc.scoreProcess,
+                          badge: novaResult.groupString,
+                          badgeColor: Color(novaResult.colorHex),
+                          isCircle: true,
+                          description: novaResult.description(langCode),
+                        ),
+                      ],
+                    );
+                  })(),
 
                   const SizedBox(height: 16),
 
@@ -1761,6 +1769,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
     );
   }
+
+
 }
 
 class DisplayNutrientEval {

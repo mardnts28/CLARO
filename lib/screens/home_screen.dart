@@ -27,7 +27,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Expand/collapse state for each grade card on the home page.
   bool _healthExpanded = false;
-  bool _ecoExpanded = false;
   bool _processExpanded = false;
 
   @override
@@ -163,8 +162,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildLabelIntro(),
             const SizedBox(height: 18),
             _buildHealthCard(),
-            const SizedBox(height: 12),
-            _buildEcoCard(),
             const SizedBox(height: 12),
             _buildProcessCard(),
             const SizedBox(height: 90),
@@ -424,25 +421,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildEcoCard() {
-    return _buildGradeCard(
-      icon: Icons.eco_outlined,
-      title: AppLocalizations.of(context)!.ecoGradeTitle,
-      subtitle: AppLocalizations.of(context)!.ecoGradeSubtitle,
-      values: [
-        AppLocalizations.of(context)!.ecoGradeValue0,
-        AppLocalizations.of(context)!.ecoGradeValue1,
-        AppLocalizations.of(context)!.ecoGradeValue2,
-        AppLocalizations.of(context)!.ecoGradeValue3,
-        AppLocalizations.of(context)!.ecoGradeValue4,
-      ],
-      expanded: _ecoExpanded,
-      onTap: () {
-        HapticService().vibrate();
-        setState(() => _ecoExpanded = !_ecoExpanded);
-      },
-    );
-  }
+
 
   Widget _buildGradeCard({
     required IconData icon,
