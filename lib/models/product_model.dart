@@ -70,7 +70,7 @@ class Product {
   }
 
   /// Returns a copy with the given fields replaced. Used to merge data from
-  /// a secondary source (e.g. Open Food Facts nutrition enrichment) onto a
+  /// a secondary source (e.g. OCR + Gemini nutrition extraction) onto a
   /// product that already carries FDA-sourced fields (id, imageUrl,
   /// fdaStatus, cprNumber, etc.) without discarding those fields.
   Product copyWith({
@@ -132,8 +132,8 @@ class NutritionalFacts {
   final double sugarsG;
   final double addedSugarsG;
 
-  /// True once real nutrition data has been found for this product (from
-  /// Open Food Facts, live or cached). False means the numeric fields above
+  /// True once real nutrition data has been found for this product (via the
+  /// OCR + Gemini extraction pipeline). False means the numeric fields above
   /// are just unset defaults (0), not a confirmed "this product has 0g of
   /// everything" -- the UI should show an "unavailable" state rather than
   /// the zero values in that case.

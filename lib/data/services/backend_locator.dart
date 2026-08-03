@@ -15,7 +15,9 @@ import '../repositories/history_repository.dart';
 import 'favorites_service.dart';
 import 'gemini_advisory_service.dart';
 import 'product_comparison_service.dart';
+import 'product_extraction_service.dart';
 import 'product_ranking_service.dart';
+import 'cloudinary_upload_service.dart';
 
 class BackendLocator {
   BackendLocator._();
@@ -25,6 +27,14 @@ class BackendLocator {
   // dependency. Update the key name below if your .env uses a different
   // variable name than GEMINI_API_KEY.
   static String get _geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
+
+  // Update these key names if your .env uses different variable names --
+  // see cloudinary_upload_service.dart's header comment for one-time
+  // Cloudinary console setup steps.
+  static String get _cloudinaryCloudName =>
+      dotenv.env['CLOUDINARY_CLOUD_NAME'] ?? '';
+  static String get _cloudinaryUploadPreset =>
+      dotenv.env['CLOUDINARY_UPLOAD_PRESET'] ?? '';
 
   static final ProductRepository productRepository = FirestoreProductRepository();
 
@@ -56,6 +66,21 @@ class BackendLocator {
 
   static final GeminiAdvisoryService geminiAdvisoryService =
       GeminiAdvisoryService(apiKey: _geminiApiKey);
+
+  // Gemini's 3rd role in this system (see product_extraction_service.dart) --
+  // reads front+back product photos and returns structured brand/nutrition/
+  // ingredient/allergen data. Used by the unknown-product report flow
+  // (Phase 3) to populate a submission before it reaches admin review.
+  static final ProductExtractionService productExtractionService =
+      ProductExtractionService(apiKey: _geminiApiKey);
+
+  // Used by the unknown-product report flow to upload front/back label
+  // photos before submitting a report -- see cloudinary_upload_service.dart.
+  static final CloudinaryUploadService cloudinaryUploadService =
+      CloudinaryUploadService(
+    cloudName: _cloudinaryCloudName,
+    uploadPreset: _cloudinaryUploadPreset,
+  );
 
   static final ProductRankingService productRankingService =
       ProductRankingService(geminiService: geminiAdvisoryService);

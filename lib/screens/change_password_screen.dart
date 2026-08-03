@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../widgets/voice_assistant_fab.dart';
+import '../generated/l10n/app_localizations.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -30,29 +31,30 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final currentPassword = _currentPasswordController.text.trim();
     final newPassword = _newPasswordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
+    final loc = AppLocalizations.of(context)!;
 
     if (currentPassword.isEmpty) {
-      _showError('Pakisulat ang iyong kasalukuyang password');
+      _showError(loc.errorCurrentPassword);
       return;
     }
 
     if (newPassword.isEmpty) {
-      _showError('Pakisulat ang iyong bagong password');
+      _showError(loc.errorNewPassword);
       return;
     }
 
     if (confirmPassword.isEmpty) {
-      _showError('Pakikonfirman ang iyong bagong password');
+      _showError(loc.errorConfirmPassword);
       return;
     }
 
     if (newPassword != confirmPassword) {
-      _showError('Ang mga password ay hindi tumutugma');
+      _showError(loc.errorPasswordsNotMatch);
       return;
     }
 
     if (newPassword.length < 6) {
-      _showError('Ang password ay dapat na hindi bababa sa 6 characters');
+      _showError(loc.errorPasswordTooShort);
       return;
     }
 
@@ -61,7 +63,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     try {
       final user = _authService.currentUser;
       if (user == null) {
-        _showError('User not authenticated');
+        _showError(loc.errorNotAuthenticated);
         return;
       }
 
@@ -93,8 +95,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Password successfully changed!'),
+          SnackBar(
+            content: Text(loc.passwordChanged),
             backgroundColor: Colors.green,
           ),
         );
@@ -102,10 +104,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _isLoading = false);
-      _showError(e.message ?? 'Error changing password');
+      _showError(e.message ?? loc.errorChangingPassword);
     } catch (e) {
       setState(() => _isLoading = false);
-      _showError('An unexpected error occurred');
+      _showError(loc.unexpectedError);
     }
   }
 
@@ -119,6 +121,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -128,13 +131,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeader(theme),
+              _buildHeader(theme, loc),
               const SizedBox(height: 24),
-              _buildDescriptionBox(theme),
+              _buildDescriptionBox(theme, loc),
               const SizedBox(height: 24),
               _buildPasswordField(
                 controller: _currentPasswordController,
-                hint: 'Kasalukuyang Password',
+                hint: loc.currentPassword,
                 showPassword: _showCurrentPassword,
                 theme: theme,
                 onToggle: () => setState(() => _showCurrentPassword = !_showCurrentPassword),
@@ -142,7 +145,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 16),
               _buildPasswordField(
                 controller: _newPasswordController,
-                hint: 'Bagong Password',
+                hint: loc.newPassword,
                 showPassword: _showNewPassword,
                 theme: theme,
                 onToggle: () => setState(() => _showNewPassword = !_showNewPassword),
@@ -150,7 +153,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 16),
               _buildPasswordField(
                 controller: _confirmPasswordController,
-                hint: 'I-type muli ang bagong Password',
+                hint: loc.confirmPassword,
                 showPassword: _showConfirmPassword,
                 theme: theme,
                 onToggle: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
@@ -171,8 +174,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                     width: 20,
                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                   )
-                      : const Text(
-                    'Baguhin ang Password',
+                      : Text(
+                    loc.changePassword,
                     style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -185,7 +188,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildHeader(ThemeData theme) {
+  Widget _buildHeader(ThemeData theme, AppLocalizations loc) {
     return Row(
       children: [
         GestureDetector(
@@ -198,7 +201,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            'Baguhin ang Password',
+            loc.changePassword,
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
           ),
         ),
@@ -206,7 +209,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildDescriptionBox(ThemeData theme) {
+  Widget _buildDescriptionBox(ThemeData theme, AppLocalizations loc) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -214,7 +217,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
-        'Ang iyong password ay dapat nasa hindi babababang anim na characters na may kombinasyon ng numero, letra, at ibang special characters (!@#%)',
+        loc.passwordRequirements,
         style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface, height: 1.6),
       ),
     );

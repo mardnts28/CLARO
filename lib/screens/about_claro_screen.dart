@@ -75,17 +75,23 @@ class AboutClaroScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: const [
-                _DevCard(
-                  name: 'Mary Faith Ardientes',
-                  role: 'Project Manager',
+                Expanded(
+                  child: _DevCard(
+                    name: 'Mary Faith Ardientes',
+                    role: 'Project Manager',
+                  ),
                 ),
-                _DevCard(
-                  name: 'Jay Bhie Bite',
-                  role: 'Front-end Developer',
+                Expanded(
+                  child: _DevCard(
+                    name: 'Jay Bhie Bite',
+                    role: 'Front-end Developer',
+                  ),
                 ),
-                _DevCard(
-                  name: 'Rochelle Ann Salucop',
-                  role: 'Back-end Developer',
+                Expanded(
+                  child: _DevCard(
+                    name: 'Rochelle Ann Salucop',
+                    role: 'Back-end Developer',
+                  ),
                 ),
               ],
             ),
@@ -112,27 +118,32 @@ class _DevCard extends StatelessWidget {
     return Column(
       children: [
         Container(
-          width: 64,
-          height: 64,
+          width: 56,
+          height: 56,
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerHighest,
             shape: BoxShape.circle,
           ),
         ),
         const SizedBox(height: 8),
-        SizedBox(
-          width: 80,
+        Flexible(
           child: Text(
             name,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
             textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          role,
-          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
-          textAlign: TextAlign.center,
+        Flexible(
+          child: Text(
+            role,
+            style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ],
     );

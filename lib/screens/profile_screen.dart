@@ -191,44 +191,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: colorScheme.secondaryContainer,
-            child: Icon(
-              Icons.person,
-              size: 40,
-              color: colorScheme.onSecondaryContainer,
+          Text(
+            _userName,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onPrimaryContainer,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _userName,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onPrimaryContainer,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _userEmail,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: colorScheme.onPrimaryContainer.withOpacity(0.8),
-                  ),
-                ),
-              ],
+          const SizedBox(height: 8),
+          Text(
+            _userEmail,
+            style: TextStyle(
+              fontSize: 14,
+              color: colorScheme.onPrimaryContainer.withOpacity(0.8),
             ),
           ),
         ],
@@ -496,13 +481,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Icon(Icons.security_outlined, color: colorScheme.primary, size: 20),
           const SizedBox(width: 12),
-          Expanded(
+          Flexible(
             child: Text(
               loc.multiFactorAuthentication,
               style: TextStyle(
                 fontSize: 15,
                 color: colorScheme.onSurface,
               ),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ),
           Switch(

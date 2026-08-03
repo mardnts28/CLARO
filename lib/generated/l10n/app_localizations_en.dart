@@ -468,7 +468,89 @@ class AppLocalizationsEn extends AppLocalizations {
   String get changePassword => 'Change password';
 
   @override
+  String get currentPassword => 'Current Password';
+
+  @override
+  String get newPassword => 'New Password';
+
+  @override
+  String get confirmPassword => 'Confirm Password';
+
+  @override
+  String get passwordRequirements =>
+      'Your password must be at least six characters with a combination of numbers, letters, and special characters (!@#%)';
+
+  @override
+  String get passwordChanged => 'Password successfully changed!';
+
+  @override
+  String get errorCurrentPassword => 'Please enter your current password';
+
+  @override
+  String get errorNewPassword => 'Please enter your new password';
+
+  @override
+  String get errorConfirmPassword => 'Please confirm your new password';
+
+  @override
+  String get errorPasswordsNotMatch => 'Passwords do not match';
+
+  @override
+  String get errorPasswordTooShort => 'Password must be at least 6 characters';
+
+  @override
+  String get errorNotAuthenticated => 'User not authenticated';
+
+  @override
+  String get errorChangingPassword => 'Error changing password';
+
+  @override
+  String get unexpectedError => 'An unexpected error occurred';
+
+  @override
   String get selectAllergen => 'Select Allergen';
+
+  @override
+  String get conditionDiabetes => 'Diabetes';
+
+  @override
+  String get conditionHypertension => 'Hypertension';
+
+  @override
+  String get conditionHeartCondition => 'Heart condition';
+
+  @override
+  String get conditionLowVision => 'Low vision';
+
+  @override
+  String get conditionNone => 'None';
+
+  @override
+  String get allergenFish => 'Fish';
+
+  @override
+  String get allergenMilk => 'Milk/Dairy';
+
+  @override
+  String get allergenEggs => 'Eggs';
+
+  @override
+  String get allergenSoy => 'Soy';
+
+  @override
+  String get allergenWheat => 'Wheat';
+
+  @override
+  String get allergenShellfish => 'Shellfish';
+
+  @override
+  String get allergenPeanuts => 'Peanuts';
+
+  @override
+  String get filterConditionTitle => 'Filter ranking by condition';
+
+  @override
+  String get conditionOverall => 'Overall (all conditions)';
 
   @override
   String get ratePrompt => 'Please select a rating between 1 and 5.';
@@ -590,8 +672,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get totalNutritionTitle => 'Total Nutrition';
 
   @override
-  String get nutritionDataUnavailable =>
-      'Open Food Facts nutrient data unavailable';
+  String get nutritionDataUnavailable => 'Nutrient data unavailable';
 
   @override
   String get nutriCalories => 'Calories';
@@ -853,6 +934,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportProductPhoto => 'Product Photo';
 
   @override
+  String get reportFrontPhoto => 'Front Photo';
+
+  @override
+  String get reportBackPhoto => 'Back Photo (Nutrition Label)';
+
+  @override
+  String get reportBackPhotoHint =>
+      'Take a clear photo of the nutrition facts and ingredients list on the back of the package.';
+
+  @override
+  String get reportAddBackPhoto => 'Add Photo';
+
+  @override
+  String get reportBackPhotoRequired =>
+      'Please add a photo of the back label before submitting.';
+
+  @override
   String get reportChangePhoto => 'Change Photo';
 
   @override
@@ -880,19 +978,4 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportGoHome => 'Go back to Home';
-
-  @override
-  String get filterConditionTitle => 'Filter ranking by condition';
-
-  @override
-  String get conditionOverall => 'Overall (all conditions)';
-
-  @override
-  String get conditionDiabetes => 'Diabetes';
-
-  @override
-  String get conditionHypertension => 'Hypertension';
-
-  @override
-  String get conditionHeartCondition => 'Heart condition';
 }

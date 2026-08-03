@@ -5,8 +5,9 @@
 // GeminiAdvisoryService, ProductRankingService, ProductComparisonService).
 //
 // Those pipelines assume every nutrient field on a Product is real. A
-// product whose nutritionalFacts were never found on Open Food Facts has
-// all-zero values (see NutritionalFacts.hasNutritionData in
+// product whose nutritionalFacts haven't been extracted yet (no matching
+// `product_nutrition_data` record) has all-zero values (see
+// NutritionalFacts.hasNutritionData in
 // models/product_model.dart) that would otherwise silently score as
 // "Suitable" / rank as the healthiest option / compare as identical to
 // products that actually have 0g of everything -- which is wrong, not just
@@ -23,10 +24,10 @@ import '../../models/product_model.dart';
 class NutritionAvailability {
   NutritionAvailability._();
 
-  /// True only if [product] has real nutrition data (fetched live from Open
-  /// Food Facts or served from the nutrition_cache) -- i.e. it's safe to
-  /// feed into WhoCalculator / GeminiAdvisoryService / ProductRankingService
-  /// / ProductComparisonService.
+  /// True only if [product] has real nutrition data (extracted via the OCR +
+  /// Gemini pipeline and served from `product_nutrition_data`) -- i.e. it's
+  /// safe to feed into WhoCalculator / GeminiAdvisoryService /
+  /// ProductRankingService / ProductComparisonService.
   static bool isAvailable(Product product) =>
       product.nutritionalFacts.hasNutritionData;
 

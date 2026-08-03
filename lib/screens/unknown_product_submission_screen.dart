@@ -1,22 +1,30 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../services/auth_service.dart';
+import '../models/report_model.dart';
+import '../data/services/backend_locator.dart';
 
-/// Simplified report screen for unidentified products.
+/// Report screen for unidentified products.
 ///
-/// Flow (matches CLARO design):
-///  1. Shows the captured photo (or a placeholder) with a "Change Photo" button
-///  2. Shows the detected product name (editable) with an "Edit" button
-///  3. An info card explaining the value of reporting
-///  4. A prominent "Submit" button
-///  5. On success → dialog with "Go back to Home"
+/// Flow (Phase 3):
+///  1. Front photo -- pre-filled from the failed scan, replaceable
+///  2. Back photo (nutrition label) -- required, must be added before submit
+///  3. Submit uploads both photos to Cloudinary, writes the report to
+///     Firestore immediately (status: Pending), and shows the success
+///     dialog right away -- OCR + Gemini extraction then runs in the
+///     background and patches `extractedData` onto the same report doc
+///     once it finishes, so the user never waits on it.
 class UnknownProductSubmissionScreen extends StatefulWidget {
-  /// Path to the image captured during the failed scan.
+  /// Path to the image captured during the failed scan -- reused as the
+  /// front photo so the user doesn't have to retake something they already
+  /// captured. Only the back photo is asked for fresh.
   final String? capturedImagePath;
 
   const UnknownProductSubmissionScreen({super.key, this.capturedImagePath});
@@ -28,49 +36,123 @@ class UnknownProductSubmissionScreen extends StatefulWidget {
 
 class _UnknownProductSubmissionScreenState
     extends State<UnknownProductSubmissionScreen> {
-  late TextEditingController _nameCtrl;
-  late TextEditingController _descCtrl;
-  String? _imagePath;
-  bool _isEditingName = false;
-  bool _isEditingDesc = false;
+  String? _frontImagePath;
+  String? _backImagePath;
   bool _isSubmitting = false;
+  String _productName = '';
+  String _selectedCategory = 'others'; // Default to 'others'
 
   final _authService = AuthService();
   final _picker = ImagePicker();
+  final _nameController = TextEditingController();
+
+  final List<String> _categories = [
+    'canned fish',
+    'canned seafood',
+    'canned meat',
+    'canned vegetables',
+    'instant noodles',
+    'others',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _imagePath = widget.capturedImagePath;
-    _nameCtrl = TextEditingController(text: '');
-    _descCtrl = TextEditingController(text: '');
+    _frontImagePath = widget.capturedImagePath;
   }
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
-    _descCtrl.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
-  // ── Pick / replace photo ───────────────────────────────────────────────
-  Future<void> _changePhoto() async {
+  // ── Pick / replace photos ──────────────────────────────────────────────
+  Future<void> _changeFrontPhoto() async {
+    // Request camera permission first
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Camera permission is required to take photos'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
     try {
       final picked = await _picker.pickImage(
         source: ImageSource.camera,
         imageQuality: 85,
       );
       if (picked != null && mounted) {
-        setState(() => _imagePath = picked.path);
+        setState(() => _frontImagePath = picked.path);
       }
     } catch (e) {
-      debugPrint('Image pick error: $e');
+      debugPrint('Front image pick error: $e');
+    }
+  }
+
+  Future<void> _pickBackPhoto() async {
+    // Request camera permission first
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Camera permission is required to take photos'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (picked != null && mounted) {
+        setState(() => _backImagePath = picked.path);
+      }
+    } catch (e) {
+      debugPrint('Back image pick error: $e');
     }
   }
 
   // ── Submit report to Firestore ─────────────────────────────────────────
   Future<void> _handleSubmit() async {
     if (_isSubmitting) return;
+
+    if (_backImagePath == null) {
+      final loc = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(loc.reportBackPhotoRequired),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a product name'),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -79,20 +161,56 @@ class _UnknownProductSubmissionScreenState
       final email = user?.email ?? '';
       final name = user?.displayName ?? email.split('@').first;
 
-      await FirebaseFirestore.instance.collection('reports').add({
-        'dateSubmitted': FieldValue.serverTimestamp(),
-        'productDescription': _descCtrl.text.trim(),
-        'productName': _nameCtrl.text.trim(),
-        'reportedBy': uid,
-        'status': 'Pending',
-        'userEmail': email,
-        'userName': name,
-        // Keep imagePath around even if not in the requested schema so we don't lose the photo
-        'imagePath': _imagePath ?? '', 
-      });
+      // Read both photos once -- the same bytes are used for the Cloudinary
+      // upload below and for the background extraction call afterwards, so
+      // we don't hit the file system twice per photo.
+      final frontBytes = await File(_frontImagePath!).readAsBytes();
+      final backBytes = await File(_backImagePath!).readAsBytes();
+
+      // Upload in parallel. CloudinaryUploadService.upload() returns null
+      // on failure rather than throwing -- we still let the report submit
+      // with a blank URL in that case (see its header comment) rather than
+      // blocking the whole submission on an image host hiccup.
+      final uploads = await Future.wait([
+        BackendLocator.cloudinaryUploadService.upload(
+          frontBytes,
+          filename: '${uid}_front_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        ),
+        BackendLocator.cloudinaryUploadService.upload(
+          backBytes,
+          filename: '${uid}_back_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        ),
+      ]);
+      final frontUrl = uploads[0] ?? '';
+      final backUrl = uploads[1] ?? '';
+
+      final report = ReportModel(
+        id: '', // Firestore assigns this on add(); unused in toMap().
+        dateSubmitted: DateTime.now(), // overwritten by toMap()'s serverTimestamp
+        productDescription: '',
+        productName: _nameController.text.trim(),
+        category: _selectedCategory,
+        reportedBy: uid,
+        status: 'Pending',
+        userEmail: email,
+        userName: name,
+        frontImageUrl: frontUrl,
+        backImageUrl: backUrl,
+        extractedData: const {}, // filled in by the background step below
+      );
+
+      final docRef =
+          await FirebaseFirestore.instance.collection('reports').add(report.toMap());
 
       if (!mounted) return;
       _showSuccessDialog();
+
+      // Fire-and-forget: don't await this, and don't touch `context`/State
+      // from inside it -- the user has already seen the success dialog and
+      // may navigate away before this finishes. Only Firestore writes
+      // happen here, which are safe regardless of whether this screen is
+      // still mounted.
+      _runBackgroundExtraction(docRef.id, frontBytes, backBytes);
     } catch (e) {
       debugPrint('Report submission error: $e');
       if (mounted) {
@@ -106,6 +224,32 @@ class _UnknownProductSubmissionScreenState
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  // ── Background extraction (Gemini's 3rd role in this app) ──────────────
+  // Runs after the report is already submitted and the user has moved on.
+  // Patches `extractedData` onto the same report doc once done, so it's
+  // ready by the time admin opens this report for review -- see
+  // ProductExtractionService and ReportModel.extractedData.
+  Future<void> _runBackgroundExtraction(
+    String reportId,
+    Uint8List frontBytes,
+    Uint8List backBytes,
+  ) async {
+    try {
+      final result = await BackendLocator.productExtractionService.extract(
+        frontImageBytes: frontBytes,
+        backImageBytes: backBytes,
+      );
+      await FirebaseFirestore.instance.collection('reports').doc(reportId).update({
+        'extractedData': result.toReportExtractedDataMap(),
+      });
+    } catch (e) {
+      debugPrint('Background extraction error for report $reportId: $e');
+      // Not surfaced to the user -- the report was already submitted
+      // successfully. Admin's review UI (Phase 4) treats an empty/missing
+      // extractedData as "needs manual entry" rather than an error state.
     }
   }
 
@@ -183,11 +327,88 @@ class _UnknownProductSubmissionScreenState
     );
   }
 
+  // ── Reusable photo block (front or back) ────────────────────────────────
+  Widget _photoBlock({
+    required ColorScheme colorScheme,
+    required String label,
+    String? hint,
+    required String? imagePath,
+    required String buttonLabel,
+    required VoidCallback onPick,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.outfit(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: colorScheme.primary,
+          ),
+        ),
+        if (hint != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            hint,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                width: 140,
+                height: 140,
+                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                child: imagePath != null && File(imagePath).existsSync()
+                    ? Image.file(File(imagePath), fit: BoxFit.cover)
+                    : Center(
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: 48,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            OutlinedButton.icon(
+              onPressed: onPick,
+              icon: Icon(Icons.camera_alt_outlined, size: 18, color: colorScheme.primary),
+              label: Text(
+                buttonLabel,
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.primary,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.4)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+    final canSubmit = !_isSubmitting && _backImagePath != null;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -238,78 +459,34 @@ class _UnknownProductSubmissionScreenState
                     ),
                     const SizedBox(height: 24),
 
-                    // ── Product Photo section ────────────────────
-                    Text(
-                      loc.reportProductPhoto,
-                      style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.primary,
-                      ),
+                    // ── Front Photo section ───────────────────────
+                    _photoBlock(
+                      colorScheme: colorScheme,
+                      label: loc.reportFrontPhoto,
+                      imagePath: _frontImagePath,
+                      buttonLabel: loc.reportChangePhoto,
+                      onPick: _changeFrontPhoto,
                     ),
-                    const SizedBox(height: 12),
 
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // Photo preview
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            width: 140,
-                            height: 140,
-                            color: colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.3),
-                            child: _imagePath != null &&
-                                    File(_imagePath!).existsSync()
-                                ? Image.file(
-                                    File(_imagePath!),
-                                    fit: BoxFit.cover,
-                                  )
-                                : Center(
-                                    child: Icon(
-                                      Icons.image_outlined,
-                                      size: 48,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                          ),
-                        ),
+                    const SizedBox(height: 28),
 
-                        const SizedBox(width: 16),
-
-                        // Change Photo button
-                        OutlinedButton.icon(
-                          onPressed: _changePhoto,
-                          icon: Icon(Icons.camera_alt_outlined,
-                              size: 18, color: colorScheme.primary),
-                          label: Text(
-                            loc.reportChangePhoto,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                                color:
-                                    colorScheme.primary.withValues(alpha: 0.4)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 10),
-                          ),
-                        ),
-                      ],
+                    // ── Back Photo section (required) ─────────────
+                    _photoBlock(
+                      colorScheme: colorScheme,
+                      label: loc.reportBackPhoto,
+                      hint: loc.reportBackPhotoHint,
+                      imagePath: _backImagePath,
+                      buttonLabel: _backImagePath == null
+                          ? loc.reportAddBackPhoto
+                          : loc.reportChangePhoto,
+                      onPick: _pickBackPhoto,
                     ),
 
                     const SizedBox(height: 28),
 
                     // ── Product Name section ─────────────────────
                     Text(
-                      loc.reportProductName,
+                      'Product Name',
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -317,85 +494,50 @@ class _UnknownProductSubmissionScreenState
                       ),
                     ),
                     const SizedBox(height: 10),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _isEditingName
-                              ? TextField(
-                                  controller: _nameCtrl,
-                                  autofocus: true,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 10),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: BorderSide(
-                                          color: colorScheme.primary),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: BorderSide(
-                                          color: colorScheme.primary,
-                                          width: 1.5),
-                                    ),
-                                  ),
-                                  onSubmitted: (_) =>
-                                      setState(() => _isEditingName = false),
-                                )
-                              : Text(
-                                  _nameCtrl.text.isEmpty
-                                      ? '—'
-                                      : _nameCtrl.text,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
+                    TextField(
+                      controller: _nameController,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: colorScheme.onSurface,
+                      ),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: colorScheme.primary),
                         ),
-                        const SizedBox(width: 10),
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              setState(() => _isEditingName = !_isEditingName),
-                          icon: Icon(
-                            _isEditingName ? Icons.check : Icons.edit_outlined,
-                            size: 16,
-                            color: colorScheme.primary,
-                          ),
-                          label: Text(
-                            _isEditingName
-                                ? 'OK'
-                                : loc.reportEditButton,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                                color:
-                                    colorScheme.primary.withValues(alpha: 0.4)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                          ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                              color: colorScheme.primary, width: 1.5),
                         ),
-                      ],
+                        hintText: 'Enter product name',
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      onChanged: (value) {
+                        setState(() => _productName = value);
+                      },
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Kindly state the brand, name, and flavor (eg. Purefoods Corned Beef).',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
 
                     const SizedBox(height: 28),
 
-                    // ── Product Description section ─────────────
+                    // ── Category section ─────────────────────────
                     Text(
-                      loc.reportProductDescription,
+                      'Category',
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -403,78 +545,27 @@ class _UnknownProductSubmissionScreenState
                       ),
                     ),
                     const SizedBox(height: 10),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _isEditingDesc
-                              ? TextField(
-                                  controller: _descCtrl,
-                                  autofocus: true,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                  decoration: InputDecoration(
-                                    isDense: true,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 12, vertical: 10),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: BorderSide(
-                                          color: colorScheme.primary),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                      borderSide: BorderSide(
-                                          color: colorScheme.primary,
-                                          width: 1.5),
-                                    ),
-                                  ),
-                                  onSubmitted: (_) =>
-                                      setState(() => _isEditingDesc = false),
-                                )
-                              : Text(
-                                  _descCtrl.text.isEmpty
-                                      ? '—'
-                                      : _descCtrl.text,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                        ),
-                        const SizedBox(width: 10),
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              setState(() => _isEditingDesc = !_isEditingDesc),
-                          icon: Icon(
-                            _isEditingDesc ? Icons.check : Icons.edit_outlined,
-                            size: 16,
-                            color: colorScheme.primary,
-                          ),
-                          label: Text(
-                            _isEditingDesc
-                                ? 'OK'
-                                : loc.reportEditButton,
+                    Column(
+                      children: _categories.map((category) {
+                        return RadioListTile<String>(
+                          title: Text(
+                            category,
                             style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.primary,
+                              fontSize: 14,
+                              color: colorScheme.onSurface,
                             ),
                           ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                                color:
-                                    colorScheme.primary.withValues(alpha: 0.4)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                          ),
-                        ),
-                      ],
+                          value: category,
+                          groupValue: _selectedCategory,
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() => _selectedCategory = value);
+                            }
+                          },
+                          activeColor: colorScheme.primary,
+                          contentPadding: EdgeInsets.zero,
+                        );
+                      }).toList(),
                     ),
 
                     const SizedBox(height: 32),
@@ -484,24 +575,24 @@ class _UnknownProductSubmissionScreenState
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: colorScheme.primary.withValues(alpha: 0.06),
+                        color: Colors.green.shade50, // Pale green for welcoming feel
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: colorScheme.primary.withValues(alpha: 0.18),
+                          color: Colors.green.shade200,
                         ),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(Icons.info_outline,
-                              color: colorScheme.primary, size: 22),
+                              color: Colors.green.shade700, size: 22),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               loc.reportInfoNote,
                               style: GoogleFonts.inter(
                                 fontSize: 13,
-                                color: colorScheme.onSurface,
+                                color: Colors.green.shade900,
                                 height: 1.5,
                               ),
                             ),
@@ -517,10 +608,12 @@ class _UnknownProductSubmissionScreenState
                       width: double.infinity,
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _handleSubmit,
+                        onPressed: canSubmit ? _handleSubmit : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colorScheme.primary,
                           foregroundColor: colorScheme.onPrimary,
+                          disabledBackgroundColor:
+                              colorScheme.primary.withValues(alpha: 0.4),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),

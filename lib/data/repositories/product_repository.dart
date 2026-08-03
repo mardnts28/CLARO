@@ -38,11 +38,13 @@ abstract class ProductRepository {
 // product data, Cloudinary is only ever an image host.
 //
 // allergens / ingredients / nutritionalFacts aren't stored in fda_products
-// at all -- they're filled in by NutritionService, which looks them up on
-// Open Food Facts and caches the result in Firestore (`nutrition_cache`),
-// keyed by this repository's document id, so OFF only gets called once ever
-// per product. Every getProductById / getAllProducts call below goes
-// through that enrichment step, so every screen sees the same data.
+// at all -- they're filled in by NutritionService, which reads them from
+// `product_nutrition_data`, keyed by this repository's document id. That
+// collection is populated by the OCR + Gemini extraction pipeline (the
+// initial dev-phase catalog population, and later, admin-approved user
+// reports of unrecognized products) -- never by a live external API call.
+// Every getProductById / getAllProducts call below goes through that
+// enrichment step, so every screen sees the same data.
 // servingInstructions has no source yet (Phase 5 fallback collection) and
 // stays at its default.
 class FirestoreProductRepository implements ProductRepository {
@@ -73,9 +75,9 @@ class FirestoreProductRepository implements ProductRepository {
     final base = snapshot.docs
         .map((doc) => _productFromDoc(doc.id, doc.data()))
         .toList();
-    // Enriched in parallel -- each lookup is either a single cheap Firestore
-    // doc read (cache hit) or a one-time Open Food Facts call (cache miss),
-    // so this stays fast even for a full-catalog fetch.
+    // Enriched in parallel -- each lookup is a single cheap Firestore doc
+    // read against `product_nutrition_data`, so this stays fast even for a
+    // full-catalog fetch.
     return Future.wait(base.map((p) => NutritionService().enrichProduct(p)));
   }
 

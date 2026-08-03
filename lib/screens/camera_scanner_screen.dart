@@ -39,6 +39,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   late Animation<double> _laserAnimation;
 
   // Simulator toggles
+  bool _forceSimulatorMode = true; // TEMPORARY: Set to true to force simulator mode even with camera access
   bool _simulateDark = false;
   bool _simulateBlur = false;
   bool _simulateMultiScan = false;
@@ -281,10 +282,11 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               children: [
                 // Camera preview or simulator placeholder
                 Positioned.fill(
-                  child: _isPermissionGranted &&
-                          _cameraController?.value.isInitialized == true
-                      ? CameraPreview(_cameraController!)
-                      : _buildSimulatorView(),
+                  child: _forceSimulatorMode ||
+                          !(_isPermissionGranted &&
+                          _cameraController?.value.isInitialized == true)
+                      ? _buildSimulatorView()
+                      : CameraPreview(_cameraController!),
                 ),
 
                 // ── Tap-to-scan area (covers viewfinder center) ─────
@@ -303,6 +305,15 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                       child: const SizedBox.expand(),
                     ),
                   ),
+
+                // ── Simulator mode debug toggles ─────────────────────
+                // Must be added here (after the capture GestureDetector
+                // above), not inside the background simulator view below
+                // it -- see _buildSimulatorToggles()'s comment for why.
+                if (_forceSimulatorMode ||
+                    !_isPermissionGranted ||
+                    _cameraController?.value.isInitialized != true)
+                  _buildSimulatorToggles(),
 
                 // Dim overlay outside viewfinder
                 Positioned.fill(
@@ -528,37 +539,68 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               style: GoogleFonts.inter(
                   color: Colors.white54, fontSize: 14, height: 1.5),
             ),
-            const SizedBox(height: 32),
-            // Debug toggles
-            _buildSimToggle('Simulate Dark', _simulateDark, (v) {
-              setState(() {
-                _simulateDark = v;
-                if (v) _simulateBlur = false;
-              });
-            }),
-            _buildSimToggle('Simulate Blur', _simulateBlur, (v) {
-              setState(() {
-                _simulateBlur = v;
-                if (v) _simulateDark = false;
-              });
-            }),
-            _buildSimToggle('Simulate Multi-Scan (5 items)', _simulateMultiScan, (v) {
-              setState(() {
-                _simulateMultiScan = v;
-                if (v) _simulateUnrecognized = false;
-              });
-            }),
-            _buildSimToggle('Simulate Unrecognized Product', _simulateUnrecognized, (v) {
-              setState(() {
-                _simulateUnrecognized = v;
-                if (v) {
-                  _simulateMultiScan = false;
-                  _simulateDark = false;
-                  _simulateBlur = false;
-                }
-              });
-            }),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Split out from _buildSimulatorView() -- these Switch rows must be a
+  // SEPARATE Stack child added AFTER the tap-to-scan GestureDetector below,
+  // not part of the background Positioned.fill above. Stack hit-tests from
+  // topmost (last child) to bottommost (first child): the capture
+  // GestureDetector is HitTestBehavior.opaque and covers the full screen,
+  // so anything added before it in the children list (like these toggles
+  // used to be, nested inside _buildSimulatorView) never receives its own
+  // taps -- they all get swallowed by the capture layer first instead.
+  // Wrapping this in Positioned.fill(child: Center(...)) rather than a
+  // second Positioned.fill(child: SizedBox.expand()) matters too: Center
+  // only occupies its child's actual (small) footprint for hit-testing, so
+  // taps outside the toggle rows still fall through to "tap to scan"
+  // underneath, instead of this layer blocking the whole screen.
+  Widget _buildSimulatorToggles() {
+    return Positioned.fill(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 36.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildSimToggle('Force Simulator Mode', _forceSimulatorMode, (v) {
+                setState(() {
+                  _forceSimulatorMode = v;
+                });
+              }),
+              _buildSimToggle('Simulate Dark', _simulateDark, (v) {
+                setState(() {
+                  _simulateDark = v;
+                  if (v) _simulateBlur = false;
+                });
+              }),
+              _buildSimToggle('Simulate Blur', _simulateBlur, (v) {
+                setState(() {
+                  _simulateBlur = v;
+                  if (v) _simulateDark = false;
+                });
+              }),
+              _buildSimToggle('Simulate Multi-Scan (5 items)', _simulateMultiScan, (v) {
+                setState(() {
+                  _simulateMultiScan = v;
+                  if (v) _simulateUnrecognized = false;
+                });
+              }),
+              _buildSimToggle('Simulate Unrecognized Product', _simulateUnrecognized, (v) {
+                setState(() {
+                  _simulateUnrecognized = v;
+                  if (v) {
+                    _simulateMultiScan = false;
+                    _simulateDark = false;
+                    _simulateBlur = false;
+                  }
+                });
+              }),
+            ],
+          ),
         ),
       ),
     );

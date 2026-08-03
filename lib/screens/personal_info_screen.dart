@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
+import '../services/locale_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'change_password_screen.dart';
@@ -32,12 +33,21 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    // Listen for language changes to refresh the UI with localized labels
+    LocaleService.localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) {
+      setState(() {}); // Force rebuild to update localized labels
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _ageController.dispose();
+    LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
 
@@ -116,22 +126,22 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
           final conditionsList = data['conditions'] as List<dynamic>? ?? [];
           _conditions = {
-            'Diabetes': conditionsList.contains('Diabetes'),
-            'Alta-presyon': conditionsList.contains('Alta-presyon'),
-            'Sakit sa puso': conditionsList.contains('Sakit sa puso'),
-            'Mababang Paningin': conditionsList.contains('Mababang Paningin'),
-            'Wala': conditionsList.contains('Wala'),
+            'Diabetes': conditionsList.contains('Diabetes') || conditionsList.contains('Diabetes'),
+            'Hypertension': conditionsList.contains('Hypertension') || conditionsList.contains('Alta-presyon'),
+            'Heart condition': conditionsList.contains('Heart condition') || conditionsList.contains('Sakit sa puso'),
+            'Low vision': conditionsList.contains('Low vision') || conditionsList.contains('Mababang Paningin'),
+            'None': conditionsList.contains('None') || conditionsList.contains('Wala'),
           };
 
           final allergensList = data['allergens'] as List<dynamic>? ?? [];
           _allergens = {
-            'Isda': allergensList.contains('Isda'),
-            'Gatas': allergensList.contains('Gatas'),
-            'Itlog': allergensList.contains('Itlog'),
-            'Soya': allergensList.contains('Soya'),
-            'Trigo': allergensList.contains('Trigo'),
-            'Lamang-Dagat': allergensList.contains('Lamang-Dagat'),
-            'Mani': allergensList.contains('Mani'),
+            'Fish': allergensList.contains('Fish') || allergensList.contains('Isda'),
+            'Milk/Dairy': allergensList.contains('Milk/Dairy') || allergensList.contains('Gatas'),
+            'Eggs': allergensList.contains('Eggs') || allergensList.contains('Itlog'),
+            'Soy': allergensList.contains('Soy') || allergensList.contains('Soya'),
+            'Wheat': allergensList.contains('Wheat') || allergensList.contains('Trigo'),
+            'Shellfish': allergensList.contains('Shellfish') || allergensList.contains('Lamang-Dagat'),
+            'Peanuts': allergensList.contains('Peanuts') || allergensList.contains('Mani'),
           };
         });
         // Keep the app-wide name notifier in sync so HomeScreen's
@@ -275,6 +285,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
+        // Always save English versions to Firestore for consistency
         final selectedConditions = _conditions.entries.where((e) => e.value).map((e) => e.key).toList();
         final ok = await _authService.updateUserData({'conditions': selectedConditions});
         if (ok) await _loadUserData();
@@ -288,12 +299,51 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
+        // Always save English versions to Firestore for consistency
         final selectedAllergens = _allergens.entries.where((e) => e.value).map((e) => e.key).toList();
         final ok = await _authService.updateUserData({'allergens': selectedAllergens});
         if (ok) await _loadUserData();
       }
     } catch (e) {
       debugPrint('Error updating allergens: $e');
+    }
+  }
+
+  String _getLocalizedConditionLabel(String key, AppLocalizations loc) {
+    switch (key) {
+      case 'Diabetes':
+        return loc.conditionDiabetes;
+      case 'Hypertension':
+        return loc.conditionHypertension;
+      case 'Heart condition':
+        return loc.conditionHeartCondition;
+      case 'Low vision':
+        return loc.conditionLowVision;
+      case 'None':
+        return loc.conditionNone;
+      default:
+        return key;
+    }
+  }
+
+  String _getLocalizedAllergenLabel(String key, AppLocalizations loc) {
+    switch (key) {
+      case 'Fish':
+        return loc.allergenFish;
+      case 'Milk/Dairy':
+        return loc.allergenMilk;
+      case 'Eggs':
+        return loc.allergenEggs;
+      case 'Soy':
+        return loc.allergenSoy;
+      case 'Wheat':
+        return loc.allergenWheat;
+      case 'Shellfish':
+        return loc.allergenShellfish;
+      case 'Peanuts':
+        return loc.allergenPeanuts;
+      default:
+        return key;
     }
   }
 
@@ -361,32 +411,26 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     return Center(
       child: Column(
         children: [
-          CircleAvatar(
-            radius: 40,
-            backgroundColor: theme.colorScheme.surfaceContainerHighest,
-            child: const Icon(Icons.person, size: 50, color: Colors.white),
-          ),
-          const SizedBox(height: 12),
           GestureDetector(
             onTap: () => _showEditNameDialog(),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('${loc.onboardingNameHint}: $_userName', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                Text('${loc.onboardingNameHint}: $_userName', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                 const SizedBox(width: 8),
-                Icon(Icons.edit, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                Icon(Icons.edit, size: 18, color: theme.colorScheme.onSurfaceVariant),
               ],
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           GestureDetector(
             onTap: () => _showEditAgeDialog(),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('${loc.ageLabel}: ${_userAge.isEmpty ? loc.none : _userAge}', style: TextStyle(fontSize: 14, color: theme.colorScheme.onSurface)),
+                Text('${loc.ageLabel}: ${_userAge.isEmpty ? loc.none : _userAge}', style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurface)),
                 const SizedBox(width: 8),
-                Icon(Icons.edit, size: 14, color: theme.colorScheme.onSurfaceVariant),
+                Icon(Icons.edit, size: 16, color: theme.colorScheme.onSurfaceVariant),
               ],
             ),
           ),
@@ -418,13 +462,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           const SizedBox(height: 12),
           ..._conditions.entries.map((entry) {
             if (entry.key == 'Wala' || entry.key == 'None') return const SizedBox.shrink();
+            final conditionLabel = _getLocalizedConditionLabel(entry.key, loc);
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
                 children: [
                   Icon(Icons.favorite, color: colorScheme.primary, size: 18),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(entry.key, style: TextStyle(fontSize: 14, color: colorScheme.onSurface))),
+                  Expanded(child: Text(conditionLabel, style: TextStyle(fontSize: 14, color: colorScheme.onSurface))),
                   Switch(
                     value: entry.value,
                     onChanged: (value) {
@@ -590,6 +635,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 runSpacing: 8,
                 children: _allergens.entries.map((entry) {
                   final isSelected = entry.value;
+                  final allergenLabel = _getLocalizedAllergenLabel(entry.key, loc);
                   return GestureDetector(
                     onTap: () {
                       HapticService().vibrate();
@@ -604,7 +650,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: colorScheme.primary, width: isSelected ? 2 : 1),
                       ),
-                      child: Text(entry.key, style: TextStyle(fontSize: 13, color: isSelected ? colorScheme.onPrimary : colorScheme.primary)),
+                      child: Text(allergenLabel, style: TextStyle(fontSize: 13, color: isSelected ? colorScheme.onPrimary : colorScheme.primary)),
                     ),
                   );
                 }).toList(),
