@@ -213,17 +213,26 @@ class AuthGate extends StatelessWidget {
                     if (docSnap.hasData && docSnap.data.exists) {
                       final data = docSnap.data.data() as Map<String, dynamic>?;
 
-                      // Personalized haptic sync: Update service state from user profile
-                      final hapticPref = data?['vibrationFeedback'] ?? false;
-                      HapticService().updateEnabled(hapticPref);
+                      // Sync user preferences AFTER the current build frame
+                      // completes to avoid triggering setState/markNeedsBuild
+                      // during build (TextSizeService.textSizeNotifier is
+                      // listened to above AuthGate by a ValueListenableBuilder
+                      // that wraps MaterialApp — mutating it here causes an
+                      // infinite rebuild cascade).
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        final hapticPref = data?['vibrationFeedback'] ?? false;
+                        HapticService().updateEnabled(hapticPref);
 
-                      // Personalized text size sync: Update service state from user profile
-                      final textSizePref = (data?['textSize'] as num?)?.toDouble() ?? 1.0;
-                      TextSizeService.textSizeNotifier.value = textSizePref;
+                        final textSizePref = (data?['textSize'] as num?)?.toDouble() ?? 1.0;
+                        if (TextSizeService.textSizeNotifier.value != textSizePref) {
+                          TextSizeService.textSizeNotifier.value = textSizePref;
+                        }
 
-                      // Personalized voice assistant sync
-                      final voicePref = data?['voiceAssistant'] ?? false;
-                      VoiceAssistantService.isEnabledNotifier.value = voicePref;
+                        final voicePref = data?['voiceAssistant'] ?? false;
+                        if (VoiceAssistantService.isEnabledNotifier.value != voicePref) {
+                          VoiceAssistantService.isEnabledNotifier.value = voicePref;
+                        }
+                      });
 
                       final bool onboarded = data?['onboardingComplete'] ?? false;
                       if (onboarded) {

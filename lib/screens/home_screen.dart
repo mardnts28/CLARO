@@ -116,21 +116,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            IndexedStack(
-              index: _selectedIndex,
-              children: [
-                _buildHomeContent(),
-                _buildScanPage(),
-                _buildHistoryPage(),
-                const ProfileScreen(),
-              ],
-            ),
-            // Removed local voice button overlay to avoid duplicate and overlapping FAB
-          ],
-        ),
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _selectedIndex,
+            children: [
+              SafeArea(bottom: false, child: _buildHomeContent()),
+              _buildScanPage(),
+              SafeArea(bottom: false, child: _buildHistoryPage()),
+              const SafeArea(bottom: false, child: ProfileScreen()),
+            ],
+          ),
+        ],
       ),
       floatingActionButton: ValueListenableBuilder<bool>(
         valueListenable: VoiceAssistantService.isEnabledNotifier,
@@ -824,7 +821,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildScanPage() {
-    return const CameraScannerScreen(embeddedMode: true);
+    return CameraScannerScreen(
+      embeddedMode: true,
+      isActive: _selectedIndex == 1,
+    );
   }
 
   Widget _buildHistoryPage() {

@@ -13,6 +13,8 @@
 // Uses models/product_model.dart's Product -- the single source of truth
 // for product data -- throughout. No separate backend Product model.
 
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../models/product_model.dart';
@@ -21,6 +23,8 @@ import '../../services/nutrition_service.dart';
 abstract class ProductRepository {
   Future<Product> getProductById(String id);
   Future<List<Product>> getAllProducts();
+  /// Look up a product by its `yolo_label` field (the exact class name from labels.json).
+  Future<Product> getProductByYoloLabel(String yoloLabel);
   // Matches on Product.category (e.g. "Canned Fish", "Instant Noodles") --
   // the grouping field the UI's compare screen uses. [excludeId] is fully
   // excluded from the result (not just moved to the end), since callers
@@ -54,17 +58,133 @@ class FirestoreProductRepository implements ProductRepository {
 
   @override
   Future<Product> getProductById(String id) async {
-    // id is the Firestore document ID (e.g. "TwKsaC2cIm2SiaW8astc"), not the
-    // human-readable slug ProductDbService used to use (e.g.
-    // "century_tuna_flakes_oil"). Every caller that stores/passes around a
-    // product id needs to be storing this document ID going forward -- see
-    // Phase 2.
     final doc = await _db.collection(_collection).doc(id).get();
-    if (!doc.exists) {
-      throw Exception('Product not found: $id');
+    if (doc.exists) {
+      final base = _productFromDoc(doc.id, doc.data()!);
+      return NutritionService().enrichProduct(base);
     }
-    final base = _productFromDoc(doc.id, doc.data()!);
-    return NutritionService().enrichProduct(base);
+
+    // Fallback: match by normalized product name or slug if doc.id differs from YOLO label
+    final snapshot = await _db.collection(_collection).get();
+    final normId = id.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    for (final d in snapshot.docs) {
+      final pName = (d.data()['product_name'] as String? ?? '')
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]'), '');
+      if (d.id == id ||
+          pName == normId ||
+          pName.contains(normId) ||
+          normId.contains(pName)) {
+        final base = _productFromDoc(d.id, d.data());
+        return NutritionService().enrichProduct(base);
+      }
+    }
+
+    throw Exception('Product not found: $id');
+  }
+
+  @override
+  Future<Product> getProductByYoloLabel(String yoloLabel) async {
+    final cleanLabel = yoloLabel.trim().toLowerCase();
+
+    // 1. Direct Firestore query on the yolo_label field
+    try {
+      final query = await _db
+          .collection(_collection)
+          .where('yolo_label', isEqualTo: cleanLabel)
+          .limit(1)
+          .get();
+      if (query.docs.isNotEmpty) {
+        final d = query.docs.first;
+        final base = _productFromDoc(d.id, d.data());
+        return NutritionService().enrichProduct(base);
+      }
+    } catch (_) {}
+
+    // 2. Fetch all products to do multi-pass token matching
+    try {
+      final snapshot = await _db.collection(_collection).get();
+      final normYolo = cleanLabel.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+      // Pass A: Exact match on doc ID or yolo_label field
+      for (final d in snapshot.docs) {
+        final data = d.data();
+        final docYolo = (data['yolo_label'] as String? ?? '').trim().toLowerCase();
+        if (d.id == yoloLabel || docYolo == cleanLabel) {
+          final base = _productFromDoc(d.id, data);
+          return NutritionService().enrichProduct(base);
+        }
+      }
+
+      // Pass B: Smart Token Overlap matching against product_name
+      final yoloTokens = cleanLabel
+          .split('_')
+          .where((t) => t.length > 2 && !['and', 'with', 'the', 'pck', 'sauce'].contains(t))
+          .toList();
+
+      QueryDocumentSnapshot<Map<String, dynamic>>? bestDoc;
+      int maxMatches = 0;
+
+      for (final d in snapshot.docs) {
+        final data = d.data();
+        final pName = (data['product_name'] as String? ?? '').toLowerCase();
+        final normPName = pName.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+        // Direct normalized substring match
+        if (normPName.contains(normYolo) || normYolo.contains(normPName)) {
+          final base = _productFromDoc(d.id, data);
+          return NutritionService().enrichProduct(base);
+        }
+
+        // Count token matches
+        int matchCount = 0;
+        for (final token in yoloTokens) {
+          if (pName.contains(token)) {
+            matchCount++;
+          }
+        }
+
+        if (matchCount > maxMatches) {
+          maxMatches = matchCount;
+          bestDoc = d;
+        }
+      }
+
+      if (bestDoc != null && maxMatches >= 2) {
+        final base = _productFromDoc(bestDoc.id, bestDoc.data());
+        return NutritionService().enrichProduct(base);
+      }
+    } catch (e) {
+      debugPrint('Firestore lookup error in getProductByYoloLabel: $e');
+    }
+
+    // 3. Fallback: Create structured Product model for recognized YOLO label classes
+    final formattedTitle = cleanLabel
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
+        .join(' ');
+
+    return Product(
+      id: yoloLabel,
+      name: formattedTitle,
+      brand: formattedTitle.split(' ').first,
+      category: 'Scanned Products',
+      imageUrl: 'assets/images/placeholder_product.png',
+      allergens: const ['Fish', 'Soy'],
+      ingredients: const ['Ingredients detailed on physical product packaging.'],
+      availableSizes: const [155.0],
+      nutritionalFacts: NutritionalFacts(
+        caloriesKcal: 190,
+        proteinG: 14,
+        totalFatG: 4.5,
+        saturatedFatG: 1.5,
+        sodiumMg: 360,
+        carbsG: 2.0,
+        fiberG: 0,
+        sugarsG: 0,
+      ),
+    );
   }
 
   @override

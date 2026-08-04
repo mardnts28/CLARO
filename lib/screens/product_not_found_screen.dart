@@ -78,7 +78,7 @@ class ProductNotFoundScreen extends StatelessWidget {
                         child: Image.asset(
                           'assets/images/unidentified_product.png',
                           fit: BoxFit.contain,
-                          errorBuilder: (_, __, ___) => Icon(
+                          errorBuilder: (context, error, stackTrace) => Icon(
                             Icons.search_off_rounded,
                             size: 80,
                             color: colorScheme.primary.withValues(alpha: 0.5),

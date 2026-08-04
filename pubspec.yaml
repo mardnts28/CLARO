@@ -38,6 +38,7 @@ dependencies:
   flutter_dotenv: ^5.1.0
   google_generative_ai: ^0.4.6
   provider: ^6.1.5+1
+  tflite_flutter: ^0.12.1
 
 dev_dependencies:
   flutter_test:
@@ -58,4 +59,6 @@ flutter:
   assets:
     - assets/
     - assets/images/
+    - assets/model/
     - .env
+
