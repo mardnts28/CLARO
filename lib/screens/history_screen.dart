@@ -11,6 +11,8 @@ import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../models/product_model.dart';
 import '../models/report_model.dart';
+import '../services/home_tab_controller.dart';
+import '../services/haptic_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 class HistoryScreen extends StatefulWidget {
   final bool embeddedMode;
@@ -671,45 +673,80 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Widget _navItem(IconData icon, String label, bool active,
-      {VoidCallback? onTap}) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon,
-              color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
-              size: 26),
-          const SizedBox(height: 2),
-          Text(label,
-              style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
-                  fontWeight:
-                      active ? FontWeight.w600 : FontWeight.normal)),
+  Widget _buildBottomNav() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    final navPillColor = theme.brightness == Brightness.dark
+        ? colorScheme.primary.withOpacity(0.2)
+        : const Color(0xFFF6CDCD);
+
+    final items = [
+      (icon: Icons.home_outlined, activeIcon: Icons.home, label: loc.home),
+      (icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: loc.scan),
+      (icon: Icons.history_outlined, activeIcon: Icons.history, label: loc.history),
+      (icon: Icons.person_outline, activeIcon: Icons.person, label: loc.profile),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: theme.brightness == Brightness.dark ? Colors.black.withOpacity(0.25) : Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _navItemScan() {
-    final colorScheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: () => Navigator.push(context,
-          MaterialPageRoute(builder: (_) => const CameraScannerScreen())),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.qr_code_scanner, color: colorScheme.onSurfaceVariant, size: 26),
-          const SizedBox(height: 2),
-          Text('Scan',
-              style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.normal)),
-        ],
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(items.length, (index) {
+            final item = items[index];
+            final isSelected = index == 2;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticService().vibrate();
+                  HomeTabController.tabNotifier.value = index;
+                  Navigator.popUntil(context, (r) => r.isFirst);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? navPillColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSelected ? item.activeIcon : item.icon,
+                        color: colorScheme.primary,
+                        size: 22,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.primary,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
       ),
     );
   }
@@ -743,47 +780,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       floatingActionButton: widget.embeddedMode ? null : const VoiceAssistantFab(),
-      bottomNavigationBar: widget.embeddedMode ? null : Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          border: Border(top: BorderSide(color: theme.dividerColor)),
-        ),
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).padding.bottom + 4, top: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _navItem(Icons.home_outlined, loc.home, false),
-            _navItemScan(),
-            // History tab is active
-            GestureDetector(
-              onTap: () {},
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 8),
-                decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.history,
-                        color: colorScheme.primary, size: 26),
-                    const SizedBox(height: 2),
-                    Text(loc.history,
-                        style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w600)),
-                  ],
-                ),
-              ),
-            ),
-            _navItem(Icons.person_outline, loc.profile, false),
-          ],
-        ),
-      ),
+      bottomNavigationBar: widget.embeddedMode ? null : _buildBottomNav(),
       body: Column(
         children: [
           // ── Top bar ──────────────────────────────────────────────────────

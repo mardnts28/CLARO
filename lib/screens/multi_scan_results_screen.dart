@@ -12,6 +12,8 @@ import '../data/models/health_profile.dart';
 import '../core/utils/nutrition_availability.dart';
 import '../data/services/backend_locator.dart';
 import '../widgets/ranked_product_card.dart';
+import '../services/home_tab_controller.dart';
+import '../services/haptic_service.dart';
 
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
@@ -385,94 +387,84 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
       floatingActionButton: const VoiceAssistantFab(),
 
       // ── Bottom Navigation Bar ─────────────────────────────────────
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          border: Border(top: BorderSide(color: theme.dividerColor)),
-        ),
-        padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).padding.bottom + 4, top: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _navItem(Icons.home_outlined, 'Home', false),
-            _navItemScan(context),
-            _navItem(Icons.history, 'History', false),
-            _navItem(Icons.person_outline, 'Profile', false),
-          ],
-        ),
-      ),
+      bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  Widget _navItem(IconData icon, String label, bool active) {
+  Widget _buildBottomNav() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final activeColor = colorScheme.primary;
-    final inactiveColor = colorScheme.onSurfaceVariant;
+    final navPillColor = theme.brightness == Brightness.dark
+        ? colorScheme.primary.withOpacity(0.2)
+        : const Color(0xFFF6CDCD);
 
-    return GestureDetector(
-      onTap: () {
-        if (label == loc.home) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const CameraScannerScreen()),
-          );
-        } else if (label == loc.history) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => const HistoryScreen()),
-          );
-        } else if (label == loc.profile) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(loc.profileFeatureSoon, style: GoogleFonts.inter()),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: active ? activeColor : inactiveColor,
-              size: 26),
-          const SizedBox(height: 2),
-          Text(label,
-              style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: active ? activeColor : inactiveColor,
-                  fontWeight:
-                      active ? FontWeight.w600 : FontWeight.normal)),
+    final items = [
+      (icon: Icons.home_outlined, activeIcon: Icons.home, label: loc.home),
+      (icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: loc.scan),
+      (icon: Icons.history_outlined, activeIcon: Icons.history, label: loc.history),
+      (icon: Icons.person_outline, activeIcon: Icons.person, label: loc.profile),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        boxShadow: [
+          BoxShadow(
+            color: theme.brightness == Brightness.dark ? Colors.black.withOpacity(0.25) : Colors.black.withOpacity(0.05),
+            blurRadius: 12,
+            offset: const Offset(0, -2),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _navItemScan(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final loc = AppLocalizations.of(context)!;
-    return GestureDetector(
-      onTap: () => Navigator.popUntil(context, (r) => r.isFirst),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        decoration: BoxDecoration(
-          color: colorScheme.primary.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.qr_code_scanner,
-                color: colorScheme.primary, size: 26),
-            const SizedBox(height: 2),
-            Text(loc.scan,
-                style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.w600)),
-          ],
+      child: SafeArea(
+        top: false,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: List.generate(items.length, (index) {
+            final item = items[index];
+            // Multi-scan results are conceptually part of the 'Scan' journey
+            final isSelected = index == 1;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  HapticService().vibrate();
+                  HomeTabController.tabNotifier.value = index;
+                  Navigator.popUntil(context, (r) => r.isFirst);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? navPillColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSelected ? item.activeIcon : item.icon,
+                        color: colorScheme.primary,
+                        size: 22,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.primary,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );
