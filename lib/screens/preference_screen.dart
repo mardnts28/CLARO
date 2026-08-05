@@ -271,57 +271,6 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.dividerColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(loc.multiFactorAuthentication, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: theme.colorScheme.surfaceContainerHighest),
-                        child: const Icon(Icons.notifications_outlined, color: _primaryRed),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(loc.multiFactorAuthentication, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
-                            const SizedBox(height: 4),
-                            Text(loc.safetyPriorityMessage, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Switch(
-                        value: _notificationsEnabled,
-                        onChanged: (v) async {
-                          HapticService().vibrate();
-                          setState(() => _notificationsEnabled = v);
-                          final ok = await _savePref('notificationsEnabled', v);
-                          if (!ok && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
-                          }
-                        },
-                        activeThumbColor: _primaryRed,
-                        activeTrackColor: _primaryRed.withAlpha(120),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),

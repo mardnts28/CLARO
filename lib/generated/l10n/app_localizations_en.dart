@@ -39,6 +39,67 @@ class AppLocalizationsEn extends AppLocalizations {
   String get scanNow => 'Scan now';
 
   @override
+  String get infoFdaTitle => 'Read the label';
+
+  @override
+  String get infoFdaSubtitle => 'FDA guide';
+
+  @override
+  String get infoWhoTitle => 'Daily limit';
+
+  @override
+  String get infoWhoSubtitle => 'WHO guide';
+
+  @override
+  String get infoFdaSheetHeading => 'How to read the nutrition label';
+
+  @override
+  String get infoFdaSheetSubtitle => 'Based on FDA guidance (fda.gov)';
+
+  @override
+  String get infoFdaSheetStep1 =>
+      'Check serving size and servings per package. All nutrient amounts on the label are based on this, not the whole package.';
+
+  @override
+  String get infoFdaSheetStep2 =>
+      'Review calories. 2,000 calories per day is a general guide, but your needs may vary by age, sex, and activity level.';
+
+  @override
+  String get infoFdaSheetStep3 =>
+      'Use % Daily Value (%DV): 5% or less is considered low; 20% or more is considered high.';
+
+  @override
+  String get infoWhoSheetHeading => 'Daily nutrient limits';
+
+  @override
+  String get infoWhoSheetSubtitle =>
+      'Based on WHO guidance for a 2,000 kcal diet';
+
+  @override
+  String get infoWhoSheetLimitSugar => 'Sugar (free sugars)';
+
+  @override
+  String get infoWhoSheetLimitSalt => 'Salt (sodium)';
+
+  @override
+  String get infoWhoSheetLimitSaturatedFat => 'Saturated fat';
+
+  @override
+  String get infoWhoSheetLimitTransFat => 'Trans fat';
+
+  @override
+  String get infoWhoSheetLimitSugarValue => '< 50g (10% of calories)';
+
+  @override
+  String get infoWhoSheetLimitSaltValue => '< 2g sodium (< 5g salt)';
+
+  @override
+  String get infoWhoSheetLimitSaturatedFatValue => '< 10% of calories';
+
+  @override
+  String get infoWhoSheetLimitTransFatValue => '< 1% of calories';
+
+  @override
   String get labelIntroTitle => 'Understand your labels';
 
   @override

@@ -25,7 +25,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _voiceAssistantEnabled = false;
   bool _mfaEnabled = false;
   bool _darkModeEnabled = false;
-  String _selectedLanguage = 'English';
+  String _selectedLanguageCode = 'en';
   double _speechRate = 0.5;
   double _speechVolume = 0.7;
   bool _vibrationFeedback = false;
@@ -79,7 +79,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
                 // `language` stored as language code ('en'|'tl'). Convert to human label for UI.
                 final code = data['language'] ?? 'en';
-                _selectedLanguage = (code == 'tl') ? 'Tagalog' : 'English';
+                _selectedLanguageCode = code;
                 _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
                 _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
                 _vibrationFeedback = data['vibrationFeedback'] ?? false;
@@ -107,7 +107,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _mfaEnabled = data['mfaEnabled'] ?? false;
               _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
               final code = data['language'] ?? 'en';
-              _selectedLanguage = (code == 'tl') ? 'Tagalog' : 'English';
+              _selectedLanguageCode = code;
               _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
               _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
               _vibrationFeedback = data['vibrationFeedback'] ?? false;
@@ -306,7 +306,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildMenuItemWithArrow(
             icon: Icons.language,
             label: loc.language,
-            trailing: Text(_selectedLanguage, style: TextStyle(color: colorScheme.onSurfaceVariant)),
+            trailing: Text(
+              _selectedLanguageCode == 'tl' ? loc.tagalog : loc.english,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
             onTap: () {
               HapticService().vibrate();
               _showLanguageChooser();
@@ -343,9 +346,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (choice != null) {
-      final selectedLabel = choice == 'en' ? AppLocalizations.of(context)!.english : AppLocalizations.of(context)!.tagalog;
-      if (selectedLabel != _selectedLanguage) {
-        setState(() => _selectedLanguage = selectedLabel);
+      if (choice != _selectedLanguageCode) {
+        setState(() => _selectedLanguageCode = choice);
         // Persist language code (e.g., 'en' or 'tl') to Firestore so server-side reads match locale codes.
         await _updateUserPreference('language', choice);
         await LocaleService.setAppLocale(choice);
