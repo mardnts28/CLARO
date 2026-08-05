@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/images/logoll.png";
 import { loginAdmin, resetPassword, firebaseErrorMessages } from "../services/authService";
-import { generateAndSendOTP } from "../services/otpService";
 import "./Login.css";
 
 export default function Login() {
@@ -46,19 +45,17 @@ export default function Login() {
 
     try {
       const admin = await loginAdmin(email.trim(), password);
-      const { expiresAt } = await generateAndSendOTP(admin.uid, admin.email);
 
-      navigate("/verify-otp", {
-        state: {
-          uid: admin.uid,
-          email: admin.email,
-          otpExpiresAt: expiresAt.getTime(),
-        },
-      });
+      // MFA/OTP step temporarily disabled (EmailJS free tier limits).
+      // Re-enable later by restoring generateAndSendOTP + navigate("/verify-otp").
+      // Mandatory password change for first-time logins is still enforced
+      // via the existing `mustChangePassword` field on the admin doc.
+      if (admin.mustChangePassword) {
+        navigate("/change-password", { replace: true, state: { firstTime: true } });
+      } else {
+        navigate("/dashboard", { replace: true });
+      }
     } catch (err) {
-        console.error("FULL ERROR OBJECT:", err);
-        console.error("ERROR CODE:", err.code);
-        console.error("ERROR MESSAGE:", err.message);
       if (err.code === "not-admin") {
         setErrors({ form: "You are not authorized to access this dashboard." });
       } else {
