@@ -17,8 +17,13 @@ import '../services/haptic_service.dart';
 
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
+  final Map<String, int>? productCounts;
 
-  const MultiScanResultsScreen({super.key, required this.detectedProducts});
+  const MultiScanResultsScreen({
+    super.key,
+    required this.detectedProducts,
+    this.productCounts,
+  });
 
   @override
   State<MultiScanResultsScreen> createState() => _MultiScanResultsScreenState();
@@ -361,6 +366,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                       final ranked = _ranked[i];
                       return RankedProductCard(
                         ranked: ranked,
+                        quantity: widget.productCounts?[ranked.evaluation.product.id],
                         onTap: () {
                           // Navigate to the individual detail screen, passing
                           // the full ranked set so the detail screen can show

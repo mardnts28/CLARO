@@ -31,12 +31,14 @@ class ProductDetailScreen extends StatefulWidget {
   // When null/omitted, this is a solo scan -- advisory-only, no comparison
   // matrix, matching the original Phase 2 solo flow.
   final List<RankedProductResult>? comparisonSet;
+  final Map<String, int>? productCounts;
 
   const ProductDetailScreen({
     super.key,
     required this.product,
     this.confidence = 0.95,
     this.comparisonSet,
+    this.productCounts,
   });
 
   @override
@@ -439,7 +441,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                p.name,
+                                widget.productCounts != null && (widget.productCounts![p.id] ?? 1) > 1
+                                    ? '${p.name} (x${widget.productCounts![p.id]})'
+                                    : p.name,
                                 style: GoogleFonts.outfit(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,

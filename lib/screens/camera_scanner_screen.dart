@@ -361,19 +361,30 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         final List<Product> resolvedProducts = [];
         final Map<String, int> productCounts = {};
 
+        // Extract unique YOLO labels and their counts first
+        final Map<String, int> labelCounts = {};
         for (var det in detections) {
+          labelCounts[det.label] = (labelCounts[det.label] ?? 0) + 1;
+        }
+
+        // Query database once per unique label
+        for (var entry in labelCounts.entries) {
+          final label = entry.key;
+          final count = entry.value;
           try {
             final prod =
-                await BackendLocator.productRepository.getProductByYoloLabel(det.label);
+                await BackendLocator.productRepository.getProductByYoloLabel(label);
             resolvedProducts.add(prod);
-            productCounts[prod.id] = (productCounts[prod.id] ?? 0) + 1;
+            productCounts[prod.id] = (productCounts[prod.id] ?? 0) + count;
           } catch (e) {
-            debugPrint('CameraScannerScreen: product lookup failed for ${det.label}: $e');
+            debugPrint('CameraScannerScreen: product lookup failed for $label: $e');
             try {
-              await FirebaseFirestore.instance.collection('unmatched_yolo_scans').add({
-                'label': det.label,
-                'timestamp': FieldValue.serverTimestamp(),
-              });
+              for (int i = 0; i < count; i++) {
+                await FirebaseFirestore.instance.collection('unmatched_yolo_scans').add({
+                  'label': label,
+                  'timestamp': FieldValue.serverTimestamp(),
+                });
+              }
             } catch (_) {}
           }
         }
@@ -390,6 +401,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 builder: (_) => ProductDetailScreen(
                   product: singleProd,
                   confidence: detections.first.confidence,
+                  productCounts: productCounts,
                 ),
               ),
             ).then((_) {
@@ -406,6 +418,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               MaterialPageRoute(
                 builder: (_) => MultiScanResultsScreen(
                   detectedProducts: distinctProducts,
+                  productCounts: productCounts,
                 ),
               ),
             ).then((_) {

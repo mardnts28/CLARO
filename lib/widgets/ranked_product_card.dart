@@ -19,12 +19,14 @@ class RankedProductCard extends StatelessWidget {
   final RankedProductResult ranked;
   final bool isCurrent;
   final VoidCallback onTap;
+  final int? quantity;
 
   const RankedProductCard({
     super.key,
     required this.ranked,
     required this.onTap,
     this.isCurrent = false,
+    this.quantity,
   });
 
   Color _labelColor() => RankLabelHelper.color(
@@ -92,7 +94,7 @@ class RankedProductCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          product.name,
+                          quantity != null && quantity! > 1 ? '${product.name} (x$quantity)' : product.name,
                           style: GoogleFonts.outfit(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
