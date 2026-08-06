@@ -56,21 +56,6 @@ export default function Sidebar({ collapsed }) {
         </NavLink>
 
         <NavLink
-          to="/settings"
-          className={({ isActive }) =>
-            "sidebar-link" + (isActive ? " active" : "")
-          }
-        >
-          <FiSettings className="icon" />
-          {!collapsed && (
-            <>
-              <span className="link-text">Settings</span>
-              <FiChevronRight className="chevron" />
-            </>
-          )}
-        </NavLink>
-
-        <NavLink
           to="/app-review"
           className={({ isActive }) =>
             "sidebar-link" + (isActive ? " active" : "")
@@ -80,6 +65,21 @@ export default function Sidebar({ collapsed }) {
           {!collapsed && (
             <>
               <span className="link-text">App Review</span>
+              <FiChevronRight className="chevron" />
+            </>
+          )}
+        </NavLink>
+
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            "sidebar-link" + (isActive ? " active" : "")
+          }
+        >
+          <FiSettings className="icon" />
+          {!collapsed && (
+            <>
+              <span className="link-text">Settings</span>
               <FiChevronRight className="chevron" />
             </>
           )}

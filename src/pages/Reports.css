@@ -114,3 +114,8 @@
   font-size: 17px;
   display: flex;
 }
+.date-cell {
+  color: #6a6a6a;
+  font-size: 13.5px;
+  white-space: nowrap;
+}

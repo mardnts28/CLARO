@@ -15,6 +15,13 @@ function StatusBadge({ status }) {
   return <span className={map[status] || "badge"}>{status}</span>;
 }
 
+// Lower number = higher priority (shown first)
+const STATUS_ORDER = {
+  Pending: 0,
+  Approve: 1,
+  Rejected: 2,
+};
+
 export default function Reports() {
   const navigate = useNavigate();
   const [reports, setReports] = useState([]);
@@ -38,8 +45,15 @@ export default function Reports() {
     load();
   }, []);
 
+  function getDateValue(r) {
+    // Supports Firestore Timestamp (has toDate) or raw Date/number/string
+    if (r.dateSubmitted?.toDate) return r.dateSubmitted.toDate().getTime();
+    if (r.dateSubmitted) return new Date(r.dateSubmitted).getTime();
+    return 0;
+  }
+
   const filteredReports = useMemo(() => {
-    return reports.filter((r) => {
+    const filtered = reports.filter((r) => {
       const matchesSearch =
         r.userName?.toLowerCase().includes(search.toLowerCase()) ||
         r.productName?.toLowerCase().includes(search.toLowerCase());
@@ -49,11 +63,22 @@ export default function Reports() {
 
       return matchesSearch && matchesStatus;
     });
+
+    return [...filtered].sort((a, b) => {
+      const statusDiff =
+        (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
+      if (statusDiff !== 0) return statusDiff;
+
+      // Within the same status, most recent first
+      return getDateValue(b) - getDateValue(a);
+    });
   }, [reports, search, statusFilter]);
 
   function formatDate(timestamp) {
-    if (!timestamp?.toDate) return "";
-    return timestamp.toDate().toLocaleDateString("en-US", {
+    if (!timestamp) return "";
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -115,6 +140,7 @@ export default function Reports() {
               <tr>
                 <th>User</th>
                 <th>Product Name</th>
+                <th>Date</th>
                 <th>Status</th>
                 <th>Actions</th>
               </tr>
@@ -134,6 +160,7 @@ export default function Reports() {
                       <div className="product-desc">{r.productDescription}</div>
                     )}
                   </td>
+                  <td className="date-cell">{formatDate(r.dateSubmitted)}</td>
                   <td>
                     <StatusBadge status={r.status} />
                   </td>
