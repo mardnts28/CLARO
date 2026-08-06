@@ -739,6 +739,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nutriCalories => 'Calories';
 
   @override
+  String get nutriCarbs => 'Carbs';
+
+  @override
   String get nutriSodium => 'Sodium';
 
   @override

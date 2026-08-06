@@ -64,6 +64,57 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
     }
   }
 
+  String _toTitleCase(String text) {
+    if (text.trim().isEmpty) return text;
+    final words = text.split(' ');
+    return words.map((w) {
+      if (w.isEmpty) return w;
+      int prefixLen = 0;
+      while (prefixLen < w.length && (w[prefixLen] == '(' || w[prefixLen] == '[')) {
+        prefixLen++;
+      }
+      if (prefixLen >= w.length) return w;
+      final prefix = w.substring(0, prefixLen);
+      final body = w.substring(prefixLen);
+      if (body.isEmpty) return w;
+      final lower = body.toLowerCase();
+      if (['and', 'or', 'with', 'in', 'of', 'for'].contains(lower) && prefixLen == 0) {
+        return lower;
+      }
+      final formattedBody = lower[0].toUpperCase() + lower.substring(1);
+      return prefix + formattedBody;
+    }).join(' ');
+  }
+
+  List<String> _parseIngredientsList(List<String> rawIngredients) {
+    if (rawIngredients.isEmpty) return [];
+    final fullText = rawIngredients.join(', ');
+
+    final List<String> items = [];
+    final StringBuffer current = StringBuffer();
+    int parenDepth = 0;
+
+    for (int i = 0; i < fullText.length; i++) {
+      final char = fullText[i];
+      if (char == '(' || char == '[') {
+        parenDepth++;
+        current.write(char);
+      } else if (char == ')' || char == ']') {
+        if (parenDepth > 0) parenDepth--;
+        current.write(char);
+      } else if (char == ',' && parenDepth == 0) {
+        final str = current.toString().trim();
+        if (str.isNotEmpty) items.add(_toTitleCase(str));
+        current.clear();
+      } else {
+        current.write(char);
+      }
+    }
+    final str = current.toString().trim();
+    if (str.isNotEmpty) items.add(_toTitleCase(str));
+    return items;
+  }
+
   @override
   Widget build(BuildContext context) {
     final product = widget.product;
@@ -104,16 +155,42 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 12),
-                  Text(
-                    product.ingredients.isNotEmpty
-                        ? product.ingredients.join(', ')
-                        : '—',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: colorScheme.onSurface,
-                      height: 1.5,
-                    ),
-                  ),
+                  Builder(builder: (context) {
+                    final parsedItems = _parseIngredientsList(product.ingredients);
+                    if (parsedItems.isEmpty) {
+                      return Text('—',
+                          style: GoogleFonts.inter(
+                              fontSize: 14, color: colorScheme.onSurface));
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: parsedItems.map((item) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('• ',
+                                  style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary)),
+                              Expanded(
+                                child: Text(
+                                  item,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    color: colorScheme.onSurface,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  }),
                   // Allergen warnings -- ONLY for allergens matched against
                   // the signed-in user's saved health profile
                   // (`widget.matchedAllergens`, the same set the Health

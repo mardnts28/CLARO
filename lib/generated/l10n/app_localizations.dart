@@ -1484,6 +1484,12 @@ abstract class AppLocalizations {
   /// **'Calories'**
   String get nutriCalories;
 
+  /// No description provided for @nutriCarbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Carbs'**
+  String get nutriCarbs;
+
   /// No description provided for @nutriSodium.
   ///
   /// In en, this message translates to:

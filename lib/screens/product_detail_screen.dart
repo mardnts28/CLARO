@@ -924,18 +924,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           children: [
                             _nutriCard(context, loc.nutriCalories, '${(p.nutritionalFacts.caloriesKcal * _sizeScale).toStringAsFixed(0)} kcal'),
                             const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriSodium, '${(p.nutritionalFacts.sodiumMg * _sizeScale).toStringAsFixed(0)}mg'),
+                            _nutriCard(context, loc.nutriCarbs, '${(p.nutritionalFacts.carbsG * _sizeScale).toStringAsFixed(1)}g'),
                             const SizedBox(width: 8),
                             _nutriCard(context, loc.nutriSugar, '${(p.nutritionalFacts.sugarsG * _sizeScale).toStringAsFixed(1)}g'),
-                            const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriProtein, '${(p.nutritionalFacts.proteinG * _sizeScale).toStringAsFixed(1)}g'),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Row(
                           children: [
-                            _nutriCard(context, loc.nutriTotalFat, '${(p.nutritionalFacts.totalFatG * _sizeScale).toStringAsFixed(1)}g'),
+                            _nutriCard(context, loc.nutriSodium, '${(p.nutritionalFacts.sodiumMg * _sizeScale).toStringAsFixed(0)}mg'),
                             const SizedBox(width: 8),
+                            _nutriCard(context, loc.nutriProtein, '${(p.nutritionalFacts.proteinG * _sizeScale).toStringAsFixed(1)}g'),
+                            const SizedBox(width: 8),
+                            _nutriCard(context, loc.nutriTotalFat, '${(p.nutritionalFacts.totalFatG * _sizeScale).toStringAsFixed(1)}g'),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
                             _nutriCard(context, loc.nutriSatFat, '${(p.nutritionalFacts.saturatedFatG * _sizeScale).toStringAsFixed(1)}g'),
                             const SizedBox(width: 8),
                             _nutriCard(context, loc.nutriTransFat, '${(p.nutritionalFacts.transFatG * _sizeScale).toStringAsFixed(1)}g'),
@@ -947,9 +953,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         Row(
                           children: [
                             _nutriCard(context, loc.nutriPotassium, '${(p.nutritionalFacts.potassiumMg * _sizeScale).toStringAsFixed(0)}mg'),
+                            const SizedBox(width: 8),
                             _nutriCard(context, loc.nutriCalcium, '${(p.nutritionalFacts.calciumMg * _sizeScale).toStringAsFixed(0)}mg'),
+                            const SizedBox(width: 8),
                             _nutriCard(context, loc.nutriIron, '${(p.nutritionalFacts.ironMg * _sizeScale).toStringAsFixed(1)}mg'),
-                            Expanded(child: const SizedBox()),
                           ],
                         ),
                         ],
