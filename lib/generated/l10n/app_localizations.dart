@@ -974,11 +974,173 @@ abstract class AppLocalizations {
   /// **'Change password'**
   String get changePassword;
 
+  /// No description provided for @currentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current Password'**
+  String get currentPassword;
+
+  /// No description provided for @newPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New Password'**
+  String get newPassword;
+
+  /// No description provided for @confirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Password'**
+  String get confirmPassword;
+
+  /// No description provided for @passwordRequirements.
+  ///
+  /// In en, this message translates to:
+  /// **'Your password must be at least six characters with a combination of numbers, letters, and special characters (!@#%)'**
+  String get passwordRequirements;
+
+  /// No description provided for @passwordChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Password successfully changed!'**
+  String get passwordChanged;
+
+  /// No description provided for @errorCurrentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your current password'**
+  String get errorCurrentPassword;
+
+  /// No description provided for @errorNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your new password'**
+  String get errorNewPassword;
+
+  /// No description provided for @errorConfirmPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Please confirm your new password'**
+  String get errorConfirmPassword;
+
+  /// No description provided for @errorPasswordsNotMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords do not match'**
+  String get errorPasswordsNotMatch;
+
+  /// No description provided for @errorPasswordTooShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must be at least 6 characters'**
+  String get errorPasswordTooShort;
+
+  /// No description provided for @errorNotAuthenticated.
+  ///
+  /// In en, this message translates to:
+  /// **'User not authenticated'**
+  String get errorNotAuthenticated;
+
+  /// No description provided for @errorChangingPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Error changing password'**
+  String get errorChangingPassword;
+
+  /// No description provided for @unexpectedError.
+  ///
+  /// In en, this message translates to:
+  /// **'An unexpected error occurred'**
+  String get unexpectedError;
+
   /// No description provided for @selectAllergen.
   ///
   /// In en, this message translates to:
   /// **'Select Allergen'**
   String get selectAllergen;
+
+  /// No description provided for @conditionDiabetes.
+  ///
+  /// In en, this message translates to:
+  /// **'Diabetes'**
+  String get conditionDiabetes;
+
+  /// No description provided for @conditionHypertension.
+  ///
+  /// In en, this message translates to:
+  /// **'Hypertension'**
+  String get conditionHypertension;
+
+  /// No description provided for @conditionHeartCondition.
+  ///
+  /// In en, this message translates to:
+  /// **'Heart condition'**
+  String get conditionHeartCondition;
+
+  /// No description provided for @conditionLowVision.
+  ///
+  /// In en, this message translates to:
+  /// **'Low vision'**
+  String get conditionLowVision;
+
+  /// No description provided for @conditionNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get conditionNone;
+
+  /// No description provided for @allergenFish.
+  ///
+  /// In en, this message translates to:
+  /// **'Fish'**
+  String get allergenFish;
+
+  /// No description provided for @allergenMilk.
+  ///
+  /// In en, this message translates to:
+  /// **'Milk/Dairy'**
+  String get allergenMilk;
+
+  /// No description provided for @allergenEggs.
+  ///
+  /// In en, this message translates to:
+  /// **'Eggs'**
+  String get allergenEggs;
+
+  /// No description provided for @allergenSoy.
+  ///
+  /// In en, this message translates to:
+  /// **'Soy'**
+  String get allergenSoy;
+
+  /// No description provided for @allergenWheat.
+  ///
+  /// In en, this message translates to:
+  /// **'Wheat'**
+  String get allergenWheat;
+
+  /// No description provided for @allergenShellfish.
+  ///
+  /// In en, this message translates to:
+  /// **'Shellfish'**
+  String get allergenShellfish;
+
+  /// No description provided for @allergenPeanuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Peanuts'**
+  String get allergenPeanuts;
+
+  /// No description provided for @filterConditionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter ranking by condition'**
+  String get filterConditionTitle;
+
+  /// No description provided for @conditionOverall.
+  ///
+  /// In en, this message translates to:
+  /// **'Overall (all conditions)'**
+  String get conditionOverall;
 
   /// No description provided for @ratePrompt.
   ///
@@ -1199,7 +1361,7 @@ abstract class AppLocalizations {
   /// No description provided for @nutritionDataUnavailable.
   ///
   /// In en, this message translates to:
-  /// **'Open Food Facts nutrient data unavailable'**
+  /// **'Nutrient data unavailable'**
   String get nutritionDataUnavailable;
 
   /// No description provided for @nutriCalories.
@@ -1688,6 +1850,36 @@ abstract class AppLocalizations {
   /// **'Product Photo'**
   String get reportProductPhoto;
 
+  /// No description provided for @reportFrontPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Front Photo'**
+  String get reportFrontPhoto;
+
+  /// No description provided for @reportBackPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Back Photo (Nutrition Label)'**
+  String get reportBackPhoto;
+
+  /// No description provided for @reportBackPhotoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Take a clear photo of the nutrition facts and ingredients list on the back of the package.'**
+  String get reportBackPhotoHint;
+
+  /// No description provided for @reportAddBackPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Photo'**
+  String get reportAddBackPhoto;
+
+  /// No description provided for @reportBackPhotoRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Please add a photo of the back label before submitting.'**
+  String get reportBackPhotoRequired;
+
   /// No description provided for @reportChangePhoto.
   ///
   /// In en, this message translates to:
@@ -1741,36 +1933,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Go back to Home'**
   String get reportGoHome;
-
-  /// No description provided for @filterConditionTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Filter ranking by condition'**
-  String get filterConditionTitle;
-
-  /// No description provided for @conditionOverall.
-  ///
-  /// In en, this message translates to:
-  /// **'Overall (all conditions)'**
-  String get conditionOverall;
-
-  /// No description provided for @conditionDiabetes.
-  ///
-  /// In en, this message translates to:
-  /// **'Diabetes'**
-  String get conditionDiabetes;
-
-  /// No description provided for @conditionHypertension.
-  ///
-  /// In en, this message translates to:
-  /// **'Hypertension'**
-  String get conditionHypertension;
-
-  /// No description provided for @conditionHeartCondition.
-  ///
-  /// In en, this message translates to:
-  /// **'Heart condition'**
-  String get conditionHeartCondition;
 }
 
 class _AppLocalizationsDelegate

@@ -194,24 +194,30 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                   Text(loc.vibrationFeedback, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 8),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: theme.colorScheme.surfaceContainerHighest),
-                        child: const Icon(Icons.vibration_outlined, color: _primaryRed),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      Flexible(
+                        child: Row(
                           children: [
-                            Text(loc.vibrationFeedback, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
-                            const SizedBox(height: 4),
-                            Text(loc.vibrateDescription, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: theme.colorScheme.surfaceContainerHighest),
+                              child: const Icon(Icons.vibration_outlined, color: _primaryRed),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(loc.vibrationFeedback, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+                                  const SizedBox(height: 4),
+                                  Text(loc.vibrateDescription, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Switch(
                         value: _vibrationFeedback,
                         onChanged: (v) async {
@@ -286,24 +292,30 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                   Text(loc.multiFactorAuthentication, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 8),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: theme.colorScheme.surfaceContainerHighest),
-                        child: const Icon(Icons.notifications_outlined, color: _primaryRed),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      Flexible(
+                        child: Row(
                           children: [
-                            Text(loc.multiFactorAuthentication, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
-                            const SizedBox(height: 4),
-                            Text(loc.safetyPriorityMessage, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: theme.colorScheme.surfaceContainerHighest),
+                              child: const Icon(Icons.notifications_outlined, color: _primaryRed),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(loc.multiFactorAuthentication, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
+                                  const SizedBox(height: 4),
+                                  Text(loc.safetyPriorityMessage, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Switch(
                         value: _notificationsEnabled,
                         onChanged: (v) async {

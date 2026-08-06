@@ -6,3 +6,4 @@ output-dir: lib/generated/l10n
 preferred-supported-locales:
   - en
   - tl
+untranslated-messages-file: untranslated.txt

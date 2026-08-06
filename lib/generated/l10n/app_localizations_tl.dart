@@ -472,7 +472,91 @@ class AppLocalizationsTl extends AppLocalizations {
   String get changePassword => 'Baguhin ang password';
 
   @override
+  String get currentPassword => 'Kasalukuyang Password';
+
+  @override
+  String get newPassword => 'Bagong Password';
+
+  @override
+  String get confirmPassword => 'I-type muli ang bagong Password';
+
+  @override
+  String get passwordRequirements =>
+      'Ang iyong password ay dapat nasa hindi babababang anim na characters na may kombinasyon ng numero, letra, at ibang special characters (!@#%)';
+
+  @override
+  String get passwordChanged => 'Password successfully changed!';
+
+  @override
+  String get errorCurrentPassword =>
+      'Pakisulat ang iyong kasalukuyang password';
+
+  @override
+  String get errorNewPassword => 'Pakisulat ang iyong bagong password';
+
+  @override
+  String get errorConfirmPassword => 'Pakikonfirman ang iyong bagong password';
+
+  @override
+  String get errorPasswordsNotMatch => 'Ang mga password ay hindi tumutugma';
+
+  @override
+  String get errorPasswordTooShort =>
+      'Ang password ay dapat na hindi bababa sa 6 characters';
+
+  @override
+  String get errorNotAuthenticated => 'User not authenticated';
+
+  @override
+  String get errorChangingPassword => 'Error changing password';
+
+  @override
+  String get unexpectedError => 'An unexpected error occurred';
+
+  @override
   String get selectAllergen => 'Pumili ng Allergen';
+
+  @override
+  String get conditionDiabetes => 'Diabetes';
+
+  @override
+  String get conditionHypertension => 'Alta-presyon';
+
+  @override
+  String get conditionHeartCondition => 'Sakit sa puso';
+
+  @override
+  String get conditionLowVision => 'Mababang Paningin';
+
+  @override
+  String get conditionNone => 'Wala';
+
+  @override
+  String get allergenFish => 'Isda';
+
+  @override
+  String get allergenMilk => 'Gatas';
+
+  @override
+  String get allergenEggs => 'Itlog';
+
+  @override
+  String get allergenSoy => 'Soya';
+
+  @override
+  String get allergenWheat => 'Trigo';
+
+  @override
+  String get allergenShellfish => 'Lamang-Dagat';
+
+  @override
+  String get allergenPeanuts => 'Mani';
+
+  @override
+  String get filterConditionTitle => 'Filter ranking by condition';
+
+  @override
+  String get conditionOverall => 'Overall (all conditions)';
 
   @override
   String get ratePrompt => 'Mangyaring pumili ng rating sa pagitan ng 1 at 5.';
@@ -598,7 +682,7 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get nutritionDataUnavailable =>
-      'Hindi available ang datos ng nutrisyon (Open Food Facts)';
+      'Hindi available ang datos ng nutrisyon';
 
   @override
   String get nutriCalories => 'Calories';
@@ -863,6 +947,23 @@ class AppLocalizationsTl extends AppLocalizations {
   String get reportProductPhoto => 'Litrato ng Produkto';
 
   @override
+  String get reportFrontPhoto => 'Litrato sa Harap';
+
+  @override
+  String get reportBackPhoto => 'Litrato sa Likod (Nutrition Label)';
+
+  @override
+  String get reportBackPhotoHint =>
+      'Kumuha ng malinaw na litrato ng nutrition facts at listahan ng sangkap sa likod ng produkto.';
+
+  @override
+  String get reportAddBackPhoto => 'Magdagdag ng Litrato';
+
+  @override
+  String get reportBackPhotoRequired =>
+      'Mangyaring magdagdag ng litrato ng likod na label bago mag-submit.';
+
+  @override
   String get reportChangePhoto => 'Baguhin ang Litrato';
 
   @override
@@ -890,19 +991,4 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get reportGoHome => 'Bumalik sa Home';
-
-  @override
-  String get filterConditionTitle => 'I-filter ang ranking base sa kondisyon';
-
-  @override
-  String get conditionOverall => 'Pangkalahatan (lahat ng kondisyon)';
-
-  @override
-  String get conditionDiabetes => 'Diabetes';
-
-  @override
-  String get conditionHypertension => 'Alta-presyon';
-
-  @override
-  String get conditionHeartCondition => 'Sakit sa puso';
 }

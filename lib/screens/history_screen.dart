@@ -7,6 +7,7 @@ import '../data/services/backend_locator.dart';
 import 'camera_scanner_screen.dart';
 import 'product_detail_screen.dart';
 import 'compare_products_screen.dart';
+import 'report_detail_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../models/product_model.dart';
@@ -580,12 +581,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildReportCard(ReportModel report) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     // Status Badge colors
     Color statusBg;
     Color statusText;
     final status = report.status.toLowerCase();
-    
+
     if (status == 'approved') {
       statusBg = Colors.green.withOpacity(0.15);
       statusText = Colors.green[700]!;
@@ -597,66 +598,73 @@ class _HistoryScreenState extends State<HistoryScreen> {
       statusText = Colors.orange[800]!;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  report.productName.isEmpty ? 'Unknown Product' : report.productName,
-                  style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusBg,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  report.status,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: statusText,
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReportDetailScreen(report: report),
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: theme.dividerColor),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    report.productName.isEmpty ? 'Unknown Product' : report.productName,
+                    style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    report.status,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: statusText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (report.category.isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                report.category,
+                style: GoogleFonts.inter(
+                    fontSize: 12, color: colorScheme.onSurfaceVariant),
               ),
             ],
-          ),
-          if (report.productDescription.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              report.productDescription,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                  fontSize: 13, color: colorScheme.onSurfaceVariant),
-            ),
-          ],
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
           Row(
             children: [
               Icon(Icons.access_time, size: 14, color: colorScheme.onSurfaceVariant),
@@ -670,6 +678,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         ],
       ),
+    ),
     );
   }
 

@@ -1,0 +1,125 @@
+Total products: 119
+  With nutrition data: 58
+  Without nutrition data: 61
+
+----------------------------------------------------------------------------------------------------
+[NO DATA]    555 Fried Sardines Escabeche                  555                  id=8dXszFWZEkXsvhYgJdGK  source=legacy
+[NO DATA]    555 Fried Sardines Hot and Spicy              555                  id=5di6O1hXjFCgTGfp8f59  source=legacy
+[NO DATA]    555 Fried Sardines Tausi                      555                  id=iTMFXeNc0rapuXsgtLh4  source=legacy
+[NO DATA]    555 Sardines in Tomato Sauce                  555                  id=0UOmtAkUjAn5hiU3Is1s  source=legacy
+[NO DATA]    555 Tuna Adobo                                555                  id=LlUtgDlXPcsOQFrECcZd  source=legacy
+[NO DATA]    555 Tuna Caldereta                            555                  id=F3JNx2573249HVgxNoRT  source=legacy
+[NO DATA]    555 Tuna Flakes In Oil                        555                  id=q5nHY4DrXazJXa6lbGEq  source=legacy
+[NO DATA]    555 Tuna Hot & Spicy                          555                  id=zzANeMKxz4GCK5OTvD21  source=legacy
+[NO DATA]    555 Tuna Spicy Bicol Express                  555                  id=0tUAd0VigP7nGiwkgOyj  source=legacy
+[NO DATA]    Argentina Beef Loaf                           Argentina            id=XvNiSLZw1v3XCkzYD60U  source=legacy
+[NO DATA]    Argentina Corned Beef                         Argentina            id=Ff4G2WEXwHrnpQD6kloX  source=legacy
+[HAS DATA]   BEEF CHILIMANSI FLAVOR INSTANT NOODLE SOUP    Lucky Me!            id=lucky_me_beef_chilimansi  source=bulk_import
+[HAS DATA]   BEEF LOAF                                     Argentina            id=argentina_beef_loaf  source=bulk_import
+[NO DATA]    Blue Bay Corned Tuna Hot & Spicy              Blue Bay             id=8nmAWHFZ3PCNxj0k3QS3  source=legacy
+[NO DATA]    Blue Bay Corned Tuna Original                 Blue Bay             id=S0D70QGki9VbTw6JZTXT  source=legacy
+[HAS DATA]   Carne Norte                                   Lucky 7              id=lucky_7_carne_norte  source=bulk_import
+[NO DATA]    CDO Home-Style Corned Beef                    CDO                  id=OpEZ7j2CqpBcqjGNyiO8  source=legacy
+[NO DATA]    CDO Karne Norte Classic                       CDO                  id=VZJ8O9J3tMbigScCuyq4  source=legacy
+[NO DATA]    Century Tuna Flakes In Oil                    Century              id=1DLwn08vhzq9GpU4RdVq  source=legacy
+[NO DATA]    Century Tuna Hot & Spicy                      Century Tuna         id=2FUZBfTr6sCERFT3pMhw  source=legacy
+[NO DATA]    Century Tuna With Calamansi                   Century              id=4K0Ji33IUNgGkZMZCKy8  source=legacy
+[HAS DATA]   CHICK 'N DE LATA CHICKEN SISIG                Suy Foods            id=suy_foods_chick_n_de_lata_chicken_sisig  source=bulk_import
+[HAS DATA]   CHICK'N DE LATA CHICKEN GINILING              Suy Foods            id=suy_foods_chick_n_de_lata_chicken_giniling  source=bulk_import
+[HAS DATA]   CHICK'N DE LATA CHICKEN PASTIL                Suy Foods            id=suy_foods_chick_n_de_lata_pastil  source=bulk_import
+[HAS DATA]   CHICKEN CHILIMANSI FLAVOR INSTANT NOODLE SOUP Lucky Me!            id=lucky_me_chicken_chilimansi  source=bulk_import
+[HAS DATA]   Chicken Luncheon Meat                         PUREFOODS            id=purefoods_chicken_luncheon_meat  source=bulk_import
+[HAS DATA]   Chicken Na Chicken Flavor Instant Mami Noodle Soup Lucky Me!            id=lucky_me_chicken_na_chicken  source=bulk_import
+[HAS DATA]   CHILI CORNED TUNA                             SAN MARINO           id=san_marino_chili_corned_tuna  source=bulk_import
+[HAS DATA]   Corned Beef                                   Argentina            id=argentina_corned_beef  source=bulk_import
+[HAS DATA]   CORNED BEEF HOT & SPICY                       PUREFOODS            id=purefoods_corned_beef_hot_and_spicy  source=bulk_import
+[HAS DATA]   CORNED BEEF WITH CHUNKS                       PUREFOODS            id=purefoods_corned_beef_with_chunks  source=bulk_import
+[HAS DATA]   CORNED TUNA                                   SAN MARINO           id=san_marino_corned_tuna  source=bulk_import
+[HAS DATA]   CORNED TUNA HOT & SPICY                       BLUE BAY             id=blue_bay_corned_tuna_hot_and_spicy  source=bulk_import
+[HAS DATA]   CORNED TUNA ORIGINAL                          BLUE BAY             id=blue_bay_corned_tuna_original  source=bulk_import
+[NO DATA]    Del Monte Fiesta Fruit Cocktail in Extra Light Syrup Del Monte Fiesta     id=KAFXHPbnLTzuPb3bQYnU  source=legacy
+[NO DATA]    Del Monte Fruit Cocktail in Heavy Syrup       Del Monte            id=3lHuoX2pqCxLnxWRaDAc  source=legacy
+[NO DATA]    Del Monte Pineapple Tidbits                   Del Monte            id=PEqbPZ4WZNcX1OEOFmTS  source=legacy
+[HAS DATA]   Fiesta Fruit Cocktail in extra light syrup    Del Monte            id=del_monte_fiesta_fruit_cocktail_in_extra_light_syrup  source=bulk_import
+[HAS DATA]   Flakes in Oil                                 Century TUNA         id=century_tuna_flakes_in_oil  source=bulk_import
+[HAS DATA]   FRIED SARDINES Escabeche                      555                  id=555_fried_sardines_escabeche  source=bulk_import
+[HAS DATA]   FRIED SARDINES Hot and Spicy                  555                  id=555_fried_sardines_hot_and_spicy  source=bulk_import
+[HAS DATA]   FRIED SARDINES Tausi                          555                  id=555_fried_sardines_tausi  source=bulk_import
+[HAS DATA]   Fruit Cocktail in Heavy Syrup                 Del Monte            id=del_monte_fruit_cocktail_in_heavy_syrup  source=bulk_import
+[HAS DATA]   Garden Fresh Green Peas                       UFC                  id=ufc_green_peas  source=bulk_import
+[NO DATA]    Golden Town Sardines in Tomato Sauce          Golden Town          id=Kf6TdPepis6MLi0w7nxv  source=legacy
+[NO DATA]    Golden Town Sardines In Tomato Sauce With Chili Added Golden Town          id=IPHktlsGIde8XwoCIW5j  source=legacy
+[NO DATA]    Golden Town Sardines Super Hot
+               Golden Town          id=7d3FyWIQoHgT7uS2lyP9  source=legacy
+[HAS DATA]   Green Peas                                    MEGA PRIME           id=mega_prime_green_peas  source=bulk_import
+[HAS DATA]   GREEN PEAS                                    RAM                  id=ram_green_peas  source=bulk_import
+[HAS DATA]   HOME-STYLE CORNED BEEF                        CDO                  id=cdo_homestyle_corned_beef  source=bulk_import
+[HAS DATA]   IMPORTED SQUID Sweet & Spicy                  Uni-Pak              id=unipak_squid_sweet_and_spicy  source=bulk_import
+[NO DATA]    Jolly Pure Goodness Mushrooms                 Jolly                id=8db2DTa6psB4U2orcbRZ  source=legacy
+[HAS DATA]   KARNE NORTE Classic GUISADO                   CDO                  id=cdo_karne_norte_classic  source=bulk_import
+[NO DATA]    Ligo Sardines In Tomato Sauce                 Ligo                 id=Hqd6KUc0X1pCWFM1oNjf  source=legacy
+[NO DATA]    Ligo Sardines In Tomato Sauce Chili Added     Ligo                 id=TwKsaC2cIm2SiaW8astc  source=legacy
+[HAS DATA]   LIVER SPREAD                                  PUREFOODS            id=purefoods_liver_spread  source=bulk_import
+[NO DATA]    Lucky 7 Carne Norte                           Lucky 7              id=RHvUOkyN6EnIyNz5LrXH  source=legacy
+[NO DATA]    Lucky Me! Beef Chilimansi                     Lucky Me!            id=o08UEnENzW8s9mtnczTM  source=legacy
+[NO DATA]    Lucky Me! Beef na Beef                        Lucky Me!            id=6MhfWUZs3uV9ZtHwUqgU  source=legacy
+[NO DATA]    Lucky Me! Chicken Chilimansi                  Lucky Me!            id=xd4WR565vfu8o5HfhRfF  source=legacy
+[NO DATA]    Lucky Me! Chicken na Chicken                  Lucky Me!            id=gz91fVc3unUjI84XG2oF  source=legacy
+[NO DATA]    Lucky Me! Pancit Canton Chilimansi            Lucky Me!            id=ipBNxr5DktDYez1tdGON  source=legacy
+[NO DATA]    Lucky Me! Pancit Canton Chilimansi Kasalo Pack Lucky Me!            id=Y4eiUvL4sdxJlB9rm2oV  source=legacy
+[NO DATA]    Lucky Me! Pancit Canton Extra Hot Chili       Lucky Me!            id=yDsVwKKILDlia3l7Zr9U  source=legacy
+[NO DATA]    Lucky Me! Pancit Canton Extra Hot Chili Kasalo Pack Lucky Me!            id=6ckvbR4IWJQGI0rHQdP4  source=legacy
+[NO DATA]    Lucky Me! Pancit Canton Kalamansi             Lucky Me!            id=H8zyRSpvBfOCSWygsoo3  source=legacy
+[NO DATA]    Lucky Me! Pancit Canton Original              Lucky Me!            id=GF3kPceybVQ4J8FqpLkc  source=legacy
+[NO DATA]    Lucky Me! Pancit Canton Sweet and Spicy       Lucky Me!            id=nLA6wuhIpHxXHji4ZdoH  source=legacy
+[NO DATA]    Lucky Me! Spicy Labuyo Beef                   Lucky Me!            id=oulXcHmlzSO0LVFKOKv2  source=legacy
+[NO DATA]    Lucky Me! Spicy Labuyo Chicken                Lucky Me!            id=yRAXlrghOo1Z3KCwizhJ  source=legacy
+[HAS DATA]   LUNCHEON MEAT                                 PUREFOODS            id=purefoods_luncheon_meat  source=bulk_import
+[NO DATA]    Mega Prime Green Peas                         Mega                 id=YKz1EzxKBsE0nindWfX3  source=legacy
+[NO DATA]    Mega Sardines In Tomato Sauce                 Mega                 id=tMO7hm0n20cFa5oxED1o  source=legacy
+[NO DATA]    Mega Sardines In Tomato Sauce Chili Added     Mega                 id=ZScB0OqSQPYlhhfXxjrQ  source=legacy
+[NO DATA]    Mega Tuna Flakes Hot & Spicy                  Mega Tuna            id=4jc3jEAzGiXIisXFQlQF  source=legacy
+[NO DATA]    Mega Tuna Flakes In Oil                       Mega Tuna            id=1CB2RXKrauuFwzEOIlCp  source=legacy
+[HAS DATA]   MUSHROOMS PIECES & STEMS                      JOLLY                id=jolly_mushrooms  source=bulk_import
+[HAS DATA]   PANCIT CANTON CHILIMANSI FLAVOR               Lucky Me!            id=lucky_me_pancit_canton_chilimansi  source=bulk_import
+[HAS DATA]   PANCIT CANTON CHILIMANSI FLAVOR               Lucky Me!            id=lucky_me_pancit_canton_chilimansi_kasalo_pack  source=bulk_import
+[HAS DATA]   PANCIT CANTON EXTRA HOT CHILI FLAVOR          Lucky Me!            id=lucky_me_pancit_canton_extra_hot_chili  source=bulk_import
+[HAS DATA]   PANCIT CANTON EXTRA HOT CHILI FLAVOR          Lucky Me!            id=lucky_me_pancit_canton_extra_hot_chili_kasalo_pack  source=bulk_import
+[HAS DATA]   PANCIT CANTON KALAMANSI FLAVOR INSTANT STIR-FRIED NOODLES Lucky Me!            id=lucky_me_pancit_canton_kalamansi  source=bulk_import
+[HAS DATA]   PANCIT CANTON ORIGINAL FLAVOR                 Lucky Me!            id=lucky_me_pancit_canton_original  source=bulk_import
+[HAS DATA]   PANCIT CANTON SWEET & SPICY FLAVOR INSTANT STIR-FRIED NOODLES Lucky Me!            id=lucky_me_pancit_canton_sweet_and_spicy  source=bulk_import
+[HAS DATA]   Pineapple TIDBITS in extra light syrup        Del Monte            id=del_monte_pineapple_tidbits  source=bulk_import
+[HAS DATA]   PREMIUM FLAKES IN OIL                         MEGA TUNA            id=mega_tuna_flakes_in_oil  source=bulk_import
+[NO DATA]    Purefoods Chicken Luncheon Meat               Purefoods            id=CEY6lhIwm89ZfcU5uLr6  source=legacy
+[NO DATA]    Purefoods Corned Beef Hot & Spicy             Purefoods            id=MmogXqZZDdVzDcTlqy9M  source=legacy
+[NO DATA]    Purefoods Corned Beef with Chunks             Purefoods            id=fQnNShOkkOpZiNUIRGgm  source=legacy
+[NO DATA]    Purefoods Liver Spread                        Purefoods            id=JYQhPlN3KDA0F10flflZ  source=legacy
+[NO DATA]    Purefoods Luncheon Meat                       Purefoods            id=aBJJZm3ARXCyG77Ig7WD  source=legacy
+[NO DATA]    RAM Green Peas                                RAM                  id=VimeTJr7MoJD0nlcHrHd  source=legacy
+[NO DATA]    Saba Squid In Soy Sauce                       Saba Seafood         id=7cPG2H7yDZt2MX00Z1vg  source=legacy
+[NO DATA]    Saba Squid In Soy Sauce With Chili            Saba Seafood         id=OUmI9VVXSJqx28Y2W8dM  source=legacy
+[NO DATA]    San Marino Chili Corned Tuna                  San Marino           id=wrVHox1FewvOqLDspK6F  source=legacy
+[NO DATA]    San Marino Corned Tuna                        San Marino           id=oLE5EB03EA7h1wv2h1T2  source=legacy
+[HAS DATA]   SARDINES in Tomato Sauce                      Ligo                 id=ligo_sardines_in_tomato_sauce  source=bulk_import
+[HAS DATA]   SARDINES IN TOMATO SAUCE                      555                  id=555_sardines_in_tomato_sauce  source=bulk_import
+[HAS DATA]   SARDINES IN TOMATO SAUCE                      MEGA                 id=mega_sardines_in_tomato_sauce  source=bulk_import
+[HAS DATA]   Sardines in Tomato Sauce Chili Added          Ligo                 id=ligo_sardines_in_tomato_sauce_chili_added  source=bulk_import
+[HAS DATA]   SARDINES IN TOMATO SAUCE CHILI ADDED          MEGA                 id=mega_sardines_in_tomato_sauce_chili_added  source=bulk_import
+[HAS DATA]   SPICY LABUYO BEEF FLAVOR INSTANT MAMI NOODLE SOUP Lucky Me!            id=lucky_me_spicy_labuyo_beef  source=bulk_import
+[HAS DATA]   Spicy Labuyo Chicken Flavor Instant Mami Noodle Soup Lucky Me!            id=lucky_me_spicy_labuyo_chicken  source=bulk_import
+[HAS DATA]   SQUID in Soy Sauce                            SABA SEAFOOD         id=saba_squid_in_soy_sauce  source=bulk_import
+[HAS DATA]   SQUID in Soy Sauce with Chili                 SABA SEAFOOD         id=saba_squid_in_soy_sauce_with_chili  source=bulk_import
+[HAS DATA]   Super Hot                                     Golden Town          id=golden_town_sardines_super_hot  source=bulk_import
+[NO DATA]    Suy Foods Chick 'N' De Lata Chicken Giniling  Suy Foods Chick 'N' De Lata id=IMOzsUdoKZxbC8NwkGmH  source=legacy
+[NO DATA]    Suy Foods Chick 'N' De Lata Chicken Pastil    Suy Foods Chick 'N' De Lata id=J2akyrvxq3GWqVmVtql1  source=legacy
+[NO DATA]    Suy Foods Chick 'N' De Lata Chicken Sisig     Suy Foods Chick 'N' De Lata id=gZOGGiFBb4FQCaQSPZ2N  source=legacy
+[HAS DATA]   TUNA ADOBO                                    555                  id=555_tuna_adobo  source=bulk_import
+[HAS DATA]   TUNA CALDERETA                                555                  id=555_tuna_caldereta  source=bulk_import
+[HAS DATA]   TUNA FLAKES IN OIL                            555                  id=555_tuna_flakes_in_oil  source=bulk_import
+[HAS DATA]   TUNA HOT & SPICY                              555                  id=555_tuna_hot_and_spicy  source=bulk_import
+[HAS DATA]   TUNA Hot and Spicy                            Century              id=century_tuna_hot_and_spicy  source=bulk_import
+[HAS DATA]   TUNA PREMIUM FLAKES HOT AND SPICY             MEGA                 id=mega_tuna_flakes_hot_and_spicy  source=bulk_import
+[HAS DATA]   TUNA Spicy BICOL EXPRESS                      555                  id=555_tuna_spicy_bicol_express  source=bulk_import
+[HAS DATA]   TUNA with Calamansi                           Century              id=century_tuna_with_calamansi  source=bulk_import
+[NO DATA]    UFC Green Peas                                UFC                  id=3kDnULSx1yQY4hRMysek  source=legacy
+[NO DATA]    Uni-pak Squid Sweet And Spicy                 Uni-Pak              id=5T05fvHJqoa6nIvaxeD4  source=legacy

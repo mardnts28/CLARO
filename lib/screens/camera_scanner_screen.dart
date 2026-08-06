@@ -477,7 +477,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           Expanded(
             child: Stack(
               children: [
-                // Live camera preview or permission-denied / simulator fallback
+                // Live camera preview
                 Positioned.fill(
                   child: _cameraController?.value.isInitialized == true
                     ? CameraPreview(_cameraController!)
@@ -486,7 +486,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
                 // (Tap-to-scan removed — scanning is now fully automatic)
 
-                // Viewfinder overlay & dynamic green/white border painter
+                // Dim overlay outside viewfinder
                 Positioned.fill(
                   child: IgnorePointer(
                     child: AnimatedBuilder(
