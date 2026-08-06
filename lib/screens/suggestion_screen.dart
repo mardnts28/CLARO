@@ -66,15 +66,13 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid == null) {
+        setState(() => _submitting = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.needSignInToSubmit)));
         return;
       }
 
       final userName = await _fetchUserName(uid);
 
-      // Auto-generated document ID (instead of .doc(uid)) so each
-      // submission is its own record and past reviews are never
-      // overwritten by a later one.
       await _authService.db.collection('suhestiyon').add({
         'uid': uid,
         'userName': userName,
@@ -83,38 +81,57 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
+      // Reset form and submitting flag BEFORE showing dialog so background button resets cleanly
+      setState(() {
+        _submitting = false;
+        _rating = 0;
+        _commentController.clear();
+      });
+
+      if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           backgroundColor: theme.cardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(loc.suggestionSentTitle, style: TextStyle(fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
-              const SizedBox(height: 8),
-              Text(loc.suggestionSentBody, textAlign: TextAlign.center, style: TextStyle(color: colorScheme.onSurfaceVariant)),
-            ],
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+          contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+          title: Text(
+            loc.suggestionSentTitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colorScheme.onSurface),
           ),
+          content: Text(
+            loc.suggestionSentBody,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          actionsAlignment: MainAxisAlignment.center,
           actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: Text(loc.backLabel, style: TextStyle(color: colorScheme.primary)),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: colorScheme.primary,
+                  foregroundColor: colorScheme.onPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: Text(
+                  loc.backLabel,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                ),
+              ),
             ),
           ],
         ),
       );
-
-      // clear form
-      setState(() {
-        _rating = 0;
-        _commentController.clear();
-      });
     } catch (e) {
       debugPrint('Error submitting feedback: $e');
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.submitError)));
-    } finally {
       setState(() => _submitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.submitError)));
     }
   }
 
@@ -157,7 +174,6 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
         title: Text(loc.suggestion, style: TextStyle(color: colorScheme.primary)),
         actions: [
           IconButton(
-            // TODO(l10n): add loc.reviewHistoryTooltip and use it here
             tooltip: 'My review history',
             icon: Icon(Icons.history, color: colorScheme.primary),
             onPressed: () {
@@ -169,74 +185,142 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            Text(loc.suggestionIntro, style: bodyLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: colorScheme.onSurface)),
-            const SizedBox(height: 18),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: theme.cardColor,
-                  border: Border.all(color: theme.dividerColor),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6)]),
-              child: Column(
-                children: [
-                  Align(alignment: Alignment.centerLeft, child: Text(loc.rateYourExperience, style: bodyMedium?.copyWith(fontSize: 14, color: colorScheme.onSurface))),
-                  const SizedBox(height: 8),
-                  _buildStars(),
-                ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text(
+                loc.suggestionIntro,
+                style: bodyLarge?.copyWith(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
+              const SizedBox(height: 18),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   color: theme.cardColor,
                   border: Border.all(color: theme.dividerColor),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6)]),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(loc.shareImprovement, style: bodyMedium?.copyWith(fontSize: 14, color: colorScheme.onSurface)),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: _commentController,
-                    minLines: 5,
-                    maxLines: 8,
-                    style: TextStyle(color: colorScheme.onSurface),
-                    decoration: InputDecoration(
-                      hintText: loc.suggestionHint,
-                      hintStyle: bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.dividerColor)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: theme.dividerColor)),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: colorScheme.primary)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        loc.rateYourExperience,
+                        style: bodyMedium?.copyWith(
+                          fontSize: 14,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildStars(),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: theme.cardColor,
+                  border: Border.all(color: theme.dividerColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 6,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      loc.shareImprovement,
+                      style: bodyMedium?.copyWith(
+                        fontSize: 14,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _commentController,
+                      minLines: 4,
+                      maxLines: 6,
+                      style: TextStyle(color: colorScheme.onSurface),
+                      decoration: InputDecoration(
+                        hintText: loc.suggestionHint,
+                        hintStyle: bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: theme.dividerColor),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: theme.dividerColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: colorScheme.primary),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _submitting ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                ],
-              ),
-            ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _submitting ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  child: _submitting
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              colorScheme.onPrimary,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          loc.submit,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.onPrimary,
+                          ),
+                        ),
                 ),
-                child: Text(_submitting ? loc.sending : loc.submit, style: TextStyle(fontSize: 16, color: colorScheme.onPrimary)),
               ),
-            ),
-            const SizedBox(height: 12),
-          ],
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
       floatingActionButton: const VoiceAssistantFab(),

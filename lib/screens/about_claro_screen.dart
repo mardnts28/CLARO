@@ -25,8 +25,9 @@ class AboutClaroScreen extends StatelessWidget {
           style: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w700),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 20),
+      body: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -38,42 +39,49 @@ class AboutClaroScreen extends StatelessWidget {
                 fontWeight: FontWeight.w700,
                 color: theme.colorScheme.onSurface,
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: theme.cardColor,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: theme.dividerColor),
                 boxShadow: [
                   BoxShadow(
-                    color: theme.shadowColor.withAlpha(20),
-                    blurRadius: 6,
+                    color: theme.shadowColor.withAlpha(15),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
                 ],
               ),
               child: Text(
                 loc.aboutClaroDescription,
-                style: TextStyle(color: theme.colorScheme.onSurface, height: 1.4),
-                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: theme.colorScheme.onSurface,
+                  height: 1.5,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.start,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 24),
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
                 loc.aboutDevelopers,
                 style: TextStyle(
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: theme.colorScheme.onSurface,
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: const [
                 Expanded(
                   child: _DevCard(
@@ -81,12 +89,14 @@ class AboutClaroScreen extends StatelessWidget {
                     role: 'Project Manager',
                   ),
                 ),
+                SizedBox(width: 8),
                 Expanded(
                   child: _DevCard(
                     name: 'Jay Bhie Bite',
                     role: 'Front-end Developer',
                   ),
                 ),
+                SizedBox(width: 8),
                 Expanded(
                   child: _DevCard(
                     name: 'Rochelle Ann Salucop',
@@ -95,8 +105,7 @@ class AboutClaroScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const Spacer(),
-            const SizedBox(height: 90),
+            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -116,34 +125,43 @@ class _DevCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 56,
-          height: 56,
+          width: 52,
+          height: 52,
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
+            color: theme.colorScheme.primaryContainer,
             shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.person_outline,
+            color: theme.colorScheme.onPrimaryContainer,
+            size: 26,
           ),
         ),
         const SizedBox(height: 8),
-        Flexible(
-          child: Text(
-            name,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+        Text(
+          name,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: theme.colorScheme.onSurface,
           ),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 4),
-        Flexible(
-          child: Text(
-            role,
-            style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+        Text(
+          role,
+          style: TextStyle(
+            fontSize: 11,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
         ),
       ],
     );

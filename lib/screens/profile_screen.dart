@@ -455,6 +455,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               style: TextStyle(fontSize: 15, color: colorScheme.onSurface),
             ),
           ),
+          const SizedBox(width: 12),
           Switch(
             value: _darkModeEnabled,
             onChanged: (value) async {
@@ -481,17 +482,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Icon(Icons.security_outlined, color: colorScheme.primary, size: 20),
           const SizedBox(width: 12),
-          Flexible(
+          Expanded(
             child: Text(
               loc.multiFactorAuthentication,
               style: TextStyle(
                 fontSize: 15,
                 color: colorScheme.onSurface,
               ),
-              overflow: TextOverflow.ellipsis,
               maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
+          const SizedBox(width: 12),
           Switch(
             value: _mfaEnabled,
             onChanged: (value) async {
@@ -533,6 +535,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 12),
           Switch(
             value: _voiceAssistantEnabled,
             onChanged: (value) async {
