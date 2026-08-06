@@ -103,9 +103,13 @@ class FirestoreProductRepository implements ProductRepository {
       }
     } catch (_) {}
 
-    // 2. Fetch all products to do multi-pass token matching
+    // 2. Fetch all products to do multi-pass token matching (with timeout
+    //    so this never hangs the scan flow on a slow connection).
     try {
-      final snapshot = await _db.collection(_collection).get();
+      final snapshot = await _db
+          .collection(_collection)
+          .get()
+          .timeout(const Duration(seconds: 5));
       final normYolo = cleanLabel.replaceAll(RegExp(r'[^a-z0-9]'), '');
 
       // Pass A: Exact match on doc ID or yolo_label field
@@ -160,33 +164,9 @@ class FirestoreProductRepository implements ProductRepository {
       debugPrint('Firestore lookup error in getProductByYoloLabel: $e');
     }
 
-    // 3. Fallback: Create structured Product model for recognized YOLO label classes
-    final formattedTitle = cleanLabel
-        .replaceAll('_', ' ')
-        .split(' ')
-        .map((w) => w.isNotEmpty ? '${w[0].toUpperCase()}${w.substring(1)}' : '')
-        .join(' ');
-
-    return Product(
-      id: yoloLabel,
-      name: formattedTitle,
-      brand: formattedTitle.split(' ').first,
-      category: 'Scanned Products',
-      imageUrl: 'assets/images/placeholder_product.png',
-      allergens: const ['Fish', 'Soy'],
-      ingredients: const ['Ingredients detailed on physical product packaging.'],
-      availableSizes: const [155.0],
-      nutritionalFacts: NutritionalFacts(
-        caloriesKcal: 190,
-        proteinG: 14,
-        totalFatG: 4.5,
-        saturatedFatG: 1.5,
-        sodiumMg: 360,
-        carbsG: 2.0,
-        fiberG: 0,
-        sugarsG: 0,
-      ),
-    );
+    // 3. No match found — throw so the camera scanner routes to
+    //    ProductNotFoundScreen → UnknownProductSubmissionScreen.
+    throw Exception('Product not found for YOLO label: $yoloLabel');
   }
 
   @override
