@@ -5,7 +5,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "import": "node import.js"
+    "import": "node import.js",
+    "find-matches": "node find-matches.js",
+    "apply-merges": "node apply-merges.js",
+    "list-products": "node list-products.js"
   },
   "dependencies": {
     "firebase-admin": "^12.6.0",

@@ -36,7 +36,11 @@ class ProductExtractionService {
             // GeminiAdvisoryService's 0.4, which is generating explanatory
             // text rather than extracting fixed facts.
             temperature: 0.1,
-            maxOutputTokens: 2048,
+            // 2048 risked truncating mid-response on products with long
+            // ingredient lists, producing invalid JSON instead of a
+            // usable result (see tools/bulk-import's PROMPT_SCHEMA.md --
+            // kept in sync with that tool's same fix).
+            maxOutputTokens: 4096,
           ),
         );
 

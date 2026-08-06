@@ -37,6 +37,32 @@ populating `fda_products.product_category` directly with no other source
 for that field. Keep this one intentional difference in mind if you diff
 the two prompts.
 
+## Back-photo count (another intentional difference)
+
+`tools/bulk-import/import.js` accepts a variable number of back photos per
+product (one combined `back.jpg`, or several `back_*.jpg` files when
+nutrition facts and ingredients are printed in different spots on the
+package) -- see `photos/_example_product/README.md`. The prompt adapts its
+wording based on how many back images were found.
+
+`lib/data/services/product_extraction_service.dart` (the runtime mobile
+report flow) currently only accepts exactly one back photo
+(`backImageBytes`), because the submission screen's UI only captures one.
+If split-panel labels turn out to be common enough that this becomes a
+real problem for user-submitted reports too, extending the mobile
+submission screen to capture multiple back photos (and updating this
+service's `extract()` signature to accept a list) would be the fix -- not
+done here since it wasn't needed yet for the runtime flow.
+
+## Output token limit (keep in sync too)
+
+Both implementations use `maxOutputTokens: 4096` (raised from an initial
+2048, which could truncate mid-response on products with long ingredient
+lists -- e.g. multi-flavor instant noodles -- producing invalid JSON
+instead of a parseable result). If you see "Unterminated string..." parse
+errors again even at 4096, that's the same failure mode recurring -- raise
+it further in both places, don't just patch one.
+
 ## Allergen vocabulary
 
 Both must offer Gemini the exact same fixed list, so allergen values are

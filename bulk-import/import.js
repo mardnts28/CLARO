@@ -20,14 +20,22 @@
 //      GOOGLE_APPLICATION_CREDENTIALS (path to a Firebase service account
 //      JSON key -- Project Settings > Service Accounts > Generate new
 //      private key in the Firebase console). Never commit this key file.
-//   2. Drop photos into photos/<product-folder-name>/front.jpg and back.jpg
-//      (see photos/_example_product/README.md).
+//   2. Drop photos into photos/<product-folder-name>/ -- see
+//      photos/_example_product/README.md for the exact filename rules
+//      (front.jpg is required; the back label can be one back.jpg OR
+//      several back_*.jpg files if nutrition/ingredients are printed in
+//      separate places on the package).
 //   3. npm install
 //   4. npm run import
 //
-// Safe to re-run: each product folder name becomes a stable Firestore
-// document ID, so re-running after adding new folders only imports the new
-// ones -- existing products are skipped, not duplicated or overwritten.
+// Safe to re-run, including after a partial/interrupted run (e.g. hitting
+// a free-tier rate limit mid-batch): each product folder name becomes a
+// stable Firestore document ID, and a product is only ever considered
+// "done" once BOTH its fda_products and product_nutrition_data documents
+// exist -- re-running only (re)processes folders that are missing either
+// one, so an interrupted run never leaves a half-imported product stuck
+// looking "done". Already-complete products are skipped without calling
+// Gemini again.
 
 import fs from 'fs';
 import path from 'path';
@@ -40,6 +48,12 @@ dotenv.config();
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PHOTOS_DIR = path.join(__dirname, 'photos');
+
+// Free-tier pacing: gap between consecutive Gemini calls, to stay under
+// per-minute rate limits rather than firing 62 requests back-to-back.
+// Override in .env if your tier/limits differ.
+const DELAY_BETWEEN_REQUESTS_MS =
+  Number(process.env.DELAY_BETWEEN_REQUESTS_MS) || 4000;
 
 // ─── Setup ──────────────────────────────────────────────────────────────
 
@@ -68,7 +82,13 @@ const model = genAI.getGenerativeModel({
   generationConfig: {
     responseMimeType: 'application/json',
     temperature: 0.1,
-    maxOutputTokens: 2048,
+    // 2048 was too tight -- products with long ingredient lists (e.g.
+    // multi-flavor instant noodles with many seasoning/additive
+    // components) could get cut off mid-response, producing invalid JSON
+    // ("Unterminated string..." from JSON.parse) rather than a usable
+    // result. 4096 gives real headroom without meaningfully raising cost
+    // (Gemini bills on tokens actually used, not the ceiling).
+    maxOutputTokens: 4096,
   },
 });
 
@@ -80,13 +100,40 @@ const CANONICAL_ALLERGENS = [
 ];
 
 // ─── Prompt (mirrors ProductExtractionService._buildPrompt) ───────────────
+// [numBackImages] varies per product -- some packages print nutrition
+// facts and the ingredients list in different spots, so a folder may
+// contribute 1 back photo or several. Gemini reads all of them in the same
+// call regardless (this is a single request either way -- what matters for
+// rate limits is requests, not images per request), so the prompt just
+// needs to say "one or more" rather than assuming exactly one.
 
-function buildPrompt() {
+function buildPrompt(numBackImages, allowParaphrase = false) {
+  const backDescription =
+    numBackImages === 1
+      ? 'the BACK of the package (second image), showing the nutrition label and/or ingredients list'
+      : `${numBackImages} additional photos covering the BACK of the package -- nutrition facts and ingredients may be split across these photos rather than in one shot`;
+
+  // Default wording asks for exact transcription, which occasionally
+  // triggers Gemini's RECITATION safety filter if this product's label
+  // text happens to closely match something published online that the
+  // model recognizes from training. The paraphrase-permitting variant is
+  // only used as an automatic retry after a RECITATION block -- normal
+  // runs always use the strict version, since exact wording matters (this
+  // is nutrition/allergen data).
+  const ingredientsRule = allowParaphrase
+    ? `- "ingredients": list each item you can identify from the label, in the
+  order printed. Prioritize accuracy over exact wording -- if reproducing
+  the exact printed phrasing is problematic, use a clear equivalent
+  description instead (e.g. "wheat flour" rather than a distinctive
+  marketing phrase around it), but never omit or invent an ingredient.`
+    : `- "ingredients": split into individual items, in the order printed. Keep as
+  printed (don't translate).`;
+
   return `
-You are reading two photos of a packaged food product sold in the
-Philippines: the FRONT of the package (first image) and the BACK/nutrition
-label (second image). Extract the following as strict JSON -- no markdown
-fences, no commentary, just the JSON object.
+You are reading photos of a packaged food product sold in the Philippines:
+the FRONT of the package (first image), and ${backDescription}. Extract the
+following as strict JSON -- no markdown fences, no commentary, just the
+JSON object.
 
 Return exactly this shape:
 {
@@ -110,18 +157,21 @@ Rules:
 - "category": a short product category label, e.g. "Canned Fish",
   "Instant Noodles", "Canned Meat", "Condiments" -- used to group similar
   products for comparison elsewhere in the app.
-- "ingredients": split into individual items, in the order printed. Keep as
-  printed (don't translate).
-- "nutrition_per_100g": read values as printed. Convert per-serving values
-  to per-100g using the stated serving size. Use null if a field genuinely
-  isn't visible/printed -- do NOT guess or estimate.
+${ingredientsRule}
+  If the ingredients list appears in one of the back photos and nutrition
+  facts in another, combine what you find across all provided photos into
+  this single field.
+- "nutrition_per_100g": read values as printed, from whichever back photo
+  shows the nutrition table. Convert per-serving values to per-100g using
+  the stated serving size. Use null if a field genuinely isn't visible/
+  printed -- do NOT guess or estimate.
 - "allergens": only choose from this fixed list, based on the label's
   allergen statement: [${CANONICAL_ALLERGENS.join(', ')}]. Note anything
   allergen-relevant that doesn't fit this list in "confidence_notes" instead
   of inventing a new category.
 - "confidence_notes": briefly flag anything unclear/blurry/ambiguous a human
   should double-check against the actual package. Empty if nothing stood out.
-- If the back label is missing/unreadable, still fill in brand/product_name/
+- If none of the back photos are readable, still fill in brand/product_name/
   size/category from the front photo, leave nutrition/ingredients/allergens
   empty, and say so in "confidence_notes".
 `;
@@ -140,12 +190,30 @@ function fileToPart(filePath) {
   };
 }
 
+const IMAGE_EXTS = ['.jpg', '.jpeg', '.png'];
+
 function findImage(folder, baseName) {
-  for (const ext of ['.jpg', '.jpeg', '.png']) {
+  for (const ext of IMAGE_EXTS) {
     const candidate = path.join(folder, `${baseName}${ext}`);
     if (fs.existsSync(candidate)) return candidate;
   }
   return null;
+}
+
+// Supports two layouts per product folder:
+//   - a single back.jpg/back.jpeg/back.png, OR
+//   - any number of back_*.jpg files (e.g. back_nutrition.jpg,
+//     back_ingredients.jpg) when the label's info is split across photos.
+// Returns [] if neither pattern matches -- caller treats that as "missing".
+function findBackImages(folder) {
+  const single = findImage(folder, 'back');
+  if (single) return [single];
+
+  return fs
+    .readdirSync(folder)
+    .filter((f) => /^back_.+/i.test(f) && IMAGE_EXTS.includes(path.extname(f).toLowerCase()))
+    .sort() // deterministic order across runs
+    .map((f) => path.join(folder, f));
 }
 
 // "century_tuna_flakes_original" -> safe, stable Firestore doc ID. Also
@@ -155,18 +223,89 @@ function slugToDocId(folderName) {
   return folderName.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
 
+// Backfilling a specific legacy product (see find-matches.js /
+// apply-merges.js): drop an optional target_id.txt file inside the
+// product's folder containing the EXACT existing fda_products document ID
+// you want this photo set written to, instead of a fresh slugified-folder-
+// name ID. Lets you re-photograph a legacy product that never got a
+// bulk-import match and write straight into its existing document rather
+// than creating yet another duplicate. Falls back to the normal slug
+// behavior if the file isn't present.
+function resolveDocId(folderPath, folderName) {
+  const overridePath = path.join(folderPath, 'target_id.txt');
+  if (fs.existsSync(overridePath)) {
+    const targetId = fs.readFileSync(overridePath, 'utf8').trim();
+    if (targetId) return targetId;
+  }
+  return slugToDocId(folderName);
+}
+
 function num(v) {
   return typeof v === 'number' ? v : 0;
 }
 
-async function extractProduct(frontPath, backPath) {
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Gemini/Google API client errors carry a numeric `status` (HTTP-style) or
+// a `.status` string like "RESOURCE_EXHAUSTED" depending on SDK version --
+// check both rather than relying on message text alone.
+function isRateLimitError(err) {
+  const status = err?.status ?? err?.code;
+  const msg = (err?.message || '').toLowerCase();
+  return (
+    status === 429 ||
+    status === 'RESOURCE_EXHAUSTED' ||
+    msg.includes('quota') ||
+    msg.includes('rate limit')
+  );
+}
+
+// RECITATION is a separate safety mechanism from rate limiting -- it fires
+// when Gemini judges its own output too close to text it recognizes from
+// training data. Can genuinely false-positive on an ordinary product label
+// if that product's ingredients/nutrition facts are already published
+// somewhere online (retailer page, manufacturer site, review blog) and the
+// model treats "read this photo verbatim" as reproducing that memorized
+// text. Not something a longer maxOutputTokens or a pacing delay fixes --
+// needs a different prompt framing instead (see buildPrompt's
+// `allowParaphrase` param below).
+function isRecitationError(err) {
+  return (err?.message || '').includes('RECITATION');
+}
+
+async function extractProduct(frontPath, backPaths, allowParaphrase = false) {
   const result = await model.generateContent([
-    buildPrompt(),
+    buildPrompt(backPaths.length, allowParaphrase),
     fileToPart(frontPath),
-    fileToPart(backPath),
+    ...backPaths.map(fileToPart),
   ]);
   const text = result.response.text();
-  return JSON.parse(text);
+  try {
+    return JSON.parse(text);
+  } catch (parseErr) {
+    // Re-throw with the raw response attached so the caller can log it --
+    // a bare "Unterminated string..." message alone doesn't tell you
+    // whether the response was truncated (hit maxOutputTokens mid-string)
+    // or genuinely malformed. Seeing the tail of the raw text usually
+    // makes that obvious at a glance.
+    const snippet = text.length > 300 ? `...${text.slice(-300)}` : text;
+    parseErr.rawResponseSnippet = snippet;
+    throw parseErr;
+  }
+}
+
+// A product only counts as already done if BOTH documents exist -- if a
+// previous run got interrupted (e.g. rate-limited) between writing
+// fda_products and product_nutrition_data, this makes sure the incomplete
+// one gets finished on the next run instead of being skipped forever.
+async function isAlreadyImported(docId) {
+  const [productSnap, nutritionSnap] = await Promise.all([
+    db.collection('fda_products').doc(docId).get(),
+    db.collection('product_nutrition_data').doc(docId).get(),
+  ]);
+  return productSnap.exists && nutritionSnap.exists;
 }
 
 // ─── Main ───────────────────────────────────────────────────────────────
@@ -191,30 +330,42 @@ async function main() {
   console.log(`Found ${folders.length} product folder(s). Starting import...\n`);
 
   const summary = { imported: [], skipped: [], failed: [] };
+  let stoppedForQuota = false;
 
   for (const folder of folders) {
     const folderPath = path.join(PHOTOS_DIR, folder);
-    const docId = slugToDocId(folder);
+    const docId = resolveDocId(folderPath, folder);
 
     const frontPath = findImage(folderPath, 'front');
-    const backPath = findImage(folderPath, 'back');
+    const backPaths = findBackImages(folderPath);
 
-    if (!frontPath || !backPath) {
-      console.log(`SKIP  ${folder} -- missing front and/or back image.`);
+    if (!frontPath || backPaths.length === 0) {
+      console.log(`SKIP  ${folder} -- missing front and/or back image(s).`);
       summary.skipped.push(folder);
       continue;
     }
 
-    const existing = await db.collection('fda_products').doc(docId).get();
-    if (existing.exists) {
-      console.log(`SKIP  ${folder} -- already imported (doc id: ${docId}).`);
+    if (await isAlreadyImported(docId)) {
+      console.log(`SKIP  ${folder} -- already fully imported (doc id: ${docId}).`);
       summary.skipped.push(folder);
       continue;
     }
 
     try {
-      console.log(`Extracting ${folder}...`);
-      const data = await extractProduct(frontPath, backPath);
+      const backLabel = backPaths.length > 1 ? `${backPaths.length} back photos` : 'back photo';
+      console.log(`Extracting ${folder} (front + ${backLabel})...`);
+      let data;
+      try {
+        data = await extractProduct(frontPath, backPaths);
+      } catch (err) {
+        if (!isRecitationError(err)) throw err;
+        // RECITATION false-positives are usually specific to the exact
+        // "transcribe verbatim" framing, not the image itself -- retry
+        // once immediately with a softened prompt before giving up on
+        // this product for the run.
+        console.log(`      RECITATION block on ${folder} -- retrying with a softened prompt...`);
+        data = await extractProduct(frontPath, backPaths, /* allowParaphrase */ true);
+      }
       const n = data.nutrition_per_100g || {};
 
       // fda_products doc -- field names match FirestoreProductRepository's
@@ -258,9 +409,39 @@ async function main() {
       console.log(`OK    ${folder} -> ${docId}${notes}`);
       summary.imported.push(folder);
     } catch (err) {
+      if (isRateLimitError(err)) {
+        console.error(
+          `\nRATE LIMIT / QUOTA hit while processing "${folder}": ${err.message}\n` +
+            'Stopping here rather than burning through the rest of the batch on ' +
+            'failed requests. Everything imported so far is saved. Just re-run ' +
+            '"npm run import" later (e.g. after your quota resets) -- already-' +
+            'imported products will be skipped automatically and this run will ' +
+            'pick up where it left off.\n',
+        );
+        stoppedForQuota = true;
+        break;
+      }
+      if (isRecitationError(err)) {
+        console.error(
+          `FAIL  ${folder} -- blocked by RECITATION even after the softened-prompt ` +
+            'retry. This product\'s label text likely matches something Gemini ' +
+            'recognizes from training data. Consider entering this one product\'s ' +
+            'data manually in Firestore Console rather than continuing to retry.',
+        );
+        summary.failed.push({ folder, error: err.message });
+        await sleep(DELAY_BETWEEN_REQUESTS_MS);
+        continue;
+      }
       console.error(`FAIL  ${folder} -- ${err.message}`);
+      if (err.rawResponseSnippet) {
+        console.error(`      Raw response tail: ${err.rawResponseSnippet}`);
+      }
       summary.failed.push({ folder, error: err.message });
     }
+
+    // Pace requests to stay under free-tier per-minute limits. Only needed
+    // after an actual Gemini call, not after a skip (no call was made).
+    await sleep(DELAY_BETWEEN_REQUESTS_MS);
   }
 
   console.log('\n--- Summary ---');
@@ -270,6 +451,11 @@ async function main() {
   if (summary.failed.length > 0) {
     console.log('\nFailed products (re-run the script to retry these):');
     summary.failed.forEach((f) => console.log(`  - ${f.folder}: ${f.error}`));
+  }
+  if (stoppedForQuota) {
+    const remaining = folders.length - summary.imported.length - summary.skipped.length - summary.failed.length;
+    console.log(`\nStopped early due to rate limiting -- ${remaining} folder(s) not yet attempted.`);
+    console.log('Re-run "npm run import" once your quota resets to continue.');
   }
   console.log(
     '\nNote: imageURL was left blank for every imported product -- upload ' +
