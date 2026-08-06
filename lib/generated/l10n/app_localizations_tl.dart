@@ -39,6 +39,67 @@ class AppLocalizationsTl extends AppLocalizations {
   String get scanNow => 'I-scan na';
 
   @override
+  String get infoFdaTitle => 'Basahin ang label';
+
+  @override
+  String get infoFdaSubtitle => 'Gabay ng FDA';
+
+  @override
+  String get infoWhoTitle => 'Araw-araw na limitasyon';
+
+  @override
+  String get infoWhoSubtitle => 'Gabay ng WHO';
+
+  @override
+  String get infoFdaSheetHeading => 'Paano basahin ang nutrition label';
+
+  @override
+  String get infoFdaSheetSubtitle => 'Batay sa gabay ng FDA (fda.gov)';
+
+  @override
+  String get infoFdaSheetStep1 =>
+      'Tingnan ang serving size at bilang ng serving kada pakete. Ang lahat ng nutrient amounts sa label ay batay dito, hindi sa buong pakete.';
+
+  @override
+  String get infoFdaSheetStep2 =>
+      'Suriin ang calories. 2,000 calories kada araw ang pangkalahatang gabay, pero maaaring iba ang kailangan mo depende sa edad, kasarian, at antas ng aktibidad.';
+
+  @override
+  String get infoFdaSheetStep3 =>
+      'Gamitin ang % Daily Value (%DV): 5% o mas mababa ay itinuturing na mababa; 20% o mas mataas ay itinuturing na mataas.';
+
+  @override
+  String get infoWhoSheetHeading => 'Limitasyon sa nutrients kada araw';
+
+  @override
+  String get infoWhoSheetSubtitle =>
+      'Batay sa gabay ng WHO, sa 2,000 kcal na diyeta';
+
+  @override
+  String get infoWhoSheetLimitSugar => 'Asukal (free sugars)';
+
+  @override
+  String get infoWhoSheetLimitSalt => 'Asin (sodium)';
+
+  @override
+  String get infoWhoSheetLimitSaturatedFat => 'Saturated fat';
+
+  @override
+  String get infoWhoSheetLimitTransFat => 'Trans fat';
+
+  @override
+  String get infoWhoSheetLimitSugarValue => '< 50g (10% ng kaloriya)';
+
+  @override
+  String get infoWhoSheetLimitSaltValue => '< 2g sodium (< 5g asin)';
+
+  @override
+  String get infoWhoSheetLimitSaturatedFatValue => '< 10% ng kaloriya';
+
+  @override
+  String get infoWhoSheetLimitTransFatValue => '< 1% ng kaloriya';
+
+  @override
   String get labelIntroTitle => 'Kilalanin ang iyong mga label';
 
   @override

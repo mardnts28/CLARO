@@ -21,6 +21,10 @@ class _HomeScreenState extends State<HomeScreen> {
   static const _primaryRed = Color(0xFF8B1A1A);
   static const _lightRed = Color(0xFFFCE7E7);
   static const _navPill = Color(0xFFF6CDCD);
+  // Amber accent used for the WHO tip card, kept separate from the red
+  // (FDA) accent so the two info sources stay visually distinguishable.
+  static const _amberBg = Color(0xFFFCEEDA);
+  static const _amberText = Color(0xFF8A5A0B);
   int _selectedIndex = 0;
   final _authService = AuthService();
   String _userName = 'User';
@@ -157,6 +161,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildScanCard(),
             const SizedBox(height: 22),
             _buildLabelIntro(),
+            const SizedBox(height: 18),
+            _buildInfoCarousel(),
             const SizedBox(height: 18),
             _buildHealthCard(),
             const SizedBox(height: 12),
@@ -386,6 +392,196 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ---------------------------------------------------------------------
+  // Info carousel — quick-access tips (FDA label guide, WHO nutrient
+  // limits). Tapping a tile opens a bottom sheet with the full detail.
+  //
+  // NOTE: strings here are hardcoded Filipino rather than routed through
+  // AppLocalizations because the corresponding keys don't exist yet in
+  // the .arb files. Add them there (e.g. infoFdaTitle, infoWhoTitle,
+  // etc.) and swap these literals for loc.xxx before shipping.
+  // ---------------------------------------------------------------------
+
+  Widget _buildInfoCarousel() {
+    final loc = AppLocalizations.of(context)!;
+    final isLtr = Directionality.of(context) == TextDirection.ltr;
+    return SizedBox(
+      height: 132,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        reverse: !isLtr,
+        children: [
+          _TipCard(
+            icon: Icons.description_outlined,
+            title: loc.infoFdaTitle,
+            subtitle: loc.infoFdaSubtitle,
+            bgColor: _lightRed,
+            fgColor: _primaryRed,
+            onTap: () => _showInfoSheet(_buildFdaSheetContent()),
+          ),
+          const SizedBox(width: 10),
+          _TipCard(
+            icon: Icons.balance_outlined,
+            title: loc.infoWhoTitle,
+            subtitle: loc.infoWhoSubtitle,
+            bgColor: _amberBg,
+            fgColor: _amberText,
+            onTap: () => _showInfoSheet(_buildWhoSheetContent()),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInfoSheet(Widget content) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.55,
+        minChildSize: 0.35,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            child: content,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Detail content shown when the FDA tip card is tapped. Steps follow
+  /// the FDA's own "How to Understand and Use the Nutrition Facts Label"
+  /// guidance (serving size → calories → %DV), fda.gov.
+  Widget _buildFdaSheetContent() {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final steps = [
+      loc.infoFdaSheetStep1,
+      loc.infoFdaSheetStep2,
+      loc.infoFdaSheetStep3,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSheetHandle(),
+        Row(
+          children: [
+            Icon(Icons.description_outlined, size: 20, color: _primaryRed),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                loc.infoFdaSheetHeading,
+                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          loc.infoFdaSheetSubtitle,
+          style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12),
+        ),
+        const SizedBox(height: 16),
+        ...List.generate(steps.length, (i) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 11,
+                backgroundColor: _lightRed,
+                child: Text(
+                  '${i + 1}',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _primaryRed),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(steps[i], style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13, height: 1.5)),
+              ),
+            ],
+          ),
+        )),
+      ],
+    );
+  }
+
+  /// Detail content shown when the WHO tip card is tapped. Figures are
+  /// WHO's percent-of-energy targets (sugar <10%, sat fat <10%, trans fat
+  /// <1%, sodium <2g) converted to grams for a 2,000 kcal reference diet.
+  Widget _buildWhoSheetContent() {
+    final theme = Theme.of(context);
+    final loc = AppLocalizations.of(context)!;
+    final limits = [
+      (loc.infoWhoSheetLimitSugar, loc.infoWhoSheetLimitSugarValue),
+      (loc.infoWhoSheetLimitSalt, loc.infoWhoSheetLimitSaltValue),
+      (loc.infoWhoSheetLimitSaturatedFat, loc.infoWhoSheetLimitSaturatedFatValue),
+      (loc.infoWhoSheetLimitTransFat, loc.infoWhoSheetLimitTransFatValue),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSheetHandle(),
+        Row(
+          children: [
+            Icon(Icons.balance_outlined, size: 20, color: _amberText),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                loc.infoWhoSheetHeading,
+                style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          loc.infoWhoSheetSubtitle,
+          style: theme.textTheme.bodyMedium?.copyWith(fontSize: 12),
+        ),
+        const SizedBox(height: 16),
+        ...limits.map((row) => Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: _amberBg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(row.$1, style: TextStyle(fontSize: 13, color: _amberText)),
+              Text(row.$2, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: _amberText)),
+            ],
+          ),
+        )),
+      ],
+    );
+  }
+
+  Widget _buildSheetHandle() {
+    return Center(
+      child: Container(
+        width: 36,
+        height: 4,
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).dividerColor,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------
   // Health & Eco grade cards (A–E scale, expandable arrow-ribbon detail)
   // ---------------------------------------------------------------------
 
@@ -482,7 +678,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(width: 8),
                 Icon(
-                  expanded ? Icons.keyboard_arrow_up : Icons.chevron_right,
+                  expanded
+                      ? Icons.keyboard_arrow_up
+                      : (Directionality.of(context) == TextDirection.ltr
+                          ? Icons.chevron_right
+                          : Icons.chevron_left),
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
@@ -729,7 +929,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(width: 8),
                 Icon(
-                  _processExpanded ? Icons.keyboard_arrow_up : Icons.chevron_right,
+                  _processExpanded
+                      ? Icons.keyboard_arrow_up
+                      : (Directionality.of(context) == TextDirection.ltr
+                          ? Icons.chevron_right
+                          : Icons.chevron_left),
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
@@ -792,9 +996,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildVoiceButton() {
-    return Positioned(
+    return PositionedDirectional(
       bottom: 92,
-      right: 24,
+      end: 24,
       child: Container(
         width: 56,
         height: 56,
@@ -931,6 +1135,119 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             );
           }),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tappable tip card used in the home info carousel. Wrapped in Material
+/// + InkWell so it gets a real ripple on tap, plus a small press-down
+/// scale so it also reads as clickable to users on platforms/situations
+/// where the ripple alone is easy to miss (e.g. fast taps).
+class _TipCard extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color bgColor;
+  final Color fgColor;
+  final VoidCallback onTap;
+
+  const _TipCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.bgColor,
+    required this.fgColor,
+    required this.onTap,
+  });
+
+  @override
+  State<_TipCard> createState() => _TipCardState();
+}
+
+class _TipCardState extends State<_TipCard> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: _pressed ? 0.96 : 1.0,
+      duration: const Duration(milliseconds: 100),
+      curve: Curves.easeOut,
+      child: SizedBox(
+        width: 150,
+        child: Material(
+          color: widget.bgColor,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            splashColor: widget.fgColor.withOpacity(0.12),
+            highlightColor: widget.fgColor.withOpacity(0.08),
+            onTapDown: (_) => _setPressed(true),
+            onTapCancel: () => _setPressed(false),
+            onTap: () {
+              _setPressed(false);
+              HapticService().vibrate();
+              widget.onTap();
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Builder(builder: (context) {
+                final isLtr = Directionality.of(context) == TextDirection.ltr;
+                return Column(
+                  crossAxisAlignment: isLtr ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: isLtr
+                          ? [
+                              Icon(widget.icon, size: 20, color: widget.fgColor),
+                              Icon(
+                                Icons.chevron_right,
+                                size: 18,
+                                color: widget.fgColor.withOpacity(0.5),
+                              ),
+                            ]
+                          : [
+                              Icon(
+                                Icons.chevron_left,
+                                size: 18,
+                                color: widget.fgColor.withOpacity(0.5),
+                              ),
+                              Icon(widget.icon, size: 20, color: widget.fgColor),
+                            ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.title,
+                      textAlign: isLtr ? TextAlign.left : TextAlign.right,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: widget.fgColor,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      widget.subtitle,
+                      textAlign: isLtr ? TextAlign.left : TextAlign.right,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: widget.fgColor.withOpacity(0.85)),
+                    ),
+                  ],
+                );
+              }),
+            ),
+          ),
         ),
       ),
     );

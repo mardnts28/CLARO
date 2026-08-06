@@ -152,6 +152,120 @@ abstract class AppLocalizations {
   /// **'Scan now'**
   String get scanNow;
 
+  /// No description provided for @infoFdaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Read the label'**
+  String get infoFdaTitle;
+
+  /// No description provided for @infoFdaSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'FDA guide'**
+  String get infoFdaSubtitle;
+
+  /// No description provided for @infoWhoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily limit'**
+  String get infoWhoTitle;
+
+  /// No description provided for @infoWhoSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'WHO guide'**
+  String get infoWhoSubtitle;
+
+  /// No description provided for @infoFdaSheetHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'How to read the nutrition label'**
+  String get infoFdaSheetHeading;
+
+  /// No description provided for @infoFdaSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Based on FDA guidance (fda.gov)'**
+  String get infoFdaSheetSubtitle;
+
+  /// No description provided for @infoFdaSheetStep1.
+  ///
+  /// In en, this message translates to:
+  /// **'Check serving size and servings per package. All nutrient amounts on the label are based on this, not the whole package.'**
+  String get infoFdaSheetStep1;
+
+  /// No description provided for @infoFdaSheetStep2.
+  ///
+  /// In en, this message translates to:
+  /// **'Review calories. 2,000 calories per day is a general guide, but your needs may vary by age, sex, and activity level.'**
+  String get infoFdaSheetStep2;
+
+  /// No description provided for @infoFdaSheetStep3.
+  ///
+  /// In en, this message translates to:
+  /// **'Use % Daily Value (%DV): 5% or less is considered low; 20% or more is considered high.'**
+  String get infoFdaSheetStep3;
+
+  /// No description provided for @infoWhoSheetHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily nutrient limits'**
+  String get infoWhoSheetHeading;
+
+  /// No description provided for @infoWhoSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Based on WHO guidance for a 2,000 kcal diet'**
+  String get infoWhoSheetSubtitle;
+
+  /// No description provided for @infoWhoSheetLimitSugar.
+  ///
+  /// In en, this message translates to:
+  /// **'Sugar (free sugars)'**
+  String get infoWhoSheetLimitSugar;
+
+  /// No description provided for @infoWhoSheetLimitSalt.
+  ///
+  /// In en, this message translates to:
+  /// **'Salt (sodium)'**
+  String get infoWhoSheetLimitSalt;
+
+  /// No description provided for @infoWhoSheetLimitSaturatedFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Saturated fat'**
+  String get infoWhoSheetLimitSaturatedFat;
+
+  /// No description provided for @infoWhoSheetLimitTransFat.
+  ///
+  /// In en, this message translates to:
+  /// **'Trans fat'**
+  String get infoWhoSheetLimitTransFat;
+
+  /// No description provided for @infoWhoSheetLimitSugarValue.
+  ///
+  /// In en, this message translates to:
+  /// **'< 50g (10% of calories)'**
+  String get infoWhoSheetLimitSugarValue;
+
+  /// No description provided for @infoWhoSheetLimitSaltValue.
+  ///
+  /// In en, this message translates to:
+  /// **'< 2g sodium (< 5g salt)'**
+  String get infoWhoSheetLimitSaltValue;
+
+  /// No description provided for @infoWhoSheetLimitSaturatedFatValue.
+  ///
+  /// In en, this message translates to:
+  /// **'< 10% of calories'**
+  String get infoWhoSheetLimitSaturatedFatValue;
+
+  /// No description provided for @infoWhoSheetLimitTransFatValue.
+  ///
+  /// In en, this message translates to:
+  /// **'< 1% of calories'**
+  String get infoWhoSheetLimitTransFatValue;
+
   /// No description provided for @labelIntroTitle.
   ///
   /// In en, this message translates to:
