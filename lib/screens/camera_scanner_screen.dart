@@ -39,15 +39,31 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     super.didUpdateWidget(oldWidget);
     if (widget.isActive != oldWidget.isActive) {
       if (widget.isActive) {
+        setState(() {
+          _isProcessing = false;
+          _isLiveAnalysisRunning = false;
+          _qualityWarning = null;
+        });
         _checkPermissionAndInit();
       } else {
+        _continuousAnalysisTimer?.cancel();
         _stopImageStreamIfActive();
         _cameraController?.dispose();
         setState(() {
+          _isProcessing = false;
+          _isLiveAnalysisRunning = false;
           _cameraController = null;
         });
       }
     }
+  }
+
+  @override
+  void deactivate() {
+    _continuousAnalysisTimer?.cancel();
+    _isProcessing = false;
+    _isLiveAnalysisRunning = false;
+    super.deactivate();
   }
 
   bool _isFlashOn = false;
@@ -301,8 +317,21 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       _qualityWarning = null;
     });
 
+    // Safety timer: if scanning resolution gets interrupted or hangs,
+    // auto-reset _isProcessing state after 3.5 seconds.
+    Timer? safetyTimer = Timer(const Duration(milliseconds: 3500), () {
+      if (mounted && _isProcessing) {
+        debugPrint('CameraScannerScreen: Safety timer triggered, resetting analyze state.');
+        setState(() {
+          _isProcessing = false;
+        });
+        _startContinuousAnalysis();
+      }
+    });
+
     try {
       if (_cameraController?.value.isInitialized != true) {
+        safetyTimer.cancel();
         setState(() => _isProcessing = false);
         _startContinuousAnalysis();
         return;
