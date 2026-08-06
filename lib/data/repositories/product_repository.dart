@@ -85,17 +85,20 @@ class FirestoreProductRepository implements ProductRepository {
     throw Exception('Product not found: $id');
   }
 
+  static List<QueryDocumentSnapshot<Map<String, dynamic>>>? _cachedCatalogDocs;
+
   @override
   Future<Product> getProductByYoloLabel(String yoloLabel) async {
     final cleanLabel = yoloLabel.trim().toLowerCase();
 
-    // 1. Direct Firestore query on the yolo_label field
+    // 1. Direct Firestore query on the yolo_label field (with 2s timeout)
     try {
       final query = await _db
           .collection(_collection)
           .where('yolo_label', isEqualTo: cleanLabel)
           .limit(1)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 2));
       if (query.docs.isNotEmpty) {
         final d = query.docs.first;
         final base = _productFromDoc(d.id, d.data());
@@ -103,17 +106,20 @@ class FirestoreProductRepository implements ProductRepository {
       }
     } catch (_) {}
 
-    // 2. Fetch all products to do multi-pass token matching (with timeout
-    //    so this never hangs the scan flow on a slow connection).
+    // 2. Multi-pass token matching against cached or freshly fetched catalog
     try {
-      final snapshot = await _db
-          .collection(_collection)
-          .get()
-          .timeout(const Duration(seconds: 5));
+      if (_cachedCatalogDocs == null) {
+        final snapshot = await _db
+            .collection(_collection)
+            .get()
+            .timeout(const Duration(seconds: 2));
+        _cachedCatalogDocs = snapshot.docs;
+      }
+      final docs = _cachedCatalogDocs!;
       final normYolo = cleanLabel.replaceAll(RegExp(r'[^a-z0-9]'), '');
 
       // Pass A: Exact match on doc ID or yolo_label field
-      for (final d in snapshot.docs) {
+      for (final d in docs) {
         final data = d.data();
         final docYolo = (data['yolo_label'] as String? ?? '').trim().toLowerCase();
         if (d.id == yoloLabel || docYolo == cleanLabel) {
@@ -131,7 +137,7 @@ class FirestoreProductRepository implements ProductRepository {
       QueryDocumentSnapshot<Map<String, dynamic>>? bestDoc;
       int maxMatches = 0;
 
-      for (final d in snapshot.docs) {
+      for (final d in docs) {
         final data = d.data();
         final pName = (data['product_name'] as String? ?? '').toLowerCase();
         final normPName = pName.replaceAll(RegExp(r'[^a-z0-9]'), '');

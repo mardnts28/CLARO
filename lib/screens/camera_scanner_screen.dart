@@ -378,14 +378,17 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             productCounts[prod.id] = (productCounts[prod.id] ?? 0) + count;
           } catch (e) {
             debugPrint('CameraScannerScreen: product lookup failed for $label: $e');
-            try {
-              for (int i = 0; i < count; i++) {
-                await FirebaseFirestore.instance.collection('unmatched_yolo_scans').add({
-                  'label': label,
-                  'timestamp': FieldValue.serverTimestamp(),
-                });
-              }
-            } catch (_) {}
+            // Fire-and-forget background log so UI navigation is instant
+            unawaited(() async {
+              try {
+                for (int i = 0; i < count; i++) {
+                  await FirebaseFirestore.instance.collection('unmatched_yolo_scans').add({
+                    'label': label,
+                    'timestamp': FieldValue.serverTimestamp(),
+                  });
+                }
+              } catch (_) {}
+            }());
           }
         }
 

@@ -32,11 +32,15 @@ class NutritionService {
     if (product.name.isEmpty) return product;
 
     try {
-      final doc = await _db.collection(_dataCollection).doc(product.id).get();
+      final doc = await _db
+          .collection(_dataCollection)
+          .doc(product.id)
+          .get()
+          .timeout(const Duration(milliseconds: 1500));
       if (!doc.exists) return product;
       return _mergeDataDoc(product, doc.data()!);
     } catch (_) {
-      // Read failure -- fail safe, return the product unenriched rather
+      // Read failure or timeout -- fail safe, return the product unenriched rather
       // than throwing and breaking the whole product fetch.
       return product;
     }
