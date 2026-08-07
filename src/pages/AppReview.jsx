@@ -16,6 +16,13 @@ function StatusBadge({ status }) {
   return <span className={map[status] || "badge"}>{status}</span>;
 }
 
+// Lower number = higher priority (shown first)
+const STATUS_ORDER = {
+  New: 0,
+  "In Progress": 1,
+  Resolved: 2,
+};
+
 function isWithinRange(date, range) {
   if (range === "All") return true;
   const now = new Date();
@@ -42,7 +49,6 @@ export default function AppReview() {
     async function load() {
       try {
         const data = await getAllReviews();
-        data.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
         setReviews(data);
       } catch (err) {
         console.error("APP REVIEW LOAD ERROR:", err);
@@ -54,8 +60,14 @@ export default function AppReview() {
     load();
   }, []);
 
+  function getDateValue(r) {
+    if (r.createdAt?.toDate) return r.createdAt.toDate().getTime();
+    if (r.createdAt) return new Date(r.createdAt).getTime();
+    return 0;
+  }
+
   const filteredReviews = useMemo(() => {
-    return reviews.filter((r) => {
+    const filtered = reviews.filter((r) => {
       const matchesStatus =
         statusFilter === "All Status" || r.status === statusFilter;
 
@@ -63,6 +75,15 @@ export default function AppReview() {
       const matchesDate = isWithinRange(createdDate, dateFilter);
 
       return matchesStatus && matchesDate;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const statusDiff =
+        (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
+      if (statusDiff !== 0) return statusDiff;
+
+      // Within the same status, most recent first
+      return getDateValue(b) - getDateValue(a);
     });
   }, [reviews, statusFilter, dateFilter]);
 

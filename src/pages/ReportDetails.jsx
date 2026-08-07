@@ -188,11 +188,12 @@ export default function ReportDetails() {
   return (
     <DashboardLayout>
       <div className="details-header">
-        <h1 className="page-title">Report Details</h1>
         <button className="back-btn" onClick={() => navigate("/reports")}>
           <FiArrowLeft /> Back to Reports
         </button>
       </div>
+
+      <h1 className="page-title details-title">Report Details</h1>
 
       <div className="details-card">
         <h2 className="details-product">{report.productName}</h2>
