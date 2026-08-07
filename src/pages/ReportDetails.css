@@ -26,38 +26,52 @@
 .details-card {
   background: #fff;
   border-radius: 14px;
-  padding: 32px 36px;
-  max-width: 520px;
+  padding: 36px 40px;
+  max-width: 1000px;
   margin: 0 auto;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
+/* ── Top identity block: name, description, reporter, date ──────────── */
+.details-header-block {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
 .details-product {
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 700;
   color: #1a1a1a;
-  margin: 0 0 2px;
+  margin: 0 0 4px;
 }
 
 .details-product-desc {
   color: #6b6b6b;
   font-size: 14px;
-  margin: 0 0 20px;
+  margin: 0 0 18px;
 }
 
-.details-row {
-  margin-bottom: 14px;
+.details-meta-row {
+  display: flex;
+  justify-content: center;
+  gap: 48px;
+  padding-top: 18px;
+  border-top: 1px solid #efe6e4;
+}
+
+.details-meta-item {
+  text-align: center;
 }
 
 .details-label {
   display: block;
-  font-size: 13px;
+  font-size: 12.5px;
   color: #8a8a8a;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .details-value {
-  font-size: 14.5px;
+  font-size: 14px;
   color: #1a1a1a;
   font-weight: 500;
 }
@@ -97,11 +111,22 @@
   cursor: not-allowed;
 }
 
-/* ── Front/back photo review ─────────────────────────────────────────── */
+/* ── Status + photos section ─────────────────────────────────────────── */
+.details-status-row {
+  text-align: center;
+  margin: 24px 0;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #efe6e4;
+}
+
+.details-status-row .details-label {
+  margin-bottom: 8px;
+}
+
 .details-photos {
   display: flex;
   gap: 16px;
-  margin: 20px 0;
+  margin: 0 0 8px;
 }
 
 .photo-box {
@@ -110,6 +135,7 @@
 
 .photo-box-label {
   display: block;
+  text-align: center;
   font-size: 13px;
   color: #8a8a8a;
   margin-bottom: 6px;
@@ -117,7 +143,7 @@
 
 .photo-box img {
   width: 100%;
-  height: 180px;
+  height: 160px;
   object-fit: cover;
   border-radius: 10px;
   border: 1px solid #e5d8d5;
@@ -128,7 +154,7 @@
 
 .photo-box-empty {
   width: 100%;
-  height: 180px;
+  height: 160px;
   border-radius: 10px;
   border: 1px dashed #d8c9c5;
   display: flex;

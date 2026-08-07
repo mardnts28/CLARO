@@ -6,6 +6,8 @@ import FdaVerificationModal from "../components/FdaVerificationModal";
 import { getReportById, approveReport, rejectReport } from "../services/reportService";
 import { CANONICAL_ALLERGENS } from "../constants/canonicalAllergens";
 import { FiArrowLeft } from "react-icons/fi";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/firebase";
 import "./ReportDetails.css";
 
 function StatusBadge({ status }) {
@@ -109,6 +111,7 @@ export default function ReportDetails() {
   const [actionLoading, setActionLoading] = useState(false);
   const [lightbox, setLightbox] = useState(null); // image url or null
   const [selectedCategory, setSelectedCategory] = useState("");
+  const [reporterName, setReporterName] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -116,6 +119,18 @@ export default function ReportDetails() {
         const data = await getReportById(id);
         setReport(data);
         setForm(buildFormState(data.extractedData));
+
+        // Look up the reporting user's name from Firestore
+        if (data.reportedBy) {
+          try {
+            const userSnap = await getDoc(doc(db, "users", data.reportedBy));
+            if (userSnap.exists()) {
+              setReporterName(userSnap.data().name || "");
+            }
+          } catch (err) {
+            console.error("Failed to load reporter name:", err);
+          }
+        }
       } catch (err) {
         setError("Report not found.");
       } finally {
@@ -256,29 +271,33 @@ export default function ReportDetails() {
       <h1 className="page-title details-title">Report Details</h1>
 
       <div className="details-card">
-        <h2 className="details-product">{report.productName}</h2>
-        <p className="details-product-desc">{report.productDescription}</p>
+        {/* ── Product identity: name, description, reporter, date ──── */}
+        <div className="details-header-block">
+          <h2 className="details-product">{report.productName}</h2>
+          <p className="details-product-desc">{report.productDescription}</p>
 
-        <div className="details-row">
-          <span className="details-label">Reported By:</span>
-          <span className="details-value">{report.userName || report.reportedBy}</span>
+          <div className="details-meta-row">
+            <div className="details-meta-item">
+              <span className="details-label">Reported By</span>
+              <span className="details-value">
+                {reporterName || report.userName || report.reportedBy}
+              </span>
+            </div>
+            <div className="details-meta-item">
+              <span className="details-label">Date Submitted</span>
+              <span className="details-value">
+                {formatDate(report.dateSubmitted)} · {formatTime(report.dateSubmitted)}
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div className="details-row">
-          <span className="details-label">Date Submitted:</span>
-          <span className="details-value">
-            {formatDate(report.dateSubmitted)}
-            <br />
-            {formatTime(report.dateSubmitted)}
-          </span>
-        </div>
-
-        <div className="details-row">
+        {/* ── Status + submitted photos ────────────────────────────── */}
+        <div className="details-status-row">
           <span className="details-label">Status</span>
+          <StatusBadge status={report.status} />
         </div>
-        <StatusBadge status={report.status} />
 
-        {/* ── Submitted photos ─────────────────────────────────────── */}
         <div className="details-photos">
           <div className="photo-box">
             <span className="photo-box-label">Front Photo</span>
