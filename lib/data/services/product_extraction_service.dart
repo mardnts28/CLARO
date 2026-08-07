@@ -124,14 +124,19 @@ Rules:
   per serving rather than per 100g, convert using the stated serving size.
   If a field is genuinely not visible/printed, use null -- do NOT guess or
   estimate a plausible-looking number.
-- "allergens": only choose from this fixed list, based on what the label's
-  allergen statement (e.g. "Contains:", "May contain traces of") actually
-  says: [$allergenList]. If the label mentions an allergen-relevant
+- "allergens": only choose from this fixed list based on TWO sources only:
+  1) The actual ingredients list, and 2) "May contain" or "May contain traces of" 
+  statements. DO NOT include allergens from facility warnings like 
+  "manufactured in a facility that stores and uses" or similar cross-contamination 
+  warnings. Only report allergens that are actual ingredients or explicitly stated 
+  as possible traces: [$allergenList]. If the label mentions an allergen-relevant
   ingredient not on this list, note it in "confidence_notes" instead of
   inventing a new category.
 - "confidence_notes": briefly flag anything unclear, blurry, or ambiguous in
   either photo that a human reviewer should double-check against the actual
-  package. Leave empty if nothing stood out.
+  package. Leave empty if nothing stood out. IMPORTANT: Return simple, concise
+  notes using bullet points. Maximum 1 sentence per bullet point. Keep each
+  note under 15 words. Use everyday language.
 - If the back label is missing, blurry, or unreadable, still fill in what
   the front photo gives you (brand, product_name, size), leave nutrition/
   ingredients/allergens empty, and say so in "confidence_notes".
