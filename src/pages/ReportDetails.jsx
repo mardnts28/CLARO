@@ -461,7 +461,7 @@ export default function ReportDetails() {
                   </tr>
                   <tr>
                     <td>Soy</td>
-                    <td>Soy, soya, soybean, tofu, tempeh, tamari, shoyu, edame, miso, nato, okara</td>
+                    <td>Soy, soya, soybean, tofu, tempeh, tamari, shoyu, edamame, miso, natto, okara</td>
                   </tr>
                   <tr>
                     <td>Sesame</td>
@@ -519,7 +519,7 @@ export default function ReportDetails() {
               className="reject-btn"
               onClick={() => setModalType("reject")}
             >
-              Reject Report
+              Reject
             </button>
             <button
               className="approve-btn"
@@ -535,7 +535,7 @@ export default function ReportDetails() {
               }
               onClick={() => setModalType("approve")}
             >
-              Approve Report
+              Approve
             </button>
           </div>
         )}
