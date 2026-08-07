@@ -47,6 +47,13 @@ function slugifyCategory(category) {
 // product_nutrition_data document sharing that same generated id -- the
 // same id-sharing convention tools/bulk-import/import.js uses.
 //
+// cpr_number, registration_status, and validity_date come from the admin's
+// manual FDA verification step (see FdaVerificationModal.jsx) -- there's
+// no automated pipeline stage that looks these up; the admin checks the
+// FDA registry themselves and enters the result before a report can be
+// approved. registration_status is only ever true when both fields were
+// actually provided, never assumed.
+//
 // Note on the recognition model: promoting here makes the product
 // immediately findable via search/browse (no dependency on retraining),
 // but it won't be recognizable via camera scan until the image recognition
@@ -57,6 +64,12 @@ async function promoteToLiveCatalog(finalData) {
   const ed = finalData.extractedData || {};
   const nutrition = ed.nutrition || {};
 
+  const cprNumber = (ed.cprNumber || "").trim();
+  const validityTimestamp = ed.validityDate
+    ? Timestamp.fromDate(new Date(ed.validityDate))
+    : null;
+  const isFdaVerified = Boolean(cprNumber && validityTimestamp);
+
   const productRef = doc(collection(db, "fda_products"));
   const newProductId = productRef.id;
 
@@ -64,8 +77,9 @@ async function promoteToLiveCatalog(finalData) {
     product_name: ed.productName || finalData.productName || "",
     brand: ed.brand || "",
     product_category: ed.category ? slugifyCategory(ed.category) : "",
-    registration_status: false, // not FDA-verified through this pipeline
-    cpr_number: "",
+    registration_status: isFdaVerified,
+    cpr_number: cprNumber,
+    validity_date: validityTimestamp,
     available_sizes: ed.size ? [ed.size] : [],
     imageURL: finalData.frontImageUrl || "",
     source: "admin_approved_report",
@@ -109,6 +123,14 @@ async function promoteToLiveCatalog(finalData) {
 /// onto the `reports` doc itself, not just the approved copy, so the
 /// report's record reflects what was actually verified.
 export async function approveReport(reportId, correctedData = {}) {
+  const ed = correctedData.extractedData || {};
+  if (!ed.cprNumber?.trim() || !ed.validityDate) {
+    throw {
+      code: "report/missing-fda-verification",
+      message: "CPR number and validity date are required before approving a report.",
+    };
+  }
+
   const reportRef = doc(db, "reports", reportId);
   const reportSnap = await getDoc(reportRef);
   if (!reportSnap.exists()) throw { code: "report/not-found" };

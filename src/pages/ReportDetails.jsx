@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
 import ConfirmModal from "../components/ConfirmModal";
+import FdaVerificationModal from "../components/FdaVerificationModal";
 import { getReportById, approveReport, rejectReport } from "../services/reportService";
 import { CANONICAL_ALLERGENS } from "../constants/canonicalAllergens";
 import { FiArrowLeft } from "react-icons/fi";
@@ -196,16 +197,26 @@ export default function ReportDetails() {
     };
   }
 
+  async function handleApproveConfirm({ cprNumber, validityDate }) {
+    setActionLoading(true);
+    try {
+      await approveReport(id, {
+        extractedData: { ...buildExtractedDataPayload(), cprNumber, validityDate },
+      });
+      setReport((prev) => ({ ...prev, status: "Approve" }));
+      setModalType(null);
+    } catch (err) {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
   async function handleConfirm() {
     setActionLoading(true);
     try {
-      if (modalType === "approve") {
-        await approveReport(id, { extractedData: buildExtractedDataPayload() });
-        setReport((prev) => ({ ...prev, status: "Approve" }));
-      } else {
-        await rejectReport(id);
-        setReport((prev) => ({ ...prev, status: "Rejected" }));
-      }
+      await rejectReport(id);
+      setReport((prev) => ({ ...prev, status: "Rejected" }));
       setModalType(null);
     } catch (err) {
       setError("Something went wrong. Please try again.");
@@ -546,7 +557,15 @@ export default function ReportDetails() {
         </div>
       )}
 
-      {modalType && (
+      {modalType === "approve" && (
+        <FdaVerificationModal
+          onConfirm={handleApproveConfirm}
+          onClose={() => setModalType(null)}
+          loading={actionLoading}
+        />
+      )}
+
+      {modalType === "reject" && (
         <ConfirmModal
           type={modalType}
           onConfirm={handleConfirm}

@@ -1,0 +1,38 @@
+.fda-modal-box {
+  max-width: 380px;
+  text-align: left;
+}
+
+.fda-modal-box .modal-icon,
+.fda-modal-box .modal-title,
+.fda-modal-box .modal-desc {
+  text-align: center;
+}
+
+.fda-field-group {
+  margin-bottom: 16px;
+}
+
+.fda-field-group .field-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a4a4a;
+  margin-bottom: 6px;
+}
+
+.fda-field-group .field-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #d8d6cd;
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.fda-field-error {
+  display: block;
+  color: #c23b3b;
+  font-size: 12px;
+  margin-top: 4px;
+}
