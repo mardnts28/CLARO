@@ -85,3 +85,169 @@
   color: #1a7f37;
   border-color: #bfe8c8;
 }
+
+.reject-btn:disabled,
+.approve-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Front/back photo review ─────────────────────────────────────────── */
+.details-photos {
+  display: flex;
+  gap: 16px;
+  margin: 20px 0;
+}
+
+.photo-box {
+  flex: 1;
+}
+
+.photo-box-label {
+  display: block;
+  font-size: 13px;
+  color: #8a8a8a;
+  margin-bottom: 6px;
+}
+
+.photo-box img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid #e5d8d5;
+  cursor: zoom-in;
+  display: block;
+  background: #f6f2f1;
+}
+
+.photo-box-empty {
+  width: 100%;
+  height: 180px;
+  border-radius: 10px;
+  border: 1px dashed #d8c9c5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a89d99;
+  font-size: 13px;
+  background: #faf7f6;
+}
+
+/* ── Extracted data review section ───────────────────────────────────── */
+.extraction-section {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #efe6e4;
+}
+
+.extraction-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 4px;
+}
+
+.extraction-pending-note {
+  font-size: 13px;
+  color: #a87d1f;
+  background: #fdf3e0;
+  border: 1px solid #f2ddab;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 10px 0 20px;
+}
+
+.confidence-note {
+  font-size: 13px;
+  color: #8a5a1f;
+  background: #fdf3e0;
+  border: 1px solid #f2ddab;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 10px 0 20px;
+}
+
+.field-group {
+  margin-bottom: 16px;
+}
+
+.field-label {
+  display: block;
+  font-size: 13px;
+  color: #8a8a8a;
+  margin-bottom: 5px;
+}
+
+.field-input,
+.field-textarea {
+  width: 100%;
+  border: 1px solid #e5d8d5;
+  border-radius: 8px;
+  padding: 9px 11px;
+  font-size: 14px;
+  color: #1a1a1a;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.field-textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+.field-row {
+  display: flex;
+  gap: 12px;
+}
+
+.field-row .field-group {
+  flex: 1;
+}
+
+.nutrition-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.nutrition-grid .field-group {
+  margin-bottom: 0;
+}
+
+.nutrition-unit {
+  font-size: 12px;
+  color: #a8a1a0;
+}
+
+/* ── Allergen checklist ──────────────────────────────────────────────── */
+.allergen-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.allergen-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1px solid #e5d8d5;
+  background: #fff;
+  font-size: 13.5px;
+  color: #4a4a4a;
+  cursor: pointer;
+  user-select: none;
+}
+
+.allergen-chip input {
+  accent-color: #c23b3b;
+}
+
+.allergen-chip.checked {
+  background: #fbe9e9;
+  border-color: #eab8b8;
+  color: #a4302f;
+  font-weight: 600;
+}
