@@ -16,6 +16,16 @@ function StatusBadge({ status }) {
   return <span className={map[status] || "badge"}>{status}</span>;
 }
 
+// Product category options for dropdown
+const PRODUCT_CATEGORIES = [
+  "Canned Fish",
+  "Canned Seafood", 
+  "Canned Meat",
+  "Canned Vegetables",
+  "Instant Noodles",
+  "Other",
+];
+
 // Nutrition fields shown in the review grid -- keys match exactly what
 // ProductExtractionResult.toReportExtractedDataMap() writes under
 // extractedData.nutrition (see the Flutter app's product_extraction_result.dart).
@@ -47,12 +57,39 @@ function buildFormState(extractedData) {
     nutritionState[key] = nutrition[key] ?? 0;
   });
 
+  // Helper to extract numeric value from size strings like "155g" or "1/2 cup (65g)"
+  function extractGrams(value) {
+    if (!value) return "";
+    if (typeof value === 'number') return value;
+    // Try to extract number from string
+    const match = value.toString().match(/(\d+)/);
+    return match ? Number(match[1]) : "";
+  }
+
+  // Determine if category matches a predefined option or is custom
+  const categoryValue = ed.category || "";
+  const categoryLower = categoryValue.toLowerCase().trim();
+  const matchedCategory = PRODUCT_CATEGORIES.find(cat => cat.toLowerCase() === categoryLower);
+  
+  let selectedCategory = "";
+  let customCategory = "";
+  
+  if (categoryValue) {
+    if (matchedCategory) {
+      selectedCategory = matchedCategory;
+    } else {
+      selectedCategory = "Other";
+      customCategory = categoryValue;
+    }
+  }
+  
   return {
     brand: ed.brand || "",
     productName: ed.productName || "",
-    category: ed.category || "",
-    size: ed.size || "",
-    servingSize: ed.servingSize || "",
+    category: selectedCategory,
+    customCategory: customCategory,
+    size: extractGrams(ed.size),
+    servingSize: extractGrams(ed.servingSize),
     ingredients: (ed.ingredients || []).join("\n"),
     allergens: ed.allergens || [],
     nutrition: nutritionState,
@@ -70,6 +107,7 @@ export default function ReportDetails() {
   const [modalType, setModalType] = useState(null); // "approve" | "reject" | null
   const [actionLoading, setActionLoading] = useState(false);
   const [lightbox, setLightbox] = useState(null); // image url or null
+  const [selectedCategory, setSelectedCategory] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -107,6 +145,14 @@ export default function ReportDetails() {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function handleCategoryChange(value) {
+    setForm((prev) => ({ 
+      ...prev, 
+      category: value, 
+      customCategory: value === "Other" ? prev.customCategory : "" 
+    }));
+  }
+
   function updateNutrition(key, value) {
     setForm((prev) => ({
       ...prev,
@@ -130,12 +176,15 @@ export default function ReportDetails() {
   // so an approved report's extractedData always has the same structure
   // whether it came straight from Gemini or was hand-edited by admin.
   function buildExtractedDataPayload() {
+    // Use custom category if "Other" is selected, otherwise use the selected category
+    const finalCategory = form.category === "Other" ? form.customCategory.trim() : form.category.trim();
+    
     return {
       brand: form.brand.trim(),
       productName: form.productName.trim(),
-      category: form.category.trim(),
-      size: form.size.trim(),
-      servingSize: form.servingSize.trim(),
+      category: finalCategory,
+      size: form.size ? Number(form.size) : "",
+      servingSize: form.servingSize ? Number(form.servingSize) : "",
       ingredients: form.ingredients
         .split("\n")
         .map((i) => i.trim())
@@ -201,7 +250,7 @@ export default function ReportDetails() {
 
         <div className="details-row">
           <span className="details-label">Reported By:</span>
-          <span className="details-value">{report.reportedBy}</span>
+          <span className="details-value">{report.userName || report.reportedBy}</span>
         </div>
 
         <div className="details-row">
@@ -259,9 +308,18 @@ export default function ReportDetails() {
           )}
 
           {form.confidenceNotes && (
-            <p className="confidence-note">
-              <strong>Gemini flagged for review:</strong> {form.confidenceNotes}
-            </p>
+            <div className="confidence-note">
+              <strong>Notes:</strong>
+              <ul>
+                {form.confidenceNotes
+                  .split(/[.\n]/)
+                  .map(note => note.trim())
+                  .filter(note => note.length > 5) // Filter out very short fragments
+                  .map((note, index) => (
+                    <li key={index}>{note.replace(/^•\s*/, '').replace(/^\d+\.\s*/, '').replace(/^-\s*/, '')}</li>
+                  ))}
+              </ul>
+            </div>
           )}
 
           <div className="field-row">
@@ -288,35 +346,53 @@ export default function ReportDetails() {
           <div className="field-row">
             <div className="field-group">
               <label className="field-label">Product Category</label>
-              <input
+              <select
                 className="field-input"
                 value={form.category}
                 disabled={isResolved}
-                placeholder="e.g. Canned Fish, Instant Noodles, Condiments"
-                onChange={(e) => updateField("category", e.target.value)}
-              />
+                onChange={(e) => handleCategoryChange(e.target.value)}
+              >
+                <option value="">Select category</option>
+                {PRODUCT_CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
             </div>
+            {form.category === "Other" && (
+              <div className="field-group">
+                <label className="field-label">Specify Category</label>
+                <input
+                  className="field-input"
+                  value={form.customCategory}
+                  disabled={isResolved}
+                  placeholder="Enter custom category"
+                  onChange={(e) => updateField("customCategory", e.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           <div className="field-row">
             <div className="field-group">
-              <label className="field-label">Package Size</label>
+              <label className="field-label">Package Size grams (g)</label>
               <input
                 className="field-input"
+                type="number"
                 value={form.size}
                 disabled={isResolved}
-                placeholder="e.g. 155g"
-                onChange={(e) => updateField("size", e.target.value)}
+                placeholder="e.g. 155"
+                onChange={(e) => updateField("size", e.target.value ? Number(e.target.value) : "")}
               />
             </div>
             <div className="field-group">
-              <label className="field-label">Serving Size</label>
+              <label className="field-label">Serving Size grams (g)</label>
               <input
                 className="field-input"
+                type="number"
                 value={form.servingSize}
                 disabled={isResolved}
-                placeholder="e.g. 1/2 cup (65g)"
-                onChange={(e) => updateField("servingSize", e.target.value)}
+                placeholder="e.g. 65"
+                onChange={(e) => updateField("servingSize", e.target.value ? Number(e.target.value) : "")}
               />
             </div>
           </div>
@@ -328,11 +404,61 @@ export default function ReportDetails() {
               value={form.ingredients}
               disabled={isResolved}
               onChange={(e) => updateField("ingredients", e.target.value)}
+              style={{ height: `${Math.max(150, form.ingredients.split('\n').length * 24)}px` }}
             />
           </div>
 
           <div className="field-group">
             <label className="field-label">Allergens</label>
+            <div className="allergen-guide">
+              <strong>Allergen Guide</strong>
+              <table className="allergen-table">
+                <thead>
+                  <tr>
+                    <th>Allergen Category</th>
+                    <th>Derivatives & Related Ingredients</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Milk</td>
+                    <td>Milk, dairy, cream, cheese, yogurt, butter, lactose, casein, whey</td>
+                  </tr>
+                  <tr>
+                    <td>Eggs</td>
+                    <td>Egg, albumin, ovalbumin, mayonnaise</td>
+                  </tr>
+                  <tr>
+                    <td>Fish</td>
+                    <td>Fish, anchovy, mackerel, tuna, salmon, cod, trout</td>
+                  </tr>
+                  <tr>
+                    <td>Shellfish</td>
+                    <td>Shellfish, shrimp, prawn, crab, lobster, squid, clams, mussels, oysters, scallops, octopus, crustacean</td>
+                  </tr>
+                  <tr>
+                    <td>Tree Nuts</td>
+                    <td>Nut, almond, walnut, cashew, pecan, hazelnut, pistachio, macadamia</td>
+                  </tr>
+                  <tr>
+                    <td>Peanuts</td>
+                    <td>Peanut, groundnut, arachis, mandelonas</td>
+                  </tr>
+                  <tr>
+                    <td>Wheat</td>
+                    <td>Wheat, gluten, flour, barley, rye</td>
+                  </tr>
+                  <tr>
+                    <td>Soy</td>
+                    <td>Soy, soya, soybean, tofu, tempeh, tamari, shoyu, edame, miso, nato, okara</td>
+                  </tr>
+                  <tr>
+                    <td>Sesame</td>
+                    <td>Sesame seeds, sesame oil, tahini</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <div className="allergen-grid">
               {CANONICAL_ALLERGENS.map((allergen) => {
                 const checked = form.allergens.includes(allergen);
@@ -386,9 +512,13 @@ export default function ReportDetails() {
             </button>
             <button
               className="approve-btn"
-              disabled={!form.productName.trim() || !form.category.trim()}
+              disabled={
+                !form.productName.trim() || 
+                !form.category || 
+                (form.category === "Other" && !form.customCategory.trim())
+              }
               title={
-                !form.productName.trim() || !form.category.trim()
+                (!form.productName.trim() || !form.category || (form.category === "Other" && !form.customCategory.trim()))
                   ? "Product Name and Product Category are required before approving"
                   : undefined
               }

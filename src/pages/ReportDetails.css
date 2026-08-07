@@ -173,6 +173,81 @@
   margin: 10px 0 20px;
 }
 
+.confidence-note ul {
+  margin: 8px 0 0 0;
+  padding-left: 20px;
+}
+
+.confidence-note li {
+  margin-bottom: 4px;
+}
+
+.allergen-guide {
+  font-size: 12px;
+  color: #6b6b6b;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.allergen-guide strong {
+  display: block;
+  margin-bottom: 10px;
+  color: #495057;
+  font-size: 13px;
+}
+
+.allergen-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 12px;
+  border-spacing: 0;
+}
+
+.allergen-table th,
+.allergen-table td {
+  border: 1px solid #dee2e6;
+  padding: 10px 14px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.allergen-table th {
+  background: #e9ecef;
+  font-weight: 600;
+  color: #343a40;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.allergen-table th:first-child {
+  width: 20%;
+}
+
+.allergen-table td {
+  color: #495057;
+  line-height: 1.6;
+}
+
+.allergen-table td:first-child {
+  font-weight: 500;
+  color: #343a40;
+  width: 20%;
+}
+
+.allergen-table tr:nth-child(even) {
+  background: #f8f9fa;
+}
+
+.allergen-table tr:hover {
+  background: #e9ecef;
+}
+
 .field-group {
   margin-bottom: 16px;
 }
@@ -185,7 +260,8 @@
 }
 
 .field-input,
-.field-textarea {
+.field-textarea,
+select.field-input {
   width: 100%;
   border: 1px solid #e5d8d5;
   border-radius: 8px;
@@ -194,11 +270,39 @@
   color: #1a1a1a;
   font-family: inherit;
   box-sizing: border-box;
+  background-color: #fff;
+}
+
+/* Hide number input spinners */
+.field-input[type="number"] {
+  -moz-appearance: textfield;
+  -webkit-appearance: textfield;
+  appearance: textfield;
+}
+
+.field-input[type="number"]::-webkit-outer-spin-button,
+.field-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.field-input[type="number"]::-moz-number-spin-box {
+  -moz-appearance: textfield;
+}
+
+select.field-input {
+  cursor: pointer;
+}
+
+select.field-input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
 }
 
 .field-textarea {
-  resize: vertical;
-  min-height: 70px;
+  resize: none;
+  height: 250px;
+  overflow: visible;
 }
 
 .field-row {
@@ -218,6 +322,18 @@
 
 .nutrition-grid .field-group {
   margin-bottom: 0;
+}
+
+.nutrition-grid .field-input[type="number"] {
+  -moz-appearance: textfield;
+  -webkit-appearance: textfield;
+  appearance: textfield;
+}
+
+.nutrition-grid .field-input[type="number"]::-webkit-outer-spin-button,
+.nutrition-grid .field-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .nutrition-unit {
