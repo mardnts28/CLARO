@@ -159,7 +159,28 @@ class _UnknownProductSubmissionScreenState
       final user = _authService.currentUser;
       final uid = user?.uid ?? 'anonymous';
       final email = user?.email ?? '';
-      final name = user?.displayName ?? email.split('@').first;
+
+      // Firebase Auth's displayName is never set in this app (no
+      // updateDisplayName() call anywhere) -- the user's actual name lives
+      // in Firestore under users/{uid}.name, written during onboarding.
+      // Falls back to the email prefix only if that document/field is
+      // somehow missing (shouldn't happen for a signed-up user, but keeps
+      // this from ever showing a raw UID if it does).
+      String name = email.isNotEmpty ? email.split('@').first : 'Anonymous';
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
+        final fetchedName = userDoc.data()?['name'] as String?;
+        if (fetchedName != null && fetchedName.trim().isNotEmpty) {
+          name = fetchedName.trim();
+        }
+      } catch (e) {
+        debugPrint('Could not fetch user name for report: $e');
+        // Keep the email-prefix fallback set above -- don't block
+        // submission over a profile lookup failure.
+      }
 
       // Read both photos once -- the same bytes are used for the Cloudinary
       // upload below and for the background extraction call afterwards, so
