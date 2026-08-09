@@ -17,6 +17,12 @@ class NutritionGuideScreen extends StatelessWidget {
   bool get isFDA =>
       type == NutritionGuideType.fda;
 
+    bool _isTagalog(BuildContext context) =>
+      Localizations.localeOf(context).languageCode == 'tl';
+
+    String _text(BuildContext context, String english, String tagalog) =>
+      _isTagalog(context) ? tagalog : english;
+
   // ---------------------------------------------------------------------------
   // OFFICIAL LINKS
   // ---------------------------------------------------------------------------
@@ -46,20 +52,16 @@ class NutritionGuideScreen extends StatelessWidget {
 
       if (!launched && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Unable to open the official website.',
-            ),
+          SnackBar(
+            content: Text(_text(context, 'Unable to open the official website.', 'Hindi mabuksan ang opisyal na website.')),
           ),
         );
       }
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Unable to open the official website.',
-            ),
+          SnackBar(
+            content: Text(_text(context, 'Unable to open the official website.', 'Hindi mabuksan ang opisyal na website.')),
           ),
         );
       }
@@ -82,10 +84,10 @@ class NutritionGuideScreen extends StatelessWidget {
 
         centerTitle: true,
 
-        title: Text(
+          title: Text(
           isFDA
-              ? 'How to Read Nutrition Labels'
-              : 'Daily Nutrient Guidelines',
+            ? _text(context, 'How to Read Nutrition Labels', 'Paano Basahin ang Nutrition Label')
+            : _text(context, 'Daily Nutrient Guidelines', 'Mga Gabay sa Nutrients Kada Araw'),
 
           style: const TextStyle(
             fontSize: 17,
@@ -131,8 +133,8 @@ class NutritionGuideScreen extends StatelessWidget {
 
         const SizedBox(height: 20),
 
-        const Text(
-          'How to Read Nutrition Labels',
+        Text(
+          _text(context, 'How to Read Nutrition Labels', 'Paano Basahin ang Nutrition Label'),
 
           style: TextStyle(
             fontSize: 24,
@@ -143,7 +145,7 @@ class NutritionGuideScreen extends StatelessWidget {
         const SizedBox(height: 8),
 
         Text(
-          'Learn how to understand the information on food labels and make more informed food choices.',
+          _text(context, 'Learn how to understand the information on food labels and make more informed food choices.', 'Alamin kung paano unawain ang impormasyon sa food label para makagawa ng mas mabuting pagpili ng pagkain.'),
 
           style: TextStyle(
             fontSize: 14,
@@ -165,10 +167,10 @@ class NutritionGuideScreen extends StatelessWidget {
           context,
 
           label:
-              'Read the Official FDA Guide',
+              _text(context, 'Read the Official FDA Guide', 'Basahin ang Opisyal na Gabay ng FDA'),
 
           subtitle:
-              'View the FDA Nutrition Facts Label guide',
+              _text(context, 'View the FDA Nutrition Facts Label guide', 'Tingnan ang gabay ng FDA sa Nutrition Facts Label'),
 
           icon:
               Icons.open_in_new,
@@ -184,10 +186,10 @@ class NutritionGuideScreen extends StatelessWidget {
 
           number: '1',
 
-          title: 'Serving Size',
+          title: _text(context, 'Serving Size', 'Laki ng Serving'),
 
           description:
-              'Check the serving size first. Nutrition information is generally based on this amount.',
+              _text(context, 'Check the serving size first. Nutrition information is generally based on this amount.', 'Tingnan muna ang laki ng serving. Karaniwang nakabatay rito ang impormasyon sa nutrisyon.'),
 
           icon:
               Icons.restaurant_outlined,
@@ -198,10 +200,10 @@ class NutritionGuideScreen extends StatelessWidget {
 
           number: '2',
 
-          title: 'Calories',
+          title: _text(context, 'Calories', 'Calories'),
 
           description:
-              'Look at the calories per serving to understand how much energy the food provides.',
+              _text(context, 'Look at the calories per serving to understand how much energy the food provides.', 'Tingnan ang calories bawat serving para malaman kung gaano karaming enerhiya ang ibinibigay ng pagkain.'),
 
           icon:
               Icons.local_fire_department_outlined,
@@ -212,10 +214,10 @@ class NutritionGuideScreen extends StatelessWidget {
 
           number: '3',
 
-          title: '% Daily Value',
+          title: _text(context, '% Daily Value', '% Daily Value'),
 
           description:
-              'Use the % Daily Value to see how much a nutrient in one serving contributes to a daily diet.',
+              _text(context, 'Use the % Daily Value to see how much a nutrient in one serving contributes to a daily diet.', 'Gamitin ang % Daily Value para makita ang ambag ng isang nutrient sa iyong pang-araw-araw na diyeta.'),
 
           icon:
               Icons.percent,
@@ -226,10 +228,10 @@ class NutritionGuideScreen extends StatelessWidget {
 
           number: '4',
 
-          title: 'Nutrients to Limit',
+          title: _text(context, 'Nutrients to Limit', 'Mga Nutrient na Dapat Limitahan'),
 
           description:
-              'Pay attention to nutrients such as sodium, saturated fat, and added sugars.',
+              _text(context, 'Pay attention to nutrients such as sodium, saturated fat, and added sugars.', 'Bigyang-pansin ang sodium, saturated fat, at added sugars.'),
 
           icon:
               Icons.warning_amber_outlined,
@@ -240,11 +242,10 @@ class NutritionGuideScreen extends StatelessWidget {
 
           number: '5',
 
-          title:
-              'Nutrients to Get Enough Of',
+            title: _text(context, 'Nutrients to Get Enough Of', 'Mga Nutrient na Dapat Sapat ang Intake'),
 
           description:
-              'Look for beneficial nutrients such as dietary fiber, vitamins, and minerals.',
+              _text(context, 'Look for beneficial nutrients such as dietary fiber, vitamins, and minerals.', 'Hanapin ang dietary fiber, vitamins, at minerals na kapaki-pakinabang sa katawan.'),
 
           icon:
               Icons.favorite_border,
@@ -255,7 +256,7 @@ class NutritionGuideScreen extends StatelessWidget {
         _buildSourceCard(
           context,
 
-          'Official Source: U.S. Food and Drug Administration (FDA)',
+          _text(context, 'Official Source: U.S. Food and Drug Administration (FDA)', 'Opisyal na Pinagmulan: U.S. Food and Drug Administration (FDA)'),
         ),
       ],
     );
@@ -280,8 +281,8 @@ class NutritionGuideScreen extends StatelessWidget {
 
         const SizedBox(height: 20),
 
-        const Text(
-          'Daily Nutrient Limit Guidelines',
+        Text(
+          _text(context, 'Daily Nutrient Limit Guidelines', 'Mga Gabay sa Limitasyon ng Nutrients Kada Araw'),
 
           style: TextStyle(
             fontSize: 24,
@@ -292,7 +293,7 @@ class NutritionGuideScreen extends StatelessWidget {
         const SizedBox(height: 8),
 
         Text(
-          'Learn about daily nutrient guidance that can help support a healthier and more balanced diet.',
+          _text(context, 'Learn about daily nutrient guidance that can help support a healthier and more balanced diet.', 'Alamin ang gabay sa nutrients kada araw para sa mas malusog at balanseng diyeta.'),
 
           style: TextStyle(
             fontSize: 14,
@@ -314,10 +315,10 @@ class NutritionGuideScreen extends StatelessWidget {
           context,
 
           label:
-              'Read the Official WHO Guidelines',
+              _text(context, 'Read the Official WHO Guidelines', 'Basahin ang Opisyal na Gabay ng WHO'),
 
           subtitle:
-              'View WHO healthy diet recommendations',
+              _text(context, 'View WHO healthy diet recommendations', 'Tingnan ang rekomendasyon ng WHO para sa malusog na diyeta'),
 
           icon:
               Icons.open_in_new,
@@ -335,10 +336,10 @@ class NutritionGuideScreen extends StatelessWidget {
               Icons.water_drop_outlined,
 
           title:
-              'Sodium (Salt)',
+              _text(context, 'Sodium (Salt)', 'Sodium (Asin)'),
 
           value:
-              'Less than 2,000 mg of sodium per day for adults.',
+              _text(context, 'Less than 2,000 mg of sodium per day for adults.', 'Mas mababa sa 2,000 mg sodium bawat araw para sa matatanda.'),
         ),
 
         _buildNutrientItem(
@@ -348,10 +349,10 @@ class NutritionGuideScreen extends StatelessWidget {
               Icons.cake_outlined,
 
           title:
-              'Free Sugars',
+              _text(context, 'Free Sugars', 'Free Sugars'),
 
           value:
-              'Limit free sugars to less than 10% of total daily energy intake. Reducing it further to 5% or less may provide additional health benefits.',
+              _text(context, 'Limit free sugars to less than 10% of total daily energy intake. Reducing it further to 5% or less may provide additional health benefits.', 'Limitahan ang free sugars sa mas mababa sa 10% ng kabuuang enerhiya bawat araw. Ang 5% o mas mababa ay maaaring magbigay ng dagdag na benepisyo sa kalusugan.'),
         ),
 
         _buildNutrientItem(
@@ -361,10 +362,10 @@ class NutritionGuideScreen extends StatelessWidget {
               Icons.opacity_outlined,
 
           title:
-              'Saturated Fat',
+              _text(context, 'Saturated Fat', 'Saturated Fat'),
 
           value:
-              'No more than 10% of total daily energy intake should come from saturated fat.',
+              _text(context, 'No more than 10% of total daily energy intake should come from saturated fat.', 'Hindi dapat lumampas sa 10% ng kabuuang enerhiya bawat araw ang galing sa saturated fat.'),
         ),
 
         _buildNutrientItem(
@@ -374,10 +375,10 @@ class NutritionGuideScreen extends StatelessWidget {
               Icons.no_food_outlined,
 
           title:
-              'Trans Fat',
+              _text(context, 'Trans Fat', 'Trans Fat'),
 
           value:
-              'Limit trans fat to less than 1% of total daily energy intake and avoid industrially produced trans fats.',
+              _text(context, 'Limit trans fat to less than 1% of total daily energy intake and avoid industrially produced trans fats.', 'Limitahan ang trans fat sa mas mababa sa 1% ng kabuuang enerhiya bawat araw at iwasan ang industrially produced trans fats.'),
         ),
 
         _buildNutrientItem(
@@ -387,10 +388,10 @@ class NutritionGuideScreen extends StatelessWidget {
               Icons.eco_outlined,
 
           title:
-              'Dietary Fiber',
+              _text(context, 'Dietary Fiber', 'Dietary Fiber'),
 
           value:
-              'Adults and children over 10 years should aim for at least 25 g of naturally occurring dietary fiber per day.',
+              _text(context, 'Adults and children over 10 years should aim for at least 25 g of naturally occurring dietary fiber per day.', 'Ang matatanda at batang higit 10 taong gulang ay dapat maghangad ng hindi bababa sa 25 g dietary fiber bawat araw.'),
         ),
 
         const SizedBox(height: 12),
@@ -398,7 +399,7 @@ class NutritionGuideScreen extends StatelessWidget {
         _buildSourceCard(
           context,
 
-          'Official Source: World Health Organization (WHO)',
+          _text(context, 'Official Source: World Health Organization (WHO)', 'Opisyal na Pinagmulan: World Health Organization (WHO)'),
         ),
 
         const SizedBox(height: 10),
@@ -942,7 +943,11 @@ class NutritionGuideScreen extends StatelessWidget {
 
           Expanded(
             child: Text(
-              'These guidelines are provided for general nutrition education. Individual nutrient needs may vary depending on age, health status, and other factors.',
+              _text(
+                context,
+                'These guidelines are provided for general nutrition education. Individual nutrient needs may vary depending on age, health status, and other factors.',
+                'Ang mga gabay na ito ay para sa pangkalahatang edukasyon sa nutrisyon. Maaaring mag-iba ang pangangailangan ng bawat tao depende sa edad, kalagayan ng kalusugan, at iba pang salik.',
+              ),
 
               style: TextStyle(
                 fontSize: 11,
