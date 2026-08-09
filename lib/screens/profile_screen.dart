@@ -12,11 +12,10 @@ import 'personal_info_screen.dart';
 import 'preference_screen.dart';
 import 'suggestion_screen.dart';
 
-// Placeholder URLs - replace with actual CLARO website URLs when available
-const String claroWebsiteUrl = 'https://example.com/about-claro';
-const String privacyPolicyUrl = 'https://example.com/privacy-policy';
-const String termsConditionsUrl = 'https://example.com/terms-and-conditions';
-const String userGuideUrl = 'https://example.com/user-guide';
+const String claroWebsiteUrl = 'https://claro-52ia.onrender.com/';
+const String privacyPolicyUrl = 'https://claro-52ia.onrender.com/privacy-policy';
+const String termsConditionsUrl = 'https://claro-52ia.onrender.com/terms-and-conditions';
+const String userGuideUrl = 'https://claro-52ia.onrender.com/user-guide';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
