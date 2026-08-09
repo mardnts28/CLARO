@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
 import '../services/locale_service.dart';
@@ -10,7 +11,12 @@ import '../generated/l10n/app_localizations.dart';
 import 'personal_info_screen.dart';
 import 'preference_screen.dart';
 import 'suggestion_screen.dart';
-import 'about_claro_screen.dart';
+
+// Placeholder URLs - replace with actual CLARO website URLs when available
+const String claroWebsiteUrl = 'https://example.com/about-claro';
+const String privacyPolicyUrl = 'https://example.com/privacy-policy';
+const String termsConditionsUrl = 'https://example.com/terms-and-conditions';
+const String userGuideUrl = 'https://example.com/user-guide';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -385,10 +391,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: loc.aboutClaro,
             onTap: () {
               HapticService().vibrate();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AboutClaroScreen()),
-              );
+              _launchUrl(claroWebsiteUrl);
+            },
+          ),
+          Divider(height: 0, color: colorScheme.outlineVariant),
+          _buildMenuItemWithArrow(
+            icon: Icons.privacy_tip_outlined,
+            label: 'Privacy Policy',
+            onTap: () {
+              HapticService().vibrate();
+              _launchUrl(privacyPolicyUrl);
+            },
+          ),
+          Divider(height: 0, color: colorScheme.outlineVariant),
+          _buildMenuItemWithArrow(
+            icon: Icons.description_outlined,
+            label: 'Terms & Conditions',
+            onTap: () {
+              HapticService().vibrate();
+              _launchUrl(termsConditionsUrl);
+            },
+          ),
+          Divider(height: 0, color: colorScheme.outlineVariant),
+          _buildMenuItemWithArrow(
+            icon: Icons.menu_book_outlined,
+            label: 'User Guide',
+            onTap: () {
+              HapticService().vibrate();
+              _launchUrl(userGuideUrl);
             },
           ),
           Divider(height: 0, color: colorScheme.outlineVariant),
@@ -418,6 +448,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _launchUrl(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    try {
+      final bool launched = await launchUrl(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to open the website.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to open the website.'),
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildMenuItemWithArrow({

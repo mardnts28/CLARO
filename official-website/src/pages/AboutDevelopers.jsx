@@ -51,9 +51,6 @@ export default function AboutDevelopers() {
 
   return (
     <div className="about-developers-page page-section" style={{ paddingTop: 0 }}>
-      {/* Auto-scrolling image header banner above page title */}
-      <ImageCarousel />
-
       <div className="container">
         {/* Page Header */}
         <div className="page-header">
@@ -119,6 +116,14 @@ export default function AboutDevelopers() {
             </div>
           ))}
         </div>
+
+        {/* Journey Section */}
+        <div className="section-header" style={{ marginTop: '4rem' }}>
+          <h2 className="section-title">Journey</h2>
+        </div>
+
+        {/* Auto-scrolling image header banner */}
+        <ImageCarousel />
       </div>
     </div>
   );

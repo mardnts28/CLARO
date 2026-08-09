@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'voice_assistant_service.dart';
 import 'gemini_service.dart';
@@ -6,10 +7,12 @@ import 'home_tab_controller.dart';
 import '../screens/personal_info_screen.dart';
 import '../screens/preference_screen.dart';
 import '../screens/suggestion_screen.dart';
-import '../screens/about_claro_screen.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/theme_screen.dart';
 import '../screens/review_history_screen.dart';
+
+// Placeholder URL - replace with actual CLARO website URL when available
+const String claroWebsiteUrl = 'https://example.com/about-claro';
 
 class VoiceCommandRouter {
   VoiceCommandRouter._();
@@ -140,8 +143,16 @@ class VoiceCommandRouter {
         await Navigator.push(context, MaterialPageRoute(builder: (_) => const SuggestionScreen()));
         return true;
       case 'about_claro':
-        await Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutClaroScreen()));
-        return true;
+        final Uri url = Uri.parse(claroWebsiteUrl);
+        try {
+          final bool launched = await launchUrl(
+            url,
+            mode: LaunchMode.externalApplication,
+          );
+          return launched;
+        } catch (e) {
+          return false;
+        }
       case 'change_password':
         await Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
         return true;

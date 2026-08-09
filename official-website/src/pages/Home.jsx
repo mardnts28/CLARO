@@ -66,6 +66,19 @@ export default function Home() {
         </div>
       </section>
 
+      {/* About CLARO Section */}
+      <section className="page-section">
+        <div className="container">
+          <div className="cta-banner">
+            <span className="badge" style={{ marginBottom: '0.75rem' }}>About CLARO</span>
+            <h2 className="section-title">About CLARO</h2>
+            <p className="section-subtitle">
+              CLARO is an AI-powered mobile app that helps grocery shoppers understand nutrition information for local canned foods. By scanning a product, users see simplified nutrition summaries, health advisories, allergen warnings, product comparisons, and accessibility features such as voice assistance to make smarter and healthier buying decisions.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* Feature Placeholders Section */}
       <section className="page-section">
         <div className="container">
