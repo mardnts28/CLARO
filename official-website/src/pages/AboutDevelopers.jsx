@@ -1,5 +1,6 @@
 import { User } from 'lucide-react';
 import ImageCarousel from '../components/ImageCarousel';
+import ardientesImg from '../assets/images/developers/ardientes.jpg';
 import biteImg from '../assets/images/developers/bite.jpg';
 import salucopImg from '../assets/images/developers/salucop.png';
 import './Pages.css';
@@ -9,7 +10,8 @@ export default function AboutDevelopers() {
     {
       name: 'Mary Faith Ardientes',
       role: 'Project Manager',
-      image: null,
+      image: 'images/developers/ardientes.jpg',
+      fallbackImage: ardientesImg,
       icon: <User size={36} />,
       bio: 'Lead project manager overseeing strategic execution, team coordination, system requirements, and capstone milestone deliverables.',
       socials: {

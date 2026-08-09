@@ -186,10 +186,14 @@ class _UnknownProductSubmissionScreenState
         // submission over a profile lookup failure.
       }
 
-      // Read both photos once -- the same bytes are used for the Cloudinary
-      // upload below and for the background extraction call afterwards, so
-      // we don't hit the file system twice per photo.
-      final frontBytes = await File(_frontImagePath!).readAsBytes();
+      // Read photos safely -- front photo is optional if capturedImagePath was not provided
+      Uint8List frontBytes = Uint8List(0);
+      if (_frontImagePath != null && _frontImagePath!.isNotEmpty) {
+        final frontFile = File(_frontImagePath!);
+        if (await frontFile.exists()) {
+          frontBytes = await frontFile.readAsBytes();
+        }
+      }
       final backBytes = await File(_backImagePath!).readAsBytes();
 
       // Upload in parallel. CloudinaryUploadService.upload() returns null
@@ -197,10 +201,12 @@ class _UnknownProductSubmissionScreenState
       // with a blank URL in that case (see its header comment) rather than
       // blocking the whole submission on an image host hiccup.
       final uploads = await Future.wait([
-        BackendLocator.cloudinaryUploadService.upload(
-          frontBytes,
-          filename: '${uid}_front_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        ),
+        frontBytes.isNotEmpty
+            ? BackendLocator.cloudinaryUploadService.upload(
+                frontBytes,
+                filename: '${uid}_front_${DateTime.now().millisecondsSinceEpoch}.jpg',
+              )
+            : Future<String?>.value(''),
         BackendLocator.cloudinaryUploadService.upload(
           backBytes,
           filename: '${uid}_back_${DateTime.now().millisecondsSinceEpoch}.jpg',
@@ -489,7 +495,9 @@ class _UnknownProductSubmissionScreenState
                       colorScheme: colorScheme,
                       label: loc.reportFrontPhoto,
                       imagePath: _frontImagePath,
-                      buttonLabel: loc.reportChangePhoto,
+                      buttonLabel: _frontImagePath == null
+                          ? loc.reportAddBackPhoto
+                          : loc.reportChangePhoto,
                       onPick: _changeFrontPhoto,
                     ),
 

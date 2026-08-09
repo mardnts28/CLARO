@@ -15,6 +15,7 @@ import '../data/services/backend_locator.dart';
 import 'product_detail_screen.dart';
 import 'product_not_found_screen.dart';
 import 'multi_scan_results_screen.dart';
+import 'unknown_product_submission_screen.dart';
 import '../models/product_model.dart';
 import '../generated/l10n/app_localizations.dart';
 
@@ -315,6 +316,41 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     }
   }
 
+  Future<void> _navigateToReportDirectly() async {
+    if (_isProcessing) return;
+
+    _continuousAnalysisTimer?.cancel();
+
+    String? capturedPath;
+    if (_cameraController?.value.isInitialized == true) {
+      try {
+        _stopImageStreamIfActive();
+        await _cameraController!.setFlashMode(
+          _isFlashOn ? FlashMode.torch : FlashMode.off,
+        );
+        final file = await _cameraController!.takePicture();
+        capturedPath = file.path;
+      } catch (e) {
+        debugPrint('Could not take picture for direct report: $e');
+      }
+    }
+
+    if (!mounted) return;
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UnknownProductSubmissionScreen(
+          capturedImagePath: capturedPath,
+        ),
+      ),
+    );
+
+    if (mounted) {
+      _startContinuousAnalysis();
+    }
+  }
+
   Future<void> _performScan() async {
     if (_isProcessing) return;
 
@@ -533,17 +569,22 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
                 // (Tap-to-scan removed — scanning is now fully automatic)
 
-                // Dim overlay outside viewfinder
+                // Dim overlay outside viewfinder & live region accessibility semantics
                 Positioned.fill(
-                  child: IgnorePointer(
-                    child: AnimatedBuilder(
-                      animation: _laserAnimation,
-                      builder: (_, __) => CustomPaint(
-                        painter: _ScannerOverlayPainter(
-                          laserProgress: _laserAnimation.value,
-                          isProcessing: _isProcessing,
-                          isProductInGuide: _isProductInGuide,
-                          detections: _liveDetections,
+                  child: Semantics(
+                    label: _getScannerSemanticLabel(context),
+                    liveRegion: true,
+                    container: true,
+                    child: IgnorePointer(
+                      child: AnimatedBuilder(
+                        animation: _laserAnimation,
+                        builder: (_, __) => CustomPaint(
+                          painter: _ScannerOverlayPainter(
+                            laserProgress: _laserAnimation.value,
+                            isProcessing: _isProcessing,
+                            isProductInGuide: _isProductInGuide,
+                            detections: _liveDetections,
+                          ),
                         ),
                       ),
                     ),
@@ -553,8 +594,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 // ── Sleek status pill header ─────────────────────────────
                 Positioned(
                   top: topPadding + 18,
-                  left: 70,
-                  right: 70,
+                  left: 68,
+                  right: 110,
                   child: Center(
                     child: _buildStatusPill(),
                   ),
@@ -589,42 +630,86 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 Positioned(
                   top: topPadding + 16,
                   left: 16,
-                  child: GestureDetector(
-                    onTap: _handleClose,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.85),
-                        shape: BoxShape.circle,
+                  child: Semantics(
+                    button: true,
+                    label: Localizations.localeOf(context).languageCode == 'tl'
+                        ? 'Isara ang scanner'
+                        : 'Close scanner',
+                    child: GestureDetector(
+                      onTap: _handleClose,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close,
+                            color: Colors.black87, size: 20),
                       ),
-                      child: const Icon(Icons.close,
-                          color: Colors.black87, size: 22),
                     ),
                   ),
                 ),
 
-                // ── Flash button top-right ─────────────────────────
+                // ── Top-right actions (Report & Flash) ───────────────
                 Positioned(
                   top: topPadding + 16,
                   right: 16,
-                  child: GestureDetector(
-                    onTap: _toggleFlash,
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.85),
-                        shape: BoxShape.circle,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Report icon button in top bar
+                      Semantics(
+                        button: true,
+                        label: AppLocalizations.of(context)!.reportProductButton,
+                        child: GestureDetector(
+                          onTap: _navigateToReportDirectly,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.report_problem_outlined,
+                              color: Color(0xFFD32F2F),
+                              size: 20,
+                            ),
+                          ),
+                        ),
                       ),
-                      child: Icon(
-                        _isFlashOn ? Icons.flash_on : Icons.flash_off,
-                        color: _isFlashOn
-                            ? const Color(0xFFFFD600)
-                            : Colors.black87,
-                        size: 22,
+                      const SizedBox(width: 8),
+                      // Flash icon button
+                      Semantics(
+                        button: true,
+                        label: _isFlashOn
+                            ? (Localizations.localeOf(context).languageCode == 'tl'
+                                ? 'Patayin ang flash'
+                                : 'Turn off flash')
+                            : (Localizations.localeOf(context).languageCode == 'tl'
+                                ? 'Buksan ang flash'
+                                : 'Turn on flash'),
+                        child: GestureDetector(
+                          onTap: _toggleFlash,
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.85),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              _isFlashOn ? Icons.flash_on : Icons.flash_off,
+                              color: _isFlashOn
+                                  ? const Color(0xFFFFD600)
+                                  : Colors.black87,
+                              size: 20,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
 
@@ -634,31 +719,89 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                     top: topPadding + 70,
                     left: 24,
                     right: 24,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.warning_amber_rounded,
-                              color: Colors.white, size: 20),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _qualityWarning!,
-                              style: GoogleFonts.inter(
-                                  color: Colors.white,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600),
+                    child: Semantics(
+                      liveRegion: true,
+                      container: true,
+                      label: _qualityWarning!,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber_rounded,
+                                color: Colors.white, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _qualityWarning!,
+                                style: GoogleFonts.inter(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
+
+                // ── Subtle bottom helper prompt (Can't scan? Report) ────
+                Positioned(
+                  bottom: 24,
+                  left: 24,
+                  right: 24,
+                  child: Center(
+                    child: Semantics(
+                      button: true,
+                      label: Localizations.localeOf(context).languageCode == 'tl'
+                          ? 'Hindi mahanap ang produkto? I-report'
+                          : 'Can’t scan your product? Report here',
+                      child: GestureDetector(
+                        onTap: _navigateToReportDirectly,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white24,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.help_outline_rounded,
+                                size: 14,
+                                color: Colors.white.withValues(alpha: 0.85),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                Localizations.localeOf(context).languageCode == 'tl'
+                                    ? 'Hindi mahanap ang produkto? I-report'
+                                    : 'Can’t scan your product? Report here',
+                                style: GoogleFonts.inter(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: Colors.white70,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
 
                 // ── Processing spinner ──────────────────────────────
                 if (_isProcessing)
@@ -684,6 +827,27 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     );
   }
 
+  String _getScannerSemanticLabel(BuildContext context) {
+    final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
+    if (_isProcessing) {
+      return isTagalog
+          ? 'Sinusuri ang natukoy na produkto'
+          : 'Analyzing detected product';
+    } else if (_isProductInGuide) {
+      return isTagalog
+          ? 'Natukoy ang produkto sa viewfinder. Paki-hawak nang steady'
+          : 'Product recognized in viewfinder. Hold steady';
+    } else if (_liveDetections.isNotEmpty) {
+      return isTagalog
+          ? 'May natukoy na produkto sa viewfinder region'
+          : 'Product detected near viewfinder';
+    } else {
+      return isTagalog
+          ? 'Naghahanap ng mga produkto sa camera region'
+          : 'Scanning camera view for food products';
+    }
+  }
+
   Widget _buildStatusPill() {
     String statusText;
     Color statusColor;
@@ -705,51 +869,56 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       iconData = Icons.center_focus_weak_rounded;
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.75),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: _isProductInGuide || _isProcessing
-              ? const Color(0xFF00E676)
-              : Colors.white24,
-          width: 1.2,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (_isProcessing)
-            const SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Color(0xFF00E676),
-              ),
-            )
-          else
-            Icon(
-              iconData,
-              size: 15,
-              color: statusColor,
-            ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              statusText,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
-              ),
-            ),
+    return Semantics(
+      label: statusText,
+      liveRegion: true,
+      container: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.75),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: _isProductInGuide || _isProcessing
+                ? const Color(0xFF00E676)
+                : Colors.white24,
+            width: 1.2,
           ),
-        ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (_isProcessing)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Color(0xFF00E676),
+                ),
+              )
+            else
+              Icon(
+                iconData,
+                size: 15,
+                color: statusColor,
+              ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                statusText,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

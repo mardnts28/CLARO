@@ -425,26 +425,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildFormErrorBanner(BuildContext context, String message) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: colorScheme.error.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.error.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.error_outline, size: 18, color: colorScheme.error),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(fontSize: 13, color: colorScheme.error),
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      label: message,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: colorScheme.error.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: colorScheme.error.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.error_outline, size: 18, color: colorScheme.error),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(fontSize: 13, color: colorScheme.error),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -463,38 +467,41 @@ class _LoginScreenState extends State<LoginScreen> {
         ValueChanged<String>? onSubmitted,
       }) {
     final colorScheme = Theme.of(context).colorScheme;
-    return TextField(
-      controller: controller,
-      focusNode: focusNode,
-      obscureText: obscure,
-      keyboardType: keyboardType,
-      textInputAction: textInputAction,
-      onSubmitted: onSubmitted,
-      style: TextStyle(color: colorScheme.onSurface),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
-        prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
-        suffixIcon: suffix,
-        errorText: errorText,
-        errorMaxLines: 2,
-        contentPadding:
-        const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colorScheme.outlineVariant),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colorScheme.primary),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colorScheme.error),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colorScheme.error, width: 1.5),
+    return Semantics(
+      hint: errorText != null ? 'Error: $errorText' : null,
+      child: TextField(
+        controller: controller,
+        focusNode: focusNode,
+        obscureText: obscure,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        onSubmitted: onSubmitted,
+        style: TextStyle(color: colorScheme.onSurface),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+          prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
+          suffixIcon: suffix,
+          errorText: errorText,
+          errorMaxLines: 2,
+          contentPadding:
+          const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: colorScheme.outlineVariant),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: colorScheme.primary),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: colorScheme.error),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: colorScheme.error, width: 1.5),
+          ),
         ),
       ),
     );
