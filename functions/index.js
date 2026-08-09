@@ -4,6 +4,37 @@ const admin = require('firebase-admin');
 
 admin.initializeApp();
 
+const GEMINI_API_URL = 'https://api.openai.com/v1/chat/completions';
+const GEMINI_MODEL = 'gpt-4.1-mini';
+
+async function callGeminiApi(messages) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('Missing Gemini API key in environment');
+  }
+
+  const response = await fetch(GEMINI_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GEMINI_MODEL,
+      messages,
+      temperature: 0.0,
+      max_tokens: 500,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini API call failed: ${response.status} ${errorText}`);
+  }
+
+  return await response.json();
+}
+
 /**
  * Cloud Function: checkMfaEnabled
  * 
@@ -242,6 +273,150 @@ exports.verifyOtp = onCall({
   } catch (error) {
     logger.error('Error in verifyOtp:', error);
     throw new HttpsError('internal', 'Failed to verify OTP');
+  }
+});
+
+exports.voiceIntent = onCall({
+  region: 'us-central1',
+  memory: '256MiB',
+  maxInstances: 10,
+  secrets: ['GEMINI_API_KEY'],
+}, async (request) => {
+  if (!request.auth || !request.auth.uid) {
+    throw new HttpsError('unauthenticated', 'Authentication is required.');
+  }
+
+  const transcript = request.data?.transcript;
+  const language = request.data?.language;
+  if (!transcript || typeof transcript !== 'string') {
+    throw new HttpsError('invalid-argument', 'transcript must be a non-empty string');
+  }
+  if (language !== 'en' && language !== 'fil') {
+    throw new HttpsError('invalid-argument', "language must be 'en' or 'fil'");
+  }
+
+  const languageLabel = language === 'fil' ? 'Tagalog' : 'English';
+  const validTargets = [
+    'home',
+    'scan',
+    'history',
+    'profile',
+    'personal_info',
+    'preference',
+    'product_detail',
+    'compare_products',
+    'multi_scan_results',
+    'product_not_found',
+    'unknown_product_submission',
+    'suggestion',
+    'review_history',
+    'about_claro',
+    'change_password',
+    'theme',
+    'report_detail',
+    'more_details',
+  ];
+
+  const systemPrompt = `You are the voice-command interpreter for a mobile app called CLARO, used mainly by low-vision users. Classify the user's spoken request into exactly one of: 'navigate' (user wants to go to a specific screen — valid targets: ${validTargets.join(', ')}), 'summarize_scan' (user wants their most recent scan/report explained simply), 'out_of_scope' (anything else — general knowledge, math, unrelated topics), or 'unclear' (ambiguous/incomplete). Respond ONLY with JSON, no prose: { type, target_page, spoken_reply }, where spoken_reply is one short sentence in ${languageLabel}. Never answer anything unrelated to CLARO navigation or scan summaries — always return out_of_scope for those, even if asked directly.`;
+
+  const messages = [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: `Transcript: ${transcript}` },
+  ];
+
+  try {
+    const geminiResponse = await callGeminiApi(messages);
+    const content = geminiResponse.choices?.[0]?.message?.content;
+    if (!content || typeof content !== 'string') {
+      throw new Error('Invalid Gemini response structure');
+    }
+
+    const parsed = JSON.parse(content);
+    if (typeof parsed !== 'object' || parsed === null) {
+      throw new Error('Gemini response is not a JSON object');
+    }
+
+    const { type, target_page, spoken_reply } = parsed;
+    if (typeof type !== 'string' || typeof spoken_reply !== 'string') {
+      throw new Error('Response JSON missing required fields');
+    }
+
+    return {
+      type,
+      target_page: target_page || null,
+      spoken_reply,
+    };
+  } catch (error) {
+    logger.error('Error in voiceIntent:', error);
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    throw new HttpsError('internal', 'Failed to interpret voice command');
+  }
+});
+
+exports.summarizeScan = onCall({
+  region: 'us-central1',
+  memory: '256MiB',
+  maxInstances: 10,
+  secrets: ['GEMINI_API_KEY'],
+}, async (request) => {
+  if (!request.auth || !request.auth.uid) {
+    throw new HttpsError('unauthenticated', 'Authentication is required.');
+  }
+
+  const language = request.data?.language;
+  if (language !== 'en' && language !== 'fil') {
+    throw new HttpsError('invalid-argument', "language must be 'en' or 'fil'");
+  }
+
+  const uid = request.auth.uid;
+  try {
+    const query = await admin.firestore()
+      .collection('reports')
+      .where('reportedBy', '==', uid)
+      .orderBy('dateSubmitted', 'desc')
+      .limit(1)
+      .get();
+
+    if (query.empty) {
+      throw new HttpsError('not-found', 'No recent scan/report found for this user.');
+    }
+
+    const reportDoc = query.docs[0];
+    const reportData = reportDoc.data();
+
+    const summaryInput = {
+      productName: reportData.productName || '',
+      productDescription: reportData.productDescription || '',
+      category: reportData.category || '',
+      status: reportData.status || '',
+      extractedData: reportData.extractedData || {},
+      frontImageUrl: reportData.frontImageUrl || '',
+      backImageUrl: reportData.backImageUrl || '',
+    };
+
+    const languageLabel = language === 'fil' ? 'Tagalog' : 'English';
+    const userPrompt = `Summarize the user's most recent scan or report in ${languageLabel}. Include these items in this order: product brand, package or serving size, FDA status, health advisory, and nutritional scores or key nutrition values. If a field is missing, say it is not available. Keep it clear and concise for a low-vision user. Do not mention internal processing. Report data: ${JSON.stringify(summaryInput)}.`;
+
+    const messages = [
+      { role: 'system', content: `You are a helper that summarizes scan/report data for the CLARO mobile app.` },
+      { role: 'user', content: userPrompt },
+    ];
+
+    const geminiResponse = await callGeminiApi(messages);
+    const content = geminiResponse.choices?.[0]?.message?.content;
+    if (!content || typeof content !== 'string') {
+      throw new Error('Invalid Gemini response structure');
+    }
+
+    return { summary: content.trim() };
+  } catch (error) {
+    logger.error('Error in summarizeScan:', error);
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+    throw new HttpsError('internal', 'Failed to summarize the latest scan/report');
   }
 });
 

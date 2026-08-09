@@ -4,8 +4,8 @@ import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/text_size_service.dart';
-import '../services/locale_service.dart';
-import '../widgets/voice_assistant_fab.dart';
+import '../services/voice_assistant_service.dart';
+import '../widgets/voice_mic_overlay.dart';
 
 class PreferenceScreen extends StatefulWidget {
   const PreferenceScreen({super.key});
@@ -18,8 +18,6 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
   static const _primaryRed = Color(0xFF8B1A1A);
   final _authService = AuthService();
 
-  String _selectedLanguage = 'en'; // store language code ('en'|'tl')
-  double _speechRate = 0.5;
   bool _vibrationFeedback = false;
   bool _notificationsEnabled = true;
   double _textSize = 1.0;
@@ -27,6 +25,9 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
   @override
   void initState() {
     super.initState();
+    if (_authService.currentUser != null) {
+      VoiceAssistantService.instance.announcePage('preference');
+    }
     _loadPrefs();
   }
 
@@ -38,9 +39,6 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
         final data = doc.data();
         if (data != null) {
           setState(() {
-            // keep the stored language code directly
-            _selectedLanguage = data['language'] ?? 'en';
-            _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
             _vibrationFeedback = data['vibrationFeedback'] ?? false;
             _notificationsEnabled = data['notificationsEnabled'] ?? true;
             _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : 1.0;
@@ -68,9 +66,6 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
           final data = doc.data();
           if (data != null) {
             setState(() {
-              // store and keep language code directly
-              _selectedLanguage = data['language'] ?? _selectedLanguage;
-              _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : _speechRate;
               _vibrationFeedback = data['vibrationFeedback'] ?? _vibrationFeedback;
               _notificationsEnabled = data['notificationsEnabled'] ?? _notificationsEnabled;
               _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : _textSize;
@@ -97,10 +92,11 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
         iconTheme: const IconThemeData(color: _primaryRed),
         title: Text(loc.preferenceTitle, style: const TextStyle(color: _primaryRed)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
+      body: VoiceMicOverlay(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
@@ -114,58 +110,90 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                 children: [
                   Text(loc.voiceSoundTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: theme.colorScheme.outlineVariant),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _selectedLanguage,
-                        dropdownColor: theme.cardColor,
-                        items: [
-                          DropdownMenuItem(value: 'en', child: Text(loc.english, style: TextStyle(color: theme.colorScheme.onSurface))),
-                          DropdownMenuItem(value: 'tl', child: Text(loc.tagalog, style: TextStyle(color: theme.colorScheme.onSurface))),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: VoiceAssistantService.isEnabledNotifier,
+                    builder: (context, isVoiceEnabled, _) {
+                      if (!isVoiceEnabled) return const SizedBox.shrink();
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Voice assistant settings',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ValueListenableBuilder<double>(
+                            valueListenable: VoiceAssistantService.speechRateNotifier,
+                            builder: (context, speechRate, _) {
+                              return Slider(
+                                value: speechRate.clamp(0.2, 1.0),
+                                min: 0.2,
+                                max: 1.0,
+                                divisions: 8,
+                                label: speechRate.toStringAsFixed(1),
+                                onChanged: (value) {
+                                  VoiceAssistantService.speechRateNotifier.value = value;
+                                },
+                                onChangeEnd: (value) async {
+                                  HapticService().vibrate();
+                                  await VoiceAssistantService.instance.updateSpeechRate(value);
+                                  await VoiceAssistantService.instance.speak('Voice speed updated.');
+                                },
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 4),
+                          ValueListenableBuilder<VoiceLang>(
+                            valueListenable: VoiceAssistantService.languageNotifier,
+                            builder: (context, language, _) {
+                              return SegmentedButton<VoiceLang>(
+                                segments: const [
+                                  ButtonSegment<VoiceLang>(
+                                    value: VoiceLang.english,
+                                    label: Text('English'),
+                                  ),
+                                  ButtonSegment<VoiceLang>(
+                                    value: VoiceLang.tagalog,
+                                    label: Text('Tagalog'),
+                                  ),
+                                ],
+                                selected: {language},
+                                onSelectionChanged: (selection) async {
+                                  final selectedLanguage = selection.first;
+                                  if (selectedLanguage == language) return;
+                                  HapticService().vibrate();
+                                  await VoiceAssistantService.instance.updateLanguage(selectedLanguage);
+                                  final actualLanguage = VoiceAssistantService.languageNotifier.value;
+                                  await VoiceAssistantService.instance.speak(
+                                    actualLanguage == VoiceLang.tagalog
+                                        ? 'Napalitan ang wika sa Tagalog.'
+                                        : selectedLanguage == VoiceLang.tagalog
+                                            ? 'Tagalog is not available on this device. Using English.'
+                                            : 'Language changed to English.',
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 12),
                         ],
-                        onChanged: (v) async {
-                          if (v == null) return;
-                          HapticService().vibrate();
-                          // store the language code directly
-                          setState(() => _selectedLanguage = v);
-                          await LocaleService.setAppLocale(v);
-                          final ok = await _savePref('language', v);
-                          if (!ok && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(loc.speechRate, style: theme.textTheme.titleSmall?.copyWith(color: theme.colorScheme.onSurface)),
-                  Slider(
-                    value: _speechRate,
-                    min: 0.3,
-                    max: 1.2,
-                    divisions: 9,
-                    onChanged: (v) async {
-                      HapticService().vibrate();
-                      setState(() => _speechRate = v);
-                      final ok = await _savePref('speechRate', v);
-                      if (!ok && mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
-                      }
+                      );
                     },
                   ),
-                  const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,
                     child: OutlinedButton.icon(
-                      onPressed: () {
+                      onPressed: () async {
                         HapticService().vibrate();
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.previewAudioShort)));
+                        await VoiceAssistantService.instance.speak(
+                          VoiceAssistantService.languageNotifier.value == VoiceLang.tagalog
+                              ? 'Ito ay isang preview ng boses ng CLARO.'
+                              : 'This is a preview of the CLARO voice assistant.',
+                        );
                       },
                       icon: const Icon(Icons.play_arrow, color: _primaryRed),
                       label: Text(loc.previewAudio, style: const TextStyle(color: _primaryRed)),
@@ -277,67 +305,10 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.dividerColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(loc.multiFactorAuthentication, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: theme.colorScheme.surfaceContainerHighest),
-                              child: const Icon(Icons.notifications_outlined, color: _primaryRed),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(loc.multiFactorAuthentication, style: TextStyle(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
-                                  const SizedBox(height: 4),
-                                  Text(loc.safetyPriorityMessage, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Switch(
-                        value: _notificationsEnabled,
-                        onChanged: (v) async {
-                          HapticService().vibrate();
-                          setState(() => _notificationsEnabled = v);
-                          final ok = await _savePref('notificationsEnabled', v);
-                          if (!ok && mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
-                          }
-                        },
-                        activeThumbColor: _primaryRed,
-                        activeTrackColor: _primaryRed.withAlpha(120),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-      floatingActionButton: const VoiceAssistantFab(),
     );
   }
 }

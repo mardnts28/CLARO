@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
+import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'review_history_screen.dart';
@@ -18,6 +19,14 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
   int _rating = 0;
   final TextEditingController _commentController = TextEditingController();
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('suggestion');
+    }
+  }
 
   @override
   void dispose() {

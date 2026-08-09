@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/auth_service.dart';
+import '../services/voice_assistant_service.dart';
 import 'product_detail_screen.dart';
 import 'camera_scanner_screen.dart';
 import 'history_screen.dart';
 import '../generated/l10n/app_localizations.dart';
-import '../widgets/voice_assistant_fab.dart';
+import '../widgets/voice_mic_overlay.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/models/health_profile.dart';
 import '../core/utils/nutrition_availability.dart';
@@ -51,6 +52,12 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   @override
   void initState() {
     super.initState();
+    if (widget.detectedProducts.isNotEmpty) {
+      VoiceAssistantService.setLatestScanProduct(widget.detectedProducts.first);
+    }
+    if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('multi_scan_results');
+    }
     _rankProducts();
   }
 
@@ -217,9 +224,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+      body: VoiceMicOverlay(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           // ── Header bar: back, Resulta (perfectly centered Stack) ──
           Container(
             color: colorScheme.surface,
@@ -386,11 +394,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                     },
                   ),
           ),
-        ],
+          ],
+        ),
       ),
-
-      // ── Floating mic button ───────────────────────────────────────
-      floatingActionButton: const VoiceAssistantFab(),
 
       // ── Bottom Navigation Bar ─────────────────────────────────────
       bottomNavigationBar: _buildBottomNav(),

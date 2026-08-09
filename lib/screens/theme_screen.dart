@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
+import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 
 class ThemeScreen extends StatefulWidget {
@@ -20,6 +21,9 @@ class _ThemeScreenState extends State<ThemeScreen> {
   @override
   void initState() {
     super.initState();
+    if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('theme');
+    }
     _load();
   }
 

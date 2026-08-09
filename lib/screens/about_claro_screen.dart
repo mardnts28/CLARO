@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 import '../generated/l10n/app_localizations.dart';
+import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 
-class AboutClaroScreen extends StatelessWidget {
+class AboutClaroScreen extends StatefulWidget {
   const AboutClaroScreen({super.key});
+
+  @override
+  State<AboutClaroScreen> createState() => _AboutClaroScreenState();
+}
+
+class _AboutClaroScreenState extends State<AboutClaroScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('about_claro');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,44 +81,6 @@ class AboutClaroScreen extends StatelessWidget {
                 textAlign: TextAlign.start,
               ),
             ),
-            const SizedBox(height: 24),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                loc.aboutDevelopers,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Expanded(
-                  child: _DevCard(
-                    name: 'Mary Faith Ardientes',
-                    role: 'Project Manager',
-                  ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: _DevCard(
-                    name: 'Jay Bhie Bite',
-                    role: 'Front-end Developer',
-                  ),
-                ),
-                SizedBox(width: 8),
-                Expanded(
-                  child: _DevCard(
-                    name: 'Rochelle Ann Salucop',
-                    role: 'Back-end Developer',
-                  ),
-                ),
-              ],
-            ),
             const SizedBox(height: 40),
           ],
         ),
@@ -114,56 +90,3 @@ class AboutClaroScreen extends StatelessWidget {
   }
 }
 
-class _DevCard extends StatelessWidget {
-  final String name;
-  final String role;
-
-  const _DevCard({required this.name, required this.role});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primaryContainer,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.person_outline,
-            color: theme.colorScheme.onPrimaryContainer,
-            size: 26,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          name,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: theme.colorScheme.onSurface,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        const SizedBox(height: 4),
-        Text(
-          role,
-          style: TextStyle(
-            fontSize: 11,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-}

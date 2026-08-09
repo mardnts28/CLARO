@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
+import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../generated/l10n/app_localizations.dart';
 

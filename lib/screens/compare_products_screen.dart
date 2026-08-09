@@ -4,6 +4,7 @@ import '../models/product_model.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/history_service.dart';
+import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../data/models/ranked_product_result.dart';
@@ -63,6 +64,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   @override
   void initState() {
     super.initState();
+    if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('compare_products');
+    }
     _searchCtrl.addListener(_onSearch);
     _loadRanking();
   }

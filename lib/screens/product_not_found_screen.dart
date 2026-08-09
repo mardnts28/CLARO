@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../generated/l10n/app_localizations.dart';
+import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'unknown_product_submission_screen.dart';
 
@@ -13,13 +14,26 @@ import 'unknown_product_submission_screen.dart';
 ///   - Descriptive text explaining the situation
 ///   - Two action buttons: "Scan again" and "Report the product"
 ///   - Bottom navigation bar consistent with the rest of the app
-class ProductNotFoundScreen extends StatelessWidget {
+class ProductNotFoundScreen extends StatefulWidget {
   /// Optional path to the image that was captured during the failed scan.
   /// If provided, it will be forwarded to the report screen so the user
   /// doesn't have to re-take the photo.
   final String? capturedImagePath;
 
   const ProductNotFoundScreen({super.key, this.capturedImagePath});
+
+  @override
+  State<ProductNotFoundScreen> createState() => _ProductNotFoundScreenState();
+}
+
+class _ProductNotFoundScreenState extends State<ProductNotFoundScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('product_not_found');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +164,7 @@ class ProductNotFoundScreen extends StatelessWidget {
                             context,
                             MaterialPageRoute(
                               builder: (_) => UnknownProductSubmissionScreen(
-                                capturedImagePath: capturedImagePath,
+                                capturedImagePath: widget.capturedImagePath,
                               ),
                             ),
                           );

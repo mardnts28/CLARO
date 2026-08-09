@@ -10,6 +10,7 @@ import '../services/yolo_recognition_service.dart';
 import '../services/image_validation_service.dart';
 import '../services/history_service.dart';
 import '../services/home_tab_controller.dart';
+import '../services/voice_assistant_service.dart';
 import '../data/services/backend_locator.dart';
 import 'product_detail_screen.dart';
 import 'product_not_found_screen.dart';
@@ -89,11 +90,13 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   @override
   void initState() {
     super.initState();
+    HomeTabController.tabNotifier.addListener(_handleTabChange);
     WidgetsBinding.instance.addObserver(this);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     if (widget.isActive) {
       _checkPermissionAndInit();
     }
+    _announceIfVisible();
 
     _laserController = AnimationController(
       vsync: this,
@@ -125,6 +128,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
   @override
   void dispose() {
+    HomeTabController.tabNotifier.removeListener(_handleTabChange);
     _continuousAnalysisTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _cameraController?.dispose();
@@ -181,6 +185,17 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       try {
         _cameraController?.stopImageStream();
       } catch (_) {}
+    }
+  }
+
+  void _handleTabChange() {
+    _announceIfVisible();
+  }
+
+  void _announceIfVisible() {
+    if (HomeTabController.tabNotifier.value == 1 &&
+        VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('scan');
     }
   }
 

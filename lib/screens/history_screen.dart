@@ -14,6 +14,7 @@ import '../models/product_model.dart';
 import '../models/report_model.dart';
 import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
+import '../services/voice_assistant_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 class HistoryScreen extends StatefulWidget {
   final bool embeddedMode;
@@ -64,6 +65,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
+    HomeTabController.tabNotifier.addListener(_handleTabChange);
+    _announceIfVisible();
     _subscription = _historyService.onUpdate.listen((_) {
       if (mounted) setState(() {});
     });
@@ -74,8 +77,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _subscribeReports();
   }
 
+  void _handleTabChange() {
+    _announceIfVisible();
+  }
+
+  void _announceIfVisible() {
+    if (HomeTabController.tabNotifier.value == 2 &&
+        _authService.currentUser != null &&
+        VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('history');
+    }
+  }
+
   @override
   void dispose() {
+    HomeTabController.tabNotifier.removeListener(_handleTabChange);
     _subscription?.cancel();
     _favoritesSubscription?.cancel();
     _reportsSubscription?.cancel();

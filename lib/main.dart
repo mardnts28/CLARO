@@ -86,12 +86,15 @@ class ClaroApp extends StatelessWidget {
                   themeMode: themeMode,
                   theme: _buildTheme(Brightness.light),
                   darkTheme: _buildTheme(Brightness.dark),
+                  navigatorObservers: [VoiceAssistantService.navigatorObserver],
                   builder: (context, child) {
-                    return MediaQuery(
-                      data: MediaQuery.of(context).copyWith(
-                        textScaler: TextScaler.linear(textSize),
+                    return _VoiceInteractionStopper(
+                      child: MediaQuery(
+                        data: MediaQuery.of(context).copyWith(
+                          textScaler: TextScaler.linear(textSize),
+                        ),
+                        child: child!,
                       ),
-                      child: child!,
                     );
                   },
                   home: const AuthGate(),
@@ -125,6 +128,45 @@ class ClaroApp extends StatelessWidget {
         onSurfaceVariant: isLight ? const Color(0xFF757575) : const Color(0xFF9E9E9E),
       ),
       useMaterial3: true,
+    );
+  }
+}
+
+class _VoiceInteractionStopper extends StatefulWidget {
+  final Widget child;
+
+  const _VoiceInteractionStopper({required this.child});
+
+  @override
+  State<_VoiceInteractionStopper> createState() => _VoiceInteractionStopperState();
+}
+
+class _VoiceInteractionStopperState extends State<_VoiceInteractionStopper> {
+  static const _movementThreshold = 8.0;
+  Offset? _pointerDownPosition;
+  bool _pointerMoved = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        _pointerDownPosition = event.position;
+        _pointerMoved = false;
+      },
+      onPointerMove: (event) {
+        final start = _pointerDownPosition;
+        if (start != null && (event.position - start).distance > _movementThreshold) {
+          _pointerMoved = true;
+        }
+      },
+      onPointerUp: (_) {
+        if (!_pointerMoved) {
+          VoiceAssistantService.instance.stopAudio();
+        }
+        _pointerDownPosition = null;
+      },
+      child: widget.child,
     );
   }
 }

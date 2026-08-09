@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
+import '../services/voice_assistant_service.dart';
 import 'home_screen.dart';
 
 /// NOTE ON LANGUAGE: this screen intentionally hardcodes every string in
@@ -145,6 +146,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           conditions: selectedConditions,
           allergens: selectedAllergens,
         );
+
+        if (selectedConditions.contains('Mababang Paningin')) {
+          await VoiceAssistantService.instance.updateEnabled(true);
+        }
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),

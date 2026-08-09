@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/fda_verification_service.dart';
 import '../services/auth_service.dart';
+import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'compare_products_screen.dart';
@@ -93,10 +94,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void initState() {
     super.initState();
+    VoiceAssistantService.setLatestScanProduct(widget.product);
     _currentProduct = widget.product;
     _currentComparisonSet = widget.comparisonSet;
     _scanEventId = '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}';
     _initSizes(_currentProduct);
+    if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('product_detail');
+    }
     _loadFdaVerification();
     _loadFavoriteStatus();
   }
@@ -145,6 +150,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     if (mounted) {
       setState(() => _fdaResult = result);
+      _refreshVoiceSummary();
     }
   }
 
@@ -272,6 +278,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           _rankingExplanation = detail.rankingExplanation;
           _advisoryLoading = false;
         });
+        _refreshVoiceSummary();
       }
     } catch (e) {
       debugPrint('Error loading health advisory: $e');
@@ -428,6 +435,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                         _selectedSizeG = newSize;
                                         _displayedImageUrl = p.imageUrlForSize(newSize);
                                       });
+                                      _refreshVoiceSummary();
                                     }
                                   },
                                 ),
@@ -1613,6 +1621,105 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (!labels.contains(label)) labels.add(label);
     }
     return labels;
+  }
+
+  String _buildVoiceSummary(
+    BuildContext context,
+    ProductEvaluation evaluation,
+  ) {
+    final languageCode = Localizations.localeOf(context).languageCode;
+    final allergenLabels = _matchedUserAllergenLabels(
+      _currentProduct,
+      languageCode,
+    );
+    final advisory = _effectiveAdvisory(context);
+    final verdict = switch (_currentOverallLevel()) {
+      AdvisoryLevel.suitable => 'Suitable',
+      AdvisoryLevel.moderate => 'Moderate',
+      AdvisoryLevel.caution => 'Caution',
+    };
+    final flaggedNutrients = <String>[];
+    for (final nutrient in evaluation.nutrientEvaluations) {
+      if (nutrient.level == AdvisoryLevel.suitable) continue;
+      final label = _voiceNutrientLabel(nutrient.nutrientKey);
+      if (!flaggedNutrients.contains(label)) {
+        flaggedNutrients.add(label);
+      }
+    }
+
+    final sections = <String>[];
+    if (allergenLabels.isNotEmpty) {
+      sections.add('Allergen warning: ${allergenLabels.join(', ')}.');
+    }
+
+    sections.add(
+      'Product: ${_currentProduct.name}, size ${_selectedSizeG.toStringAsFixed(0)} grams.',
+    );
+    sections.add('Overall verdict: $verdict.');
+
+    if (advisory != null) {
+      if (advisory.warningText.trim().isNotEmpty) {
+        sections.add(advisory.warningText.trim());
+      }
+      if (advisory.explanation.trim().isNotEmpty) {
+        sections.add(advisory.explanation.trim());
+      }
+    }
+
+    if (flaggedNutrients.isNotEmpty) {
+      sections.add('Nutrients driving this verdict: ${flaggedNutrients.join(', ')}.');
+    }
+
+    final fda = _fdaResult;
+    if (fda != null) {
+      sections.add(
+        fda.isActive
+            ? 'FDA status: active.'
+            : fda.isExpired
+                ? 'FDA status: expired.'
+                : 'FDA status: unverified.',
+      );
+    }
+
+    final comparisonSet = _currentComparisonSet;
+    if (comparisonSet != null && comparisonSet.isNotEmpty) {
+      final currentRank = comparisonSet.firstWhere(
+        (item) => item.evaluation.product.id == _currentProduct.id,
+        orElse: () => comparisonSet.first,
+      );
+      final rankLabel = RankLabelHelper.label(
+        rank: currentRank.rank,
+        suitabilityRankLabel: currentRank.suitabilityRankLabel,
+      );
+      if (_rankingExplanation != null && _rankingExplanation!.trim().isNotEmpty) {
+        sections.add('Comparison ranking: $rankLabel. ${_rankingExplanation!.trim()}');
+      } else {
+        sections.add('Comparison ranking: $rankLabel.');
+      }
+    }
+
+    return sections.join(' ');
+  }
+
+  void _refreshVoiceSummary() {
+    final evaluation = _evaluation;
+    if (!mounted || evaluation == null) return;
+    VoiceAssistantService.setLatestScanSummary(
+      _buildVoiceSummary(context, evaluation),
+    );
+  }
+
+  String _voiceNutrientLabel(String nutrientKey) {
+    switch (nutrientKey) {
+      case 'sodiumMg':
+        return 'sodium';
+      case 'sugarsG':
+        return 'sugar';
+      case 'saturatedFatG':
+        return 'saturated fat';
+      default:
+        return nutrientKey;
+    }
   }
 
   // Re-derives the overall advisory level (the badge on this screen) for

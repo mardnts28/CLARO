@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/product_model.dart';
 import '../data/models/health_profile.dart';
+import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 
@@ -38,6 +39,9 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    if (VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('more_details');
+    }
     _fetchStorageInstructions();
   }
 

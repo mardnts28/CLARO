@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
+import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'change_password_screen.dart';
@@ -32,6 +33,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   @override
   void initState() {
     super.initState();
+    if (_authService.currentUser != null) {
+      VoiceAssistantService.instance.announcePage('personal_info');
+    }
     _loadUserData();
     // Listen for language changes to refresh the UI with localized labels
     LocaleService.localeNotifier.addListener(_onLocaleChanged);
@@ -288,7 +292,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         // Always save English versions to Firestore for consistency
         final selectedConditions = _conditions.entries.where((e) => e.value).map((e) => e.key).toList();
         final ok = await _authService.updateUserData({'conditions': selectedConditions});
-        if (ok) await _loadUserData();
+        if (ok) {
+          if (selectedConditions.contains('Low vision')) {
+            await VoiceAssistantService.instance.updateEnabled(true);
+          }
+          await _loadUserData();
+        }
       }
     } catch (e) {
       debugPrint('Error updating conditions: $e');

@@ -2,14 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/report_model.dart';
 import '../generated/l10n/app_localizations.dart';
+import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 
 /// Screen to display the details of a submitted product report
 /// Shows the front and back images, product name, category, and status
-class ReportDetailScreen extends StatelessWidget {
+class ReportDetailScreen extends StatefulWidget {
   final ReportModel report;
 
   const ReportDetailScreen({super.key, required this.report});
+
+  @override
+  State<ReportDetailScreen> createState() => _ReportDetailScreenState();
+}
+
+class _ReportDetailScreenState extends State<ReportDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    if (VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('report_detail');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +34,7 @@ class ReportDetailScreen extends StatelessWidget {
     // Status Badge colors
     Color statusBg;
     Color statusText;
-    final status = report.status.toLowerCase();
+    final status = widget.report.status.toLowerCase();
 
     if (status == 'approved') {
       statusBg = Colors.green.withOpacity(0.15);
@@ -78,7 +92,7 @@ class ReportDetailScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        report.status,
+                        widget.report.status,
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -99,7 +113,7 @@ class ReportDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      report.productName.isEmpty ? 'Unknown Product' : report.productName,
+                      widget.report.productName.isEmpty ? 'Unknown Product' : widget.report.productName,
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         color: colorScheme.onSurface,
@@ -108,7 +122,7 @@ class ReportDetailScreen extends StatelessWidget {
                     const SizedBox(height: 20),
 
                     // Category
-                    if (report.category.isNotEmpty) ...[
+                    if (widget.report.category.isNotEmpty) ...[
                       Text(
                         'Category',
                         style: GoogleFonts.outfit(
@@ -119,7 +133,7 @@ class ReportDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        report.category,
+                        widget.report.category,
                         style: GoogleFonts.inter(
                           fontSize: 15,
                           color: colorScheme.onSurface,
@@ -138,11 +152,11 @@ class ReportDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    if (report.frontImageUrl.isNotEmpty)
+                    if (widget.report.frontImageUrl.isNotEmpty)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.network(
-                          report.frontImageUrl,
+                          widget.report.frontImageUrl,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
                             height: 200,
@@ -187,11 +201,11 @@ class ReportDetailScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    if (report.backImageUrl.isNotEmpty)
+                    if (widget.report.backImageUrl.isNotEmpty)
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.network(
-                          report.backImageUrl,
+                          widget.report.backImageUrl,
                           fit: BoxFit.cover,
                           errorBuilder: (_, __, ___) => Container(
                             height: 200,
@@ -237,7 +251,7 @@ class ReportDetailScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      _formatDate(report.dateSubmitted),
+                      _formatDate(widget.report.dateSubmitted),
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         color: colorScheme.onSurface,

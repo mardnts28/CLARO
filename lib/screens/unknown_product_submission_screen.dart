@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../generated/l10n/app_localizations.dart';
+import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../services/auth_service.dart';
 import '../models/report_model.dart';
@@ -59,6 +60,9 @@ class _UnknownProductSubmissionScreenState
   void initState() {
     super.initState();
     _frontImagePath = widget.capturedImagePath;
+    if (VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('unknown_product_submission');
+    }
   }
 
   @override

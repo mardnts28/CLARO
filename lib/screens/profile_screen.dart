@@ -5,6 +5,7 @@ import '../services/theme_service.dart';
 import '../services/locale_service.dart';
 import '../services/haptic_service.dart';
 import '../services/voice_assistant_service.dart';
+import '../services/home_tab_controller.dart';
 import '../generated/l10n/app_localizations.dart';
 import 'personal_info_screen.dart';
 import 'preference_screen.dart';
@@ -35,6 +36,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
+    HomeTabController.tabNotifier.addListener(_handleTabChange);
+    _announceIfVisible();
     _loadUserData();
     // Listen to the shared name notifier so this header updates
     // instantly if the name is changed elsewhere (e.g.
@@ -49,8 +52,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     AuthService.userNameNotifier.addListener(_handleNameChanged);
   }
 
+  void _handleTabChange() {
+    _announceIfVisible();
+  }
+
+  void _announceIfVisible() {
+    if (HomeTabController.tabNotifier.value == 3 &&
+        _authService.currentUser != null &&
+        VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('profile');
+    }
+  }
+
   @override
   void dispose() {
+    HomeTabController.tabNotifier.removeListener(_handleTabChange);
     AuthService.userNameNotifier.removeListener(_handleNameChanged);
     super.dispose();
   }

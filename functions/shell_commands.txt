@@ -1,0 +1,3 @@
+console.log(JSON.stringify(voiceIntent({ transcript: "take me to my history", language: "en" }, { auth: { uid: "test-user-123" } })));
+console.log(JSON.stringify(voiceIntent({ transcript: "what is 2 plus 2", language: "en" }, { auth: { uid: "test-user-123" } })));
+exit

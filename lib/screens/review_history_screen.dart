@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/auth_service.dart';
+import '../services/voice_assistant_service.dart';
 
 /// Strongly-typed view of a single review document, so the rest of the
 /// screen never touches raw, untyped Firestore map data directly.
@@ -72,6 +73,14 @@ class ReviewHistoryScreen extends StatefulWidget {
 
 class _ReviewHistoryScreenState extends State<ReviewHistoryScreen> {
   final _authService = AuthService();
+
+  @override
+  void initState() {
+    super.initState();
+    if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
+      VoiceAssistantService.instance.announcePage('review_history');
+    }
+  }
 
   /// The list is already kept live by the underlying `.snapshots()`
   /// stream, so this doesn't need to manually splice new data in.
