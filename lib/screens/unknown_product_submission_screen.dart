@@ -39,6 +39,7 @@ class _UnknownProductSubmissionScreenState
     extends State<UnknownProductSubmissionScreen> {
   String? _frontImagePath;
   String? _backImagePath;
+  final List<String> _additionalBackImagePaths = [];
   bool _isSubmitting = false;
   String _productName = '';
   String _selectedCategory = 'others'; // Default to 'others'
@@ -130,6 +131,39 @@ class _UnknownProductSubmissionScreenState
     }
   }
 
+  Future<void> _pickAdditionalBackPhoto() async {
+    // Request camera permission first
+    final status = await Permission.camera.request();
+    if (!status.isGranted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Camera permission is required to take photos'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      final picked = await _picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+      );
+      if (picked != null && mounted) {
+        setState(() => _additionalBackImagePaths.add(picked.path));
+      }
+    } catch (e) {
+      debugPrint('Additional back image pick error: $e');
+    }
+  }
+
+  void _removeAdditionalBackPhoto(int index) {
+    setState(() => _additionalBackImagePaths.removeAt(index));
+  }
+
   // ── Submit report to Firestore ─────────────────────────────────────────
   Future<void> _handleSubmit() async {
     if (_isSubmitting) return;
@@ -196,6 +230,21 @@ class _UnknownProductSubmissionScreenState
       }
       final backBytes = await File(_backImagePath!).readAsBytes();
 
+      // Upload additional back photos
+      List<Future<String?>> additionalUploads = [];
+      for (int i = 0; i < _additionalBackImagePaths.length; i++) {
+        final additionalFile = File(_additionalBackImagePaths[i]);
+        if (await additionalFile.exists()) {
+          final additionalBytes = await additionalFile.readAsBytes();
+          additionalUploads.add(
+            BackendLocator.cloudinaryUploadService.upload(
+              additionalBytes,
+              filename: '${uid}_back_additional_${i}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+            ),
+          );
+        }
+      }
+
       // Upload in parallel. CloudinaryUploadService.upload() returns null
       // on failure rather than throwing -- we still let the report submit
       // with a blank URL in that case (see its header comment) rather than
@@ -211,9 +260,14 @@ class _UnknownProductSubmissionScreenState
           backBytes,
           filename: '${uid}_back_${DateTime.now().millisecondsSinceEpoch}.jpg',
         ),
+        ...additionalUploads,
       ]);
       final frontUrl = uploads[0] ?? '';
       final backUrl = uploads[1] ?? '';
+      final additionalBackUrls = uploads.skip(2)
+          .where((url) => url != null && url.isNotEmpty)
+          .cast<String>()
+          .toList();
 
       final report = ReportModel(
         id: '', // Firestore assigns this on add(); unused in toMap().
@@ -227,6 +281,7 @@ class _UnknownProductSubmissionScreenState
         userName: name,
         frontImageUrl: frontUrl,
         backImageUrl: backUrl,
+        additionalBackImageUrls: additionalBackUrls,
         extractedData: const {}, // filled in by the background step below
       );
 
@@ -513,6 +568,93 @@ class _UnknownProductSubmissionScreenState
                           ? loc.reportAddBackPhoto
                           : loc.reportChangePhoto,
                       onPick: _pickBackPhoto,
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // ── Additional Back Photos section (optional) ────
+                    Text(
+                      'Additional Back Photos (Optional)',
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Add more photos of the back label if needed (ingredients, nutrition facts, etc.)',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Display additional back photos
+                    if (_additionalBackImagePaths.isNotEmpty) ...[
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: List.generate(_additionalBackImagePaths.length, (index) {
+                          return Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  width: 100,
+                                  height: 100,
+                                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                                  child: Image.file(
+                                    File(_additionalBackImagePaths[index]),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: () => _removeAdditionalBackPhoto(index),
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.9),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    padding: const EdgeInsets.all(4),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
+                    // Add additional photo button
+                    OutlinedButton.icon(
+                      onPressed: _pickAdditionalBackPhoto,
+                      icon: Icon(Icons.add_photo_alternate_outlined, size: 18, color: colorScheme.primary),
+                      label: Text(
+                        'Add Another Back Photo',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.4)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      ),
                     ),
 
                     const SizedBox(height: 28),

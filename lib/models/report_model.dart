@@ -20,6 +20,7 @@ class ReportModel {
   final String userName;
   final String frontImageUrl;
   final String backImageUrl;
+  final List<String> additionalBackImageUrls;
 
   /// Structured OCR + Gemini extraction output (brand, size, ingredients,
   /// nutrition, allergens, confidenceNotes) -- see
@@ -40,6 +41,7 @@ class ReportModel {
     required this.userName,
     this.frontImageUrl = '',
     this.backImageUrl = '',
+    this.additionalBackImageUrls = const [],
     this.extractedData = const {},
   });
 
@@ -68,6 +70,7 @@ class ReportModel {
       userName: data['userName'] ?? '',
       frontImageUrl: data['frontImageUrl'] ?? '',
       backImageUrl: data['backImageUrl'] ?? '',
+      additionalBackImageUrls: List<String>.from(data['additionalBackImageUrls'] ?? []),
       extractedData: Map<String, dynamic>.from(data['extractedData'] ?? {}),
     );
   }
@@ -84,6 +87,7 @@ class ReportModel {
       'userName': userName,
       'frontImageUrl': frontImageUrl,
       'backImageUrl': backImageUrl,
+      'additionalBackImageUrls': additionalBackImageUrls,
       'extractedData': extractedData,
     };
   }
