@@ -666,6 +666,49 @@ class AuthService {
     await _firebaseAuth.signOut();
   }
 
+  Future<String?> deleteAccount() async {
+    final user = _firebaseAuth.currentUser;
+    if (user == null) {
+      return 'No authenticated user found.';
+    }
+
+    final uid = user.uid;
+
+    try {
+      // Delete Firebase Authentication account first
+      // This will fail if the user hasn't recently authenticated
+      try {
+        await user.delete();
+      } on FirebaseAuthException catch (e) {
+        debugPrint('Firebase Auth deletion error: $e');
+        // If deletion fails due to recent authentication requirement, try signing out first
+        if (e.code == 'requires-recent-login') {
+          await _firebaseAuth.signOut();
+          return 'For security reasons, you need to re-login before deleting your account. Please log in again and try.';
+        }
+        rethrow;
+      }
+
+      // Delete Firestore user document
+      await _firebaseDb.collection('users').doc(uid).delete();
+
+      // Clear local session data
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('sessionId');
+
+      // Reset personalized feedback
+      HapticService().updateEnabled(false);
+
+      return null;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth deletion error: $e');
+      return e.message ?? 'Failed to delete account. Please try again.';
+    } catch (e) {
+      debugPrint('Account deletion error: $e');
+      return 'An error occurred while deleting your account. Please try again.';
+    }
+  }
+
   User? get currentUser {
     if (!_isFirebaseReady) return null;
     return _firebaseAuth.currentUser;

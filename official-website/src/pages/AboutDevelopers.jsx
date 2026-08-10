@@ -15,10 +15,10 @@ export default function AboutDevelopers() {
       icon: <User size={36} />,
       bio: 'Lead project manager overseeing strategic execution, team coordination, system requirements, and capstone milestone deliverables.',
       socials: {
-        facebook: '#',
-        instagram: '#',
-        github: '#',
-        linkedin: '#'
+        facebook: 'https://www.facebook.com/mary.ardientes',
+        instagram: 'https://www.instagram.com/___mry.a?igsh=MXEzYXdtcXRnNjNv',
+        github: 'https://github.com/mardnts28?fbclid=IwY2xjawTmmpVwZG9mBWV4dG4DYWVtAjEwAGJyaWQRMUxiUXUzeDhUSGJZQ0xlelRzcnRjBmFwcF9pZBAyMjIwMzkxNzg4MjAwODkyAAEeFmVD4rKFMmaq4btW2_2DYaryT6Po5gUhCLiUoCjS2yAWE_44_Uq4SKWkjYs_aem_Yuj8BcpgNQIfj5QdFyeBTQ',
+        linkedin: 'https://www.linkedin.com/in/ardientes-mary-faith-aa8598315'
       }
     },
     {
@@ -28,10 +28,10 @@ export default function AboutDevelopers() {
       fallbackImage: biteImg,
       bio: 'Creative UI/UX designer focusing on user research, wireframing, interface design system, and overall mobile/web user experience.',
       socials: {
-        facebook: '#',
-        instagram: '#',
-        github: '#',
-        linkedin: '#'
+        facebook: 'https://www.facebook.com/share/1HWeEZRHYK/',
+        instagram: 'https://www.instagram.com/jbbite?igsh=MTJzdm1xYnBkb3RxZw==',
+        github: 'https://github.com/0910bayts',
+        linkedin: 'https://www.linkedin.com/in/jay-bhie-bite-0462a1339?utm_source=share_via&utm_content=profile&utm_medium=member_android&fbclid=IwY2xjawTmmv1wZG9mBWV4dG4DYWVtAjEwAGJyaWQRMUxiUXUzeDhUSGJZQ0xlelRzcnRjBmFwcF9pZBAyMjIwMzkxNzg4MjAwODkyAAEe6WivYG0WfCMpWX3z49ySPCgDXqnOoxDsmEcVjIiFful9WGQ8_13osC_9Q0g_aem_vf_XxuScw-DbyplPovKb-Q'
       }
     },
     {
@@ -41,10 +41,10 @@ export default function AboutDevelopers() {
       fallbackImage: salucopImg,
       bio: 'Backend engineer specializing in API architecture, database optimization, nutrition data integration, and server-side processing.',
       socials: {
-        facebook: '#',
-        instagram: '#',
-        github: '#',
-        linkedin: '#'
+        facebook: 'https://www.facebook.com/share/1b3eKUXKbK/',
+        instagram: 'https://www.instagram.com/sea.chellie/',
+        github: 'https://github.com/poculas',
+        linkedin: 'https://www.linkedin.com/in/rochelle-ann-salucop-13621a280/'
       }
     }
   ];

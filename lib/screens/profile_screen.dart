@@ -426,6 +426,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: SizedBox(
               width: double.infinity,
               child: TextButton(
+                onPressed: () {
+                  HapticService().vibrate();
+                  _showDeleteAccountDialog();
+                },
+                child: Text(
+                  'Delete Account',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Colors.red,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Divider(height: 0, color: colorScheme.outlineVariant),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: SizedBox(
+              width: double.infinity,
+              child: TextButton(
                 onPressed: () async {
                   HapticService().vibrate();
                   await _authService.signOut();
@@ -473,6 +494,162 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       }
     }
+  }
+
+  void _showDeleteAccountDialog() {
+    final colorScheme = Theme.of(context).colorScheme;
+    String? errorMessage;
+    bool isDeleting = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        final TextEditingController deleteController = TextEditingController();
+        
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              backgroundColor: colorScheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text(
+                'Delete Account?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'This action will permanently delete your account and associated profile data. This cannot be undone.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Type "DELETE" to confirm:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: deleteController,
+                    onChanged: (value) {
+                      setState(() {
+                        errorMessage = null;
+                      });
+                    },
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'DELETE',
+                      hintStyle: TextStyle(
+                        color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: colorScheme.outlineVariant),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                      ),
+                      errorText: errorMessage,
+                    ),
+                    textCapitalization: TextCapitalization.characters,
+                  ),
+                  if (isDeleting) ...[
+                    const SizedBox(height: 16),
+                    const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () {
+                          HapticService().vibrate();
+                          deleteController.dispose();
+                          Navigator.of(dialogContext).pop();
+                        },
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: isDeleting
+                          ? colorScheme.onSurfaceVariant.withOpacity(0.5)
+                          : colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: isDeleting
+                      ? null
+                      : () async {
+                          if (deleteController.text.trim() != 'DELETE') {
+                            setState(() {
+                              errorMessage = 'Please type DELETE to confirm account deletion.';
+                            });
+                            return;
+                          }
+
+                          setState(() {
+                            isDeleting = true;
+                          });
+
+                          final error = await _authService.deleteAccount();
+                          
+                          deleteController.dispose();
+                          
+                          if (mounted) {
+                            Navigator.of(dialogContext).pop();
+                            
+                            // Use post-frame callback to ensure dialog is fully closed before navigating
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (mounted) {
+                                if (error != null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(error),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                } else {
+                                  Navigator.pushReplacementNamed(context, '/');
+                                }
+                              }
+                            });
+                          }
+                        },
+                  child: Text(
+                    isDeleting ? 'Deleting...' : 'Confirm',
+                    style: TextStyle(
+                      color: isDeleting
+                          ? Colors.red.withOpacity(0.5)
+                          : Colors.red,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildMenuItemWithArrow({
