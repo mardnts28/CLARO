@@ -9,7 +9,9 @@ export default function TermsConditions() {
         <div className="page-header" style={{ marginBottom: '2rem' }}>
           <h1 className="page-title">Terms & Conditions</h1>
           <p className="page-subtitle">
-            Terms of service and usage conditions template for the CLARO project.
+            These Terms and Conditions ("Terms") govern your access to and use of the CLARO mobile application and its related services.
+
+By creating an account or using CLARO, you agree to these Terms. If you do not agree with these Terms, please do not use the application.
           </p>
         </div>
 
@@ -17,44 +19,373 @@ export default function TermsConditions() {
         <div className="doc-card">
           <div className="doc-meta">
             <Clock size={16} />
-            <span>Last Updated: [Placeholder Date]</span>
+            <span>Last Updated: August 10, 2026</span>
             <span style={{ margin: '0 0.5rem' }}>•</span>
             <FileCheck size={16} />
-            <span>Terms Version 1.0 Template</span>
+            <span>Terms Version 1.0</span>
           </div>
 
           <div className="doc-section">
-            <h2 className="doc-section-title">1. Acceptance of Terms (Placeholder)</h2>
+            <h2 className="doc-section-title">1. About CLARO</h2>
             <p className="doc-section-text">
-              This section will specify that by accessing or using the CLARO application and website, users agree to abide by these Terms & Conditions and all applicable regulations.
+              CLARO is a food product recognition and nutritional information application designed to help users identify selected food products and understand information such as:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Product information</li>
+              <li>Nutritional values</li>
+              <li>FDA registration information</li>
+              <li>Nutri-Score</li>
+              <li>NOVA classification</li>
+              <li>Allergen information</li>
+              <li>Health-related advisories</li>
+              <li>Product comparisons and rankings</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              The application may also provide personalized recommendations based on information voluntarily entered into the user's health profile.
             </p>
           </div>
 
           <div className="doc-section">
-            <h2 className="doc-section-title">2. Scope & Purpose (Placeholder)</h2>
+            <h2 className="doc-section-title">2. Eligibility and Account</h2>
             <p className="doc-section-text">
-              Statement indicating that CLARO is developed as an academic capstone project focused on smart food recognition and nutrition guidance for informational purposes.
+              To access features requiring authentication, you must create or access a CLARO account using one of the authentication methods supported by the application.
+            </p>
+            <p className="doc-section-text">
+              You are responsible for:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Providing accurate information when required</li>
+              <li>Maintaining the security of your account</li>
+              <li>Keeping your authentication credentials confidential</li>
+              <li>Not sharing your account with unauthorized individuals</li>
+              <li>Immediately reporting suspected unauthorized access</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              CLARO may restrict or terminate access when an account is used in violation of these Terms or in a manner that threatens the security or integrity of the system.
             </p>
           </div>
 
           <div className="doc-section">
-            <h2 className="doc-section-title">3. User Conduct & Use Guidelines (Placeholder)</h2>
+            <h2 className="doc-section-title">3. Health Profile</h2>
             <p className="doc-section-text">
-              Outline of permitted and prohibited activities when using the platform, including proper use of image scanning features and respect for system limitations.
+              CLARO allows users to provide information about their health conditions and food allergies.
+            </p>
+            <p className="doc-section-text">
+              This information is used to personalize product advisories, warnings, and recommendations.
+            </p>
+            <p className="doc-section-text">
+              You are responsible for ensuring that the information in your health profile is accurate and up to date.
+            </p>
+            <p className="doc-section-text">
+              If your health information changes, you should update your profile accordingly.
             </p>
           </div>
 
           <div className="doc-section">
-            <h2 className="doc-section-title">4. Intellectual Property (Placeholder)</h2>
+            <h2 className="doc-section-title">4. Health and Medical Disclaimer</h2>
             <p className="doc-section-text">
-              Information regarding ownership of the CLARO logo, branding assets, software source code, machine learning models, and original website design elements.
+              CLARO is an informational and educational tool and is not a substitute for professional medical advice, diagnosis, or treatment.
+            </p>
+            <p className="doc-section-text">
+              Health advisories, warnings, classifications, and recommendations generated by CLARO are intended to help users understand nutritional and product-related information.
+            </p>
+            <p className="doc-section-text">
+              They should not be interpreted as:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>A medical diagnosis</li>
+              <li>A prescription</li>
+              <li>A treatment plan</li>
+              <li>Professional dietary advice</li>
+              <li>A substitute for consultation with a physician, registered dietitian, nutritionist, or other qualified healthcare professional</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              Users with medical conditions, food allergies, dietary restrictions, or other health concerns should consult an appropriate healthcare professional before making significant dietary or health-related decisions.
+            </p>
+            <p className="doc-section-text">
+              In case of an allergic reaction or medical emergency, seek appropriate professional medical assistance immediately.
             </p>
           </div>
 
           <div className="doc-section">
-            <h2 className="doc-section-title">5. Disclaimer of Health & Medical Advice (Placeholder)</h2>
+            <h2 className="doc-section-title">5. Accuracy of Information</h2>
             <p className="doc-section-text">
-              Explicit disclaimer noting that nutritional data and automated food recognition results are provided for general guidance and do not replace professional medical or dietary advice.
+              CLARO attempts to provide useful and relevant product and nutritional information. However, information may originate from databases, publicly available sources, product labels, OCR extraction, or other reference sources.
+            </p>
+            <p className="doc-section-text">
+              Accordingly, CLARO does not guarantee that all information will always be:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Accurate</li>
+              <li>Complete</li>
+              <li>Current</li>
+              <li>Error-free</li>
+              <li>Available</li>
+              <li>Suitable for a particular individual's circumstances</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              Users should verify important nutritional, allergen, and regulatory information using the product's official packaging, labeling, or appropriate authoritative sources.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">6. Product Recognition</h2>
+            <p className="doc-section-text">
+              CLARO uses image recognition technology to identify supported food products.
+            </p>
+            <p className="doc-section-text">
+              Recognition results may occasionally be incorrect because of:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Image quality</li>
+              <li>Lighting conditions</li>
+              <li>Camera positioning</li>
+              <li>Product packaging changes</li>
+              <li>Similar product designs</li>
+              <li>Occlusion or obstruction</li>
+              <li>Model limitations</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              Users should verify the identified product before relying on the information presented by the application.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">7. Product Comparison and Ranking</h2>
+            <p className="doc-section-text">
+              CLARO may provide product comparisons and rankings based on nutritional information and, where applicable, the user's health profile.
+            </p>
+            <p className="doc-section-text">
+              These rankings are intended to assist users in comparing products.
+            </p>
+            <p className="doc-section-text">
+              A higher-ranked product does not necessarily mean that it is medically or nutritionally appropriate for every individual.
+            </p>
+            <p className="doc-section-text">
+              Users should consider their personal circumstances and consult qualified professionals when necessary.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">8. Nutri-Score and NOVA Classification</h2>
+            <p className="doc-section-text">
+              CLARO may display Nutri-Score and NOVA classifications to help users understand nutritional quality and processing levels.
+            </p>
+            <p className="doc-section-text">
+              These classifications are provided for informational purposes.
+            </p>
+            <p className="doc-section-text">
+              They should not be interpreted as a complete assessment of a product's overall healthfulness or suitability for a particular individual.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">9. FDA and Regulatory Information</h2>
+            <p className="doc-section-text">
+              CLARO may display Philippine FDA-related information, including product registration numbers and validity dates, as reference information.
+            </p>
+            <p className="doc-section-text">
+              The application does not independently issue, modify, or grant FDA registration.
+            </p>
+            <p className="doc-section-text">
+              Regulatory information displayed by CLARO should be verified through appropriate official Philippine FDA sources when regulatory confirmation is required.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">10. Voice Assistant</h2>
+            <p className="doc-section-text">
+              CLARO may provide voice-assisted navigation and interaction.
+            </p>
+            <p className="doc-section-text">
+              Users are responsible for ensuring that microphone permissions are appropriately configured on their device.
+            </p>
+            <p className="doc-section-text">
+              Voice recognition may not always accurately understand spoken commands because of factors such as:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Background noise</li>
+              <li>Pronunciation</li>
+              <li>Accent</li>
+              <li>Microphone quality</li>
+              <li>Internet connectivity</li>
+              <li>Language selection</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              Users should not rely exclusively on voice commands for critical actions.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">11. User-Submitted Product Reports</h2>
+            <p className="doc-section-text">
+              Users may submit reports for products that CLARO does not recognize.
+            </p>
+            <p className="doc-section-text">
+              Users agree that submitted information should be:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Accurate to the best of their knowledge</li>
+              <li>Relevant to the product being reported</li>
+              <li>Free from intentionally misleading information</li>
+              <li>Appropriate for the application's intended purpose</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              CLARO administrators may review, validate, reject, or otherwise process submitted reports.
+            </p>
+            <p className="doc-section-text">
+              Submitting a report does not guarantee that the product will be added to the application's database.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">12. Prohibited Use</h2>
+            <p className="doc-section-text">
+              You agree not to use CLARO to:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Provide intentionally false or misleading information</li>
+              <li>Submit fraudulent product reports</li>
+              <li>Attempt to access another user's account</li>
+              <li>Attempt to access another user's health information</li>
+              <li>Circumvent authentication or security controls</li>
+              <li>Interfere with the application's operation</li>
+              <li>Abuse or overload application services</li>
+              <li>Reverse engineer or attempt to compromise security mechanisms</li>
+              <li>Use the application for unlawful purposes</li>
+              <li>Use another person's personal information without authorization</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              CLARO reserves the right to restrict access where misuse threatens the application's users, data, or infrastructure.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">13. Intellectual Property</h2>
+            <p className="doc-section-text">
+              The CLARO application, including its software, interface, design, branding, logos, original written content, and other original materials, is owned by or licensed to the CLARO development team and is protected by applicable intellectual property laws.
+            </p>
+            <p className="doc-section-text">
+              Unless expressly permitted, users may not reproduce, redistribute, modify, or commercially exploit CLARO's original materials without appropriate authorization.
+            </p>
+            <p className="doc-section-text">
+              Third-party names, trademarks, databases, and services remain the property of their respective owners.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">14. Third-Party Services</h2>
+            <p className="doc-section-text">
+              CLARO may rely on third-party services such as:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Firebase Authentication</li>
+              <li>Firebase Firestore</li>
+              <li>Google OAuth</li>
+              <li>Nutritional and regulatory reference databases</li>
+              <li>AI services used for advisory explanations</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              The availability and operation of these third-party services may affect CLARO's functionality.
+            </p>
+            <p className="doc-section-text">
+              Third-party services may have their own terms, privacy policies, and technical limitations.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">15. Availability of the Application</h2>
+            <p className="doc-section-text">
+              We aim to keep CLARO available and functional; however, uninterrupted availability cannot be guaranteed.
+            </p>
+            <p className="doc-section-text">
+              The application may temporarily become unavailable because of:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Maintenance</li>
+              <li>Software updates</li>
+              <li>Server or cloud-service interruptions</li>
+              <li>Internet connectivity issues</li>
+              <li>Third-party service outages</li>
+              <li>Security incidents</li>
+              <li>Technical failures</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              CLARO may modify, suspend, or discontinue certain features when necessary.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">16. Account Deletion</h2>
+            <p className="doc-section-text">
+              Users may request deletion of their CLARO account through the application's account deletion feature.
+            </p>
+            <p className="doc-section-text">
+              Once successfully processed, the account and associated user information will be deleted in accordance with the application's Privacy Policy and applicable requirements.
+            </p>
+            <p className="doc-section-text">
+              Account deletion may result in permanent loss of access to information associated with the account.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">17. Disclaimer of Warranties</h2>
+            <p className="doc-section-text">
+              To the extent permitted by applicable law, CLARO is provided on an "as is" and "as available" basis.
+            </p>
+            <p className="doc-section-text">
+              We do not guarantee that:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>The application will always be available</li>
+              <li>Product recognition will always be accurate</li>
+              <li>Nutritional information will always be complete or current</li>
+              <li>Health recommendations will be appropriate for every user</li>
+              <li>Third-party services will always be available</li>
+              <li>The application will be free from all errors or interruptions</li>
+            </ul>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">18. Limitation of Liability</h2>
+            <p className="doc-section-text">
+              To the extent permitted by applicable law, CLARO and its development team shall not be responsible for losses or damages resulting from reliance on information provided by the application, including nutritional information, product classifications, product rankings, health advisories, or product recognition results.
+            </p>
+            <p className="doc-section-text">
+              Users remain responsible for verifying information and making their own decisions regarding food consumption and health.
+            </p>
+            <p className="doc-section-text">
+              Nothing in these Terms is intended to exclude or limit rights or obligations that cannot legally be excluded or limited under applicable law.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">19. Privacy</h2>
+            <p className="doc-section-text">
+              Your use of CLARO is also governed by our Privacy Policy, which explains how personal information is collected, used, stored, protected, and managed.
+            </p>
+            <p className="doc-section-text">
+              By using CLARO, you acknowledge that you have reviewed the Privacy Policy.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">20. Changes to These Terms</h2>
+            <p className="doc-section-text">
+              We may update these Terms when necessary to reflect changes to the application, its features, or applicable requirements.
+            </p>
+            <p className="doc-section-text">
+              Updated Terms will be posted on this page with a revised Last Updated date.
+            </p>
+            <p className="doc-section-text">
+              Your continued use of CLARO after changes are posted constitutes acceptance of the updated Terms, to the extent permitted by applicable law.
+            </p>
+          </div>
+
+          <div className="doc-section">
+            <h2 className="doc-section-title">21. Governing Law</h2>
+            <p className="doc-section-text">
+              These Terms shall be interpreted and governed in accordance with the applicable laws of the Republic of the Philippines, including relevant provisions applicable to the use of digital services and data protection.
             </p>
           </div>
         </div>

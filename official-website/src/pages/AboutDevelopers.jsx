@@ -9,11 +9,11 @@ export default function AboutDevelopers() {
   const developers = [
     {
       name: 'Mary Faith Ardientes',
-      role: 'Project Manager',
+      role: 'Project Manager & Machine Learning Engineer',
       image: 'images/developers/ardientes.jpg',
       fallbackImage: ardientesImg,
       icon: <User size={36} />,
-      bio: 'Lead project manager overseeing strategic execution, team coordination, system requirements, and capstone milestone deliverables.',
+      bio: 'Lead project manager overseeing strategic execution, team coordination, system requirements, and capstone milestone deliverables. Also, Machine Learning Engineer responsible for model training, validation, evaluation, and integration.',
       socials: {
         facebook: 'https://www.facebook.com/mary.ardientes',
         instagram: 'https://www.instagram.com/___mry.a?igsh=MXEzYXdtcXRnNjNv',
@@ -23,10 +23,10 @@ export default function AboutDevelopers() {
     },
     {
       name: 'Jay Bhie Bite',
-      role: 'UI/UX Designer',
+      role: 'UI/UX Designer & Developer',
       image: 'images/developers/bite.jpg',
       fallbackImage: biteImg,
-      bio: 'Creative UI/UX designer focusing on user research, wireframing, interface design system, and overall mobile/web user experience.',
+      bio: 'UI/UX Designer focusing on user research, wireframing, interface design, and a consistent mobile/web experience. Also responsible for accessibility features for low-vision users, including light/dark themes, adjustable text size and speech volume, and English and Tagalog language support',
       socials: {
         facebook: 'https://www.facebook.com/share/1HWeEZRHYK/',
         instagram: 'https://www.instagram.com/jbbite?igsh=MTJzdm1xYnBkb3RxZw==',
@@ -36,10 +36,10 @@ export default function AboutDevelopers() {
     },
     {
       name: 'Rochelle Ann C. Salucop',
-      role: 'Backend Developer',
+      role: 'Backend Developer & Quality Tester',
       image: 'images/developers/salucop.png',
       fallbackImage: salucopImg,
-      bio: 'Backend engineer specializing in API architecture, database optimization, nutrition data integration, and server-side processing.',
+      bio: 'Backend Developer responsible for developing and maintaining the application\'s backend services, database operations, nutrition data integration, server-side processing, and conducting quality testing to identify and resolve system issues',
       socials: {
         facebook: 'https://www.facebook.com/share/1b3eKUXKbK/',
         instagram: 'https://www.instagram.com/sea.chellie/',
@@ -56,7 +56,7 @@ export default function AboutDevelopers() {
         <div className="page-header">
           <h1 className="page-title">About the Developers</h1>
           <p className="page-subtitle">
-            Meet the student development team behind the CLARO smart food recognition project.
+            Meet the students who developed the CLARO project.
           </p>
         </div>
 
