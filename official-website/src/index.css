@@ -27,6 +27,25 @@
   --doc-container-width: 860px;
 }
 
+[data-theme="dark"] {
+  --bg-main: #121212;
+  --bg-navbar: #1E1E1E;
+  --text-primary: #E0E0E0;
+  --text-secondary: #9E9E9E;
+  --primary-red: #8B1A1A;
+  --primary-accent: #EF5350;
+  --primary-red-hover: #EF5350;
+  --primary-red-light: rgba(239, 83, 80, 0.15);
+  --primary-red-glow: rgba(239, 83, 80, 0.25);
+  --card-bg: #1E1E1E;
+  --card-bg-alt: #2C2C2C;
+  --border-color: #424242;
+  --border-color-strong: #616161;
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.6);
+}
+
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;

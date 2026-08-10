@@ -35,7 +35,6 @@ export default function UserGuide() {
       <div className="container">
         {/* Page Header */}
         <div className="page-header">
-          <span className="badge" style={{ marginBottom: '0.75rem' }}>Documentation</span>
           <h1 className="page-title">User Guide</h1>
           <p className="page-subtitle">
             Comprehensive placeholder documentation and walkthrough guides for using the CLARO application.

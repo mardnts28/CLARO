@@ -1,12 +1,25 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Sun, Moon } from 'lucide-react';
 import logoImg from '../assets/images/logoII.png';
 import './Navbar.css';
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || 'light';
+  });
   const location = useLocation();
+
+  // Handle theme attribute on document root
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prevTheme) => (prevTheme === 'light' ? 'dark' : 'light'));
+  };
 
   // Close mobile drawer on route change
   useEffect(() => {
@@ -40,24 +53,45 @@ export default function Navbar() {
           <img src={logoImg} alt="CLARO Logo" className="navbar-logo" />
         </NavLink>
 
-        {/* Desktop Navigation Links */}
-        <nav aria-label="Desktop Navigation">
-          <ul className="navbar-links">
-            {navItems.map((item) => (
-              <li key={item.path}>
-                <NavLink
-                  to={item.path}
-                  end={item.path === '/'}
-                  className={({ isActive }) =>
-                    isActive ? 'nav-link active' : 'nav-link'
-                  }
-                >
-                  {item.label}
-                </NavLink>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        {/* Desktop Navigation Links & Theme Toggle */}
+        <div className="navbar-desktop-right">
+          <nav aria-label="Desktop Navigation">
+            <ul className="navbar-links">
+              {navItems.map((item) => (
+                <li key={item.path}>
+                  <NavLink
+                    to={item.path}
+                    end={item.path === '/'}
+                    className={({ isActive }) =>
+                      isActive ? 'nav-link active' : 'nav-link'
+                    }
+                  >
+                    {item.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          <button
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+            title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+          >
+            {theme === 'light' ? (
+              <>
+                <Moon size={18} />
+                <span className="theme-toggle-label">Dark Mode</span>
+              </>
+            ) : (
+              <>
+                <Sun size={18} />
+                <span className="theme-toggle-label">Light Mode</span>
+              </>
+            )}
+          </button>
+        </div>
 
         {/* Mobile Hamburger Toggle Button */}
         <button
@@ -94,6 +128,26 @@ export default function Navbar() {
             {item.label}
           </NavLink>
         ))}
+        
+        <div style={{ marginTop: 'auto', paddingTop: '1rem', borderTop: '1px solid var(--border-color)' }}>
+          <button
+            className="theme-toggle-btn mobile-theme-toggle"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+          >
+            {theme === 'light' ? (
+              <>
+                <Moon size={18} />
+                <span>Dark Mode</span>
+              </>
+            ) : (
+              <>
+                <Sun size={18} />
+                <span>Light Mode</span>
+              </>
+            )}
+          </button>
+        </div>
       </nav>
     </header>
   );

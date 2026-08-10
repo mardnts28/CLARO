@@ -1,4 +1,4 @@
-import { Download, Sparkles, Scan, HeartPulse, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Download, Scan, FileText, ShieldCheck, HeartPulse, GitCompare, Mic } from 'lucide-react';
 import logoImg from '../assets/images/logoII.png';
 import './Pages.css';
 
@@ -14,35 +14,24 @@ export default function Home() {
       <section className="hero-section">
         <div className="container hero-grid">
           <div className="hero-content">
-            <div className="hero-badge-wrap">
-              <span className="badge">Capstone Project</span>
-            </div>
             <h1 className="hero-title">
               <span className="hero-title-accent">CLARO</span>
             </h1>
             <p className="hero-subtitle">
-              Smart food recognition and nutrition guidance
+              An AI-Powered Mobile Application for Health-Informed Decision-Making on FDA-Registered Filipino Canned Fish, Meat, Vegetables and Local Instant Noodle Products
             </p>
             
             <div className="hero-actions">
               <button
                 className="btn-primary"
                 onClick={handleDownloadClick}
-                title="Download non-functional placeholder"
-                aria-label="Download CLARO App (Visual Template Button)"
+                title="Install CALRO App"
+                aria-label="Install CALRO App"
               >
                 <Download size={18} />
-                <span>Download App</span>
+                <span>Install CALRO App</span>
               </button>
-
-              <span className="badge" style={{ background: 'var(--card-bg)', border: '1px solid var(--border-color)', color: 'var(--text-secondary)' }}>
-                Template Preview Mode
-              </span>
             </div>
-
-            <p className="download-tooltip-note">
-              * The Download button is a visual placeholder for UI demonstration.
-            </p>
           </div>
 
           {/* Hero Visual Mockup Card */}
@@ -70,7 +59,6 @@ export default function Home() {
       <section className="page-section">
         <div className="container">
           <div className="cta-banner">
-            <span className="badge" style={{ marginBottom: '0.75rem' }}>About CLARO</span>
             <h2 className="section-title">About CLARO</h2>
             <p className="section-subtitle">
               CLARO is an AI-powered mobile app that helps grocery shoppers understand nutrition information for local canned foods. By scanning a product, users see simplified nutrition summaries, health advisories, allergen warnings, product comparisons, and accessibility features such as voice assistance to make smarter and healthier buying decisions.
@@ -79,14 +67,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Feature Placeholders Section */}
+      {/* Features Overview Section */}
       <section className="page-section">
         <div className="container">
           <div className="section-header">
-            <span className="badge" style={{ marginBottom: '0.75rem' }}>System Capabilities</span>
             <h2 className="section-title">Features Overview</h2>
             <p className="section-subtitle">
-              Placeholder section demonstrating feature breakdown card structures.
+              Here are the core features of CLARO:
             </p>
           </div>
 
@@ -95,19 +82,19 @@ export default function Home() {
               <div className="feature-icon-wrapper">
                 <Scan size={24} />
               </div>
-              <h3 className="feature-title">Smart Food Recognition</h3>
+              <h3 className="feature-title">AI Food Recognition</h3>
               <p>
-                Placeholder description for intelligent food image analysis and identification functionality.
+                Identifies local canned food and instant noodle products using a trained YOLOv8 image scanning model with auto-detection and capture.
               </p>
             </div>
 
             <div className="card feature-card">
               <div className="feature-icon-wrapper">
-                <HeartPulse size={24} />
+                <FileText size={24} />
               </div>
-              <h3 className="feature-title">Nutrition Guidance</h3>
+              <h3 className="feature-title">Nutritional Information & Food Classification</h3>
               <p>
-                Placeholder description for dietary insights, nutritional breakdown, and personalized recommendation metrics.
+                Presents ingredients, allergens, Nutri-Score, and NOVA classification of identified product.
               </p>
             </div>
 
@@ -115,9 +102,39 @@ export default function Home() {
               <div className="feature-icon-wrapper">
                 <ShieldCheck size={24} />
               </div>
-              <h3 className="feature-title">Health Advisory</h3>
+              <h3 className="feature-title">FDA Registration Verification</h3>
               <p>
-                Placeholder description for health alert prompts, ingredient awareness, and nutritional safety guides.
+                Checks the product’s FDA registration status through the Philippine FDA Verification Portal.
+              </p>
+            </div>
+
+            <div className="card feature-card">
+              <div className="feature-icon-wrapper">
+                <HeartPulse size={24} />
+              </div>
+              <h3 className="feature-title">Health Profile & Advisory</h3>
+              <p>
+                Provides a health advisory based on conditions such as hypertension, diabetes, heart disease, and food allergies, using Food and Drug Association (FDA) nutrition label reading guidance, and Word Health Organization (WHO) daily nutrition intake guidance.
+              </p>
+            </div>
+
+            <div className="card feature-card">
+              <div className="feature-icon-wrapper">
+                <GitCompare size={24} />
+              </div>
+              <h3 className="feature-title">Product Comparison & Ranking</h3>
+              <p>
+                Compares and ranks up to five products based on their suitability to the user’s health profile, recommending the best choice for your health condition.
+              </p>
+            </div>
+
+            <div className="card feature-card">
+              <div className="feature-icon-wrapper">
+                <Mic size={24} />
+              </div>
+              <h3 className="feature-title">Voice Assistance</h3>
+              <p>
+                Offers hands-free navigation, and screen reading for accessibility through voice commands, supporting English and Tagalog Language.
               </p>
             </div>
           </div>
@@ -125,57 +142,42 @@ export default function Home() {
       </section>
 
       {/* How CLARO Works Section */}
-      <section className="page-section" style={{ backgroundColor: 'rgba(255, 255, 255, 0.4)' }}>
+      <section className="page-section" style={{ backgroundColor: 'var(--card-bg-alt)' }}>
         <div className="container">
           <div className="section-header">
-            <span className="badge" style={{ marginBottom: '0.75rem' }}>Workflow</span>
             <h2 className="section-title">How CLARO Works</h2>
-            <p className="section-subtitle">
-              A 3-step placeholder process layout demonstrating application flow.
-            </p>
           </div>
 
           <div className="workflow-grid">
             <div className="card step-card">
               <span className="step-number">01</span>
-              <h3>Capture or Upload</h3>
+              <h3>Point and Capture</h3>
               <p>
-                Placeholder step description detailing how users scan or upload food items into the system.
+                Aim the camera at a Philippine brand canned food or instant noodles. The app auto-detects the object and captures when the product is properly framed.
               </p>
             </div>
 
             <div className="card step-card">
               <span className="step-number">02</span>
-              <h3>AI Analysis</h3>
-              <p>
-                Placeholder step description explaining system processing, recognition model, and data lookup.
+              <h3>Receive Analysis</h3>
+              <p style={{ marginBottom: '0.5rem' }}>
+                once the product has been recognized, you may instantly view:
               </p>
+              <ul className="step-details-list">
+                <li>Product's Information and FDA Registration number and its expiry date</li>
+                <li>Complete ingredients and Nutrition Facts</li>
+                <li>Nutri-Score and NOVA Classification</li>
+                <li>Health Advisory</li>
+              </ul>
             </div>
 
             <div className="card step-card">
               <span className="step-number">03</span>
-              <h3>Receive Guidance</h3>
+              <h3>Compare Products</h3>
               <p>
-                Placeholder step description illustrating nutritional summaries and health guidance output.
+                scan multiple products or tap the compare button to view ranked list and recommendation
               </p>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Call to Action Section */}
-      <section className="page-section">
-        <div className="container">
-          <div className="cta-banner">
-            <Sparkles size={32} style={{ color: 'var(--primary-red)' }} />
-            <h2>Experience CLARO Capstone Project</h2>
-            <p className="section-subtitle">
-              Placeholder CTA area for project launch, documentation links, or future store release highlights.
-            </p>
-            <button className="btn-primary" onClick={handleDownloadClick}>
-              <span>Download Visual Template</span>
-              <ArrowRight size={18} />
-            </button>
           </div>
         </div>
       </section>

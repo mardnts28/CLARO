@@ -211,6 +211,19 @@
   opacity: 0.85;
 }
 
+.step-details-list {
+  margin-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.step-details-list li {
+  line-height: 1.45;
+}
+
 /* Call to action section */
 .cta-banner {
   background-color: var(--card-bg);

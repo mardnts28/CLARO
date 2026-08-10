@@ -54,7 +54,6 @@ export default function AboutDevelopers() {
       <div className="container">
         {/* Page Header */}
         <div className="page-header">
-          <span className="badge" style={{ marginBottom: '0.75rem' }}>Capstone Team</span>
           <h1 className="page-title">About the Developers</h1>
           <p className="page-subtitle">
             Meet the student development team behind the CLARO smart food recognition project.
