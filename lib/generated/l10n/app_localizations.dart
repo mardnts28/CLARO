@@ -1259,8 +1259,32 @@ abstract class AppLocalizations {
   /// No description provided for @errorPasswordTooShort.
   ///
   /// In en, this message translates to:
-  /// **'Password must be at least 6 characters'**
+  /// **'Password must be at least 8 characters'**
   String get errorPasswordTooShort;
+
+  /// No description provided for @errorPasswordUppercase.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain at least one uppercase letter'**
+  String get errorPasswordUppercase;
+
+  /// No description provided for @errorPasswordLowercase.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain at least one lowercase letter'**
+  String get errorPasswordLowercase;
+
+  /// No description provided for @errorPasswordNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain at least one number'**
+  String get errorPasswordNumber;
+
+  /// No description provided for @errorPasswordSpecial.
+  ///
+  /// In en, this message translates to:
+  /// **'Password must contain at least one special character'**
+  String get errorPasswordSpecial;
 
   /// No description provided for @errorNotAuthenticated.
   ///
@@ -1279,6 +1303,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'An unexpected error occurred'**
   String get unexpectedError;
+
+  /// No description provided for @emailRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Email is required'**
+  String get emailRequired;
+
+  /// No description provided for @invalidEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a valid email address'**
+  String get invalidEmail;
+
+  /// No description provided for @validEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A valid email address (e.g. name@example.com)'**
+  String get validEmailHint;
 
   /// No description provided for @selectAllergen.
   ///

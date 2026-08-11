@@ -617,7 +617,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorPasswordsNotMatch => 'Passwords do not match';
 
   @override
-  String get errorPasswordTooShort => 'Password must be at least 6 characters';
+  String get errorPasswordTooShort => 'Password must be at least 8 characters';
+
+  @override
+  String get errorPasswordUppercase =>
+      'Password must contain at least one uppercase letter';
+
+  @override
+  String get errorPasswordLowercase =>
+      'Password must contain at least one lowercase letter';
+
+  @override
+  String get errorPasswordNumber => 'Password must contain at least one number';
+
+  @override
+  String get errorPasswordSpecial =>
+      'Password must contain at least one special character';
 
   @override
   String get errorNotAuthenticated => 'User not authenticated';
@@ -627,6 +642,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unexpectedError => 'An unexpected error occurred';
+
+  @override
+  String get emailRequired => 'Email is required';
+
+  @override
+  String get invalidEmail => 'Please enter a valid email address';
+
+  @override
+  String get validEmailHint => 'A valid email address (e.g. name@example.com)';
 
   @override
   String get selectAllergen => 'Select Allergen';

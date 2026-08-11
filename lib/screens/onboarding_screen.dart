@@ -492,27 +492,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 else
                   const SizedBox(height: 32),
                 const SizedBox(height: 4),
-                // FittedBox + maxLines:1 keeps every label on a single
-                // line (fixes "Hypertension" wrapping and stranding a
-                // letter on its own line) by shrinking only as much as a
-                // given label actually needs to fit the cell -- shorter
-                // labels like "Diabetes" or "None" stay at the normal
-                // 10sp size instead of everything being shrunk statically.
+                // Allow text wrapping for longer labels like "Mababang Paningin"
+                // while keeping consistent font size across all options
+                // softWrap ensures words wrap at word boundaries, not character boundaries
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      label,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      softWrap: false,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: selected ? colorScheme.primary : colorScheme.onSurface,
-                        fontWeight:
-                        selected ? FontWeight.bold : FontWeight.normal,
-                      ),
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: true,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: selected ? colorScheme.primary : colorScheme.onSurface,
+                      fontWeight:
+                      selected ? FontWeight.bold : FontWeight.normal,
                     ),
                   ),
                 ),

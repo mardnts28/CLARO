@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';
 
@@ -16,10 +17,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _emailSent = false;
 
   Future<void> _handlePasswordReset() async {
+    final loc = AppLocalizations.of(context)!;
     final email = _emailController.text.trim();
 
     // Validate email
-    final emailError = ValidationService.validateEmail(email);
+    final emailError = ValidationService.validateEmail(email, loc);
     if (emailError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(emailError)),
@@ -38,8 +40,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     } else {
       setState(() => _emailSent = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password reset email sent! Check your inbox.'),
+        SnackBar(
+          content: Text(loc.emailSent),
           backgroundColor: Colors.green,
         ),
       );

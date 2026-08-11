@@ -518,7 +518,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (dialogContext) {
         final TextEditingController deleteController = TextEditingController();
-        
+
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
@@ -641,28 +641,67 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           });
 
                           final error = await _authService.deleteAccount();
-                          
-                          deleteController.dispose();
-                          
-                          if (mounted) {
+
+                          if (!mounted) return;
+
+                          if (error != null) {
+                            // Deletion failed: just close the dialog and
+                            // surface the error via a snackbar. Nothing
+                            // else on the widget tree is torn down here,
+                            // so the plain pop + post-frame snackbar is
+                            // fine as before.
+                            deleteController.dispose();
                             Navigator.of(dialogContext).pop();
-                            
-                            // Use post-frame callback to ensure dialog is fully closed before navigating
+
                             WidgetsBinding.instance.addPostFrameCallback((_) {
                               if (mounted) {
-                                if (error != null) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(error),
-                                      backgroundColor: deleteColor,
-                                    ),
-                                  );
-                                } else {
-                                  Navigator.pushReplacementNamed(context, '/');
-                                }
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(error),
+                                    backgroundColor: deleteColor,
+                                  ),
+                                );
                               }
                             });
+                            return;
                           }
+
+                          // Success path: dismiss the dialog AND redirect
+                          // to Login in a single atomic Navigator
+                          // transaction instead of popping the dialog and
+                          // separately pushing a replacement afterward.
+                          //
+                          // Doing those as two separate operations raced
+                          // the dialog route's pop/exit transition against
+                          // the teardown of HomeScreen's much larger
+                          // subtree (the IndexedStack tabs — including
+                          // this very ProfileScreen — and everything that
+                          // consumes Theme/MediaQuery/etc. inside it).
+                          // That inconsistent teardown order is what threw
+                          // "Failed assertion: '_dependents.isEmpty'":
+                          // an InheritedElement further up the tree was
+                          // unmounting before a dependent element from the
+                          // still-animating-out dialog route had fully
+                          // detached.
+                          //
+                          // pushNamedAndRemoveUntil on the ROOT navigator
+                          // (the same one showDialog used) removes every
+                          // route on the stack — the dialog's own route
+                          // included — and pushes Login ('/') in one
+                          // atomic step, so there's no in-between frame
+                          // where the dialog is gone but HomeScreen isn't,
+                          // or vice versa.
+                          Navigator.of(context, rootNavigator: true)
+                              .pushNamedAndRemoveUntil('/', (route) => false);
+
+                          // Dispose the controller only after this frame's
+                          // teardown has actually run, so the TextField's
+                          // own dispose() (which calls removeListener on
+                          // it) always runs before the controller itself
+                          // is freed.
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            deleteController.dispose();
+                          });
                         },
                   child: Text(
                     isDeleting ? 'Deleting...' : 'Confirm',

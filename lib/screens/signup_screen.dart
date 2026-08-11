@@ -79,10 +79,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
   // ---- Live requirements panel definitions ----
 
-  final List<_Requirement> _emailRequirements = [
-    _Requirement('A valid email address (e.g. name@example.com)',
-            (v) => ValidationService.validateEmail(v.trim().toLowerCase()) == null),
-  ];
+  List<_Requirement> get _emailRequirements {
+    final loc = AppLocalizations.of(context)!;
+    return [
+      _Requirement(loc.validEmailHint,
+              (v) => ValidationService.validateEmail(v.trim().toLowerCase(), loc) == null),
+    ];
+  }
 
   final List<_Requirement> _passwordRequirements = [
     _Requirement('At least 8 characters', (v) => v.length >= 8),
@@ -164,28 +167,31 @@ class _SignupScreenState extends State<SignupScreen> {
   String get _rawConfirmPassword => _confirmPasswordController.text;
 
   bool _validateEmail({bool showIfEmpty = true}) {
+    final loc = AppLocalizations.of(context)!;
     final email = _cleanEmail;
     if (email.isEmpty && !showIfEmpty) {
       setState(() => _emailError = null);
       return false;
     }
-    final error = ValidationService.validateEmail(email);
+    final error = ValidationService.validateEmail(email, loc);
     setState(() => _emailError = error);
     return error == null;
   }
 
   bool _validatePassword({bool showIfEmpty = true}) {
+    final loc = AppLocalizations.of(context)!;
     final password = _rawPassword;
     if (password.isEmpty && !showIfEmpty) {
       setState(() => _passwordError = null);
       return false;
     }
-    final error = ValidationService.validatePassword(password);
+    final error = ValidationService.validatePassword(password, loc);
     setState(() => _passwordError = error);
     return error == null;
   }
 
   bool _validateConfirmPassword({bool showIfEmpty = true}) {
+    final loc = AppLocalizations.of(context)!;
     final confirm = _rawConfirmPassword;
     if (confirm.isEmpty && !showIfEmpty) {
       setState(() => _confirmPasswordError = null);
@@ -194,6 +200,7 @@ class _SignupScreenState extends State<SignupScreen> {
     final error = ValidationService.validatePasswordMatch(
       _rawPassword,
       confirm,
+      loc,
     );
     setState(() => _confirmPasswordError = error);
     return error == null;

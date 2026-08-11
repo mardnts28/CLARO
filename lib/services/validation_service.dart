@@ -1,8 +1,10 @@
+import '../generated/l10n/app_localizations.dart';
+
 class ValidationService {
   /// Validates email format
-  static String? validateEmail(String email) {
+  static String? validateEmail(String email, AppLocalizations loc) {
     if (email.isEmpty) {
-      return 'Email is required';
+      return loc.emailRequired;
     }
     
     final emailRegex = RegExp(
@@ -10,56 +12,56 @@ class ValidationService {
     );
     
     if (!emailRegex.hasMatch(email)) {
-      return 'Please enter a valid email address';
+      return loc.invalidEmail;
     }
     
     return null;
   }
 
   /// Validates password strength
-  static String? validatePassword(String password) {
+  static String? validatePassword(String password, AppLocalizations loc) {
     if (password.isEmpty) {
-      return 'Password is required';
+      return loc.passwordRequired;
     }
     
     if (password.length < 8) {
-      return 'Password must be at least 8 characters long';
+      return loc.errorPasswordTooShort;
     }
     
     if (!RegExp(r'[A-Z]').hasMatch(password)) {
-      return 'Password must contain at least one uppercase letter';
+      return loc.errorPasswordUppercase;
     }
     
     if (!RegExp(r'[a-z]').hasMatch(password)) {
-      return 'Password must contain at least one lowercase letter';
+      return loc.errorPasswordLowercase;
     }
     
     if (!RegExp(r'[0-9]').hasMatch(password)) {
-      return 'Password must contain at least one number';
+      return loc.errorPasswordNumber;
     }
     
     if (!RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) {
-      return 'Password must contain at least one special character (!@#\$%^&*(),.?":{}|<>)';
+      return loc.errorPasswordSpecial;
     }
     
     return null;
   }
 
   /// Validates that passwords match
-  static String? validatePasswordMatch(String password, String confirmPassword) {
+  static String? validatePasswordMatch(String password, String confirmPassword, AppLocalizations loc) {
     if (confirmPassword.isEmpty) {
-      return 'Please confirm your password';
+      return loc.errorConfirmPassword;
     }
     
     if (password != confirmPassword) {
-      return 'Passwords do not match';
+      return loc.errorPasswordsNotMatch;
     }
     
     return null;
   }
 
   /// Gets a generic error message for login failures
-  static String getGenericLoginError() {
-    return 'Invalid email or password';
+  static String getGenericLoginError(AppLocalizations loc) {
+    return loc.invalidEmailOrPassword;
   }
 }

@@ -624,7 +624,23 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get errorPasswordTooShort =>
-      'Ang password ay dapat na hindi bababa sa 6 characters';
+      'Ang password ay dapat na hindi bababa sa 8 characters';
+
+  @override
+  String get errorPasswordUppercase =>
+      'Ang password ay dapat maglaman ng kahit isang uppercase letter';
+
+  @override
+  String get errorPasswordLowercase =>
+      'Ang password ay dapat maglaman ng kahit isang lowercase letter';
+
+  @override
+  String get errorPasswordNumber =>
+      'Ang password ay dapat maglaman ng kahit isang numero';
+
+  @override
+  String get errorPasswordSpecial =>
+      'Ang password ay dapat maglaman ng kahit isang special character';
 
   @override
   String get errorNotAuthenticated => 'User not authenticated';
@@ -634,6 +650,16 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get unexpectedError => 'An unexpected error occurred';
+
+  @override
+  String get emailRequired => 'Kinakailangan ang email';
+
+  @override
+  String get invalidEmail => 'Mangyaring maglagay ng valid na email address';
+
+  @override
+  String get validEmailHint =>
+      'Isang valid na email address (hal. pangalan@halimbawa.com)';
 
   @override
   String get selectAllergen => 'Pumili ng Allergen';

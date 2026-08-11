@@ -53,15 +53,12 @@ class _LoginScreenState extends State<LoginScreen> {
     // starts fixing it.
     _emailFocus.addListener(() {
       if (!_emailFocus.hasFocus) {
-        final email = _emailController.text.trim();
-        if (email.isNotEmpty) {
-          setState(() => _emailError = ValidationService.validateEmail(email));
-        }
+        _validateEmail();
       }
     });
     _emailController.addListener(() {
       if (_emailError != null) {
-        setState(() => _emailError = ValidationService.validateEmail(_emailController.text.trim()));
+        _validateEmail();
       }
     });
     _passwordController.addListener(() {
@@ -69,6 +66,15 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _passwordError = null);
       }
     });
+  }
+
+  void _validateEmail() {
+    if (!mounted) return;
+    final loc = AppLocalizations.of(context)!;
+    final email = _emailController.text.trim();
+    if (email.isNotEmpty) {
+      setState(() => _emailError = ValidationService.validateEmail(email, loc));
+    }
   }
 
   @override
@@ -156,7 +162,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     // Validate inline, under each field, instead of a bottom snackbar.
-    final emailError = ValidationService.validateEmail(email);
+    final emailError = ValidationService.validateEmail(email, loc);
     final passwordError = password.isEmpty ? loc.passwordRequired : null;
 
     setState(() {
