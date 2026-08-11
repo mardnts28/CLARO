@@ -325,6 +325,26 @@ export default function ReportDetails() {
           </div>
         </div>
 
+        {/* Additional Back Photos */}
+        {report.additionalBackImageUrls && report.additionalBackImageUrls.length > 0 && (
+          <div className="details-photos">
+            <div className="photo-box additional-photos">
+              <span className="photo-box-label">Additional Back Photos</span>
+              <div className="additional-photos-grid">
+                {report.additionalBackImageUrls.map((url, index) => (
+                  <div key={index} className="additional-photo-item">
+                    <img
+                      src={url}
+                      alt={`Additional back photo ${index + 1}`}
+                      onClick={() => setLightbox(url)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Extracted data review (editable) ─────────────────────── */}
         <div className="extraction-section">
           <h3 className="extraction-section-title">Extracted Product Data</h3>
