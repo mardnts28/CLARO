@@ -4,17 +4,19 @@ import 'forgot_password_screen.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
 import 'otp_verification_screen.dart';
+import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
 
-/// NOTE ON LANGUAGE: this screen intentionally hardcodes every string in
-/// English rather than calling AppLocalizations.of(context) -- it must
-/// NOT follow the app-wide language toggle (Settings > Language), the
-/// same way SignupScreen and OnboardingScreen are hardcoded. Previously
-/// this screen used AppLocalizations for welcomeBack/email/password/etc,
-/// which meant switching the app to Tagalog also flipped the login
-/// screen -- inconsistent with Signup, which was already English-only.
+/// NOTE ON LANGUAGE: this screen now follows the app-wide selected
+/// language (Select Language screen on first launch / Settings >
+/// Language afterwards), same as SignupScreen, BasicInfo, and Health
+/// Profile. It previously hardcoded everything to English -- that was
+/// intentional at the time, but the onboarding flow now asks the user to
+/// choose a language *before* they ever reach this screen, so the login
+/// screen needs to actually honor that choice instead of always showing
+/// English.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -103,6 +105,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _routeAfterAuth() async {
     final onboarded = await _authService.hasCompletedOnboarding();
     if (!mounted) return;
+    // Dismiss the keyboard/field focus before navigating away -- carrying
+    // focus over to the next screen (which may not have a matching text
+    // field under the cursor position) is what caused the
+    // "BOTTOM OVERFLOWED" layout error previously seen when this screen
+    // used to sit right before Get Started.
+    FocusScope.of(context).unfocus();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => onboarded ? const HomeScreen() : const OnboardingScreen(),
@@ -125,6 +133,9 @@ class _LoginScreenState extends State<LoginScreen> {
   void _navigateToOtpScreen() {
     final challenge = AuthService.pendingMfaChallenge.value;
     if (!mounted || challenge == null) return;
+    // Dismiss the keyboard/field focus before navigating away -- see
+    // _routeAfterAuth for why.
+    FocusScope.of(context).unfocus();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => OtpVerificationScreen(
@@ -140,12 +151,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    final loc = AppLocalizations.of(context)!;
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
     // Validate inline, under each field, instead of a bottom snackbar.
     final emailError = ValidationService.validateEmail(email);
-    final passwordError = password.isEmpty ? 'Password is required' : null;
+    final passwordError = password.isEmpty ? loc.passwordRequired : null;
 
     setState(() {
       _emailError = emailError;
@@ -250,6 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Builder(
           builder: (context) {
             final colorScheme = Theme.of(context).colorScheme;
+            final loc = AppLocalizations.of(context)!;
 
             return MediaQuery(
               data: MediaQuery.of(context).copyWith(
@@ -286,12 +299,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 32),
                           Text(
-                            'Welcome back!',
+                            loc.welcomeBack,
                             style: TextStyle(
                                 fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.primary),
                           ),
                           Text(
-                            'Login to continue',
+                            loc.loginToContinue,
                             style: TextStyle(fontSize: 13, color: colorScheme.primary),
                           ),
                           const SizedBox(height: 24),
@@ -305,7 +318,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             context,
                             controller: _emailController,
                             focusNode: _emailFocus,
-                            hint: 'Email',
+                            hint: loc.email,
                             icon: Icons.email_outlined,
                             errorText: _emailError,
                             keyboardType: TextInputType.emailAddress,
@@ -316,7 +329,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             context,
                             controller: _passwordController,
                             focusNode: _passwordFocus,
-                            hint: 'Password',
+                            hint: loc.password,
                             icon: Icons.lock_outline,
                             obscure: !_showPassword,
                             errorText: _passwordError,
@@ -345,7 +358,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 );
                               },
                               child: Text(
-                                'Forgot password?',
+                                loc.forgotPassword,
                                 style: TextStyle(
                                     fontSize: 13,
                                     color: colorScheme.primary,
@@ -371,9 +384,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2),
                               )
-                                  : const Text(
-                                'Login',
-                                style: TextStyle(
+                                  : Text(
+                                loc.login,
+                                style: const TextStyle(
                                     fontSize: 16,
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold),
@@ -389,11 +402,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text("Don't have an account? ",
-                                    style: TextStyle(fontSize: 13)),
+                                Text('${loc.dontHaveAccount} ',
+                                    style: const TextStyle(fontSize: 13)),
                                 GestureDetector(
                                   onTap: () {
                                     HapticService().vibrate();
+                                    // Dismiss keyboard/focus before leaving
+                                    // this screen (see _routeAfterAuth).
+                                    FocusScope.of(context).unfocus();
                                     Navigator.pushReplacement(
                                       context,
                                       MaterialPageRoute(
@@ -401,7 +417,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     );
                                   },
                                   child: Text(
-                                    'Sign up',
+                                    loc.signUp,
                                     style: TextStyle(
                                         fontSize: 13,
                                         color: colorScheme.primary,
@@ -509,12 +525,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildDivider(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
     return Row(
       children: [
         Expanded(child: Divider(color: colorScheme.outlineVariant)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text('or continue with',
+          child: Text(loc.orContinueWith,
               style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
         ),
         Expanded(child: Divider(color: colorScheme.outlineVariant)),
@@ -524,6 +541,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildGoogleButton(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
     return SizedBox(
       width: double.infinity,
       height: 48,
@@ -535,7 +553,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         icon: Image.asset('assets/images/google.png', height: 20),
         label: Text(
-          'Continue with Google',
+          loc.continueWithGoogle,
           style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
         ),
         onPressed: _isLoading ? null : _handleGoogleSignIn,

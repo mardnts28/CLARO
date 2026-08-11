@@ -586,6 +586,7 @@ class AuthService {
   Future<void> saveOnboardingData({
     required String name,
     required String age,
+    DateTime? dateOfBirth,
     required List<String> conditions,
     required List<String> allergens,
   }) async {
@@ -609,6 +610,12 @@ class AuthService {
     }
     if (!userDoc.exists || docData == null || !docData.containsKey('age')) {
       data['age'] = age;
+    }
+    // Store dateOfBirth as Firestore Timestamp if provided
+    if (dateOfBirth != null) {
+      if (!userDoc.exists || docData == null || !docData.containsKey('dateOfBirth')) {
+        data['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
+      }
     }
 
     await _firebaseDb.collection('users').doc(uid).set(data, SetOptions(merge: true));

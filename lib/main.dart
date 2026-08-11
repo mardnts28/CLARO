@@ -8,6 +8,7 @@ import 'firebase_options.dart';
 import 'generated/l10n/app_localizations.dart';
 import 'services/theme_service.dart';
 import 'services/locale_service.dart';
+import 'services/get_started_service.dart';
 import 'services/auth_service.dart';
 import 'services/haptic_service.dart';
 import 'services/text_size_service.dart';
@@ -16,6 +17,8 @@ import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/otp_verification_screen.dart';
+import 'screens/select_language_screen.dart';
+import 'screens/get_started_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,6 +58,7 @@ void main() async {
 
   await initializeThemeMode();
   await LocaleService.initializeLocale();
+  await GetStartedService.initialize();
   await HapticService().init();
   await TextSizeService.initialize();
   await VoiceAssistantService.initialize();
@@ -97,7 +101,7 @@ class ClaroApp extends StatelessWidget {
                       ),
                     );
                   },
-                  home: const AuthGate(),
+                  home: const RootGate(),
                 );
               },
             );
@@ -171,9 +175,47 @@ class _VoiceInteractionStopperState extends State<_VoiceInteractionStopper> {
   }
 }
 
+/// App entry point. Routes, in order:
+/// 1. Language not yet explicitly selected → SelectLanguageScreen
+/// 2. Get Started not yet seen → GetStartedScreen
+/// 3. Otherwise → AuthGate (Login/Sign Up → onboarding → Home, as below)
+///
+/// This produces the chronological flow: Select Language → Get Started →
+/// Login/Sign Up → Basic Information → Health Profile → Home/Dashboard.
+///
+/// Steps 1 and 2 are each shown once per device (persisted via
+/// LocaleService.hasSelectedLanguageNotifier and
+/// GetStartedService.hasSeenGetStartedNotifier) -- reopening the app, or
+/// logging out and back in, does not show them again.
+class RootGate extends StatelessWidget {
+  const RootGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: LocaleService.hasSelectedLanguageNotifier,
+      builder: (context, hasSelectedLanguage, _) {
+        if (!hasSelectedLanguage) {
+          return const SelectLanguageScreen();
+        }
+        return ValueListenableBuilder<bool>(
+          valueListenable: GetStartedService.hasSeenGetStartedNotifier,
+          builder: (context, hasSeenGetStarted, _) {
+            if (!hasSeenGetStarted) {
+              return const GetStartedScreen();
+            }
+            return const AuthGate();
+          },
+        );
+      },
+    );
+  }
+}
+
 /// Routes users based on authentication state:
 /// - Not logged in → LoginScreen
-/// - Logged in but onboarding incomplete → OnboardingScreen
+/// - Logged in but onboarding incomplete → OnboardingScreen (Basic
+///   Information → Health Profile)
 /// - Logged in and onboarded → HomeScreen
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});

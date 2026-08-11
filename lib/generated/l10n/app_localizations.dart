@@ -278,6 +278,42 @@ abstract class AppLocalizations {
   /// **'With CLARO, it’s easier to read labels and choose healthier options.'**
   String get labelIntroSubtitle;
 
+  /// No description provided for @learnMoreTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'LEARN MORE'**
+  String get learnMoreTitle;
+
+  /// No description provided for @learnMoreSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trusted guides to help you understand nutrition better.'**
+  String get learnMoreSubtitle;
+
+  /// No description provided for @fdaCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to Read Nutrition Labels'**
+  String get fdaCardTitle;
+
+  /// No description provided for @fdaCardSource.
+  ///
+  /// In en, this message translates to:
+  /// **'by FDA'**
+  String get fdaCardSource;
+
+  /// No description provided for @whoCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Nutrient Limit Guidelines'**
+  String get whoCardTitle;
+
+  /// No description provided for @whoCardSource.
+  ///
+  /// In en, this message translates to:
+  /// **'by WHO'**
+  String get whoCardSource;
+
   /// No description provided for @healthGradeTitle.
   ///
   /// In en, this message translates to:
@@ -572,6 +608,36 @@ abstract class AppLocalizations {
   /// **'About CLARO'**
   String get aboutClaro;
 
+  /// No description provided for @privacyPolicy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy Policy'**
+  String get privacyPolicy;
+
+  /// No description provided for @termsConditions.
+  ///
+  /// In en, this message translates to:
+  /// **'Terms & Conditions'**
+  String get termsConditions;
+
+  /// No description provided for @userGuide.
+  ///
+  /// In en, this message translates to:
+  /// **'User Guide'**
+  String get userGuide;
+
+  /// No description provided for @productName.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Name'**
+  String get productName;
+
+  /// No description provided for @category.
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get category;
+
   /// No description provided for @logout.
   ///
   /// In en, this message translates to:
@@ -722,6 +788,24 @@ abstract class AppLocalizations {
   /// **'Already have an account?'**
   String get alreadyHaveAccount;
 
+  /// No description provided for @accountCreatedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account created'**
+  String get accountCreatedTitle;
+
+  /// No description provided for @accountCreatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account has been created successfully.'**
+  String get accountCreatedMessage;
+
+  /// No description provided for @okayButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Okay'**
+  String get okayButton;
+
   /// No description provided for @resetPassword.
   ///
   /// In en, this message translates to:
@@ -854,6 +938,24 @@ abstract class AppLocalizations {
   /// **'Please enter your name.'**
   String get onboardingNameEmpty;
 
+  /// No description provided for @onboardingBasicInfoIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your information to use the app'**
+  String get onboardingBasicInfoIntro;
+
+  /// No description provided for @onboardingAgeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your age.'**
+  String get onboardingAgeEmpty;
+
+  /// No description provided for @nextButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get nextButton;
+
   /// No description provided for @onboardingHeadline.
   ///
   /// In en, this message translates to:
@@ -895,6 +997,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Get started'**
   String get getStarted;
+
+  /// No description provided for @getStartedTagline.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear. Local. Trusted.'**
+  String get getStartedTagline;
+
+  /// No description provided for @getStartedSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your AI helper for healthier shopping.'**
+  String get getStartedSubtitle;
 
   /// No description provided for @onboardingInstructions.
   ///
@@ -2012,6 +2126,36 @@ abstract class AppLocalizations {
   /// **'Product Name'**
   String get reportProductName;
 
+  /// No description provided for @reportAdditionalBackPhotos.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional Back Photos (Optional)'**
+  String get reportAdditionalBackPhotos;
+
+  /// No description provided for @reportAdditionalBackPhotosHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add more photos of the back label if needed (ingredients, nutrition facts, etc.)'**
+  String get reportAdditionalBackPhotosHint;
+
+  /// No description provided for @reportAddAnotherBackPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Another Back Photo'**
+  String get reportAddAnotherBackPhoto;
+
+  /// No description provided for @reportProductNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Kindly state the brand, name, and flavor (eg. Purefoods Corned Beef).'**
+  String get reportProductNameHint;
+
+  /// No description provided for @reportProductNameFieldHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter product name'**
+  String get reportProductNameFieldHint;
+
   /// No description provided for @reportProductDescription.
   ///
   /// In en, this message translates to:
@@ -2053,6 +2197,96 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Go back to Home'**
   String get reportGoHome;
+
+  /// No description provided for @dateOfBirth.
+  ///
+  /// In en, this message translates to:
+  /// **'Date of Birth'**
+  String get dateOfBirth;
+
+  /// No description provided for @january.
+  ///
+  /// In en, this message translates to:
+  /// **'January'**
+  String get january;
+
+  /// No description provided for @february.
+  ///
+  /// In en, this message translates to:
+  /// **'February'**
+  String get february;
+
+  /// No description provided for @march.
+  ///
+  /// In en, this message translates to:
+  /// **'March'**
+  String get march;
+
+  /// No description provided for @april.
+  ///
+  /// In en, this message translates to:
+  /// **'April'**
+  String get april;
+
+  /// No description provided for @may.
+  ///
+  /// In en, this message translates to:
+  /// **'May'**
+  String get may;
+
+  /// No description provided for @june.
+  ///
+  /// In en, this message translates to:
+  /// **'June'**
+  String get june;
+
+  /// No description provided for @july.
+  ///
+  /// In en, this message translates to:
+  /// **'July'**
+  String get july;
+
+  /// No description provided for @august.
+  ///
+  /// In en, this message translates to:
+  /// **'August'**
+  String get august;
+
+  /// No description provided for @september.
+  ///
+  /// In en, this message translates to:
+  /// **'September'**
+  String get september;
+
+  /// No description provided for @october.
+  ///
+  /// In en, this message translates to:
+  /// **'October'**
+  String get october;
+
+  /// No description provided for @november.
+  ///
+  /// In en, this message translates to:
+  /// **'November'**
+  String get november;
+
+  /// No description provided for @december.
+  ///
+  /// In en, this message translates to:
+  /// **'December'**
+  String get december;
+
+  /// No description provided for @invalidDateOfBirth.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select a valid date of birth'**
+  String get invalidDateOfBirth;
+
+  /// No description provided for @under18Error.
+  ///
+  /// In en, this message translates to:
+  /// **'You must be at least 18 years old to use this app'**
+  String get under18Error;
 }
 
 class _AppLocalizationsDelegate

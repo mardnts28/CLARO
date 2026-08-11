@@ -9,13 +9,26 @@ class LocaleService {
 
   static final ValueNotifier<Locale> localeNotifier = ValueNotifier(const Locale('en'));
 
+  // Tracks whether the user has ever *explicitly* chosen a language --
+  // either on the first-launch Select Language screen or later from
+  // Profile/Settings. This is intentionally separate from `localeNotifier`
+  // itself: `localeNotifier` always has a value (it falls back to the
+  // system locale when nothing has been chosen yet), so it can't be used
+  // on its own to decide whether the Select Language screen should be
+  // shown. `hasSelectedLanguageNotifier` is what the app's root routing
+  // checks for that.
+  static final ValueNotifier<bool> hasSelectedLanguageNotifier = ValueNotifier(false);
+
   static const _prefKey = 'app_locale';
+  static const _languageSelectedPrefKey = 'language_selected';
 
   static Future<void> setAppLocale(String languageCode) async {
     final locale = Locale(languageCode);
     localeNotifier.value = locale;
+    hasSelectedLanguageNotifier.value = true;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefKey, languageCode);
+    await prefs.setBool(_languageSelectedPrefKey, true);
   }
 
   static Future<void> initializeLocale({AuthService? authService}) async {
@@ -24,18 +37,28 @@ class LocaleService {
       final aSvc = authService ?? AuthService();
       final uid = aSvc.currentUser?.uid;
       String? code;
+      bool explicitlySelected = false;
+
       if (uid != null) {
         try {
           final doc = await aSvc.db.collection('users').doc(uid).get();
           final data = doc.data();
           if (data != null && data['language'] != null) {
             code = (data['language'] as String);
+            // An account that already has a saved language preference
+            // (e.g. an existing user, or one who picked a language on
+            // another device) has effectively already made this choice.
+            explicitlySelected = true;
           }
         } catch (_) {}
       }
 
+      final prefs = await SharedPreferences.getInstance();
+      if (!explicitlySelected) {
+        explicitlySelected = prefs.getBool(_languageSelectedPrefKey) ?? false;
+      }
+
       if (code == null) {
-        final prefs = await SharedPreferences.getInstance();
         code = prefs.getString(_prefKey);
       }
 
@@ -45,6 +68,7 @@ class LocaleService {
       }
 
       localeNotifier.value = Locale(code);
+      hasSelectedLanguageNotifier.value = explicitlySelected;
     } catch (e) {
       // fallback to English
       localeNotifier.value = const Locale('en');

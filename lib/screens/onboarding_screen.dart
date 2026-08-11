@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/voice_assistant_service.dart';
+import '../widgets/date_of_birth_picker.dart';
 import 'home_screen.dart';
 
-/// NOTE ON LANGUAGE: this screen intentionally hardcodes every string in
-/// English rather than calling AppLocalizations.of(context) -- it must
-/// NOT follow the app-wide language toggle (Settings > Language), the
-/// same way LoginScreen and SignupScreen are hardcoded.
+/// NOTE ON LANGUAGE: this screen's user-facing text now follows the
+/// app-wide selected language (see LoginScreen's header comment for
+/// background on why this changed for the auth/onboarding screens).
+///
+/// NOTE ON FLOW: this screen used to be a 3-page PageView (Basic Info →
+/// Get Started → Health Profile) shown after login. "Get Started" has
+/// since moved to its own standalone screen (GetStartedScreen) earlier
+/// in the flow -- right after language selection and before Login/Sign
+/// Up -- so this is now a 2-page flow: Basic Info → Health Profile.
 ///
 /// IMPORTANT: the keys in _conditions / _allergens (e.g. 'Diabetes',
 /// 'Alta-presyon', 'Isda') are NOT just UI labels -- they are the exact
@@ -17,8 +25,9 @@ import 'home_screen.dart';
 /// .dart). Renaming these keys would silently break condition/allergen
 /// matching for any user who already completed onboarding under the old
 /// keys. So those internal keys are left untouched; only the on-screen
-/// text was translated, via the *DisplayEn maps below, which are purely
-/// cosmetic and never written anywhere.
+/// *display* text is localized, via the _conditionDisplay*/
+/// _allergenDisplay* maps below, which are purely cosmetic and never
+/// written anywhere.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -29,7 +38,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   final _nameController = TextEditingController();
-  final _ageController = TextEditingController();
+  DateTime? _selectedDateOfBirth;
   final _authService = AuthService();
   int _currentPage = 0;
   bool _isLoading = false;
@@ -74,38 +83,43 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Mani': 'assets/images/mani.png',
   };
 
-  // Cosmetic-only English display labels for the internal keys above.
-  // These are what actually render on screen; the keys themselves keep
-  // going to Firestore unchanged.
-  final Map<String, String> _conditionDisplayEn = {
-    'Diabetes': 'Diabetes',
-    'Alta-presyon': 'Hypertension',
-    'Sakit sa puso': 'Heart Condition',
-    'Mababang Paningin': 'Low Vision',
-    'Wala': 'None',
+  // Cosmetic-only display labels for the internal keys above, built from
+  // AppLocalizations so they follow the selected language -- the keys
+  // themselves keep going to Firestore unchanged (see class doc above).
+  Map<String, String> _conditionDisplay(AppLocalizations loc) => {
+    'Diabetes': loc.conditionDiabetes,
+    'Alta-presyon': loc.conditionHypertension,
+    'Sakit sa puso': loc.conditionHeartCondition,
+    'Mababang Paningin': loc.conditionLowVision,
+    'Wala': loc.conditionNone,
   };
 
-  final Map<String, String> _allergenDisplayEn = {
-    'Isda': 'Fish',
-    'Gatas': 'Milk',
-    'Itlog': 'Egg',
-    'Soya': 'Soy',
-    'Trigo': 'Wheat',
-    'Lamang-Dagat': 'Shellfish',
-    'Mani': 'Peanut',
+  Map<String, String> _allergenDisplay(AppLocalizations loc) => {
+    'Isda': loc.allergenFish,
+    'Gatas': loc.allergenMilk,
+    'Itlog': loc.allergenEggs,
+    'Soya': loc.allergenSoy,
+    'Trigo': loc.allergenWheat,
+    'Lamang-Dagat': loc.allergenShellfish,
+    'Mani': loc.allergenPeanuts,
   };
 
   @override
   void dispose() {
     _nameController.dispose();
-    _ageController.dispose();
     _pageController.dispose();
     super.dispose();
   }
 
   Future<void> _nextPage() async {
     HapticService().vibrate();
-    if (_currentPage < 2) {
+    final loc = AppLocalizations.of(context)!;
+    if (_currentPage < 1) {
+      // Dismiss keyboard/focus before moving to the next page -- Basic
+      // Info has text fields but Health Profile doesn't, so carrying
+      // focus over serves no purpose and risks the same kind of overflow
+      // issue fixed on the Login → Get Started transition.
+      FocusScope.of(context).unfocus();
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -114,18 +128,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // Validate name
       if (_nameController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter your name.')),
+          SnackBar(content: Text(loc.onboardingNameEmpty)),
         );
         return;
       }
 
-      // Validate age
-      if (_ageController.text.trim().isEmpty) {
+      // Validate date of birth
+      if (_selectedDateOfBirth == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter your age.')),
+          SnackBar(content: Text(loc.invalidDateOfBirth)),
         );
         return;
       }
+
+      // Calculate age from DOB
+      final now = DateTime.now();
+      int age = now.year - _selectedDateOfBirth!.year;
+      // Adjust if birthday hasn't occurred yet this year
+      if (now.month < _selectedDateOfBirth!.month ||
+          (now.month == _selectedDateOfBirth!.month && now.day < _selectedDateOfBirth!.day)) {
+        age--;
+      }
+      final ageString = age.toString();
 
       setState(() => _isLoading = true);
 
@@ -142,7 +166,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       try {
         await _authService.saveOnboardingData(
           name: _nameController.text.trim(),
-          age: _ageController.text.trim(),
+          age: ageString,
+          dateOfBirth: _selectedDateOfBirth,
           conditions: selectedConditions,
           allergens: selectedAllergens,
         );
@@ -151,6 +176,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           await VoiceAssistantService.instance.updateEnabled(true);
         }
 
+        if (!mounted) return;
+        FocusScope.of(context).unfocus();
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -211,6 +238,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Builder(
         builder: (context) {
           final theme = Theme.of(context);
+          final loc = AppLocalizations.of(context)!;
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(
               textScaler: TextScaler.noScaling,
@@ -223,9 +251,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   physics: const NeverScrollableScrollPhysics(),
                   onPageChanged: (i) => setState(() => _currentPage = i),
                   children: [
-                    _buildPage1(theme),
-                    _buildPage2(theme),
-                    _buildPage3(theme),
+                    _buildPage1(theme, loc),
+                    _buildPage2(theme, loc),
                   ],
                 ),
               ),
@@ -236,7 +263,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildPage1(ThemeData theme) {
+  Widget _buildPage1(ThemeData theme, AppLocalizations loc) {
     final colorScheme = theme.colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
@@ -246,7 +273,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _buildLogo(theme),
           const SizedBox(height: 32),
           Text(
-            'Please enter your information to use the app',
+            loc.onboardingBasicInfoIntro,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 16, color: colorScheme.onSurface, fontWeight: FontWeight.w500),
           ),
@@ -255,78 +282,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             controller: _nameController,
             style: TextStyle(color: colorScheme.onSurface),
             decoration: InputDecoration(
-              hintText: 'Name',
+              hintText: loc.onboardingNameHint,
               hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
               enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
               focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
             ),
           ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: _ageController,
-            keyboardType: TextInputType.number,
-            style: TextStyle(color: colorScheme.onSurface),
-            decoration: InputDecoration(
-              hintText: 'Age',
-              hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
-              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
-            ),
+          const SizedBox(height: 24),
+          DateOfBirthPicker(
+            initialDate: _selectedDateOfBirth,
+            requireAdult: true,
+            onDateChanged: (date) {
+              setState(() {
+                _selectedDateOfBirth = date;
+              });
+            },
           ),
           const Spacer(),
-          _buildButton('Next', _nextPage, theme),
+          _buildButton(loc.nextButton, _nextPage, theme),
         ],
       ),
     );
   }
 
-  Widget _buildPage2(ThemeData theme) {
-    final colorScheme = theme.colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-      child: Column(
-        children: [
-          const Spacer(),
-          _buildLogo(theme),
-          const SizedBox(height: 20),
-          Text(
-            'Clear. Local. Trusted.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Your AI helper for healthier shopping.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: colorScheme.onSurface, height: 1.5),
-          ),
-          const SizedBox(height: 36),
-          GridView.count(
-            crossAxisCount: 2,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: 1.4,
-            children: [
-              _buildFeatureCard('assets/images/scan.png', 'Scan Product', theme),
-              _buildFeatureCard('assets/images/nutrisyon.png', 'Product Nutrition', theme),
-              _buildFeatureCard('assets/images/gabay.png', 'Health Guidance', theme),
-              _buildFeatureCard('assets/images/compare.png', 'Product Comparison', theme),
-            ],
-          ),
-          const Spacer(),
-          _buildButton('Get Started', _nextPage, theme),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPage3(ThemeData theme) {
+  Widget _buildPage2(ThemeData theme, AppLocalizations loc) {
     final colorScheme = theme.colorScheme;
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
@@ -336,26 +315,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           _buildLogo(theme),
           const SizedBox(height: 12),
           Text(
-            'Answer the following for safer and more personalized recommendations for you',
+            loc.onboardingInstructions,
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: colorScheme.onSurface, height: 1.5),
           ),
           const SizedBox(height: 20),
           _buildSelectionCard(
             icon: Icons.favorite_border,
-            title: 'Do you have any health conditions?',
-            subtitle: 'Choose all that apply to you',
-            note: 'You can change this later in your profile settings.',
+            title: loc.conditionsQuestion,
+            subtitle: loc.chooseAllThatApply,
+            note: loc.profileChangeNote,
             noteIcon: Icons.info_outline,
-            child: _buildConditionsGrid(theme),
+            child: _buildConditionsGrid(theme, loc),
           ),
           const SizedBox(height: 16),
           _buildSelectionCard(
             icon: Icons.warning_amber_rounded,
             iconColor: const Color(0xFFB45309),
-            title: 'Are there any allergens you should avoid?',
-            subtitle: 'Choose all that apply to you',
-            child: _buildAllergensGrid(theme),
+            title: loc.allergensQuestion,
+            subtitle: loc.chooseAllThatApply,
+            child: _buildAllergensGrid(theme, loc),
           ),
           const SizedBox(height: 16),
           Container(
@@ -375,12 +354,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'We prioritize your safety',
+                        loc.safetyPriorityTitle,
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.primary),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'We will use this information to provide health insights and safer recommendations.',
+                        loc.safetyPriorityMessage,
                         style: TextStyle(fontSize: 12, color: colorScheme.onSurface, height: 1.4),
                       ),
                     ],
@@ -390,7 +369,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildButton('Get Started', _nextPage, theme),
+          _buildButton(loc.getStarted, _nextPage, theme, checkValidation: true),
           const SizedBox(height: 12),
           Center(
             child: Text(
@@ -406,7 +385,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildConditionsGrid(ThemeData theme) {
+  Widget _buildConditionsGrid(ThemeData theme, AppLocalizations loc) {
+    final display = _conditionDisplay(loc);
     final keys = _conditions.keys.toList();
     return GridView.count(
       crossAxisCount: 4,
@@ -421,7 +401,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return GestureDetector(
           onTap: () => _toggleCondition(key),
           child: _buildToggleItem(
-            label: _conditionDisplayEn[key] ?? key,
+            label: display[key] ?? key,
             selected: selected,
             isWala: isWala,
             imagePath: isWala ? null : _conditionIcons[key],
@@ -432,7 +412,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildAllergensGrid(ThemeData theme) {
+  Widget _buildAllergensGrid(ThemeData theme, AppLocalizations loc) {
+    final display = _allergenDisplay(loc);
     final keys = _allergens.keys.toList();
     return GridView.count(
       crossAxisCount: 4,
@@ -446,7 +427,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return GestureDetector(
           onTap: () => _toggleAllergen(key),
           child: _buildToggleItem(
-            label: _allergenDisplayEn[key] ?? key,
+            label: display[key] ?? key,
             selected: selected,
             imagePath: _allergenIcons[key],
             theme: theme,
@@ -495,14 +476,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 else
                   const SizedBox(height: 32),
                 const SizedBox(height: 4),
-                Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: selected ? colorScheme.primary : colorScheme.onSurface,
-                    fontWeight:
-                    selected ? FontWeight.bold : FontWeight.normal,
+                // FittedBox + maxLines:1 keeps every label on a single
+                // line (fixes "Hypertension" wrapping and stranding a
+                // letter on its own line) by shrinking only as much as a
+                // given label actually needs to fit the cell -- shorter
+                // labels like "Diabetes" or "None" stay at the normal
+                // 10sp size instead of everything being shrunk statically.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: selected ? colorScheme.primary : colorScheme.onSurface,
+                        fontWeight:
+                        selected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -585,36 +580,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildFeatureCard(String imagePath, String label, ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            imagePath,
-            height: 36,
-            width: 36,
-            errorBuilder: (_, __, ___) => const Icon(
-                Icons.image_not_supported,
-                size: 36,
-                color: Colors.grey),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildLogo(ThemeData theme) {
     return Column(
       children: [
@@ -633,19 +598,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildButton(String label, VoidCallback onTap, ThemeData theme) {
+  bool _isFormValid() {
+    // At least one health condition must be selected
+    final hasCondition = _conditions.values.any((selected) => selected);
+    return hasCondition;
+  }
+
+  Widget _buildButton(String label, VoidCallback onTap, ThemeData theme, {bool checkValidation = false}) {
     final colorScheme = theme.colorScheme;
+    final isButtonEnabled = checkValidation ? (_isFormValid() && !_isLoading) : !_isLoading;
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
+          backgroundColor: isButtonEnabled ? colorScheme.primary : colorScheme.outlineVariant,
+          foregroundColor: isButtonEnabled ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8)),
         ),
-        onPressed: _isLoading ? null : onTap,
+        onPressed: isButtonEnabled ? onTap : null,
         child: _isLoading
             ? SizedBox(
           height: 20,

@@ -9,6 +9,8 @@ import '../generated/l10n/app_localizations.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../services/auth_service.dart';
+import '../services/haptic_service.dart';
+import '../services/home_tab_controller.dart';
 import '../models/report_model.dart';
 import '../data/services/backend_locator.dart';
 
@@ -416,6 +418,7 @@ class _UnknownProductSubmissionScreenState
   // ── Reusable photo block (front or back) ────────────────────────────────
   Widget _photoBlock({
     required ColorScheme colorScheme,
+    required Color primaryColor,
     required String label,
     String? hint,
     required String? imagePath,
@@ -430,7 +433,7 @@ class _UnknownProductSubmissionScreenState
           style: GoogleFonts.outfit(
             fontSize: 16,
             fontWeight: FontWeight.w700,
-            color: colorScheme.primary,
+            color: primaryColor,
           ),
         ),
         if (hint != null) ...[
@@ -445,6 +448,12 @@ class _UnknownProductSubmissionScreenState
           ),
         ],
         const SizedBox(height: 12),
+        // `Expanded` around the button (instead of letting it size to its
+        // unwrapped intrinsic width) is what actually fixes the overflow:
+        // longer labels -- e.g. the Tagalog "Baguhin ang Litrato" /
+        // "Magdagdag ng Litrato" vs. English "Change Photo" / "Add Photo"
+        // -- now wrap and share the remaining row width instead of pushing
+        // past the screen edge ("RIGHT OVERFLOWED BY 34 PIXELS").
         Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -466,21 +475,25 @@ class _UnknownProductSubmissionScreenState
               ),
             ),
             const SizedBox(width: 16),
-            OutlinedButton.icon(
-              onPressed: onPick,
-              icon: Icon(Icons.camera_alt_outlined, size: 18, color: colorScheme.primary),
-              label: Text(
-                buttonLabel,
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.primary,
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onPick,
+                icon: Icon(Icons.camera_alt_outlined, size: 18, color: primaryColor),
+                label: Text(
+                  buttonLabel,
+                  softWrap: true,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: primaryColor,
+                  ),
                 ),
-              ),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colorScheme.primary.withValues(alpha: 0.4)),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: primaryColor.withValues(alpha: 0.4)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  alignment: Alignment.center,
+                ),
               ),
             ),
           ],
@@ -493,6 +506,9 @@ class _UnknownProductSubmissionScreenState
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : colorScheme.primary;
     final loc = AppLocalizations.of(context)!;
     final canSubmit = !_isSubmitting && _backImagePath != null;
 
@@ -508,7 +524,7 @@ class _UnknownProductSubmissionScreenState
                 padding: const EdgeInsets.only(left: 8, top: 8),
                 child: IconButton(
                   icon: Icon(Icons.arrow_back,
-                      color: colorScheme.primary, size: 26),
+                      color: primaryColor, size: 26),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -548,6 +564,7 @@ class _UnknownProductSubmissionScreenState
                     // ── Front Photo section ───────────────────────
                     _photoBlock(
                       colorScheme: colorScheme,
+                      primaryColor: primaryColor,
                       label: loc.reportFrontPhoto,
                       imagePath: _frontImagePath,
                       buttonLabel: _frontImagePath == null
@@ -561,6 +578,7 @@ class _UnknownProductSubmissionScreenState
                     // ── Back Photo section (required) ─────────────
                     _photoBlock(
                       colorScheme: colorScheme,
+                      primaryColor: primaryColor,
                       label: loc.reportBackPhoto,
                       hint: loc.reportBackPhotoHint,
                       imagePath: _backImagePath,
@@ -574,16 +592,16 @@ class _UnknownProductSubmissionScreenState
 
                     // ── Additional Back Photos section (optional) ────
                     Text(
-                      'Additional Back Photos (Optional)',
+                      loc.reportAdditionalBackPhotos,
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: colorScheme.primary,
+                        color: primaryColor,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Add more photos of the back label if needed (ingredients, nutrition facts, etc.)',
+                      loc.reportAdditionalBackPhotosHint,
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         color: colorScheme.onSurfaceVariant,
@@ -643,7 +661,7 @@ class _UnknownProductSubmissionScreenState
                       onPressed: _pickAdditionalBackPhoto,
                       icon: Icon(Icons.add_photo_alternate_outlined, size: 18, color: colorScheme.primary),
                       label: Text(
-                        'Add Another Back Photo',
+                        loc.reportAddAnotherBackPhoto,
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -661,11 +679,11 @@ class _UnknownProductSubmissionScreenState
 
                     // ── Product Name section ─────────────────────
                     Text(
-                      'Product Name',
+                      loc.productName,
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: colorScheme.primary,
+                        color: primaryColor,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -681,12 +699,12 @@ class _UnknownProductSubmissionScreenState
                             horizontal: 12, vertical: 10),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: colorScheme.primary),
+                          borderSide: BorderSide(color: primaryColor),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                           borderSide: BorderSide(
-                              color: colorScheme.primary, width: 1.5),
+                              color: primaryColor, width: 1.5),
                         ),
                         hintText: 'Enter product name',
                         hintStyle: GoogleFonts.inter(
@@ -712,11 +730,11 @@ class _UnknownProductSubmissionScreenState
 
                     // ── Category section ─────────────────────────
                     Text(
-                      'Category',
+                      loc.category,
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: colorScheme.primary,
+                        color: primaryColor,
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -737,7 +755,7 @@ class _UnknownProductSubmissionScreenState
                               setState(() => _selectedCategory = value);
                             }
                           },
-                          activeColor: colorScheme.primary,
+                          activeColor: primaryColor,
                           contentPadding: EdgeInsets.zero,
                         );
                       }).toList(),
@@ -750,24 +768,32 @@ class _UnknownProductSubmissionScreenState
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50, // Pale green for welcoming feel
+                        color: theme.brightness == Brightness.dark
+                            ? colorScheme.surfaceContainerHighest
+                            : Colors.green.shade50,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: Colors.green.shade200,
+                          color: theme.brightness == Brightness.dark
+                              ? colorScheme.outlineVariant
+                              : Colors.green.shade200,
                         ),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Icon(Icons.info_outline,
-                              color: Colors.green.shade700, size: 22),
+                              color: theme.brightness == Brightness.dark
+                                  ? primaryColor
+                                  : Colors.green.shade700, size: 22),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               loc.reportInfoNote,
                               style: GoogleFonts.inter(
                                 fontSize: 13,
-                                color: Colors.green.shade900,
+                                color: theme.brightness == Brightness.dark
+                                    ? colorScheme.onSurface
+                                    : Colors.green.shade900,
                                 height: 1.5,
                               ),
                             ),
@@ -785,10 +811,10 @@ class _UnknownProductSubmissionScreenState
                       child: ElevatedButton(
                         onPressed: canSubmit ? _handleSubmit : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
+                          backgroundColor: primaryColor,
                           foregroundColor: colorScheme.onPrimary,
                           disabledBackgroundColor:
-                              colorScheme.primary.withValues(alpha: 0.4),
+                              primaryColor.withValues(alpha: 0.4),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -835,15 +861,18 @@ class _UnknownProductSubmissionScreenState
     ThemeData theme,
   ) {
     final loc = AppLocalizations.of(context)!;
+    // Active nav item uses a white pill in dark mode so it stands out
+    // against the dark bottom bar background; the icon/text stay in
+    // colorScheme.primary (a saturated red), which reads clearly on white.
     final navPillColor = theme.brightness == Brightness.dark
-        ? colorScheme.primary.withValues(alpha: 0.2)
+        ? Colors.white
         : const Color(0xFFF6CDCD);
 
     final items = [
-      (icon: Icons.home_outlined, label: loc.home, active: false),
-      (icon: Icons.qr_code_scanner, label: loc.scan, active: true),
-      (icon: Icons.history_outlined, label: loc.history, active: false),
-      (icon: Icons.person_outline, label: loc.profile, active: false),
+      (icon: Icons.home_outlined, label: loc.home),
+      (icon: Icons.qr_code_scanner, label: loc.scan),
+      (icon: Icons.history_outlined, label: loc.history),
+      (icon: Icons.person_outline, label: loc.profile),
     ];
 
     return Container(
@@ -862,35 +891,52 @@ class _UnknownProductSubmissionScreenState
         top: false,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: items.map((item) {
+          children: List.generate(items.length, (index) {
+            final item = items[index];
+            // "Scan" stays highlighted here since this screen is reached
+            // from the scan flow (via Product Not Found), matching the
+            // same convention used by Product Not Found's own nav.
+            final isSelected = index == 1;
             return Expanded(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: item.active ? navPillColor : Colors.transparent,
-                  borderRadius: BorderRadius.circular(18),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(item.icon, color: colorScheme.primary, size: 22),
-                    const SizedBox(height: 4),
-                    Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colorScheme.primary,
-                        fontWeight:
-                            item.active ? FontWeight.bold : FontWeight.w500,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  // Reuses the same tab-switch + pop-to-root navigation as
+                  // the other main screens (see HistoryScreen) so bottom
+                  // nav taps actually work from this screen instead of
+                  // being visually present but non-functional.
+                  HapticService().vibrate();
+                  HomeTabController.switchToTab(index);
+                  Navigator.of(context).popUntil((r) => r.isFirst);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isSelected ? navPillColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(item.icon, color: colorScheme.primary, size: 22),
+                      const SizedBox(height: 4),
+                      Text(
+                        item.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.primary,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             );
-          }).toList(),
+          }),
         ),
       ),
     );

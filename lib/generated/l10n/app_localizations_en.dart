@@ -107,6 +107,25 @@ class AppLocalizationsEn extends AppLocalizations {
       'With CLARO, it’s easier to read labels and choose healthier options.';
 
   @override
+  String get learnMoreTitle => 'LEARN MORE';
+
+  @override
+  String get learnMoreSubtitle =>
+      'Trusted guides to help you understand nutrition better.';
+
+  @override
+  String get fdaCardTitle => 'How to Read Nutrition Labels';
+
+  @override
+  String get fdaCardSource => 'by FDA';
+
+  @override
+  String get whoCardTitle => 'Daily Nutrient Limit Guidelines';
+
+  @override
+  String get whoCardSource => 'by WHO';
+
+  @override
   String get healthGradeTitle => 'Food health rating';
 
   @override
@@ -256,6 +275,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutClaro => 'About CLARO';
 
   @override
+  String get privacyPolicy => 'Privacy Policy';
+
+  @override
+  String get termsConditions => 'Terms & Conditions';
+
+  @override
+  String get userGuide => 'User Guide';
+
+  @override
+  String get productName => 'Product Name';
+
+  @override
+  String get category => 'Category';
+
+  @override
   String get logout => 'Logout';
 
   @override
@@ -332,6 +366,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get alreadyHaveAccount => 'Already have an account?';
 
   @override
+  String get accountCreatedTitle => 'Account created';
+
+  @override
+  String get accountCreatedMessage =>
+      'Your account has been created successfully.';
+
+  @override
+  String get okayButton => 'Okay';
+
+  @override
   String get resetPassword => 'Reset password';
 
   @override
@@ -406,6 +450,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get onboardingNameEmpty => 'Please enter your name.';
 
   @override
+  String get onboardingBasicInfoIntro =>
+      'Please enter your information to use the app';
+
+  @override
+  String get onboardingAgeEmpty => 'Please enter your age.';
+
+  @override
+  String get nextButton => 'Next';
+
+  @override
   String get onboardingHeadline => 'Clear. Local. Trusted.';
 
   @override
@@ -425,6 +479,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get getStarted => 'Get started';
+
+  @override
+  String get getStartedTagline => 'Clear. Local. Trusted.';
+
+  @override
+  String get getStartedSubtitle => 'Your AI helper for healthier shopping.';
 
   @override
   String get onboardingInstructions =>
@@ -1021,6 +1081,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get reportProductName => 'Product Name';
 
   @override
+  String get reportAdditionalBackPhotos => 'Additional Back Photos (Optional)';
+
+  @override
+  String get reportAdditionalBackPhotosHint =>
+      'Add more photos of the back label if needed (ingredients, nutrition facts, etc.)';
+
+  @override
+  String get reportAddAnotherBackPhoto => 'Add Another Back Photo';
+
+  @override
+  String get reportProductNameHint =>
+      'Kindly state the brand, name, and flavor (eg. Purefoods Corned Beef).';
+
+  @override
+  String get reportProductNameFieldHint => 'Enter product name';
+
+  @override
   String get reportProductDescription => 'Product Description';
 
   @override
@@ -1042,4 +1119,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportGoHome => 'Go back to Home';
+
+  @override
+  String get dateOfBirth => 'Date of Birth';
+
+  @override
+  String get january => 'January';
+
+  @override
+  String get february => 'February';
+
+  @override
+  String get march => 'March';
+
+  @override
+  String get april => 'April';
+
+  @override
+  String get may => 'May';
+
+  @override
+  String get june => 'June';
+
+  @override
+  String get july => 'July';
+
+  @override
+  String get august => 'August';
+
+  @override
+  String get september => 'September';
+
+  @override
+  String get october => 'October';
+
+  @override
+  String get november => 'November';
+
+  @override
+  String get december => 'December';
+
+  @override
+  String get invalidDateOfBirth => 'Please select a valid date of birth';
+
+  @override
+  String get under18Error =>
+      'You must be at least 18 years old to use this app';
 }

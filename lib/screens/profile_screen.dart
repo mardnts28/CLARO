@@ -173,11 +173,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : colorScheme.primary;
 
     return RefreshIndicator(
-      color: colorScheme.primary,
+      color: primaryColor,
       onRefresh: _onRefresh,
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -362,7 +366,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildMoreSection() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
 
     return Container(
@@ -396,7 +401,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Divider(height: 0, color: colorScheme.outlineVariant),
           _buildMenuItemWithArrow(
             icon: Icons.privacy_tip_outlined,
-            label: 'Privacy Policy',
+            label: loc.privacyPolicy,
             onTap: () {
               HapticService().vibrate();
               _launchUrl(privacyPolicyUrl);
@@ -405,7 +410,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Divider(height: 0, color: colorScheme.outlineVariant),
           _buildMenuItemWithArrow(
             icon: Icons.description_outlined,
-            label: 'Terms & Conditions',
+            label: loc.termsConditions,
             onTap: () {
               HapticService().vibrate();
               _launchUrl(termsConditionsUrl);
@@ -414,7 +419,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Divider(height: 0, color: colorScheme.outlineVariant),
           _buildMenuItemWithArrow(
             icon: Icons.menu_book_outlined,
-            label: 'User Guide',
+            label: loc.userGuide,
             onTap: () {
               HapticService().vibrate();
               _launchUrl(userGuideUrl);
@@ -434,7 +439,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Delete Account',
                   style: TextStyle(
                     fontSize: 15,
-                    color: Colors.red,
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.red
+                        : const Color(0xFF8B1A1A),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -458,7 +465,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   loc.logout,
                   style: TextStyle(
                     fontSize: 15,
-                    color: colorScheme.primary,
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.red
+                        : colorScheme.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -497,7 +506,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showDeleteAccountDialog() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final deleteColor = theme.brightness == Brightness.dark
+        ? colorScheme.primary
+        : const Color(0xFF8B1A1A);
     String? errorMessage;
     bool isDeleting = false;
 
@@ -511,13 +524,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return AlertDialog(
               backgroundColor: colorScheme.surface,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Text(
-                'Delete Account?',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.warning_rounded,
+                    color: deleteColor,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Delete Account?',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: deleteColor,
+                      ),
+                    ),
+                  ),
+                ],
               ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -537,7 +562,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: colorScheme.onSurface,
+                      color: deleteColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -562,16 +587,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                        borderSide: BorderSide(color: deleteColor, width: 2),
                       ),
                       errorText: errorMessage,
+                      errorStyle: TextStyle(
+                        color: deleteColor,
+                      ),
                     ),
                     textCapitalization: TextCapitalization.characters,
                   ),
                   if (isDeleting) ...[
                     const SizedBox(height: 16),
-                    const Center(
-                      child: CircularProgressIndicator(),
+                    Center(
+                      child: CircularProgressIndicator(
+                        color: deleteColor,
+                      ),
                     ),
                   ],
                 ],
@@ -624,7 +654,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(error),
-                                      backgroundColor: Colors.red,
+                                      backgroundColor: deleteColor,
                                     ),
                                   );
                                 } else {
@@ -638,8 +668,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     isDeleting ? 'Deleting...' : 'Confirm',
                     style: TextStyle(
                       color: isDeleting
-                          ? Colors.red.withOpacity(0.5)
-                          : Colors.red,
+                          ? deleteColor.withOpacity(0.5)
+                          : deleteColor,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -658,7 +688,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Widget? trailing,
     required VoidCallback onTap,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : colorScheme.primary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -667,7 +701,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         behavior: HitTestBehavior.opaque,
         child: Row(
           children: [
-            Icon(icon, color: colorScheme.primary, size: 20),
+            Icon(icon, color: primaryColor, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -691,13 +725,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildDarkModeToggle() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : colorScheme.primary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Icon(Icons.dark_mode_outlined, color: colorScheme.primary, size: 20),
+          Icon(Icons.dark_mode_outlined, color: primaryColor, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -715,7 +753,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               await setAppThemeMode(parseThemeMode(theme));
               await _authService.updateUserData({'theme': theme});
             },
-            activeColor: colorScheme.primary,
+            activeColor: primaryColor,
           ),
         ],
       ),
@@ -723,14 +761,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildMfaToggle() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : colorScheme.primary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Icon(Icons.security_outlined, color: colorScheme.primary, size: 20),
+          Icon(Icons.security_outlined, color: primaryColor, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -759,7 +801,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
               }
             },
-            activeColor: colorScheme.primary,
+            activeColor: primaryColor,
           ),
         ],
       ),
@@ -767,14 +809,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildVoiceAssistantToggle() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : colorScheme.primary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          Icon(Icons.mic_outlined, color: colorScheme.primary, size: 20),
+          Icon(Icons.mic_outlined, color: primaryColor, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -803,7 +849,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 }
               }
             },
-            activeColor: colorScheme.primary,
+            activeColor: primaryColor,
           ),
         ],
       ),

@@ -180,9 +180,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildHomeContent() {
     final theme = Theme.of(context);
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : theme.colorScheme.primary;
 
     return RefreshIndicator(
-      color: theme.colorScheme.primary,
+      color: primaryColor,
       onRefresh: _onRefresh,
 
       child: SingleChildScrollView(
@@ -632,6 +635,9 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : theme.colorScheme.primary;
 
     final bodyLarge = theme.textTheme.bodyLarge;
     final bodyMedium = theme.textTheme.bodyMedium;
@@ -675,12 +681,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   radius: 18,
 
                   backgroundColor:
-                      theme.colorScheme.primary.withOpacity(0.12),
+                      primaryColor.withOpacity(0.12),
 
                   child: Icon(
                     icon,
                     size: 18,
-                    color: theme.colorScheme.primary,
+                    color: primaryColor,
                   ),
                 ),
 
@@ -1017,6 +1023,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildProcessCard() {
     final theme = Theme.of(context);
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : theme.colorScheme.primary;
     final loc = AppLocalizations.of(context)!;
 
     final bodyLarge = theme.textTheme.bodyLarge;
@@ -1076,14 +1085,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   radius: 18,
 
                   backgroundColor:
-                      theme.colorScheme.primary
+                      primaryColor
                           .withOpacity(0.12),
 
                   child: Icon(
                     Icons.blender_outlined,
                     size: 18,
                     color:
-                        theme.colorScheme.primary,
+                        primaryColor,
                   ),
                 ),
 
@@ -1278,6 +1287,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildNutritionInformationSection() {
     final theme = Theme.of(context);
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : theme.colorScheme.primary;
+    final loc = AppLocalizations.of(context)!;
 
     return Column(
       crossAxisAlignment:
@@ -1286,10 +1299,10 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         // Section title
         Text(
-          'LEARN MORE',
+          loc.learnMoreTitle,
 
           style: TextStyle(
-            color: theme.colorScheme.primary,
+            color: primaryColor,
             fontSize: 15,
             fontWeight: FontWeight.bold,
             letterSpacing: 0.5,
@@ -1300,7 +1313,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // Very brief introduction
         Text(
-          'Trusted guides to help you understand nutrition better.',
+          loc.learnMoreSubtitle,
 
           style: TextStyle(
             color:
@@ -1323,11 +1336,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 imagePath:
                     'assets/images/fdaimg.png',
 
-                title:
-                    'How to Read Nutrition Labels',
+                title: loc.fdaCardTitle,
 
-                source:
-                    'by FDA',
+                source: loc.fdaCardSource,
 
                 onTap: () {
                   HapticService().vibrate();
@@ -1354,11 +1365,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 imagePath:
                     'assets/images/whoimg.png',
 
-                title:
-                    'Daily Nutrient Limit Guidelines',
+                title: loc.whoCardTitle,
 
-                source:
-                    'by WHO',
+                source: loc.whoCardSource,
 
                 onTap: () {
                   HapticService().vibrate();
@@ -1394,6 +1403,9 @@ class _HomeScreenState extends State<HomeScreen> {
     required VoidCallback onTap,
   }) {
     final theme = Theme.of(context);
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : theme.colorScheme.primary;
 
     return GestureDetector(
       onTap: onTap,
@@ -1520,9 +1532,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontWeight:
                                 FontWeight.w600,
 
-                            color: theme
-                                .colorScheme
-                                .primary,
+                            color: primaryColor,
                           ),
                         ),
                       ],
@@ -1536,9 +1546,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 28,
 
                     decoration: BoxDecoration(
-                      color: theme
-                          .colorScheme
-                          .primary
+                      color: primaryColor
                           .withOpacity(0.10),
 
                       shape: BoxShape.circle,
@@ -1549,9 +1557,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       size: 19,
 
-                      color: theme
-                          .colorScheme
-                          .primary,
+                      color: primaryColor,
                     ),
                   ),
                 ],
@@ -1696,11 +1702,16 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
 
     final colorScheme = theme.colorScheme;
+    final primaryColor = theme.brightness == Brightness.dark
+        ? Colors.red
+        : colorScheme.primary;
 
+    // Active nav item uses a white pill in dark mode so it stands out
+    // against the dark bottom bar background; the icon/text stay in
+    // colorScheme.primary (a saturated red), which reads clearly on white.
     final navPillColor =
         theme.brightness == Brightness.dark
-            ? colorScheme.primary
-                .withOpacity(0.2)
+            ? Colors.grey.withOpacity(0.3)
             : const Color(0xFFF6CDCD);
 
     final items = [
@@ -1827,8 +1838,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               : item.icon,
 
                           color:
-                              colorScheme
-                                  .primary,
+                              primaryColor,
 
                           size: 22,
                         ),
@@ -1844,8 +1854,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             fontSize: 11,
 
                             color:
-                                colorScheme
-                                    .primary,
+                                primaryColor,
 
                             fontWeight:
                                 isSelected

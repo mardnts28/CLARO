@@ -407,8 +407,11 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+    // Active nav item uses a white pill in dark mode so it stands out
+    // against the dark bottom bar background; the icon/text stay in
+    // colorScheme.primary (a saturated red), which reads clearly on white.
     final navPillColor = theme.brightness == Brightness.dark
-        ? colorScheme.primary.withOpacity(0.2)
+        ? Colors.white
         : const Color(0xFFF6CDCD);
 
     final items = [

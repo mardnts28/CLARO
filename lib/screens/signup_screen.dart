@@ -4,9 +4,18 @@ import 'login_screen.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
 import 'otp_verification_screen.dart';
+import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
+
+// NOTE ON LANGUAGE: the headline text, field hints, and primary buttons on
+// this screen now follow the app-wide selected language (see
+// LoginScreen's header comment for background on why this changed). The
+// live password/email "requirements" checklist and the detailed
+// backend-error copy in _friendlyFormError() are intentionally left in
+// English for now -- translating that fine-grained validation microcopy
+// accurately is a separate follow-up, not part of this pass.
 
 /// Strips leading/trailing whitespace and blocks newline / control
 /// characters from ever entering the field in the first place.
@@ -233,21 +242,20 @@ class _SignupScreenState extends State<SignupScreen> {
   /// only proceeds once the user taps "Okay".
   Future<void> _showAccountCreatedDialog() async {
     if (!mounted) return;
+    final loc = AppLocalizations.of(context)!;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
         final colorScheme = Theme.of(context).colorScheme;
         return AlertDialog(
-          title: const Text('Account created'),
-          content: const Text(
-            'Your account has been created successfully.',
-          ),
+          title: Text(loc.accountCreatedTitle),
+          content: Text(loc.accountCreatedMessage),
           actions: [
             TextButton(
               style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Okay'),
+              child: Text(loc.okayButton),
             ),
           ],
         );
@@ -260,6 +268,9 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _routeAfterAuth() async {
     final onboarded = await _authService.hasCompletedOnboarding();
     if (!mounted) return;
+    // Dismiss the keyboard/field focus before navigating away -- see
+    // LoginScreen._routeAfterAuth for why this matters.
+    FocusScope.of(context).unfocus();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => onboarded ? const HomeScreen() : const OnboardingScreen(),
@@ -279,6 +290,7 @@ class _SignupScreenState extends State<SignupScreen> {
   void _navigateToOtpScreen() {
     final challenge = AuthService.pendingMfaChallenge.value;
     if (!mounted || challenge == null) return;
+    FocusScope.of(context).unfocus();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => OtpVerificationScreen(
@@ -329,6 +341,11 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() => _isLoading = false);
       await _showAccountCreatedDialog();
       if (!mounted) return;
+      // Dismiss the keyboard/field focus before navigating away -- see
+      // LoginScreen._routeAfterAuth for why this matters. Signed-up
+      // users go straight to OnboardingScreen, which now opens on the
+      // Basic Information page.
+      FocusScope.of(context).unfocus();
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
             (route) => false,
@@ -409,6 +426,7 @@ class _SignupScreenState extends State<SignupScreen> {
       child: Builder(
           builder: (context) {
             final colorScheme = Theme.of(context).colorScheme;
+            final loc = AppLocalizations.of(context)!;
 
             return MediaQuery(
               data: MediaQuery.of(context).copyWith(
@@ -445,12 +463,12 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           const SizedBox(height: 32),
                           Text(
-                            'Welcome!',
+                            loc.signUpWelcome,
                             style: TextStyle(
                                 fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.primary),
                           ),
                           Text(
-                            'Sign up to start',
+                            loc.signUpSubtitle,
                             style: TextStyle(fontSize: 13, color: colorScheme.primary),
                           ),
                           const SizedBox(height: 24),
@@ -464,7 +482,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             context,
                             controller: _emailController,
                             focusNode: _emailFocus,
-                            hint: 'Email',
+                            hint: loc.email,
                             icon: Icons.email_outlined,
                             errorText: _emailError,
                             keyboardType: TextInputType.emailAddress,
@@ -481,7 +499,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             context,
                             controller: _passwordController,
                             focusNode: _passwordFocus,
-                            hint: 'Password',
+                            hint: loc.password,
                             icon: Icons.lock_outline,
                             obscure: !_showPassword,
                             errorText: _passwordError,
@@ -507,7 +525,7 @@ class _SignupScreenState extends State<SignupScreen> {
                             context,
                             controller: _confirmPasswordController,
                             focusNode: _confirmPasswordFocus,
-                            hint: 'Confirm Password',
+                            hint: loc.confirmPassword,
                             icon: Icons.lock_outline,
                             obscure: !_showConfirmPassword,
                             errorText: _confirmPasswordError,
@@ -549,9 +567,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                 child: CircularProgressIndicator(
                                     color: Colors.white, strokeWidth: 2),
                               )
-                                  : const Text(
-                                'Sign up',
-                                style: TextStyle(
+                                  : Text(
+                                loc.signUp,
+                                style: const TextStyle(
                                     fontSize: 16,
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold),
@@ -567,11 +585,12 @@ class _SignupScreenState extends State<SignupScreen> {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text('Already have an account? ',
-                                    style: TextStyle(fontSize: 13)),
+                                Text('${loc.alreadyHaveAccount} ',
+                                    style: const TextStyle(fontSize: 13)),
                                 GestureDetector(
                                   onTap: () {
                                     HapticService().vibrate();
+                                    FocusScope.of(context).unfocus();
                                     Navigator.pushReplacement(
                                       context,
                                       MaterialPageRoute(
@@ -579,7 +598,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                     );
                                   },
                                   child: Text(
-                                    'Login',
+                                    loc.login,
                                     style: TextStyle(
                                         fontSize: 13,
                                         color: colorScheme.primary,
@@ -755,12 +774,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildDivider(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
     return Row(
       children: [
         Expanded(child: Divider(color: colorScheme.outlineVariant)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text('or continue with',
+          child: Text(loc.orContinueWith,
               style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
         ),
         Expanded(child: Divider(color: colorScheme.outlineVariant)),
@@ -770,6 +790,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Widget _buildGoogleButton(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
     return SizedBox(
       width: double.infinity,
       height: 48,
@@ -781,7 +802,7 @@ class _SignupScreenState extends State<SignupScreen> {
         ),
         icon: Image.asset('assets/images/google.png', height: 20),
         label: Text(
-          'Continue with Google',
+          loc.continueWithGoogle,
           style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
         ),
         onPressed: _isLoading ? null : _handleGoogleSignIn,

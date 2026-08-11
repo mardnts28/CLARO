@@ -107,6 +107,26 @@ class AppLocalizationsTl extends AppLocalizations {
       'Sa tulong ng CLARO, mas madaling maunawaan ang mga label at pumili ng mas malusog na opsyon.';
 
   @override
+  String get learnMoreTitle => 'MATUTO PA';
+
+  @override
+  String get learnMoreSubtitle =>
+      'Mapagkakatiwalaang gabay para mas maintindihan mo ang nutrisyon.';
+
+  @override
+  String get fdaCardTitle => 'Paano Basahin ang Nutrition Label';
+
+  @override
+  String get fdaCardSource => 'ng FDA';
+
+  @override
+  String get whoCardTitle =>
+      'Gabay sa Pang-araw-araw na Limitasyon ng Sustansya';
+
+  @override
+  String get whoCardSource => 'ng WHO';
+
+  @override
   String get healthGradeTitle => 'Sukat ng kalusugan ng pagkain';
 
   @override
@@ -193,10 +213,10 @@ class AppLocalizationsTl extends AppLocalizations {
       'Makikita mo rito ang iyong history ng pag-scan.';
 
   @override
-  String get welcomeBack => 'Welcome back!';
+  String get welcomeBack => 'Kumusta, ulit!';
 
   @override
-  String get loginToContinue => 'Login to continue';
+  String get loginToContinue => 'Mag-login upang magpatuloy';
 
   @override
   String get email => 'Email';
@@ -255,6 +275,21 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get aboutClaro => 'Tungkol sa CLARO';
+
+  @override
+  String get privacyPolicy => 'Patakaran sa Privacy';
+
+  @override
+  String get termsConditions => 'Mga Tuntunin at Kundisyon';
+
+  @override
+  String get userGuide => 'Gabay sa Gumagamit';
+
+  @override
+  String get productName => 'Pangalan ng Produkto';
+
+  @override
+  String get category => 'Kategorya';
 
   @override
   String get logout => 'Logout';
@@ -334,6 +369,15 @@ class AppLocalizationsTl extends AppLocalizations {
   String get alreadyHaveAccount => 'Mayroon ka nang account?';
 
   @override
+  String get accountCreatedTitle => 'Nagawa na ang account';
+
+  @override
+  String get accountCreatedMessage => 'Matagumpay na nagawa ang iyong account.';
+
+  @override
+  String get okayButton => 'Sige';
+
+  @override
   String get resetPassword => 'I-reset ang password';
 
   @override
@@ -409,6 +453,16 @@ class AppLocalizationsTl extends AppLocalizations {
   String get onboardingNameEmpty => 'Pakisulat ang iyong pangalan.';
 
   @override
+  String get onboardingBasicInfoIntro =>
+      'Pakilagay ang iyong impormasyon upang magamit ang app';
+
+  @override
+  String get onboardingAgeEmpty => 'Pakisulat ang iyong edad.';
+
+  @override
+  String get nextButton => 'Susunod';
+
+  @override
   String get onboardingHeadline => 'Malinaw. Lokal. Maaasahan.';
 
   @override
@@ -429,6 +483,13 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get getStarted => 'Magsimula';
+
+  @override
+  String get getStartedTagline => 'Malinaw. Lokal. Maaasahan.';
+
+  @override
+  String get getStartedSubtitle =>
+      'Ang iyong AI na katulong para sa mas malusog na pamimili.';
 
   @override
   String get onboardingInstructions =>
@@ -1034,6 +1095,25 @@ class AppLocalizationsTl extends AppLocalizations {
   String get reportProductName => 'Pangalan ng Produkto';
 
   @override
+  String get reportAdditionalBackPhotos =>
+      'Karagdagang Litrato sa Likod (Opsyonal)';
+
+  @override
+  String get reportAdditionalBackPhotosHint =>
+      'Magdagdag ng higit pang litrato ng likod na label kung kinakailangan (sangkap, nutrition facts, atbp.)';
+
+  @override
+  String get reportAddAnotherBackPhoto =>
+      'Magdagdag ng Isa Pang Litrato sa Likod';
+
+  @override
+  String get reportProductNameHint =>
+      'Pakisabi ang brand, pangalan, at lasa (hal. Purefoods Corned Beef).';
+
+  @override
+  String get reportProductNameFieldHint => 'Ilagay ang pangalan ng produkto';
+
+  @override
   String get reportProductDescription => 'Deskripsyon ng Produkto';
 
   @override
@@ -1055,4 +1135,51 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get reportGoHome => 'Bumalik sa Home';
+
+  @override
+  String get dateOfBirth => 'Petsa ng Kapanganakan';
+
+  @override
+  String get january => 'Enero';
+
+  @override
+  String get february => 'Pebrero';
+
+  @override
+  String get march => 'Marso';
+
+  @override
+  String get april => 'Abril';
+
+  @override
+  String get may => 'Mayo';
+
+  @override
+  String get june => 'Hunyo';
+
+  @override
+  String get july => 'Hulyo';
+
+  @override
+  String get august => 'Agosto';
+
+  @override
+  String get september => 'Setyembre';
+
+  @override
+  String get october => 'Oktubre';
+
+  @override
+  String get november => 'Nobyembre';
+
+  @override
+  String get december => 'Disyembre';
+
+  @override
+  String get invalidDateOfBirth =>
+      'Mangyaring pumili ng wastong petsa ng kapanganakan';
+
+  @override
+  String get under18Error =>
+      'Dapat kang nasa edad na 18 pataas para magamit ang app na ito';
 }
