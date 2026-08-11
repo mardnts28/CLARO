@@ -509,7 +509,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final deleteColor = theme.brightness == Brightness.dark
-        ? colorScheme.primary
+        ? Colors.red
         : const Color(0xFF8B1A1A);
     String? errorMessage;
     bool isDeleting = false;

@@ -195,8 +195,13 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
     final years = List.generate(maxDate.year - minDate.year + 1, (index) => minDate.year + index);
     final months = List.generate(12, (index) => index + 1);
 
+    // Calculate responsive height based on screen size
+    final screenHeight = MediaQuery.of(context).size.height;
+    final pickerHeight = screenHeight * 0.28; // Use 28% of screen height
+    final itemHeight = pickerHeight * 0.18; // Item height as percentage of picker height
+
     return Container(
-      height: 220,
+      height: pickerHeight.clamp(180.0, 280.0), // Clamp between min and max values
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(20),
@@ -205,11 +210,14 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: pickerHeight * 0.07,
+            ),
             child: Text(
               loc.dateOfBirth,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: (pickerHeight * 0.08).clamp(14.0, 20.0),
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onSurface,
               ),
@@ -224,7 +232,7 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
                   flex: 2,
                   child: ListWheelScrollView.useDelegate(
                     controller: _monthController,
-                    itemExtent: 40,
+                    itemExtent: itemHeight.clamp(32.0, 48.0),
                     onSelectedItemChanged: _onMonthChanged,
                     physics: const FixedExtentScrollPhysics(),
                     childDelegate: ListWheelChildBuilderDelegate(
@@ -234,15 +242,18 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
                         return Center(
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 4),
-                            child: Text(
-                              _getMonthName(months[index], loc),
-                              style: TextStyle(
-                                fontSize: isSelected ? 16 : 14,
-                                color: isSelected ? primaryColor : colorScheme.onSurface,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                _getMonthName(months[index], loc),
+                                style: TextStyle(
+                                  fontSize: (itemHeight * 0.4).clamp(12.0, 18.0),
+                                  color: isSelected ? primaryColor : colorScheme.onSurface,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         );
@@ -255,7 +266,7 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
                   flex: 1,
                   child: ListWheelScrollView.useDelegate(
                     controller: _dayController,
-                    itemExtent: 40,
+                    itemExtent: itemHeight.clamp(32.0, 48.0),
                     onSelectedItemChanged: _onDayChanged,
                     physics: const FixedExtentScrollPhysics(),
                     childDelegate: ListWheelChildBuilderDelegate(
@@ -263,12 +274,15 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
                       builder: (context, index) {
                         final isSelected = index == _selectedDay - 1;
                         return Center(
-                          child: Text(
-                            validDays[index].toString(),
-                            style: TextStyle(
-                              fontSize: isSelected ? 16 : 14,
-                              color: isSelected ? primaryColor : colorScheme.onSurface,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              validDays[index].toString(),
+                              style: TextStyle(
+                                fontSize: (itemHeight * 0.4).clamp(12.0, 18.0),
+                                color: isSelected ? primaryColor : colorScheme.onSurface,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
                             ),
                           ),
                         );
@@ -281,7 +295,7 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
                   flex: 1,
                   child: ListWheelScrollView.useDelegate(
                     controller: _yearController,
-                    itemExtent: 40,
+                    itemExtent: itemHeight.clamp(32.0, 48.0),
                     onSelectedItemChanged: _onYearChanged,
                     physics: const FixedExtentScrollPhysics(),
                     childDelegate: ListWheelChildBuilderDelegate(
@@ -289,12 +303,15 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
                       builder: (context, index) {
                         final isSelected = years[index] == _selectedYear;
                         return Center(
-                          child: Text(
-                            years[index].toString(),
-                            style: TextStyle(
-                              fontSize: isSelected ? 16 : 14,
-                              color: isSelected ? primaryColor : colorScheme.onSurface,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              years[index].toString(),
+                              style: TextStyle(
+                                fontSize: (itemHeight * 0.4).clamp(12.0, 18.0),
+                                color: isSelected ? primaryColor : colorScheme.onSurface,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
                             ),
                           ),
                         );

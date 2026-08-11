@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/history_service.dart';
 import '../services/auth_service.dart';
+import '../services/locale_service.dart';
 import '../data/services/backend_locator.dart';
 import 'camera_scanner_screen.dart';
 import 'product_detail_screen.dart';
@@ -75,6 +76,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
     _subscribeFavorites();
     _subscribeReports();
+    // Listen for language changes to refresh the UI with localized labels
+    LocaleService.localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) {
+      setState(() {}); // Force rebuild to update localized labels
+    }
   }
 
   void _handleTabChange() {
@@ -92,6 +101,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void dispose() {
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
+    LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     _subscription?.cancel();
     _favoritesSubscription?.cancel();
     _reportsSubscription?.cancel();

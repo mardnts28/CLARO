@@ -3,6 +3,7 @@ import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
+import '../services/locale_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/voice_mic_overlay.dart';
 import 'profile_screen.dart';
@@ -52,6 +53,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // Listen for name changes from other screens.
     AuthService.userNameNotifier.addListener(_handleNameChanged);
+
+    // Listen for language changes to refresh the UI with localized labels
+    LocaleService.localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) {
+      setState(() {}); // Force rebuild to update localized labels
+    }
   }
 
   void _handleNameChanged() {
@@ -66,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
     AuthService.userNameNotifier.removeListener(_handleNameChanged);
+    LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
 

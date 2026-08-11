@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
+import '../services/locale_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/date_of_birth_picker.dart';
 import 'home_screen.dart';
@@ -105,9 +106,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   };
 
   @override
+  void initState() {
+    super.initState();
+    // Listen for language changes to refresh the UI with localized labels
+    LocaleService.localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) {
+      setState(() {}); // Force rebuild to update localized labels
+    }
+  }
+
+  @override
   void dispose() {
     _nameController.dispose();
     _pageController.dispose();
+    LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
 
@@ -265,11 +280,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildPage1(ThemeData theme, AppLocalizations loc) {
     final colorScheme = theme.colorScheme;
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
       child: Column(
         children: [
-          const Spacer(),
+          const SizedBox(height: 40),
           _buildLogo(theme),
           const SizedBox(height: 32),
           Text(
@@ -298,8 +313,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               });
             },
           ),
-          const Spacer(),
+          const SizedBox(height: 32),
           _buildButton(loc.nextButton, _nextPage, theme),
+          const SizedBox(height: 40),
         ],
       ),
     );
