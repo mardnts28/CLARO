@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
@@ -71,10 +72,24 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     _loadRanking();
   }
 
+  Timer? _searchDebounce;
+
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _onSearch() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {
+          _filtered = _computeFiltered(_allRanked);
+        });
+      }
+    });
   }
 
   Future<void> _loadRanking() async {
@@ -150,11 +165,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         .toList();
   }
 
-  void _onSearch() {
-    setState(() {
-      _filtered = _computeFiltered(_allRanked);
-    });
-  }
+
 
   /// Re-ranks the SAME comparison set (no new DB fetch, no new Gemini call)
   /// against a health profile narrowed to just [condition] -- or the full

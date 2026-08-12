@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
+import '../core/utils/success_feedback_utils.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'review_history_screen.dart';
 
@@ -54,24 +55,27 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
   Future<void> _submit() async {
     HapticService().vibrate();
     if (_submitting) return;
+    setState(() => _submitting = true);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final text = _commentController.text.trim();
     if (_rating < 1) {
+      setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.ratePrompt)));
       return;
     }
     if (text.isEmpty) {
+      setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.suggestionEmpty)));
       return;
     }
     if (text.length > 500) {
+      setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.suggestionTooLong)));
       return;
     }
 
-    setState(() => _submitting = true);
     try {
       final uid = _authService.currentUser?.uid;
       if (uid == null) {
@@ -98,44 +102,11 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
       });
 
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: theme.cardColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-          contentPadding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-          title: Text(
-            loc.suggestionSentTitle,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: colorScheme.onSurface),
-          ),
-          content: Text(
-            loc.suggestionSentBody,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
-          ),
-          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          actionsAlignment: MainAxisAlignment.center,
-          actions: [
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  foregroundColor: colorScheme.onPrimary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                child: Text(
-                  loc.backLabel,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-              ),
-            ),
-          ],
-        ),
+      await SuccessFeedbackUtils.showSuccessDialog(
+        context,
+        title: loc.suggestionSentTitle,
+        message: loc.suggestionSentBody,
+        buttonText: loc.backLabel,
       );
     } catch (e) {
       debugPrint('Error submitting feedback: $e');

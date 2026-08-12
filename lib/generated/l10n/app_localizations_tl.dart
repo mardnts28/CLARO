@@ -1044,6 +1044,19 @@ class AppLocalizationsTl extends AppLocalizations {
   String get cautionLegend => 'Caution >20%';
 
   @override
+  String get howToUnderstandTitle => 'Paano unawain:';
+
+  @override
+  String get legendSuitableDesc => 'Mababang epekto sa panganib sa kalusugan.';
+
+  @override
+  String get legendModerateDesc => 'Kainin nang katamtaman.';
+
+  @override
+  String get legendCautionDesc =>
+      'Mataas na epekto sa panganib sa kalusugan. Limitahan ang pagkonsumo.';
+
+  @override
   String get forMoreDetails => 'Higit pang detalye';
 
   @override
@@ -1208,4 +1221,11 @@ class AppLocalizationsTl extends AppLocalizations {
   @override
   String get under18Error =>
       'Dapat kang nasa edad na 18 pataas para magamit ang app na ito';
+
+  @override
+  String get enterDigitCode => 'Ilagay ang 6-digit na code';
+
+  @override
+  String get pleaseEnterProductName =>
+      'Mangyaring ilagay ang pangalan ng produkto';
 }

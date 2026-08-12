@@ -63,6 +63,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   List<ReportModel> _reports = [];
   bool _reportsLoading = true;
 
+  Timer? _searchDebounce;
+
   @override
   void initState() {
     super.initState();
@@ -72,7 +74,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (mounted) setState(() {});
     });
     _searchController.addListener(() {
-      setState(() => _searchQuery = _searchController.text);
+      _searchDebounce?.cancel();
+      _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+        if (mounted) {
+          setState(() => _searchQuery = _searchController.text);
+        }
+      });
     });
     _subscribeFavorites();
     _subscribeReports();
@@ -349,6 +356,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               snapshot.connectionState != ConnectionState.done;
 
           return GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () async {
               if (product != null) {
                 await Navigator.push(
@@ -484,6 +492,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       ),
       onDismissed: (_) => _historyService.deleteRecord(item.id),
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: () async {
           // Reopen the comparison by navigating to CompareProductsScreen
           // Set saveToHistory: false to avoid creating duplicate history entries
@@ -965,7 +974,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     : _groupReports(_reports).isEmpty
                         ? _buildEmptyState()
                         : ListView(
-                            key: const ValueKey('reports_list'),
+                            key: const PageStorageKey<String>('reports_scroll'),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 4),
                             children: _groupReports(_reports)
@@ -980,7 +989,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     : grouped.isEmpty
                         ? _buildEmptyState()
                         : ListView(
-                            key: const ValueKey('history_list'),
+                            key: const PageStorageKey<String>('history_scroll'),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 4),
                             children: grouped.entries

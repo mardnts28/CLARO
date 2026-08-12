@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
+import '../core/utils/success_feedback_utils.dart';
 import '../services/haptic_service.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
@@ -139,15 +141,15 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       }
       _startTimer();
       final resendEmailSent = otpData['emailSent'] == true;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            resendEmailSent
-                ? 'A new verification code has been sent.'
-                : 'We couldn\'t send the code to your email. Please try again in a moment.',
+      if (resendEmailSent) {
+        SuccessFeedbackUtils.showSuccessSnackBar(context, 'A new verification code has been sent.');
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('We couldn\'t send the code to your email. Please try again in a moment.'),
           ),
-        ),
-      );
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isResending = false);
@@ -242,7 +244,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       keyboardType: TextInputType.number,
                       textAlign: TextAlign.center,
                       decoration: InputDecoration(
-                        hintText: 'Enter 6-digit code',
+                        hintText: AppLocalizations.of(context)!.enterDigitCode,
                         hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
                         enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
                         focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),

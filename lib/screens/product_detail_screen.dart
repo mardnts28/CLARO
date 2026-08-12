@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../core/utils/number_format_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/product_model.dart';
 import '../services/fda_verification_service.dart';
 import '../services/auth_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
+import '../services/locale_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'compare_products_screen.dart';
 import 'more_details_screen.dart';
@@ -94,6 +96,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void initState() {
     super.initState();
+    LocaleService.localeNotifier.addListener(_onLocaleChanged);
     VoiceAssistantService.setLatestScanProduct(widget.product);
     _currentProduct = widget.product;
     _currentComparisonSet = widget.comparisonSet;
@@ -104,6 +107,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
     _loadFdaVerification();
     _loadFavoriteStatus();
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    LocaleService.localeNotifier.removeListener(_onLocaleChanged);
+    super.dispose();
   }
 
   /// Updates the currently displayed product and reloads all associated data.
@@ -348,6 +363,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           // ── Scrollable content ────────────────────────────────────
           Expanded(
             child: SingleChildScrollView(
+              key: const PageStorageKey<String>('product_detail_scroll'),
               physics: const BouncingScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -583,8 +599,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   Text(
                                     loc.analysisBasisSubtitle('${_selectedSizeG == _selectedSizeG.roundToDouble() ? _selectedSizeG.toInt().toString() : _selectedSizeG.toStringAsFixed(1)}g'),
                                     style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: colorScheme.onSurfaceVariant,
+                                      fontSize: 13,
+                                      color: colorScheme.onSurface.withValues(alpha: 0.85),
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
@@ -819,31 +835,39 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ),
 
-                        // Legend section
+                        // Legend section - How to understand
                         Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Divider(height: 24, thickness: 1),
-                            Wrap(
-                              alignment: WrapAlignment.center,
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _buildLegendPill(
-                                  label: loc.suitableLegend,
-                                  bgColor: const Color(0xFFC8E6C9),
-                                  textColor: const Color(0xFF2E7D32),
-                                ),
-                                _buildLegendPill(
-                                  label: loc.moderateLegend,
-                                  bgColor: const Color(0xFFFFE0B2),
-                                  textColor: const Color(0xFFE65100),
-                                ),
-                                _buildLegendPill(
-                                  label: loc.cautionLegend,
-                                  bgColor: const Color(0xFFFFCDD2),
-                                  textColor: const Color(0xFFC62828),
-                                ),
-                              ],
+                            Text(
+                              loc.howToUnderstandTitle,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            _buildLegendItem(
+                              dotColor: const Color(0xFF2E7D32),
+                              label: loc.suitableLegend,
+                              description: loc.legendSuitableDesc,
+                              colorScheme: colorScheme,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildLegendItem(
+                              dotColor: const Color(0xFFE65100),
+                              label: loc.moderateLegend,
+                              description: loc.legendModerateDesc,
+                              colorScheme: colorScheme,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildLegendItem(
+                              dotColor: const Color(0xFFC62828),
+                              label: loc.cautionLegend,
+                              description: loc.legendCautionDesc,
+                              colorScheme: colorScheme,
                             ),
                           ],
                         ),
@@ -1858,33 +1882,54 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   String _formatValue(double value) {
-    if (value == 2000.0) return '2,000';
-    if (value == 1250.0) return '1,250';
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(1);
+    return NumberFormatUtils.formatValue(value);
   }
 
-  Widget _buildLegendPill({
+  Widget _buildLegendItem({
+    required Color dotColor,
     required String label,
-    required Color bgColor,
-    required Color textColor,
+    required String description,
+    required ColorScheme colorScheme,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.inter(
-          color: textColor,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 4, right: 8),
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: dotColor,
+              shape: BoxShape.circle,
+            ),
+          ),
         ),
-      ),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                TextSpan(
+                  text: description,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.normal,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 

@@ -1,5 +1,6 @@
 import 'dart:ui';
 import '../data/models/health_profile.dart';
+import '../core/utils/number_format_utils.dart';
 import '../core/utils/nutrition_calculator.dart';
 
 /// One entry of a product's `available_sizes` array, pairing a package
@@ -148,16 +149,16 @@ class NutritionalFacts {
   final bool hasNutritionData;
 
   // Computed getters for UI rendering (retains compatibility with old fields)
-  String get calories => '${caloriesKcal.toStringAsFixed(0)} kcal';
-  String get totalFat => '${totalFatG.toStringAsFixed(1)}g';
-  String get saturatedFat => '${saturatedFatG.toStringAsFixed(1)}g';
-  String get transFat => '${transFatG.toStringAsFixed(1)}g';
-  String get cholesterol => '${cholesterolMg.toStringAsFixed(0)}mg';
-  String get sodium => '${sodiumMg.toStringAsFixed(0)}mg';
-  String get totalCarbohydrate => '${carbsG.toStringAsFixed(1)}g';
-  String get dietaryFiber => '${fiberG.toStringAsFixed(1)}g';
-  String get sugars => '${sugarsG.toStringAsFixed(1)}g';
-  String get protein => '${proteinG.toStringAsFixed(1)}g';
+  String get calories => '${NumberFormatUtils.formatValue(caloriesKcal)} kcal';
+  String get totalFat => '${NumberFormatUtils.formatValue(totalFatG)}g';
+  String get saturatedFat => '${NumberFormatUtils.formatValue(saturatedFatG)}g';
+  String get transFat => '${NumberFormatUtils.formatValue(transFatG)}g';
+  String get cholesterol => '${NumberFormatUtils.formatValue(cholesterolMg)}mg';
+  String get sodium => '${NumberFormatUtils.formatValue(sodiumMg)}mg';
+  String get totalCarbohydrate => '${NumberFormatUtils.formatValue(carbsG)}g';
+  String get dietaryFiber => '${NumberFormatUtils.formatValue(fiberG)}g';
+  String get sugars => '${NumberFormatUtils.formatValue(sugarsG)}g';
+  String get protein => '${NumberFormatUtils.formatValue(proteinG)}g';
 
   NutritionalFacts({
     this.servingSize = '',

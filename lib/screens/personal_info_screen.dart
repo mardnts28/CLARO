@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../widgets/custom_text_field.dart';
+import '../core/utils/sanitizing_text_input_formatter.dart';
+import '../core/utils/success_feedback_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
@@ -191,7 +194,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         // away, rather than waiting on the Firestore round-trip below.
         AuthService.userNameNotifier.value = newName;
         await _loadUserData();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateSuccess)));
+        if (mounted) SuccessFeedbackUtils.showSuccessSnackBar(context, loc.profileUpdateSuccess);
       } else {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
       }
@@ -211,7 +214,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       setState(() => _isSavingAge = false);
       if (ok) {
         await _loadUserData();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateSuccess)));
+        if (mounted) SuccessFeedbackUtils.showSuccessSnackBar(context, loc.profileUpdateSuccess);
       } else {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
       }
@@ -247,7 +250,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         setState(() => _isSavingAge = false);
         if (ok) {
           await _loadUserData();
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateSuccess)));
+          if (mounted) SuccessFeedbackUtils.showSuccessSnackBar(context, loc.profileUpdateSuccess);
         } else {
           if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
         }
@@ -255,39 +258,57 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     } catch (e) {
       debugPrint('Error saving date of birth: $e');
       setState(() => _isSavingAge = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
     }
   }
 
   void _showEditNameDialog() {
     HapticService().vibrate();
     final loc = AppLocalizations.of(context)!;
+    String? dialogNameError;
     showDialog(
       context: context,
       builder: (context) {
         final dialogTheme = Theme.of(context);
-        return AlertDialog(
-          backgroundColor: dialogTheme.cardColor,
-          title: Text(loc.editName, style: TextStyle(color: dialogTheme.colorScheme.onSurface)),
-          content: TextField(
-            controller: _nameController,
-            decoration: InputDecoration(hintText: loc.onboardingNameHint, hintStyle: TextStyle(color: dialogTheme.colorScheme.onSurfaceVariant)),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text(loc.cancel)),
-            TextButton(
-              onPressed: _isSavingName
-                  ? null
-                  : () async {
-                final newName = _nameController.text.trim();
-                if (newName.isEmpty) return;
-                Navigator.pop(context);
-                await _saveUserName(newName);
-              },
-              child: _isSavingName
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(loc.save),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, dialogSetState) {
+            return AlertDialog(
+              backgroundColor: dialogTheme.cardColor,
+              title: Text(loc.editName, style: TextStyle(color: dialogTheme.colorScheme.onSurface)),
+              content: CustomTextField(
+                controller: _nameController,
+                hintText: loc.onboardingNameHint,
+                errorText: dialogNameError,
+                autofocus: true,
+                inputFormatters: [SanitizingTextInputFormatter()],
+                onChanged: (val) {
+                  if (dialogNameError != null && val.trim().isNotEmpty) {
+                    dialogSetState(() => dialogNameError = null);
+                  }
+                },
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: Text(loc.cancel)),
+                TextButton(
+                  onPressed: _isSavingName
+                      ? null
+                      : () async {
+                    final newName = _nameController.text.trim();
+                    if (newName.isEmpty) {
+                      dialogSetState(() => dialogNameError = loc.onboardingNameHint);
+                      return;
+                    }
+                    setState(() => _isSavingName = true);
+                    Navigator.pop(context);
+                    await _saveUserName(newName);
+                  },
+                  child: _isSavingName
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Text(loc.save),
+                ),
+              ],
+            );
+          },
         );
       },
     );

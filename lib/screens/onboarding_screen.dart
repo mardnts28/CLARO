@@ -39,6 +39,7 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   final _nameController = TextEditingController();
+  String? _nameError;
   DateTime? _selectedDateOfBirth;
   final _authService = AuthService();
   int _currentPage = 0;
@@ -126,10 +127,41 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
+  void _previousPage() {
+    HapticService().vibrate();
+    FocusScope.of(context).unfocus();
+    _pageController.previousPage(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
   Future<void> _nextPage() async {
     HapticService().vibrate();
     final loc = AppLocalizations.of(context)!;
     if (_currentPage < 1) {
+      // Validate name
+      if (_nameController.text.trim().isEmpty) {
+        setState(() {
+          _nameError = loc.onboardingNameEmpty;
+        });
+        return;
+      } else {
+        if (_nameError != null) {
+          setState(() {
+            _nameError = null;
+          });
+        }
+      }
+
+      // Validate date of birth
+      if (_selectedDateOfBirth == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(loc.invalidDateOfBirth)),
+        );
+        return;
+      }
+
       // Dismiss keyboard/focus before moving to the next page -- Basic
       // Info has text fields but Health Profile doesn't, so carrying
       // focus over serves no purpose and risks the same kind of overflow
@@ -254,16 +286,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         builder: (context) {
           final theme = Theme.of(context);
           final loc = AppLocalizations.of(context)!;
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.noScaling,
-            ),
+          return PopScope(
+            canPop: _currentPage == 0,
+            onPopInvokedWithResult: (didPop, result) {
+              if (didPop) return;
+              if (_currentPage > 0) {
+                _previousPage();
+              }
+            },
             child: Scaffold(
               backgroundColor: theme.scaffoldBackgroundColor,
               body: SafeArea(
                 child: PageView(
                   controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
+                  physics: _currentPage == 0
+                      ? const NeverScrollableScrollPhysics()
+                      : const PageScrollPhysics(),
                   onPageChanged: (i) => setState(() => _currentPage = i),
                   children: [
                     _buildPage1(theme, loc),
@@ -293,14 +331,42 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             style: TextStyle(fontSize: 16, color: colorScheme.onSurface, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 24),
-          TextField(
-            controller: _nameController,
-            style: TextStyle(color: colorScheme.onSurface),
-            decoration: InputDecoration(
-              hintText: loc.onboardingNameHint,
-              hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
-              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
+          Semantics(
+            hint: _nameError != null ? 'Error: $_nameError' : null,
+            child: TextField(
+              controller: _nameController,
+              onChanged: (val) {
+                if (_nameError != null && val.trim().isNotEmpty) {
+                  setState(() {
+                    _nameError = null;
+                  });
+                }
+              },
+              style: TextStyle(color: colorScheme.onSurface),
+              decoration: InputDecoration(
+                hintText: loc.onboardingNameHint,
+                hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+                prefixIcon: Icon(Icons.person_outline, color: colorScheme.onSurfaceVariant, size: 20),
+                errorText: _nameError,
+                errorMaxLines: 2,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: colorScheme.outlineVariant),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: colorScheme.primary),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: colorScheme.error),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: colorScheme.error, width: 1.5),
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -334,7 +400,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildLogo(theme),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                  color: colorScheme.primary,
+                  onPressed: _previousPage,
+                  tooltip: 'Back',
+                ),
+              ),
+              _buildLogo(theme),
+            ],
+          ),
           const SizedBox(height: 12),
           Text(
             loc.onboardingInstructions,
@@ -582,18 +662,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           const SizedBox(height: 4),
           Text(subtitle,
-              style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+              style: TextStyle(fontSize: 13, color: colorScheme.onSurface.withValues(alpha: 0.85))),
           const SizedBox(height: 12),
           child,
           if (note != null) ...[
             const SizedBox(height: 10),
             Row(
               children: [
-                Icon(noteIcon, size: 14, color: colorScheme.onSurfaceVariant),
+                Icon(noteIcon, size: 14, color: colorScheme.onSurface.withValues(alpha: 0.85)),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(note,
-                      style: TextStyle(fontSize: 11, color: colorScheme.onSurfaceVariant)),
+                      style: TextStyle(fontSize: 13, color: colorScheme.onSurface.withValues(alpha: 0.85))),
                 ),
               ],
             ),
@@ -606,7 +686,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildLogo(ThemeData theme) {
     return Column(
       children: [
-        Image.asset('assets/images/logo.png', height: 80),
+        Image.asset(
+          'assets/images/logo.png',
+          height: 80,
+          cacheHeight: (80 * MediaQuery.devicePixelRatioOf(context)).round(),
+        ),
         const SizedBox(height: 6),
         Text(
           'CLARO',

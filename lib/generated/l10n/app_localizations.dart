@@ -2030,6 +2030,30 @@ abstract class AppLocalizations {
   /// **'Caution >20%'**
   String get cautionLegend;
 
+  /// No description provided for @howToUnderstandTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How to understand:'**
+  String get howToUnderstandTitle;
+
+  /// No description provided for @legendSuitableDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Low impact on health risk.'**
+  String get legendSuitableDesc;
+
+  /// No description provided for @legendModerateDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Consume in moderation.'**
+  String get legendModerateDesc;
+
+  /// No description provided for @legendCautionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'High impact on health risk. Limit intake.'**
+  String get legendCautionDesc;
+
   /// No description provided for @forMoreDetails.
   ///
   /// In en, this message translates to:
@@ -2329,6 +2353,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You must be at least 18 years old to use this app'**
   String get under18Error;
+
+  /// No description provided for @enterDigitCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter 6-digit code'**
+  String get enterDigitCode;
+
+  /// No description provided for @pleaseEnterProductName.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter a product name'**
+  String get pleaseEnterProductName;
 }
 
 class _AppLocalizationsDelegate

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import '../widgets/custom_text_field.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import '../services/validation_service.dart';
+import '../core/utils/success_feedback_utils.dart';
 import '../services/haptic_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
@@ -27,6 +30,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _showConfirmPassword = false;
   bool _isLoading = false;
 
+  String? _currentPasswordError;
+  String? _newPasswordError;
+  String? _confirmPasswordError;
+
   Future<void> _handleChangePassword() async {
     HapticService().vibrate();
     final currentPassword = _currentPasswordController.text.trim();
@@ -34,28 +41,35 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     final confirmPassword = _confirmPasswordController.text.trim();
     final loc = AppLocalizations.of(context)!;
 
+    setState(() {
+      _currentPasswordError = null;
+      _newPasswordError = null;
+      _confirmPasswordError = null;
+    });
+
     if (currentPassword.isEmpty) {
-      _showError(loc.errorCurrentPassword);
+      setState(() => _currentPasswordError = loc.errorCurrentPassword);
       return;
     }
 
     if (newPassword.isEmpty) {
-      _showError(loc.errorNewPassword);
+      setState(() => _newPasswordError = loc.errorNewPassword);
+      return;
+    }
+
+    final newPassValidation = ValidationService.validatePassword(newPassword, loc);
+    if (newPassValidation != null) {
+      setState(() => _newPasswordError = newPassValidation);
       return;
     }
 
     if (confirmPassword.isEmpty) {
-      _showError(loc.errorConfirmPassword);
+      setState(() => _confirmPasswordError = loc.errorConfirmPassword);
       return;
     }
 
     if (newPassword != confirmPassword) {
-      _showError(loc.errorPasswordsNotMatch);
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      _showError(loc.errorPasswordTooShort);
+      setState(() => _confirmPasswordError = loc.errorPasswordsNotMatch);
       return;
     }
 
@@ -95,12 +109,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       setState(() => _isLoading = false);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(loc.passwordChanged),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SuccessFeedbackUtils.showSuccessSnackBar(context, loc.passwordChanged);
         Navigator.pop(context);
       }
     } on FirebaseAuthException catch (e) {
@@ -141,7 +150,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 hint: loc.currentPassword,
                 showPassword: _showCurrentPassword,
                 theme: theme,
+                errorText: _currentPasswordError,
                 onToggle: () => setState(() => _showCurrentPassword = !_showCurrentPassword),
+                onChanged: (val) {
+                  if (_currentPasswordError != null && val.trim().isNotEmpty) {
+                    setState(() => _currentPasswordError = null);
+                  }
+                },
               ),
               const SizedBox(height: 16),
               _buildPasswordField(
@@ -149,7 +164,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 hint: loc.newPassword,
                 showPassword: _showNewPassword,
                 theme: theme,
+                errorText: _newPasswordError,
                 onToggle: () => setState(() => _showNewPassword = !_showNewPassword),
+                onChanged: (val) {
+                  if (_newPasswordError != null && val.trim().isNotEmpty) {
+                    setState(() => _newPasswordError = null);
+                  }
+                },
               ),
               const SizedBox(height: 16),
               _buildPasswordField(
@@ -157,7 +178,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 hint: loc.confirmPassword,
                 showPassword: _showConfirmPassword,
                 theme: theme,
+                errorText: _confirmPasswordError,
                 onToggle: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+                onChanged: (val) {
+                  if (_confirmPasswordError != null && val.trim().isNotEmpty) {
+                    setState(() => _confirmPasswordError = null);
+                  }
+                },
               ),
               const SizedBox(height: 32),
               SizedBox(
@@ -229,32 +256,23 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     required String hint,
     required bool showPassword,
     required ThemeData theme,
+    String? errorText,
     required VoidCallback onToggle,
+    ValueChanged<String>? onChanged,
   }) {
-    return TextField(
+    return CustomTextField(
       controller: controller,
+      hintText: hint,
       obscureText: !showPassword,
-      style: TextStyle(color: theme.colorScheme.onSurface),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: theme.colorScheme.onSurfaceVariant, fontSize: 14),
-        contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        suffixIcon: IconButton(
-          icon: Icon(
-            showPassword ? Icons.visibility : Icons.visibility_off,
-            size: 20,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-          onPressed: onToggle,
+      errorText: errorText,
+      onChanged: onChanged,
+      suffixIcon: IconButton(
+        icon: Icon(
+          showPassword ? Icons.visibility : Icons.visibility_off,
+          size: 20,
+          color: theme.colorScheme.onSurfaceVariant,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: theme.colorScheme.outlineVariant),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: const BorderRadius.all(Radius.circular(8)),
-          borderSide: BorderSide(color: theme.colorScheme.primary),
-        ),
+        onPressed: onToggle,
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/utils/success_feedback_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
@@ -65,9 +66,7 @@ class _ThemeScreenState extends State<ThemeScreen> {
         // reload server value to be sure
         await _load();
         setAppThemeMode(parseThemeMode(theme));
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.themeSaved)),
-        );
+        if (mounted) SuccessFeedbackUtils.showSuccessSnackBar(context, loc.themeSaved);
       } else {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(loc.themeSaveError)),

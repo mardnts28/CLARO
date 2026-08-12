@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../widgets/custom_text_field.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';
+import '../core/utils/success_feedback_utils.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -15,6 +17,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _authService = AuthService();
   bool _isLoading = false;
   bool _emailSent = false;
+  String? _emailError;
 
   Future<void> _handlePasswordReset() async {
     final loc = AppLocalizations.of(context)!;
@@ -23,11 +26,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     // Validate email
     final emailError = ValidationService.validateEmail(email, loc);
     if (emailError != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(emailError)),
-      );
+      setState(() => _emailError = emailError);
       return;
     }
+    setState(() => _emailError = null);
 
     setState(() => _isLoading = true);
     final error = await _authService.sendPasswordResetEmail(email: email);
@@ -39,12 +41,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
     } else {
       setState(() => _emailSent = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(loc.emailSent),
-          backgroundColor: Colors.green,
-        ),
-      );
+      SuccessFeedbackUtils.showSuccessSnackBar(context, loc.emailSent);
     }
   }
 
@@ -75,13 +72,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         builder: (context) {
           final colorScheme = Theme.of(context).colorScheme;
 
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.noScaling,
-            ),
-            child: Scaffold(
-              backgroundColor: colorScheme.surface,
-              body: SafeArea(
+          return Scaffold(
+            backgroundColor: colorScheme.surface,
+            body: SafeArea(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
                   child: Column(
@@ -232,9 +225,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
       ),
     );
   }
@@ -247,29 +239,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         bool enabled = true,
       }) {
     final colorScheme = Theme.of(context).colorScheme;
-    return TextField(
+    return CustomTextField(
       controller: controller,
+      hintText: hint,
+      prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
       enabled: enabled,
-      style: TextStyle(color: colorScheme.onSurface),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
-        prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
-        contentPadding:
-        const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colorScheme.outlineVariant),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide(color: colorScheme.primary),
-        ),
-      ),
+      errorText: _emailError,
+      onChanged: (val) {
+        if (_emailError != null && val.trim().isNotEmpty) {
+          setState(() => _emailError = null);
+        }
+      },
     );
   }
 

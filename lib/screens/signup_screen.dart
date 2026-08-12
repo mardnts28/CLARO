@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../widgets/custom_text_field.dart';
 import 'login_screen.dart';
 import 'onboarding_screen.dart';
 import 'home_screen.dart';
@@ -435,10 +436,8 @@ class _SignupScreenState extends State<SignupScreen> {
             final colorScheme = Theme.of(context).colorScheme;
             final loc = AppLocalizations.of(context)!;
 
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: TextScaler.noScaling,
-              ),
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: SystemUiOverlayStyle.dark,
               child: Scaffold(
                 backgroundColor: colorScheme.surface,
                 body: SafeArea(
@@ -454,7 +453,11 @@ class _SignupScreenState extends State<SignupScreen> {
                           Center(
                             child: Column(
                               children: [
-                                Image.asset('assets/images/logo.png', height: 90),
+                                Image.asset(
+                                  'assets/images/logo.png',
+                                  height: 90,
+                                  cacheHeight: (90 * MediaQuery.devicePixelRatioOf(context)).round(),
+                                ),
                                 const SizedBox(height: 8),
                                 Text(
                                   'CLARO',
@@ -622,9 +625,9 @@ class _SignupScreenState extends State<SignupScreen> {
                 ),
               ),
             );
-          }
-      ),
-    );
+          },
+        ),
+      );
   }
 
   Widget _buildFormErrorBanner(BuildContext context, String message) {
@@ -738,44 +741,18 @@ class _SignupScreenState extends State<SignupScreen> {
         ValueChanged<String>? onSubmitted,
       }) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Semantics(
-      hint: errorText != null ? 'Error: $errorText' : null,
-      child: TextField(
-        controller: controller,
-        focusNode: focusNode,
-        obscureText: obscure,
-        keyboardType: keyboardType,
-        inputFormatters: inputFormatters,
-        textInputAction: textInputAction,
-        onSubmitted: onSubmitted,
-        style: TextStyle(color: colorScheme.onSurface),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
-          prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
-          suffixIcon: suffix,
-          errorText: errorText,
-          errorMaxLines: 2,
-          contentPadding:
-          const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: colorScheme.outlineVariant),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: colorScheme.primary),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: colorScheme.error),
-          ),
-          focusedErrorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: colorScheme.error, width: 1.5),
-          ),
-        ),
-      ),
+    return CustomTextField(
+      controller: controller,
+      focusNode: focusNode,
+      hintText: hint,
+      prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
+      suffixIcon: suffix,
+      obscureText: obscure,
+      errorText: errorText,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      textInputAction: textInputAction,
+      onSubmitted: onSubmitted,
     );
   }
 

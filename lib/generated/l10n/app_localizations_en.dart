@@ -1030,6 +1030,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cautionLegend => 'Caution >20%';
 
   @override
+  String get howToUnderstandTitle => 'How to understand:';
+
+  @override
+  String get legendSuitableDesc => 'Low impact on health risk.';
+
+  @override
+  String get legendModerateDesc => 'Consume in moderation.';
+
+  @override
+  String get legendCautionDesc => 'High impact on health risk. Limit intake.';
+
+  @override
   String get forMoreDetails => 'For more details';
 
   @override
@@ -1189,4 +1201,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get under18Error =>
       'You must be at least 18 years old to use this app';
+
+  @override
+  String get enterDigitCode => 'Enter 6-digit code';
+
+  @override
+  String get pleaseEnterProductName => 'Please enter a product name';
 }

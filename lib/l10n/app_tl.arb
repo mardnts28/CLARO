@@ -388,6 +388,10 @@
   "suitableLegend": "Suitable ≤5%",
   "moderateLegend": "Moderate 6-20%",
   "cautionLegend": "Caution >20%",
+  "howToUnderstandTitle": "Paano unawain:",
+  "legendSuitableDesc": "Mababang epekto sa panganib sa kalusugan.",
+  "legendModerateDesc": "Kainin nang katamtaman.",
+  "legendCautionDesc": "Mataas na epekto sa panganib sa kalusugan. Limitahan ang pagkonsumo.",
 
   "forMoreDetails": "Higit pang detalye",
   "moreDetailsScreenTitle": "Higit pang Detalye",
@@ -448,5 +452,7 @@
   "november": "Nobyembre",
   "december": "Disyembre",
   "invalidDateOfBirth": "Mangyaring pumili ng wastong petsa ng kapanganakan",
-  "under18Error": "Dapat kang nasa edad na 18 pataas para magamit ang app na ito"
+  "under18Error": "Dapat kang nasa edad na 18 pataas para magamit ang app na ito",
+  "enterDigitCode": "Ilagay ang 6-digit na code",
+  "pleaseEnterProductName": "Mangyaring ilagay ang pangalan ng produkto"
 }

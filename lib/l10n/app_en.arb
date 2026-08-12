@@ -388,6 +388,10 @@
   "suitableLegend": "Suitable ≤5%",
   "moderateLegend": "Moderate 6-20%",
   "cautionLegend": "Caution >20%",
+  "howToUnderstandTitle": "How to understand:",
+  "legendSuitableDesc": "Low impact on health risk.",
+  "legendModerateDesc": "Consume in moderation.",
+  "legendCautionDesc": "High impact on health risk. Limit intake.",
 
   "forMoreDetails": "For more details",
   "moreDetailsScreenTitle": "More Details",
@@ -448,5 +452,7 @@
   "november": "November",
   "december": "December",
   "invalidDateOfBirth": "Please select a valid date of birth",
-  "under18Error": "You must be at least 18 years old to use this app"
+  "under18Error": "You must be at least 18 years old to use this app",
+  "enterDigitCode": "Enter 6-digit code",
+  "pleaseEnterProductName": "Please enter a product name"
 }

@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import '../widgets/custom_text_field.dart';
+import '../core/utils/sanitizing_text_input_formatter.dart';
+import '../core/utils/success_feedback_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -43,6 +46,7 @@ class _UnknownProductSubmissionScreenState
   String? _backImagePath;
   final List<String> _additionalBackImagePaths = [];
   bool _isSubmitting = false;
+  String? _nameError;
   String _productName = '';
   String _selectedCategory = 'others'; // Default to 'others'
 
@@ -169,9 +173,9 @@ class _UnknownProductSubmissionScreenState
   // ── Submit report to Firestore ─────────────────────────────────────────
   Future<void> _handleSubmit() async {
     if (_isSubmitting) return;
+    final loc = AppLocalizations.of(context)!;
 
     if (_backImagePath == null) {
-      final loc = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(loc.reportBackPhotoRequired),
@@ -183,15 +187,10 @@ class _UnknownProductSubmissionScreenState
     }
 
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a product name'),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      setState(() => _nameError = loc.pleaseEnterProductName);
       return;
     }
+    setState(() => _nameError = null);
 
     setState(() => _isSubmitting = true);
 
@@ -342,76 +341,15 @@ class _UnknownProductSubmissionScreenState
   }
 
   void _showSuccessDialog() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => Dialog(
-        backgroundColor: theme.cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Title
-              Text(
-                loc.reportSuccessTitle,
-                style: GoogleFonts.outfit(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 10),
-
-              // Body
-              Text(
-                loc.reportSuccessBody,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Go Home button
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop(); // close dialog
-                    // Pop all the way back to the home screen
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                  },
-                  icon: const Icon(Icons.home, size: 20),
-                  label: Text(
-                    loc.reportGoHome,
-                    style: GoogleFonts.outfit(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    elevation: 0,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    SuccessFeedbackUtils.showSuccessDialog(
+      context,
+      title: loc.reportSuccessTitle,
+      message: loc.reportSuccessBody,
+      buttonText: loc.reportGoHome,
+      onDismiss: () {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      },
     );
   }
 
@@ -687,32 +625,13 @@ class _UnknownProductSubmissionScreenState
                       ),
                     ),
                     const SizedBox(height: 10),
-                    TextField(
+                    CustomTextField(
                       controller: _nameController,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        color: colorScheme.onSurface,
-                      ),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(color: primaryColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide(
-                              color: primaryColor, width: 1.5),
-                        ),
-                        hintText: 'Enter product name',
-                        hintStyle: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
+                      hintText: 'Enter product name',
+                      errorText: _nameError,
+                      inputFormatters: [SanitizingTextInputFormatter()],
                       onChanged: (value) {
+                        if (_nameError != null) setState(() => _nameError = null);
                         setState(() => _productName = value);
                       },
                     ),
