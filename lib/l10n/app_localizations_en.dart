@@ -1,3 +1,6 @@
+// FILE LOCATION: lib/l10n/app_localizations_en.dart
+// (Not the one imported by the app -- see lib/generated/l10n/app_localizations_en.dart)
+
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
@@ -849,6 +852,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noSearchMatchDesc => 'No products matched your search.';
+
+  @override
+  String get seeMore => 'See More';
 
   @override
   String get scanGuideText => 'Align product label to scan';

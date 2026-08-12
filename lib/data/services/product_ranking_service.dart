@@ -32,11 +32,24 @@ class ProductRankingService {
   /// Ranks [products] against [user]'s profile. Pure Dart -- no API calls,
   /// safe to call as often as needed (rebuilds, re-sorts, etc.) at zero cost.
   /// Powers the ranked list-of-names screen.
+  ///
+  /// [enforceMaxCap] gates the $kMaxProductsPerRanking-item hard limit.
+  /// Defaults to true, which is what Scenario A (multi-product scan --
+  /// MultiScanResultsScreen, always fed at most 5 detections -- see
+  /// CameraScannerScreen's `.take(5)`) and the solo-product path
+  /// (ProductDetailScreen, always a 1-item list) rely on. Scenario B (the
+  /// "Compare" button -- ProductComparisonService.compareWithAlternatives
+  /// and CompareProductsScreen's re-rank-on-filter-change) passes
+  /// `enforceMaxCap: false`, since it intentionally ranks every
+  /// same-category product regardless of count; the UI layer, not this
+  /// method, is responsible for paginating that longer list behind
+  /// "See More".
   List<RankedProductResult> rankProducts({
     required List<Product> products,
     required UserHealthProfile user,
+    bool enforceMaxCap = true,
   }) {
-    if (products.length > kMaxProductsPerRanking) {
+    if (enforceMaxCap && products.length > kMaxProductsPerRanking) {
       throw ArgumentError(
         'CLARO supports ranking up to $kMaxProductsPerRanking products per '
         'scan event, got ${products.length}.',

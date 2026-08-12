@@ -62,6 +62,16 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   // conditions). Non-null == ranking narrowed to that single condition.
   HealthCondition? _selectedCondition;
 
+  // Scenario B only: the ranked list can hold more than
+  // kMaxProductsPerRanking products now that compareWithAlternatives
+  // returns every same-category match. false == show only the top 5;
+  // true == "See More" was tapped, show the rest in the same ranked
+  // order. Ignored while a search query is active -- search shows every
+  // matching result regardless of this flag.
+  bool _expanded = false;
+
+  static const int _initialVisibleCount = 5;
+
   @override
   void initState() {
     super.initState();
@@ -188,15 +198,23 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
             voiceAssistant: profile.voiceAssistant,
           );
 
+    // Same Scenario B set as the initial load -- can legitimately exceed
+    // kMaxProductsPerRanking, so the cap enforced for Scenario A must stay
+    // off here too.
     final reRanked = BackendLocator.productRankingService.rankProducts(
       products: _comparisonProducts,
       user: effectiveProfile,
+      enforceMaxCap: false,
     );
 
     setState(() {
       _selectedCondition = condition;
       _allRanked = reRanked;
       _filtered = _computeFiltered(reRanked);
+      // Re-ranking can reorder which products land in the top 5, so
+      // collapse back to the initial view rather than keep an expansion
+      // state that no longer matches the new order.
+      _expanded = false;
     });
   }
 
@@ -482,49 +500,106 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                     ? _buildNutritionUnavailable()
                     : _filtered.isEmpty
                     ? _buildEmpty()
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        itemCount: _filtered.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (context, i) {
-                          final ranked = _filtered[i];
-                          final isCurrent =
-                              ranked.evaluation.product.id == widget.sourceProduct.id;
-                          return RankedProductCard(
-                            ranked: ranked,
-                            isCurrent: isCurrent,
-                            onTap: () async {
-                              if (widget.saveToHistory) {
-                                // Normal flow: return result to caller (ProductDetailScreen)
-                                Navigator.pop(
-                                  context,
-                                  {
-                                    'product': ranked.evaluation.product,
-                                    'comparisonSet': _allRanked,
-                                  },
-                                );
-                              } else {
-                                // Saved comparison flow: navigate directly to ProductDetailScreen
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ProductDetailScreen(
-                                      product: ranked.evaluation.product,
-                                      comparisonSet: _allRanked,
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                          );
-                        },
-                      ),
+                    : _buildRankedList(),
           ),
         ],
       ),
 
       // ── Floating mic button (matching design) ─────────────────────
       floatingActionButton: const VoiceAssistantFab(),
+    );
+  }
+
+  /// Builds the ranked list with Scenario B's "top 5 + See More" behavior.
+  /// While a search query is active, this is bypassed entirely -- every
+  /// matching result is shown, since search is a deliberate lookup rather
+  /// than browsing the ranked order.
+  Widget _buildRankedList() {
+    final isSearching = _searchCtrl.text.trim().isNotEmpty;
+    final hasMore = !isSearching && _filtered.length > _initialVisibleCount;
+    final showSeeMore = hasMore && !_expanded;
+    final visibleCount = isSearching || _expanded
+        ? _filtered.length
+        : _filtered.length.clamp(0, _initialVisibleCount);
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      itemCount: visibleCount + (showSeeMore ? 1 : 0),
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (context, i) {
+        if (showSeeMore && i == visibleCount) {
+          return _buildSeeMoreButton();
+        }
+
+        final ranked = _filtered[i];
+        final isCurrent =
+            ranked.evaluation.product.id == widget.sourceProduct.id;
+        return RankedProductCard(
+          ranked: ranked,
+          isCurrent: isCurrent,
+          onTap: () async {
+            if (widget.saveToHistory) {
+              // Normal flow: return result to caller (ProductDetailScreen)
+              Navigator.pop(
+                context,
+                {
+                  'product': ranked.evaluation.product,
+                  'comparisonSet': _allRanked,
+                },
+              );
+            } else {
+              // Saved comparison flow: navigate directly to ProductDetailScreen
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProductDetailScreen(
+                    product: ranked.evaluation.product,
+                    comparisonSet: _allRanked,
+                  ),
+                ),
+              );
+            }
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildSeeMoreButton() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    final remaining = _filtered.length - _initialVisibleCount;
+
+    return GestureDetector(
+      onTap: () {
+        HapticService().vibrate();
+        setState(() => _expanded = true);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${loc.seeMore} ($remaining)',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.primary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.keyboard_arrow_down, size: 18, color: colorScheme.primary),
+          ],
+        ),
+      ),
     );
   }
 

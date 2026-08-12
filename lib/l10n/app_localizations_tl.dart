@@ -1,3 +1,6 @@
+// FILE LOCATION: lib/l10n/app_localizations_tl.dart
+// (Not the one imported by the app -- see lib/generated/l10n/app_localizations_tl.dart)
+
 // ignore: unused_import
 import 'package:intl/intl.dart' as intl;
 import 'app_localizations.dart';
@@ -859,6 +862,9 @@ class AppLocalizationsTl extends AppLocalizations {
   @override
   String get noSearchMatchDesc =>
       'Walang mga produktong tumutugma sa iyong paghahanap.';
+
+  @override
+  String get seeMore => 'Tingnan Pa';
 
   @override
   String get scanGuideText => 'I-align ang label ng produkto upang i-scan';

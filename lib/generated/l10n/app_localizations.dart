@@ -1778,6 +1778,12 @@ abstract class AppLocalizations {
   /// **'No products matched your search.'**
   String get noSearchMatchDesc;
 
+  /// No description provided for @seeMore.
+  ///
+  /// In en, this message translates to:
+  /// **'See More'**
+  String get seeMore;
+
   /// No description provided for @scanGuideText.
   ///
   /// In en, this message translates to:

@@ -910,6 +910,9 @@ class AppLocalizationsTl extends AppLocalizations {
       'Walang mga produktong tumutugma sa iyong paghahanap.';
 
   @override
+  String get seeMore => 'Tingnan Pa';
+
+  @override
   String get scanGuideText => 'I-align ang label ng produkto upang i-scan';
 
   @override

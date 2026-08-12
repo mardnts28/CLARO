@@ -1,3 +1,6 @@
+// FILE LOCATION: lib/l10n/app_localizations.dart
+// (Not the one imported by the app -- see lib/generated/l10n/app_localizations.dart)
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -1693,6 +1696,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No products matched your search.'**
   String get noSearchMatchDesc;
+
+  /// No description provided for @seeMore.
+  ///
+  /// In en, this message translates to:
+  /// **'See More'**
+  String get seeMore;
 
   /// No description provided for @scanGuideText.
   ///

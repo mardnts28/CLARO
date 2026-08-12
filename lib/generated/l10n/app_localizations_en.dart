@@ -896,6 +896,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noSearchMatchDesc => 'No products matched your search.';
 
   @override
+  String get seeMore => 'See More';
+
+  @override
   String get scanGuideText => 'Align product label to scan';
 
   @override
