@@ -682,22 +682,45 @@ class AuthService {
     final uid = user.uid;
 
     try {
-      // Delete Firebase Authentication account first
-      // This will fail if the user hasn't recently authenticated
+      // Delete the Firestore user document FIRST, while the user is still
+      // authenticated.
+      //
+      // This used to run the other way around (Auth account deleted,
+      // then Firestore document deleted). But deleting the Firebase Auth
+      // user signs them out immediately and invalidates their ID token,
+      // so the Firestore delete that followed was running as an
+      // unauthenticated request. Firestore's security rules for the
+      // `users` collection require the requester to be the owner
+      // (request.auth.uid == uid), so that delete would fail with
+      // permission-denied -- leaving an orphaned `users/{uid}` document
+      // behind even though the Auth account was already gone. Deleting
+      // Firestore first, based on the authenticated user's own uid,
+      // avoids that: if it fails, nothing has been deleted yet and we
+      // can report the failure honestly instead of silently leaving a
+      // stray document.
+      try {
+        await _firebaseDb.collection('users').doc(uid).delete();
+      } catch (e) {
+        debugPrint('Firestore user document deletion error: $e');
+        return 'Failed to delete your account data. Please try again.';
+      }
+
+      // Now delete the Firebase Authentication account.
+      // This can fail if the user hasn't recently authenticated. At this
+      // point the Firestore document is already gone, so on this
+      // particular failure we still sign the user out and ask them to
+      // re-login and retry -- retrying will simply find no document left
+      // to delete and proceed straight to removing the Auth account.
       try {
         await user.delete();
       } on FirebaseAuthException catch (e) {
         debugPrint('Firebase Auth deletion error: $e');
-        // If deletion fails due to recent authentication requirement, try signing out first
         if (e.code == 'requires-recent-login') {
           await _firebaseAuth.signOut();
           return 'For security reasons, you need to re-login before deleting your account. Please log in again and try.';
         }
         rethrow;
       }
-
-      // Delete Firestore user document
-      await _firebaseDb.collection('users').doc(uid).delete();
 
       // Clear local session data
       final prefs = await SharedPreferences.getInstance();

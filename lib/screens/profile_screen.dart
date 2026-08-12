@@ -30,6 +30,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userEmail = '';
   bool _voiceAssistantEnabled = false;
   bool _mfaEnabled = false;
+  // True while an account-deletion request is in flight. Drives an
+  // in-place loading overlay in build() below -- deliberately NOT a
+  // separate dialog/route, so there's nothing left over to race against
+  // AuthGate's reactive teardown of this whole screen once the Auth
+  // account is actually deleted. See _performAccountDeletion for why.
+  bool _isDeletingAccount = false;
   bool _darkModeEnabled = false;
   String _selectedLanguageCode = 'en';
   double _speechRate = 0.5;
@@ -180,35 +186,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? Colors.red
         : colorScheme.primary;
 
-    return RefreshIndicator(
-      color: primaryColor,
-      onRefresh: _onRefresh,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              loc.profile,
-              style: TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
+    return Stack(
+      children: [
+        RefreshIndicator(
+          color: primaryColor,
+          onRefresh: _onRefresh,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  loc.profile,
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                _buildProfileCard(),
+                const SizedBox(height: 24),
+                _buildPersonalSection(),
+                const SizedBox(height: 20),
+                _buildPreferenceSection(),
+                const SizedBox(height: 20),
+                _buildMoreSection(),
+                const SizedBox(height: 90),
+              ],
+            ),
+          ),
+        ),
+        // Deliberately an in-place overlay within THIS screen's own
+        // subtree, not a separate showDialog()/Route. A separate route
+        // would sit on top of HomeScreen in the Navigator while
+        // AuthGate reactively swaps HomeScreen for LoginScreen out from
+        // under it -- the same kind of teardown race that caused the
+        // _dependents.isEmpty assertion. Because this overlay lives
+        // inside ProfileScreen's own widget tree, it tears down
+        // atomically with the rest of this screen when AuthGate
+        // replaces it, instead of racing it.
+        if (_isDeletingAccount)
+          Positioned.fill(
+            child: ColoredBox(
+              color: colorScheme.surface.withOpacity(0.7),
+              child: Center(
+                child: CircularProgressIndicator(color: primaryColor),
               ),
             ),
-            const SizedBox(height: 20),
-            _buildProfileCard(),
-            const SizedBox(height: 24),
-            _buildPersonalSection(),
-            const SizedBox(height: 20),
-            _buildPreferenceSection(),
-            const SizedBox(height: 20),
-            _buildMoreSection(),
-            const SizedBox(height: 90),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 
@@ -512,7 +540,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? Colors.red
         : const Color(0xFF8B1A1A);
     String? errorMessage;
-    bool isDeleting = false;
+
+    // The phrase the user must type is derived from their current
+    // username/name (e.g. "DELETE-john"), not a static "DELETE". Captured
+    // once when the dialog opens so it stays stable for the lifetime of
+    // the dialog even if _userName were to change underneath it.
+    final String requiredDeletePhrase = 'DELETE-$_userName';
 
     showDialog(
       context: context,
@@ -558,7 +591,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'Type "DELETE" to confirm:',
+                    'Type "$requiredDeletePhrase" to confirm:',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -577,7 +610,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: colorScheme.onSurface,
                     ),
                     decoration: InputDecoration(
-                      hintText: 'DELETE',
+                      hintText: requiredDeletePhrase,
                       hintStyle: TextStyle(
                         color: colorScheme.onSurfaceVariant.withOpacity(0.5),
                       ),
@@ -594,121 +627,71 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: deleteColor,
                       ),
                     ),
-                    textCapitalization: TextCapitalization.characters,
+                    // NOTE: no longer forcing TextCapitalization.characters.
+                    // The required phrase now embeds the user's name in its
+                    // original case (e.g. "DELETE-John") and the comparison
+                    // below is case-sensitive, so nudging the keyboard
+                    // toward all-caps input would make it harder, not
+                    // easier, for users to type a matching phrase.
                   ),
-                  if (isDeleting) ...[
-                    const SizedBox(height: 16),
-                    Center(
-                      child: CircularProgressIndicator(
-                        color: deleteColor,
-                      ),
-                    ),
-                  ],
                 ],
               ),
               actions: [
                 TextButton(
-                  onPressed: isDeleting
-                      ? null
-                      : () {
-                          HapticService().vibrate();
-                          deleteController.dispose();
-                          Navigator.of(dialogContext).pop();
-                        },
+                  onPressed: () {
+                    HapticService().vibrate();
+                    deleteController.dispose();
+                    Navigator.of(dialogContext).pop();
+                  },
                   child: Text(
                     'Cancel',
                     style: TextStyle(
-                      color: isDeleting
-                          ? colorScheme.onSurfaceVariant.withOpacity(0.5)
-                          : colorScheme.onSurfaceVariant,
+                      color: colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
                 TextButton(
-                  onPressed: isDeleting
-                      ? null
-                      : () async {
-                          if (deleteController.text.trim() != 'DELETE') {
-                            setState(() {
-                              errorMessage = 'Please type DELETE to confirm account deletion.';
-                            });
-                            return;
-                          }
+                  onPressed: () {
+                    if (deleteController.text.trim() != requiredDeletePhrase) {
+                      setState(() {
+                        errorMessage =
+                            'Please type $requiredDeletePhrase to confirm account deletion.';
+                      });
+                      return;
+                    }
 
-                          setState(() {
-                            isDeleting = true;
-                          });
+                    // Close the dialog RIGHT NOW, synchronously, before any
+                    // async work starts -- do not wait for
+                    // _authService.deleteAccount() first.
+                    //
+                    // deleteAccount() ends by deleting the Firebase Auth
+                    // user, and this app's root widget (AuthGate in
+                    // main.dart) wraps HomeScreen/ProfileScreen in a
+                    // StreamBuilder on FirebaseAuth.authStateChanges().
+                    // That stream can emit `null` -- and AuthGate can
+                    // react by tearing HomeScreen down and swapping in
+                    // LoginScreen -- before control even returns to this
+                    // callback from the `await` below. If this dialog's
+                    // route were still open when that happens, it would
+                    // be a second, independent teardown of HomeScreen's
+                    // subtree racing the one AuthGate is already doing,
+                    // which is exactly what threw "Failed assertion:
+                    // '_dependents.isEmpty'": an InheritedElement
+                    // unmounted while a dependent element from the
+                    // still-open dialog route hadn't detached yet. Popping
+                    // the dialog first, before deletion even begins,
+                    // means there's no dialog route left to race against
+                    // that rebuild.
+                    deleteController.dispose();
+                    Navigator.of(dialogContext).pop();
 
-                          final error = await _authService.deleteAccount();
-
-                          if (!mounted) return;
-
-                          if (error != null) {
-                            // Deletion failed: just close the dialog and
-                            // surface the error via a snackbar. Nothing
-                            // else on the widget tree is torn down here,
-                            // so the plain pop + post-frame snackbar is
-                            // fine as before.
-                            deleteController.dispose();
-                            Navigator.of(dialogContext).pop();
-
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(error),
-                                    backgroundColor: deleteColor,
-                                  ),
-                                );
-                              }
-                            });
-                            return;
-                          }
-
-                          // Success path: dismiss the dialog AND redirect
-                          // to Login in a single atomic Navigator
-                          // transaction instead of popping the dialog and
-                          // separately pushing a replacement afterward.
-                          //
-                          // Doing those as two separate operations raced
-                          // the dialog route's pop/exit transition against
-                          // the teardown of HomeScreen's much larger
-                          // subtree (the IndexedStack tabs — including
-                          // this very ProfileScreen — and everything that
-                          // consumes Theme/MediaQuery/etc. inside it).
-                          // That inconsistent teardown order is what threw
-                          // "Failed assertion: '_dependents.isEmpty'":
-                          // an InheritedElement further up the tree was
-                          // unmounting before a dependent element from the
-                          // still-animating-out dialog route had fully
-                          // detached.
-                          //
-                          // pushNamedAndRemoveUntil on the ROOT navigator
-                          // (the same one showDialog used) removes every
-                          // route on the stack — the dialog's own route
-                          // included — and pushes Login ('/') in one
-                          // atomic step, so there's no in-between frame
-                          // where the dialog is gone but HomeScreen isn't,
-                          // or vice versa.
-                          Navigator.of(context, rootNavigator: true)
-                              .pushNamedAndRemoveUntil('/', (route) => false);
-
-                          // Dispose the controller only after this frame's
-                          // teardown has actually run, so the TextField's
-                          // own dispose() (which calls removeListener on
-                          // it) always runs before the controller itself
-                          // is freed.
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            deleteController.dispose();
-                          });
-                        },
+                    _performAccountDeletion();
+                  },
                   child: Text(
-                    isDeleting ? 'Deleting...' : 'Confirm',
+                    'Confirm',
                     style: TextStyle(
-                      color: isDeleting
-                          ? deleteColor.withOpacity(0.5)
-                          : deleteColor,
+                      color: deleteColor,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -719,6 +702,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+  }
+
+  /// Runs the actual account deletion after the confirmation dialog has
+  /// already been dismissed (see _showDeleteAccountDialog for why the
+  /// dialog must be closed first).
+  ///
+  /// Progress is shown via `_isDeletingAccount`, an in-place overlay
+  /// inside THIS screen's own build() -- not a separate dialog/route --
+  /// so that if AuthGate swaps this whole screen out for LoginScreen
+  /// partway through (which happens automatically, reactively, the
+  /// moment the Firebase Auth account is actually deleted), the overlay
+  /// tears down atomically along with everything else instead of being
+  /// left dangling on top of a torn-down tree.
+  Future<void> _performAccountDeletion() async {
+    if (!mounted) return;
+    setState(() {
+      _isDeletingAccount = true;
+    });
+
+    final error = await _authService.deleteAccount();
+
+    // If this screen is gone by the time we get here, AuthGate has
+    // already reacted to the Auth account being deleted and replaced it
+    // with LoginScreen -- deletion succeeded and there is nothing further
+    // to do.
+    if (!mounted) return;
+
+    if (error != null) {
+      // Deletion failed (and, per deleteAccount's Firestore-first
+      // ordering, nothing was actually deleted), and AuthGate never
+      // touched this screen -- so it's safe to update our own state and
+      // show the error normally.
+      setState(() {
+        _isDeletingAccount = false;
+      });
+      final theme = Theme.of(context);
+      final deleteColor = theme.brightness == Brightness.dark
+          ? Colors.red
+          : const Color(0xFF8B1A1A);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error),
+          backgroundColor: deleteColor,
+        ),
+      );
+      return;
+    }
+
+    // Success, but this screen hasn't been torn down yet (AuthGate's
+    // rebuild hasn't landed this frame) -- leave _isDeletingAccount as
+    // true so the overlay stays up. AuthGate will swap in LoginScreen
+    // momentarily; there's nothing else for this screen to do.
   }
 
   Widget _buildMenuItemWithArrow({

@@ -314,7 +314,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             },
           ),
           const SizedBox(height: 32),
-          _buildButton(loc.nextButton, _nextPage, theme),
+          _buildButton(
+            loc.nextButton,
+            _nextPage,
+            theme,
+            checkValidation: true,
+            isFormValid: isBasicInfoValid,
+          ),
           const SizedBox(height: 40),
         ],
       ),
@@ -385,7 +391,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildButton(loc.getStarted, _nextPage, theme, checkValidation: true),
+          _buildButton(
+            loc.getStarted,
+            _nextPage,
+            theme,
+            checkValidation: true,
+            isFormValid: _isFormValid,
+          ),
           const SizedBox(height: 12),
           Center(
             child: Text(
@@ -609,15 +621,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  bool isBasicInfoValid() {
+    final hasName = _nameController.text.trim().isNotEmpty;
+    final hasDob = _selectedDateOfBirth != null;
+    return hasName && hasDob;
+  }
+
   bool _isFormValid() {
     // At least one health condition must be selected
     final hasCondition = _conditions.values.any((selected) => selected);
     return hasCondition;
   }
 
-  Widget _buildButton(String label, VoidCallback onTap, ThemeData theme, {bool checkValidation = false}) {
+  Widget _buildButton(
+    String label,
+    VoidCallback onTap,
+    ThemeData theme, {
+    bool checkValidation = false,
+    bool Function()? isFormValid,
+  }) {
     final colorScheme = theme.colorScheme;
-    final isButtonEnabled = checkValidation ? (_isFormValid() && !_isLoading) : !_isLoading;
+    final enabledChecker = isFormValid ?? _isFormValid;
+    final isButtonEnabled = checkValidation ? (enabledChecker() && !_isLoading) : !_isLoading;
     return SizedBox(
       width: double.infinity,
       height: 48,
