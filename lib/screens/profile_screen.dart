@@ -539,7 +539,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final deleteColor = theme.brightness == Brightness.dark
         ? Colors.red
         : const Color(0xFF8B1A1A);
-    String? errorMessage;
 
     // The phrase the user must type is derived from their current
     // username/name (e.g. "DELETE-john"), not a static "DELETE". Captured
@@ -549,158 +548,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     showDialog(
       context: context,
-      builder: (dialogContext) {
-        final TextEditingController deleteController = TextEditingController();
-
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              backgroundColor: colorScheme.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              title: Row(
-                children: [
-                  Icon(
-                    Icons.warning_rounded,
-                    color: deleteColor,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Delete Account?',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: deleteColor,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'This action will permanently delete your account and associated profile data. This cannot be undone.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: colorScheme.onSurfaceVariant,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Type "$requiredDeletePhrase" to confirm:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: deleteColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: deleteController,
-                    onChanged: (value) {
-                      setState(() {
-                        errorMessage = null;
-                      });
-                    },
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: requiredDeletePhrase,
-                      hintStyle: TextStyle(
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.5),
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: colorScheme.outlineVariant),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: deleteColor, width: 2),
-                      ),
-                      errorText: errorMessage,
-                      errorStyle: TextStyle(
-                        color: deleteColor,
-                      ),
-                    ),
-                    // NOTE: no longer forcing TextCapitalization.characters.
-                    // The required phrase now embeds the user's name in its
-                    // original case (e.g. "DELETE-John") and the comparison
-                    // below is case-sensitive, so nudging the keyboard
-                    // toward all-caps input would make it harder, not
-                    // easier, for users to type a matching phrase.
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    HapticService().vibrate();
-                    deleteController.dispose();
-                    Navigator.of(dialogContext).pop();
-                  },
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    if (deleteController.text.trim() != requiredDeletePhrase) {
-                      setState(() {
-                        errorMessage =
-                            'Please type $requiredDeletePhrase to confirm account deletion.';
-                      });
-                      return;
-                    }
-
-                    // Close the dialog RIGHT NOW, synchronously, before any
-                    // async work starts -- do not wait for
-                    // _authService.deleteAccount() first.
-                    //
-                    // deleteAccount() ends by deleting the Firebase Auth
-                    // user, and this app's root widget (AuthGate in
-                    // main.dart) wraps HomeScreen/ProfileScreen in a
-                    // StreamBuilder on FirebaseAuth.authStateChanges().
-                    // That stream can emit `null` -- and AuthGate can
-                    // react by tearing HomeScreen down and swapping in
-                    // LoginScreen -- before control even returns to this
-                    // callback from the `await` below. If this dialog's
-                    // route were still open when that happens, it would
-                    // be a second, independent teardown of HomeScreen's
-                    // subtree racing the one AuthGate is already doing,
-                    // which is exactly what threw "Failed assertion:
-                    // '_dependents.isEmpty'": an InheritedElement
-                    // unmounted while a dependent element from the
-                    // still-open dialog route hadn't detached yet. Popping
-                    // the dialog first, before deletion even begins,
-                    // means there's no dialog route left to race against
-                    // that rebuild.
-                    deleteController.dispose();
-                    Navigator.of(dialogContext).pop();
-
-                    _performAccountDeletion();
-                  },
-                  child: Text(
-                    'Confirm',
-                    style: TextStyle(
-                      color: deleteColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (dialogContext) => _DeleteAccountDialogContent(
+        requiredPhrase: requiredDeletePhrase,
+        colorScheme: colorScheme,
+        deleteColor: deleteColor,
+        onConfirmed: _performAccountDeletion,
+      ),
     );
   }
 
@@ -927,6 +780,201 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Content of the "Delete Account?" confirmation dialog.
+///
+/// This is a dedicated StatefulWidget -- not an inline TextEditingController
+/// paired with a StatefulBuilder -- specifically so its TextEditingController
+/// is disposed by Flutter's own State.dispose() lifecycle, at the moment
+/// this widget's element actually finishes unmounting, rather than being
+/// disposed manually alongside a Navigator.pop() call.
+///
+/// That distinction matters: showDialog's route plays an exit animation, so
+/// after pop() is called the dialog (and its TextField) is still part of
+/// the tree, still being rebuilt, for as long as that animation runs.
+/// Manually disposing the controller synchronously at pop() time -- as the
+/// previous version of this dialog did -- meant the very next frame tried
+/// to rebuild that still-animating-out TextField against an
+/// already-disposed controller, throwing "A TextEditingController was used
+/// after being disposed." mid-build. Anchoring disposal to this State's own
+/// dispose() instead guarantees it only happens once Flutter is actually
+/// done with the widget.
+class _DeleteAccountDialogContent extends StatefulWidget {
+  const _DeleteAccountDialogContent({
+    required this.requiredPhrase,
+    required this.colorScheme,
+    required this.deleteColor,
+    required this.onConfirmed,
+  });
+
+  final String requiredPhrase;
+  final ColorScheme colorScheme;
+  final Color deleteColor;
+  final VoidCallback onConfirmed;
+
+  @override
+  State<_DeleteAccountDialogContent> createState() =>
+      _DeleteAccountDialogContentState();
+}
+
+class _DeleteAccountDialogContentState
+    extends State<_DeleteAccountDialogContent> {
+  late final TextEditingController _controller;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = widget.colorScheme;
+    final deleteColor = widget.deleteColor;
+    final requiredDeletePhrase = widget.requiredPhrase;
+
+    return AlertDialog(
+      backgroundColor: colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(
+            Icons.warning_rounded,
+            color: deleteColor,
+            size: 24,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Delete Account?',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: deleteColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'This action will permanently delete your account and associated profile data. This cannot be undone.',
+            style: TextStyle(
+              fontSize: 14,
+              color: colorScheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Type "$requiredDeletePhrase" to confirm:',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: deleteColor,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _controller,
+            onChanged: (value) {
+              if (_errorMessage != null) {
+                setState(() {
+                  _errorMessage = null;
+                });
+              }
+            },
+            style: TextStyle(
+              color: colorScheme.onSurface,
+            ),
+            decoration: InputDecoration(
+              hintText: requiredDeletePhrase,
+              hintStyle: TextStyle(
+                color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: colorScheme.outlineVariant),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: deleteColor, width: 2),
+              ),
+              errorText: _errorMessage,
+              errorStyle: TextStyle(
+                color: deleteColor,
+              ),
+            ),
+            // NOTE: no longer forcing TextCapitalization.characters. The
+            // required phrase now embeds the user's name in its original
+            // case (e.g. "DELETE-John") and the comparison below is
+            // case-sensitive, so nudging the keyboard toward all-caps
+            // input would make it harder, not easier, for users to type a
+            // matching phrase.
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            HapticService().vibrate();
+            Navigator.of(context).pop();
+          },
+          child: Text(
+            'Cancel',
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: () {
+            if (_controller.text.trim() != requiredDeletePhrase) {
+              setState(() {
+                _errorMessage =
+                    'Please type $requiredDeletePhrase to confirm account deletion.';
+              });
+              return;
+            }
+
+            // Close the dialog RIGHT NOW, before any async work starts --
+            // do not wait for account deletion first. deleteAccount() ends
+            // by deleting the Firebase Auth user, and this app's root
+            // widget (AuthGate in main.dart) wraps HomeScreen/ProfileScreen
+            // in a StreamBuilder on FirebaseAuth.authStateChanges(). That
+            // stream can emit `null` -- and AuthGate can react by tearing
+            // HomeScreen down and swapping in LoginScreen -- before this
+            // deletion even finishes. Popping first, before deletion
+            // begins, means there's no dialog route left to race against
+            // that rebuild. (The controller itself is safe regardless,
+            // since it's now disposed via this State's own dispose() --
+            // see the class doc comment above.)
+            Navigator.of(context).pop();
+            widget.onConfirmed();
+          },
+          child: Text(
+            'Confirm',
+            style: TextStyle(
+              color: deleteColor,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
