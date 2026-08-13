@@ -249,6 +249,11 @@
 
   "filterConditionTitle": "Filter ranking by condition",
   "conditionOverall": "Overall (all conditions)",
+  "filterProductTypeTitle": "Uri ng Produkto",
+  "filterFlavorTitle": "Lasa",
+  "spicyLabel": "Maanghang",
+  "nonSpicyLabel": "Hindi Maanghang",
+  "apply": "I-apply",
 
   "ratePrompt": "Mangyaring pumili ng rating sa pagitan ng 1 at 5.",
   "suggestionEmpty": "Mangyaring ilagay ang iyong suhestiyon bago ipadala.",

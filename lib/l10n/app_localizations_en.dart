@@ -656,6 +656,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get conditionOverall => 'Overall (all conditions)';
 
   @override
+  String get filterProductTypeTitle => 'Product Type';
+
+  @override
+  String get filterFlavorTitle => 'Flavor';
+
+  @override
+  String get spicyLabel => 'Spicy';
+
+  @override
+  String get nonSpicyLabel => 'Non-Spicy';
+
+  @override
+  String get apply => 'Apply';
+
+  @override
   String get ratePrompt => 'Please select a rating between 1 and 5.';
 
   @override

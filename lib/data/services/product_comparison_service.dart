@@ -11,6 +11,9 @@
 //   1. Selection (this file, _isRelevantCandidate below): a deterministic,
 //      keyword/phrase-based relevance gate over Product.name -- decides
 //      WHICH same-category products are similar enough to include at all.
+//      The keyword lists live in ProductCharacteristics (core/utils),
+//      shared with CompareProductsScreen's on-screen Product Type/Flavor
+//      filter chips, so there's one vocabulary to maintain, not two.
 //   2. Ranking (ProductRankingService.rankProducts, i.e. WhoCalculator):
 //      decides the DISPLAY ORDER of whichever candidates made it through
 //      step 1, purely on nutritional suitability. Selection never
@@ -36,6 +39,7 @@
 // "See More" rather than this service truncating it.
 
 import '../models/health_profile.dart';
+import '../../core/utils/product_characteristics.dart';
 import '../../models/product_model.dart';
 import '../models/ranked_product_result.dart';
 import '../repositories/product_repository.dart';
@@ -109,109 +113,17 @@ class ProductComparisonService {
     return result;
   }
 
-  // ── Deterministic similarity gate (Option B) ────────────────────────
-  //
-  // Two products are "relevant" to each other if they share at least one
-  // meaningful characteristic token -- drawn from either the curated
-  // protein/type + flavor keyword lists below, or (for categories those
-  // lists don't cover) generic overlap of the meaningful words left in
-  // each product's name after stripping brand name and packaging/filler
-  // words. A candidate needs to share ONLY ONE such token to be included
-  // -- this deliberately is not an exact-match-of-every-phrase
-  // requirement, so "Sardines in Tomato Sauce" and "Tuna in Tomato Sauce"
-  // still match each other (shared flavor) even though their protein
-  // differs.
-
-  /// Curated PROTEIN/PRODUCT-TYPE keywords -- common, short/ambiguous
-  /// words (like "tuna") that deserve an explicit list rather than
-  /// relying on generic token overlap alone.
-  static const List<String> _typeKeywords = [
-    // Canned fish / meats
-    'tuna', 'sardines', 'sardine', 'mackerel', 'bangus', 'milkfish',
-    'corned beef', 'luncheon meat', 'meatloaf', 'vienna sausage', 'hotdog',
-    // Common protein descriptors (noodles, snacks, etc.)
-    'chicken', 'beef', 'pork', 'seafood', 'shrimp', 'squid',
-  ];
-
-  /// Curated FLAVOR/PREPARATION keywords -- checked against the product
-  /// NAME (the only field that reliably carries this info -- see file
-  /// header on Product.variant). Lets two products of a DIFFERENT protein
-  /// type still count as relevant when they share a flavor/prep style,
-  /// e.g. "Tuna in Tomato Sauce" vs. "Sardines in Tomato Sauce".
-  static const List<String> _flavorKeywords = [
-    'tomato sauce', 'chili sauce', 'hot and spicy', 'spicy', 'hot',
-    'calamansi', 'vegetable oil', 'oil', 'garlic', 'onion', 'vinegar',
-    'adobo', 'curry', 'barbecue', 'bbq', 'sweet and sour',
-  ];
-
-  /// Words that describe packaging/preparation filler rather than WHAT
-  /// the product is -- stripped out before comparing product-name tokens
-  /// so two products don't look "similar" just because they're both
-  /// canned, or both use a generic descriptor like "original"/"premium".
-  /// "sauce" is included here (rather than left as a generic token) since
-  /// the SPECIFIC sauce types that actually matter are already captured
-  /// as two-word phrases in [_flavorKeywords] (e.g. "tomato sauce") --
-  /// letting the bare word "sauce" match on its own would treat any two
-  /// differently-sauced products in a category as "relevant" to each
-  /// other, which is too broad.
-  static const List<String> _genericStopwords = [
-    'canned', 'can', 'in', 'of', 'the', 'and', 'with', 'a', 'an',
-    'original', 'classic', 'premium', 'select', 'choice', 'natural',
-    'flavor', 'flavored', 'style', 'brand', 'new', 'net', 'wt', 'pack',
-    'sauce',
-  ];
-
-  /// Every curated keyword (type OR flavor) found in [product]'s name,
-  /// e.g. "Century Tuna Flakes in Tomato Sauce" -> {'tuna', 'tomato
-  /// sauce'}.
-  Set<String> _curatedCharacteristics(Product product) {
-    final name = product.name.toLowerCase();
-    return [..._typeKeywords, ..._flavorKeywords]
-        .where((k) => name.contains(k))
-        .toSet();
-  }
-
-  /// Fallback for categories the curated lists don't cover (fruits,
-  /// vegetables, condiments, etc.): the set of meaningful words left in
-  /// the product name after removing the brand name and packaging/filler
-  /// words. "Del Monte Mixed Fruit Cocktail in Syrup" (brand "Del Monte")
-  /// -> {'mixed', 'fruit', 'cocktail', 'syrup'}.
-  Set<String> _genericNameTokens(Product product) {
-    final brandWords = product.brand
-        .toLowerCase()
-        .split(RegExp(r'[^a-z0-9]+'))
-        .where((w) => w.isNotEmpty)
-        .toSet();
-
-    return product.name
-        .toLowerCase()
-        .split(RegExp(r'[^a-z0-9]+'))
-        .where((w) => w.length >= 3)
-        .where((w) => !brandWords.contains(w))
-        .where((w) => !_genericStopwords.contains(w))
-        .toSet();
-  }
-
-  /// The full set of "what makes this product what it is" tokens for
-  /// [product]: curated type/flavor keyword hits, plus generic name
-  /// tokens as a catch-all. Combining both (rather than one OR the
-  /// other) means a curated protein match ("sardines") AND a curated or
-  /// generic flavor match ("tomato sauce") both count toward relevance.
-  Set<String> _characteristicTokens(Product product) {
-    return {
-      ..._curatedCharacteristics(product),
-      ..._genericNameTokens(product),
-    };
-  }
-
   /// True if [candidate] shares at least one meaningful characteristic
-  /// (protein/type, flavor/prep, or -- for uncovered categories --
-  /// generic name token) with [scanned]. This is the sole gate deciding
-  /// whether [candidate] enters the comparison set; it does not affect
-  /// where it ends up ranked once included.
+  /// token (see ProductCharacteristics) with [scanned]. This is the sole
+  /// gate deciding whether [candidate] enters the comparison set; it does
+  /// not affect where it ends up ranked once included. Not an
+  /// exact-match-of-every-phrase requirement -- "Sardines in Tomato
+  /// Sauce" and "Tuna in Tomato Sauce" still match each other (shared
+  /// flavor) even though their protein differs.
   bool _isRelevantCandidate(Product scanned, Product candidate) {
-    final scannedTokens = _characteristicTokens(scanned);
-    final candidateTokens = _characteristicTokens(candidate);
+    final scannedTokens = ProductCharacteristics.characteristicTokens(scanned);
+    final candidateTokens =
+        ProductCharacteristics.characteristicTokens(candidate);
     if (scannedTokens.isEmpty || candidateTokens.isEmpty) return false;
     return scannedTokens.intersection(candidateTokens).isNotEmpty;
   }

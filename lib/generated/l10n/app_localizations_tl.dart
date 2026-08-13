@@ -707,6 +707,21 @@ class AppLocalizationsTl extends AppLocalizations {
   String get conditionOverall => 'Overall (all conditions)';
 
   @override
+  String get filterProductTypeTitle => 'Uri ng Produkto';
+
+  @override
+  String get filterFlavorTitle => 'Lasa';
+
+  @override
+  String get spicyLabel => 'Maanghang';
+
+  @override
+  String get nonSpicyLabel => 'Hindi Maanghang';
+
+  @override
+  String get apply => 'I-apply';
+
+  @override
   String get ratePrompt => 'Mangyaring pumili ng rating sa pagitan ng 1 at 5.';
 
   @override

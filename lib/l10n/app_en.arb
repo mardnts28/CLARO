@@ -249,6 +249,11 @@
 
   "filterConditionTitle": "Filter ranking by condition",
   "conditionOverall": "Overall (all conditions)",
+  "filterProductTypeTitle": "Product Type",
+  "filterFlavorTitle": "Flavor",
+  "spicyLabel": "Spicy",
+  "nonSpicyLabel": "Non-Spicy",
+  "apply": "Apply",
 
   "ratePrompt": "Please select a rating between 1 and 5.",
   "suggestionEmpty": "Please enter your suggestion before submitting.",

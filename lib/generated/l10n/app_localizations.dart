@@ -1412,6 +1412,36 @@ abstract class AppLocalizations {
   /// **'Overall (all conditions)'**
   String get conditionOverall;
 
+  /// No description provided for @filterProductTypeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Product Type'**
+  String get filterProductTypeTitle;
+
+  /// No description provided for @filterFlavorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Flavor'**
+  String get filterFlavorTitle;
+
+  /// No description provided for @spicyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Spicy'**
+  String get spicyLabel;
+
+  /// No description provided for @nonSpicyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Non-Spicy'**
+  String get nonSpicyLabel;
+
+  /// No description provided for @apply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get apply;
+
   /// No description provided for @ratePrompt.
   ///
   /// In en, this message translates to:
