@@ -460,5 +460,6 @@
   "invalidDateOfBirth": "Please select a valid date of birth",
   "under18Error": "You must be at least 18 years old to use this app",
   "enterDigitCode": "Enter 6-digit code",
-  "pleaseEnterProductName": "Please enter a product name"
+  "pleaseEnterProductName": "Please enter a product name",
+  "reportButtonToast": "Wrong product? Try reporting here"
 }

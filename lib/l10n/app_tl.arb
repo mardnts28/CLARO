@@ -460,5 +460,6 @@
   "invalidDateOfBirth": "Mangyaring pumili ng wastong petsa ng kapanganakan",
   "under18Error": "Dapat kang nasa edad na 18 pataas para magamit ang app na ito",
   "enterDigitCode": "Ilagay ang 6-digit na code",
-  "pleaseEnterProductName": "Mangyaring ilagay ang pangalan ng produkto"
+  "pleaseEnterProductName": "Mangyaring ilagay ang pangalan ng produkto",
+  "reportButtonToast": "Maling produkto? I-report ito dito"
 }

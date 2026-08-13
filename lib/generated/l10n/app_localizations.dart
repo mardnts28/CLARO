@@ -2401,6 +2401,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please enter a product name'**
   String get pleaseEnterProductName;
+
+  /// No description provided for @reportButtonToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong product? Try reporting here'**
+  String get reportButtonToast;
 }
 
 class _AppLocalizationsDelegate

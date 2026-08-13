@@ -1225,4 +1225,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get pleaseEnterProductName => 'Please enter a product name';
+
+  @override
+  String get reportButtonToast => 'Wrong product? Try reporting here';
 }

@@ -1246,4 +1246,7 @@ class AppLocalizationsTl extends AppLocalizations {
   @override
   String get pleaseEnterProductName =>
       'Mangyaring ilagay ang pangalan ng produkto';
+
+  @override
+  String get reportButtonToast => 'Maling produkto? I-report ito dito';
 }

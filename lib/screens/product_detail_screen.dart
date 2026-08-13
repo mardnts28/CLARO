@@ -10,6 +10,7 @@ import '../services/locale_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 import 'compare_products_screen.dart';
 import 'more_details_screen.dart';
+import 'unknown_product_submission_screen.dart';
 import '../data/models/health_profile.dart';
 import '../data/models/health_advisory.dart';
 import '../data/models/product_evaluation.dart';
@@ -78,6 +79,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late List<double> _availableSizes;
   late String _displayedImageUrl;
 
+  // Toast notification state
+  bool _hasShownReportToast = false;
+  OverlayEntry? _toastOverlay;
+
   void _initSizes(Product product) {
     final originalG = product.servingSizeG > 0 ? product.servingSizeG : 100.0;
     final sizeSet = <double>{originalG, ...product.availableSizes};
@@ -115,9 +120,106 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  /// Navigates to the report screen for reporting incorrect product information
+  void _navigateToReport() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UnknownProductSubmissionScreen(
+          capturedImagePath: null, // No pre-captured image when reporting from detail screen
+        ),
+      ),
+    );
+  }
+
+  /// Shows the toast notification to help users discover the report button
+  void _showReportToast() {
+    if (_hasShownReportToast) return;
+    
+    final loc = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    
+    // Remove emoji from the message
+    String message = loc.reportButtonToast.replaceAll('🔔 ', '');
+    
+    // Create custom speech bubble toast with proper pointer positioning
+    _toastOverlay = OverlayEntry(
+      builder: (context) => Positioned(
+        top: 72, // Position below the navigation header (56 + 16 padding)
+        right: 16, // Position near the right side where Report button is
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Stack to position triangle above toast body
+              SizedBox(
+                width: 200,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Triangular tip pointing upward, positioned above the toast
+                    Positioned(
+                      top: -6, // Position above the toast
+                      right: 56, // Offset to align with Report button center (Report button is left of Favorite button)
+                      child: CustomPaint(
+                        size: const Size(12, 6),
+                        painter: _TrianglePainter(
+                          color: Colors.grey[700]!,
+                        ),
+                      ),
+                    ),
+                    // Speech bubble body
+                    Container(
+                      width: 200,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[700],
+                        borderRadius: BorderRadius.circular(8),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        message,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    
+    Overlay.of(context).insert(_toastOverlay!);
+    setState(() => _hasShownReportToast = true);
+    
+    // Auto-dismiss after 6 seconds
+    Future.delayed(const Duration(seconds: 6), () {
+      if (_toastOverlay != null) {
+        _toastOverlay!.remove();
+        _toastOverlay = null;
+      }
+    });
+  }
+
   @override
   void dispose() {
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
+    _toastOverlay?.remove();
     super.dispose();
   }
 
@@ -150,6 +252,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (!_advisoryStarted) {
       _advisoryStarted = true;
       _loadAdvisory();
+    }
+    
+    // Show report toast notification after a short delay to help users discover the feature
+    // Only show it once per screen instance to avoid repetition
+    if (!_hasShownReportToast) {
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (mounted) {
+          _showReportToast();
+        }
+      });
     }
   }
 
@@ -343,16 +455,40 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         color: colorScheme.primary, size: 24),
                   ),
                 ),
-                // Right Heart Button
+                // Right Heart Button + Report Button
                 Align(
                   alignment: Alignment.centerRight,
-                  child: GestureDetector(
-                    onTap: _toggleFavorite,
-                    child: Icon(
-                      _isFavorite ? Icons.favorite : Icons.favorite_border,
-                      color: colorScheme.secondary,
-                      size: 26,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Report button
+                      GestureDetector(
+                        onTap: _navigateToReport,
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.85),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.report_problem_outlined,
+                            color: Color(0xFFD32F2F),
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Favorite button
+                      GestureDetector(
+                        onTap: _toggleFavorite,
+                        child: Icon(
+                          _isFavorite ? Icons.favorite : Icons.favorite_border,
+                          color: colorScheme.secondary,
+                          size: 26,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1954,4 +2090,31 @@ class DisplayNutrientEval {
     required this.level,
     required this.unit,
   });
+}
+
+// Custom painter for the triangular tip of the speech bubble
+class _TrianglePainter extends CustomPainter {
+  final Color color;
+
+  _TrianglePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final path = Path()
+      ..moveTo(size.width / 2, 0) // Top center point
+      ..lineTo(0, size.height) // Bottom left
+      ..lineTo(size.width, size.height) // Bottom right
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrianglePainter oldDelegate) {
+    return oldDelegate.color != color;
+  }
 }

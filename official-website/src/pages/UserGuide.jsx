@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, BarChart2, GitCompare, Mic } from 'lucide-react';
+import { Camera, BarChart2, GitCompare, Mic, ChevronDown, ChevronUp, PackageSearch } from 'lucide-react';
 import './Pages.css';
 
 export default function UserGuide() {
@@ -8,6 +8,94 @@ export default function UserGuide() {
   const toggleCard = (cardId) => {
     setExpandedCard(expandedCard === cardId ? null : cardId);
   };
+
+  // Products currently supported by the CLARO recognition model, as of August 14, 2026.
+  // Each category's product list is sorted alphabetically.
+  // Product data sourced from Ever Plus Superstore Inc., Dela Fuente St., Sampaloc, Manila
+  // in early week of August 2026 with the consent and supervision of the store branch's supervisor and manager.
+  const supportedProducts = [
+    {
+      category: 'Canned Fish',
+      products: [
+        '555 Flakes in Oil Tuna',
+        '555 Fried Sardines Hot and Spicy',
+        '555 Hot and Spicy Tuna',
+        '555 Sardines Escabeche',
+        '555 Spicy Bicol Express',
+        '555 Tomato Sauce',
+        '555 Tuna Adobo',
+        '555 Tuna Caldereta',
+        'Blue Bay Corned Tuna Hot and Spicy',
+        'Blue Bay Original',
+        'Century Tuna Flakes and Oil',
+        'Century Tuna Hot and Spicy',
+        'Century Tuna with Calamansi',
+        'Golden Town Tomato Sauce',
+        'Ligo Sardines Tomato Sauce',
+        'Ligo Sardines Tomato Sauce Chili Added',
+        'Mega Sardines Tomato Sauce',
+        'Mega Sardines Tomato Sauce Chili Added',
+        'Mega Tuna Hot and Spicy'
+      ]
+    },
+    {
+      category: 'Canned Meat',
+      products: [
+        'Argentina Beef Loaf',
+        'Argentina Corned Beef',
+        'CDO Home Styled Corned Beef',
+        'CDO Karne Norte Classic',
+        'LM Beef Chili Mansi',
+        'LM Beef Na Beef',
+        'LM Chicken Chili Mansi',
+        'LM Chicken Na Chicken',
+        'LM PC Chili Mansi',
+        'LM PC Chili Mansi Kasalo PCK',
+        'LM PC Extra Hot Chili',
+        'LM PC Extra Hot Chili Kasalo PCK',
+        'LM PC Kalamansi',
+        'LM PC Original',
+        'LM PC Sweet and Spicy',
+        'Lucky 7 Carne Norte',
+        'Purefoods Chicken Luncheon Meat',
+        'Purefoods Corned Beef Hot and Spicy',
+        'Purefoods Corned Beef with Chunks',
+        'Purefoods Liver Spread',
+        'San Marino Corned',
+        'San Marino Corned Chili',
+        'Spicy Labuyo Beef',
+        'Spicy Labuyo Chicken'
+      ]
+    },
+    {
+      category: 'Canned Seafood',
+      products: [
+        'Unipack Squid'
+      ]
+    },
+    {
+      category: 'Canned Vegetables',
+      products: [
+        'DM Fiesta Fruit Cocktail',
+        'DM Fruit Cocktail Heavy Syrup',
+        'DM Pineapple Tidbits',
+        'Jolly Mushroom',
+        'Mega Prime Green Peas',
+        'Ram Green Peas',
+        'Saba Soy Sauce',
+        'Saba Soy Sauce with Chili',
+        'UFC Green Peas'
+      ]
+    },
+    {
+      category: 'Instant Noodles',
+      products: [
+        'Suy Foods Chick-N-De-Lata Chicken Giniling',
+        'Suy Foods Chick-N-De-Lata Chicken Pastil',
+        'Suy Foods Chick-N-De-Lata Chicken Sisig'
+      ]
+    }
+  ];
 
   const guideCards = [
     {
@@ -237,6 +325,72 @@ export default function UserGuide() {
           </div>
         </div>
       )
+    },
+    {
+      id: 5,
+      title: 'What to Do if Product is Unrecognized?',
+      icon: <PackageSearch size={24} />,
+      content: (
+        <div className="guide-content">
+          <h4>What to Do if Product is Unrecognized?</h4>
+          <p>
+            Sometimes CLARO may not recognize the product you scanned, or it may recognize it
+            incorrectly and show the wrong product on the Product Detail screen. This can happen
+            if the product isn't in our database yet, or if the packaging is hard to read from the photo.
+          </p>
+
+          <div className="result-section">
+            <h5>How to Report the Issue</h5>
+            <ol>
+              <li>
+                <strong>Take a Front Photo</strong>
+                <p>Capture a clear photo of the front of the product packaging.</p>
+              </li>
+              <li>
+                <strong>Take a Back Photo</strong>
+                <p>Capture a clear photo of the back of the product, preferably showing the nutrition and product information.</p>
+              </li>
+              <li>
+                <strong>Submit the Report Form</strong>
+                <p>Complete and submit the report using the Report feature so our team can review it.</p>
+              </li>
+            </ol>
+          </div>
+
+          <div className="tips-section">
+            <h5>Why Reporting Helps</h5>
+            <ul>
+              <li>Expands the number of products supported by the recognition model.</li>
+              <li>Improves recognition accuracy over time.</li>
+              <li>Reduces incorrect product identifications.</li>
+              <li>Continuously improves CLARO's product database and recognition capabilities.</li>
+            </ul>
+          </div>
+
+          <div className="result-section">
+            <h5>Products Currently Supported by the Recognition Model — As of August 14, 2026</h5>
+            <p className="supported-products-date">
+              The list below reflects the products CLARO's recognition model can currently identify, as of <strong>August 14, 2026</strong>. These products were sourced from <strong>Ever Plus Superstore Inc., Dela Fuente St., Sampaloc, Manila</strong> in the early week of August 2026 with the consent and supervision of the store branch's supervisor and manager. If a product isn't listed here, please submit a report so we can add it.
+            </p>
+            <div className="supported-products-grid">
+              {supportedProducts.map((group) => (
+                <div className="command-category" key={group.category}>
+                  <h6>{group.category}</h6>
+                  {group.products.length > 0 ? (
+                    <ul>
+                      {group.products.map((product) => (
+                        <li key={product}>{product}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="supported-products-empty">List pending — no products confirmed yet.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )
     }
   ];
 
@@ -263,11 +417,14 @@ export default function UserGuide() {
                   <div className="guide-card-icon">{card.icon}</div>
                   <h3 className="guide-card-title">{card.title}</h3>
                 </div>
-                <button 
-                  className="guide-card-toggle"
+                <button
+                  className="guide-card-toggle guide-card-toggle-icon"
                   onClick={() => toggleCard(card.id)}
+                  title={expandedCard === card.id ? 'View Less' : 'View More'}
+                  aria-label={expandedCard === card.id ? 'View Less' : 'View More'}
+                  aria-expanded={expandedCard === card.id}
                 >
-                  {expandedCard === card.id ? 'View Less' : 'View More'}
+                  {expandedCard === card.id ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                 </button>
               </div>
               {expandedCard === card.id && (

@@ -1,8 +1,5 @@
 import { User } from 'lucide-react';
 import ImageCarousel from '../components/ImageCarousel';
-import ardientesImg from '../assets/images/developers/ardientes.jpg';
-import biteImg from '../assets/images/developers/bite.jpg';
-import salucopImg from '../assets/images/developers/salucop.png';
 import './Pages.css';
 
 export default function AboutDevelopers() {
@@ -10,8 +7,7 @@ export default function AboutDevelopers() {
     {
       name: 'Mary Faith Ardientes',
       role: 'Project Manager & Machine Learning Engineer',
-      image: 'images/developers/ardientes.jpg',
-      fallbackImage: ardientesImg,
+      image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1786704181/ardientes_wrfpjz.jpg',
       icon: <User size={36} />,
       bio: 'Lead project manager overseeing strategic execution, team coordination, system requirements, and capstone milestone deliverables. Also, Machine Learning Engineer responsible for model training, validation, evaluation, and integration.',
       socials: {
@@ -24,8 +20,7 @@ export default function AboutDevelopers() {
     {
       name: 'Jay Bhie Bite',
       role: 'UI/UX Designer & Developer',
-      image: 'images/developers/bite.jpg',
-      fallbackImage: biteImg,
+      image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1786704181/bite_vbnfzg.jpg',
       bio: 'UI/UX Designer focusing on user research, wireframing, interface design, and a consistent mobile/web experience. Also responsible for accessibility features for low-vision users, including light/dark themes, adjustable text size and speech volume, and English and Tagalog language support',
       socials: {
         facebook: 'https://www.facebook.com/share/1HWeEZRHYK/',
@@ -37,8 +32,7 @@ export default function AboutDevelopers() {
     {
       name: 'Rochelle Ann C. Salucop',
       role: 'Backend Developer & Quality Tester',
-      image: 'images/developers/salucop.png',
-      fallbackImage: salucopImg,
+      image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1786704183/salucop_mvd2zk.jpg',
       bio: 'Backend Developer responsible for developing and maintaining the application\'s backend services, database operations, nutrition data integration, server-side processing, and conducting quality testing to identify and resolve system issues',
       socials: {
         facebook: 'https://www.facebook.com/share/1b3eKUXKbK/',
@@ -69,11 +63,7 @@ export default function AboutDevelopers() {
                   src={dev.image}
                   alt={dev.name}
                   className="developer-avatar-img"
-                  onError={(e) => {
-                    if (dev.fallbackImage && e.target.src !== dev.fallbackImage) {
-                      e.target.src = dev.fallbackImage;
-                    }
-                  }}
+                  loading="lazy"
                 />
               ) : (
                 <div className="developer-avatar-placeholder" aria-label="Developer avatar placeholder">

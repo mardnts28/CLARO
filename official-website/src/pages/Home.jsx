@@ -25,11 +25,11 @@ export default function Home() {
               <button
                 className="btn-primary"
                 onClick={handleDownloadClick}
-                title="Install CALRO App"
-                aria-label="Install CALRO App"
+                title="Install CLARO App"
+                aria-label="Install CLARO App"
               >
                 <Download size={18} />
-                <span>Install CALRO App</span>
+                <span>Install CLARO App</span>
               </button>
             </div>
           </div>

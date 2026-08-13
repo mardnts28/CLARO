@@ -319,6 +319,16 @@
   outline-offset: 2px;
 }
 
+.guide-card-toggle-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border-radius: 50%;
+}
+
 .guide-card-body {
   padding: 0 1.75rem 1.75rem;
   border-top: 1px solid var(--border-color);
@@ -425,6 +435,24 @@
   color: var(--primary-red);
 }
 
+.supported-products-date {
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.supported-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.5rem 1.5rem;
+}
+
+.supported-products-empty {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-style: italic;
+  margin-bottom: 1rem;
+}
+
 .additional-help-section {
   background-color: var(--card-bg);
   border: 1px solid var(--border-color);
@@ -462,8 +490,8 @@
     width: 100%;
   }
 
-  .guide-card-toggle {
-    width: 100%;
+  .guide-card-toggle-icon {
+    align-self: flex-end;
     margin-top: 0.75rem;
   }
 
