@@ -1997,7 +1997,7 @@ abstract class AppLocalizations {
   /// No description provided for @analysisBasisTitle.
   ///
   /// In en, this message translates to:
-  /// **'Analysis Basis'**
+  /// **'Your Health Analysis'**
   String get analysisBasisTitle;
 
   /// No description provided for @analysisBasisSubtitle.

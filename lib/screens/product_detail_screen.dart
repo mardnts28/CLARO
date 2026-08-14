@@ -63,6 +63,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   HealthAdvisory? _advisory;
   ComparisonMatrix? _comparisonMatrix;
   String? _rankingExplanation;
+  UserHealthProfile? _userHealthProfile;
 
   // Placeholder scan-event id used only for GeminiAdvisoryService's
   // per-scan-event response cache. Once a real scan-session id is threaded
@@ -238,6 +239,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _comparisonMatrix = null;
       _rankingExplanation = null;
       _fdaResult = null;
+      _userHealthProfile = null;
       _isFavorite = false;
       _favoriteBusy = true; // Prevent interaction while loading new product's favorite status
     });
@@ -366,6 +368,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       }
 
       final profile = await BackendLocator.userRepository.getHealthProfile(uid);
+      
+      if (mounted) {
+        setState(() => _userHealthProfile = profile);
+      }
 
       // If a comparisonSet was handed to us (from Compare / multi-scan),
       // use it as-is -- it's already ranked. Otherwise this is a solo
@@ -822,7 +828,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             })(),
                           ];
 
-                          return evals.map((e) {
+                          // Reorder evaluations based on user's health profile
+                          final orderedEvals = _reorderNutrientEvaluations(evals);
+
+                          return orderedEvals.map((e) {
                             Color progressColor;
                             Color badgeBgColor;
                             Color badgeTextColor;
@@ -1244,6 +1253,128 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // ── Helper method to reorder nutrient evaluations based on user's health profile ──────
+  List<DisplayNutrientEval> _reorderNutrientEvaluations(List<DisplayNutrientEval> evals) {
+    if (_userHealthProfile == null || _userHealthProfile!.conditions.isEmpty) {
+      return evals;
+    }
+
+    final relatedEvals = <DisplayNutrientEval>[];
+    final unrelatedEvals = <DisplayNutrientEval>[];
+
+    for (final eval in evals) {
+      bool isRelated = false;
+      
+      // Check if this nutrient is related to user's health conditions
+      for (final condition in _userHealthProfile!.conditions) {
+        switch (condition) {
+          case HealthCondition.hypertension:
+            if (eval.nutrientKey == 'sodiumMg') {
+              isRelated = true;
+            }
+            break;
+          case HealthCondition.diabetes:
+            if (eval.nutrientKey == 'sugarsG') {
+              isRelated = true;
+            }
+            break;
+          case HealthCondition.heartCondition:
+            if (eval.nutrientKey == 'saturatedFatG') {
+              isRelated = true;
+            }
+            break;
+        }
+        if (isRelated) break;
+      }
+
+      if (isRelated) {
+        relatedEvals.add(eval);
+      } else {
+        unrelatedEvals.add(eval);
+      }
+    }
+
+    // Sort related conditions alphabetically if user has multiple health conditions
+    if (relatedEvals.length > 1) {
+      relatedEvals.sort((a, b) => a.label.compareTo(b.label));
+    }
+
+    // Sort unrelated conditions alphabetically
+    if (unrelatedEvals.length > 1) {
+      unrelatedEvals.sort((a, b) => a.label.compareTo(b.label));
+    }
+
+    // Combine: related first, then unrelated
+    return [...relatedEvals, ...unrelatedEvals];
+  }
+
+  // ── Helper method to build advisory subtitle with emphasized last sentence ──────
+  Widget _buildAdvisorySubtitle(String subtitle, ColorScheme colorScheme, AdvisoryLevel level) {
+    // Don't apply emphasis when suitability level is Suitable
+    if (level == AdvisoryLevel.suitable) {
+      return Text(
+        subtitle,
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          color: colorScheme.onSurface,
+          height: 1.4,
+        ),
+      );
+    }
+    
+    // Split the text into sentences
+    final sentences = subtitle.split(RegExp(r'(?<=[.!?])\s+'));
+    
+    if (sentences.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // If there's only one sentence, emphasize it
+    if (sentences.length == 1) {
+      return Text(
+        subtitle,
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          color: colorScheme.onSurface,
+          height: 1.4,
+          fontWeight: FontWeight.bold,
+          fontStyle: FontStyle.italic,
+        ),
+      );
+    }
+    
+    // Build text spans with emphasis on the last sentence
+    final textSpans = <TextSpan>[];
+    
+    // Add all sentences except the last one normally
+    for (int i = 0; i < sentences.length - 1; i++) {
+      textSpans.add(TextSpan(
+        text: sentences[i] + ' ',
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          color: colorScheme.onSurface,
+          height: 1.4,
+        ),
+      ));
+    }
+    
+    // Add the last sentence with emphasis (bold and italic, no underline)
+    textSpans.add(TextSpan(
+      text: sentences.last,
+      style: GoogleFonts.inter(
+        fontSize: 13,
+        color: colorScheme.onSurface,
+        height: 1.4,
+        fontWeight: FontWeight.bold,
+        fontStyle: FontStyle.italic,
+      ),
+    ));
+    
+    return Text.rich(
+      TextSpan(children: textSpans),
+    );
+  }
+
   // ── Health advisory banner (WhoCalculator + GeminiAdvisoryService) ──────
   Widget _buildAdvisoryBanner(BuildContext context, AppLocalizations loc) {
     final theme = Theme.of(context);
@@ -1358,14 +1489,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    color: colorScheme.onSurface,
-                    height: 1.4,
-                  ),
-                ),
+                _buildAdvisorySubtitle(subtitle, colorScheme, level),
               ],
             ),
           ),

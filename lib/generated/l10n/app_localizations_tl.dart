@@ -1023,7 +1023,7 @@ class AppLocalizationsTl extends AppLocalizations {
   String get worstLabelShort => 'Worst';
 
   @override
-  String get analysisBasisTitle => 'Batayan ng Pagsusuri';
+  String get analysisBasisTitle => 'Ang Iyong Pagsusuri sa Kalusugan';
 
   @override
   String analysisBasisSubtitle(String servingSize) {

@@ -375,7 +375,7 @@
 
   "bestLabelShort": "Best",
   "worstLabelShort": "Worst",
-  "analysisBasisTitle": "Analysis Basis",
+  "analysisBasisTitle": "Your Health Analysis",
   "analysisBasisSubtitle": "Based on WHO daily limit, per 1 serving ({servingSize})",
   "@analysisBasisSubtitle": {
     "placeholders": {

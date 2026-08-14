@@ -1009,7 +1009,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worstLabelShort => 'Worst';
 
   @override
-  String get analysisBasisTitle => 'Analysis Basis';
+  String get analysisBasisTitle => 'Your Health Analysis';
 
   @override
   String analysisBasisSubtitle(String servingSize) {
