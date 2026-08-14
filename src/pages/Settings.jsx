@@ -59,6 +59,7 @@ export default function Settings() {
                 <tr>
                   <th>Date and Time</th>
                   <th>Activity</th>
+                  <th>Admin</th>
                   <th>Details</th>
                 </tr>
               </thead>
@@ -72,6 +73,7 @@ export default function Settings() {
                       </div>
                     </td>
                     <td className="activity-cell">{log.activity}</td>
+                    <td className="activity-cell">{log.adminName || log.adminUid || "—"}</td>
                     <td className="details-cell">
                         {log.label ? (
                             <>

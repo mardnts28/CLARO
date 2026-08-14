@@ -6,11 +6,28 @@ import {
   orderBy,
   limit,
   Timestamp,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/firebase";
 
 export async function logActivity(activity, targetId, type = "report", label = "") {
   const user = auth.currentUser;
+
+  // Try to read the admin's display name from their admin profile (allowed
+  // for the signed-in user). Fall back to the auth email if not available.
+  let adminName = user?.email || "Unknown Admin";
+  try {
+    if (user?.uid) {
+      const adminDoc = await getDoc(doc(db, "admins", user.uid));
+      if (adminDoc.exists()) {
+        const data = adminDoc.data();
+        if (data?.name) adminName = data.name;
+      }
+    }
+  } catch (e) {
+    // ignore and fall back to email
+  }
 
   await addDoc(collection(db, "activity_logs"), {
     activity,
@@ -18,7 +35,7 @@ export async function logActivity(activity, targetId, type = "report", label = "
     type,
     label, // human-readable reference (product name or review snippet)
     adminUid: user?.uid || "unknown",
-    adminName: user?.email || "Unknown Admin",
+    adminName,
     timestamp: Timestamp.now(),
   });
 }
