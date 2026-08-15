@@ -375,7 +375,7 @@
 
   "bestLabelShort": "Best",
   "worstLabelShort": "Worst",
-  "analysisBasisTitle": "Your Health Analysis",
+  "analysisBasisTitle": "Health Analysis",
   "analysisBasisSubtitle": "Based on WHO daily limit, per 1 serving ({servingSize})",
   "@analysisBasisSubtitle": {
     "placeholders": {
@@ -387,6 +387,9 @@
   "bpSodiumLabel": "Blood pressure - Sodium",
   "diabetesSugarsLabel": "Diabetes - Total sugars",
   "heartSatFatLabel": "Heart disease - Saturated fats",
+  "bpSodiumShortLabel": "Sodium",
+  "diabetesSugarsShortLabel": "Total sugars",
+  "heartSatFatShortLabel": "Saturated fats",
   "dailySuffix": "daily",
   "ofWhoLimit": "of WHO limit",
   "allergenDetectedBadge": "Allergen Detected",

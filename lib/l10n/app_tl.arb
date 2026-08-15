@@ -375,7 +375,7 @@
 
   "bestLabelShort": "Best",
   "worstLabelShort": "Worst",
-  "analysisBasisTitle": "Ang Iyong Pagsusuri sa Kalusugan",
+  "analysisBasisTitle": "Pagsusuri sa Kalusugan",
   "analysisBasisSubtitle": "Batay sa WHO daily limit, bawat 1 serving ({servingSize})",
   "@analysisBasisSubtitle": {
     "placeholders": {
@@ -387,6 +387,9 @@
   "bpSodiumLabel": "Presyon ng dugo - Sodium",
   "diabetesSugarsLabel": "Diabetes - Total sugars",
   "heartSatFatLabel": "Sakit sa puso - Saturated fats",
+  "bpSodiumShortLabel": "Sodium",
+  "diabetesSugarsShortLabel": "Total sugars",
+  "heartSatFatShortLabel": "Saturated fats",
   "dailySuffix": "araw-araw",
   "ofWhoLimit": "ng WHO limit",
   "allergenDetectedBadge": "Allergen Detected",

@@ -1023,7 +1023,7 @@ class AppLocalizationsTl extends AppLocalizations {
   String get worstLabelShort => 'Worst';
 
   @override
-  String get analysisBasisTitle => 'Ang Iyong Pagsusuri sa Kalusugan';
+  String get analysisBasisTitle => 'Pagsusuri sa Kalusugan';
 
   @override
   String analysisBasisSubtitle(String servingSize) {
@@ -1038,6 +1038,15 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get heartSatFatLabel => 'Sakit sa puso - Saturated fats';
+
+  @override
+  String get bpSodiumShortLabel => 'Sodium';
+
+  @override
+  String get diabetesSugarsShortLabel => 'Total sugars';
+
+  @override
+  String get heartSatFatShortLabel => 'Saturated fats';
 
   @override
   String get dailySuffix => 'araw-araw';

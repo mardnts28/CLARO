@@ -1009,7 +1009,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get worstLabelShort => 'Worst';
 
   @override
-  String get analysisBasisTitle => 'Your Health Analysis';
+  String get analysisBasisTitle => 'Health Analysis';
 
   @override
   String analysisBasisSubtitle(String servingSize) {
@@ -1024,6 +1024,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get heartSatFatLabel => 'Heart disease - Saturated fats';
+
+  @override
+  String get bpSodiumShortLabel => 'Sodium';
+
+  @override
+  String get diabetesSugarsShortLabel => 'Total sugars';
+
+  @override
+  String get heartSatFatShortLabel => 'Saturated fats';
 
   @override
   String get dailySuffix => 'daily';

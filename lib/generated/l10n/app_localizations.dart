@@ -1997,7 +1997,7 @@ abstract class AppLocalizations {
   /// No description provided for @analysisBasisTitle.
   ///
   /// In en, this message translates to:
-  /// **'Your Health Analysis'**
+  /// **'Health Analysis'**
   String get analysisBasisTitle;
 
   /// No description provided for @analysisBasisSubtitle.
@@ -2023,6 +2023,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Heart disease - Saturated fats'**
   String get heartSatFatLabel;
+
+  /// No description provided for @bpSodiumShortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sodium'**
+  String get bpSodiumShortLabel;
+
+  /// No description provided for @diabetesSugarsShortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Total sugars'**
+  String get diabetesSugarsShortLabel;
+
+  /// No description provided for @heartSatFatShortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Saturated fats'**
+  String get heartSatFatShortLabel;
 
   /// No description provided for @dailySuffix.
   ///

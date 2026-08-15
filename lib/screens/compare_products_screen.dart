@@ -59,9 +59,13 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   UserHealthProfile? _profile;
   List<Product> _comparisonProducts = [];
 
-  // null == "Overall" (current/default behavior, all of the user's
-  // conditions). Non-null == ranking narrowed to that single condition.
-  HealthCondition? _selectedCondition;
+  // Empty set == "Overall" (all of the user's conditions, i.e. the
+  // profile as saved). Non-empty == ranking narrowed to just those
+  // condition(s) -- multi-select, so the user can combine e.g. Diabetes
+  // + Hypertension. Defaults to whichever of the 3 conditions are
+  // actually on the user's saved health profile once it loads (see
+  // _loadRanking), so the initial view already reflects their profile.
+  Set<HealthCondition> _selectedConditions = {};
 
   // Product Type / Flavor filter chips -- membership filters (hide
   // non-matching products) layered on top of the health-condition
@@ -169,6 +173,14 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         _filtered = List.from(ranked);
         _loading = false;
         _computeAvailableTags();
+        // Pre-check whichever of the 3 filterable conditions the user
+        // actually has on their saved profile. `ranked` was already
+        // computed against the full profile above, so this matches the
+        // list just shown -- it's the same ranking, just reflected in
+        // the filter UI's default state.
+        _selectedConditions = HealthCondition.values
+            .where(profile.conditions.contains)
+            .toSet();
       });
 
       // Save comparison session to history immediately after successful generation
@@ -275,19 +287,23 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   /// filtering happens afterward, in _computeFiltered -- it narrows which
   /// of the re-ranked results are shown, it never changes their order.
   void _reRankAndFilter({
-    required HealthCondition? condition,
+    required Set<HealthCondition> conditions,
     required Set<String> typeTags,
     required Set<String> flavorTags,
   }) {
     final profile = _profile;
     if (profile == null) return;
 
-    final effectiveProfile = condition == null
+    // Empty selection == "Overall" -- rank against the profile exactly as
+    // saved (every condition the user has). A non-empty selection narrows
+    // the effective profile to just those condition(s), which can be one
+    // or several at once.
+    final effectiveProfile = conditions.isEmpty
         ? profile
         : UserHealthProfile(
             userId: profile.userId,
             displayName: profile.displayName,
-            conditions: [condition],
+            conditions: conditions.toList(),
             allergies: profile.allergies,
             voiceAssistant: profile.voiceAssistant,
           );
@@ -302,7 +318,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     );
 
     setState(() {
-      _selectedCondition = condition;
+      _selectedConditions
+        ..clear()
+        ..addAll(conditions);
       _selectedTypeTags
         ..clear()
         ..addAll(typeTags);
@@ -321,18 +339,27 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   /// Quick single-change helper -- used by the inline "X" remove chips on
   /// the main screen, which only ever touch one filter at a time and keep
   /// everything else as-is.
-  void _selectConditionFilter(HealthCondition? condition) {
+  void _selectConditionFilter(Set<HealthCondition> conditions) {
     _reRankAndFilter(
-      condition: condition,
+      conditions: conditions,
       typeTags: _selectedTypeTags,
       flavorTags: _selectedFlavorTags,
     );
   }
 
+  /// Removes a single condition from the current multi-select, keeping
+  /// the rest of the selection (and the Product Type/Flavor filters)
+  /// untouched. Mirrors _removeTypeTag/_removeFlavorTag below.
+  void _removeConditionTag(HealthCondition condition) {
+    final updated = Set<HealthCondition>.from(_selectedConditions)
+      ..remove(condition);
+    _selectConditionFilter(updated);
+  }
+
   void _removeTypeTag(String tag) {
     final updated = Set<String>.from(_selectedTypeTags)..remove(tag);
     _reRankAndFilter(
-      condition: _selectedCondition,
+      conditions: _selectedConditions,
       typeTags: updated,
       flavorTags: _selectedFlavorTags,
     );
@@ -341,7 +368,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   void _removeFlavorTag(String tag) {
     final updated = Set<String>.from(_selectedFlavorTags)..remove(tag);
     _reRankAndFilter(
-      condition: _selectedCondition,
+      conditions: _selectedConditions,
       typeTags: _selectedTypeTags,
       flavorTags: updated,
     );
@@ -382,7 +409,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     // only committed to screen state when "Apply" is tapped. "Clear All"
     // resets these (and the sheet's view of itself) without touching the
     // screen until Apply/Clear is actually pressed.
-    HealthCondition? tempCondition = _selectedCondition;
+    final tempConditions = Set<HealthCondition>.from(_selectedConditions);
     final tempTypeTags = Set<String>.from(_selectedTypeTags);
     final tempFlavorTags = Set<String>.from(_selectedFlavorTags);
 
@@ -440,22 +467,21 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     sectionTitle(loc.filterConditionTitle),
-                    RadioListTile<HealthCondition?>(
-                      value: null,
-                      groupValue: tempCondition,
-                      activeColor: colorScheme.primary,
-                      title: Text(loc.conditionOverall),
-                      onChanged: (value) =>
-                          setSheetState(() => tempCondition = value),
-                    ),
+                    // Multi-select: any combination of the 3 conditions
+                    // can be checked at once (e.g. Diabetes + Heart
+                    // Condition together).
                     for (final condition in HealthCondition.values)
-                      RadioListTile<HealthCondition?>(
-                        value: condition,
-                        groupValue: tempCondition,
+                      CheckboxListTile(
+                        value: tempConditions.contains(condition),
                         activeColor: colorScheme.primary,
                         title: Text(_conditionLabel(condition)),
-                        onChanged: (value) =>
-                            setSheetState(() => tempCondition = value),
+                        onChanged: (checked) => setSheetState(() {
+                          if (checked == true) {
+                            tempConditions.add(condition);
+                          } else {
+                            tempConditions.remove(condition);
+                          }
+                        }),
                       ),
 
                     // ── Product Type (only shown if this comparison set
@@ -544,7 +570,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () => setSheetState(() {
-                                tempCondition = null;
+                                tempConditions.clear();
                                 tempTypeTags.clear();
                                 tempFlavorTags.clear();
                               }),
@@ -561,7 +587,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                               onPressed: () {
                                 Navigator.pop(sheetContext);
                                 _reRankAndFilter(
-                                  condition: tempCondition,
+                                  conditions: tempConditions,
                                   typeTags: tempTypeTags,
                                   flavorTags: tempFlavorTags,
                                 );
@@ -632,7 +658,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                       children: [
                         Icon(Icons.filter_list,
                             color: colorScheme.primary, size: 24),
-                        if (_selectedCondition != null || _hasActiveTagFilters)
+                        if (_selectedConditions.isNotEmpty || _hasActiveTagFilters)
                           Positioned(
                             top: -2,
                             right: -2,
@@ -684,10 +710,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   style: GoogleFonts.inter(
                       fontSize: 12, color: colorScheme.onSurfaceVariant),
                 ),
-                if (_selectedCondition != null)
+                for (final condition in _selectedConditions)
                   _buildRemovableChip(
-                    label: _conditionLabel(_selectedCondition!),
-                    onRemove: () => _selectConditionFilter(null),
+                    label: _conditionLabel(condition),
+                    onRemove: () => _removeConditionTag(condition),
                   ),
                 for (final tag in _selectedTypeTags)
                   _buildRemovableChip(

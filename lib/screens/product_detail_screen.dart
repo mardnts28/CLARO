@@ -775,7 +775,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           )
                         else ...[
-                        // Nutrient rows
+                        // Nutrient + allergy rows, combined into a single
+                        // ordered list. Ranking: a direct allergen match is
+                        // the strongest signal this card can show -- it's
+                        // the one thing that forces the overall verdict to
+                        // Caution regardless of any nutrient level (see
+                        // `_currentOverallLevel`) -- so it now goes through
+                        // the same "user-related comes first" ranking as
+                        // the health-condition rows below, instead of
+                        // always being pinned to the bottom of the card
+                        // regardless of relevance.
                         ...(() {
                           final evals = <DisplayNutrientEval>[
                             // 1. Sodium (Hypertension)
@@ -786,6 +795,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               final pct = (valServing / limit) * 100;
                               return DisplayNutrientEval(
                                 label: loc.bpSodiumLabel,
+                                shortLabel: loc.bpSodiumShortLabel,
                                 nutrientKey: 'sodiumMg',
                                 valuePerServing: valServing,
                                 limit: limit,
@@ -802,6 +812,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               final pct = (valServing / limit) * 100;
                               return DisplayNutrientEval(
                                 label: loc.diabetesSugarsLabel,
+                                shortLabel: loc.diabetesSugarsShortLabel,
                                 nutrientKey: 'sugarsG',
                                 valuePerServing: valServing,
                                 limit: limit,
@@ -818,6 +829,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               final pct = (valServing / limit) * 100;
                               return DisplayNutrientEval(
                                 label: loc.heartSatFatLabel,
+                                shortLabel: loc.heartSatFatShortLabel,
                                 nutrientKey: 'saturatedFatG',
                                 valuePerServing: valServing,
                                 limit: limit,
@@ -831,154 +843,38 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           // Reorder evaluations based on user's health profile
                           final orderedEvals = _reorderNutrientEvaluations(evals);
 
-                          return orderedEvals.map((e) {
-                            Color progressColor;
-                            Color badgeBgColor;
-                            Color badgeTextColor;
-                            String badgeLabel;
+                          // Allergens that are both (a) present in this
+                          // product AND (b) saved in the user's own health
+                          // profile. `p.allergens` alone is every allergen
+                          // the PRODUCT contains, not the ones relevant to
+                          // this user; cross-reference against
+                          // `_evaluation.allergenAssessment.matchedContains`
+                          // (computed by WhoCalculator.assessAllergens
+                          // against the signed-in user's saved allergies)
+                          // so a user who only lists "milk" doesn't see
+                          // unrelated allergens like crustaceans/fish/soy
+                          // that simply happen to be in the product.
+                          //
+                          // -- consolidated into ONE row listing every
+                          // matched allergen together, rather than
+                          // repeating the full title/badge/note layout per
+                          // allergen. With 2+ allergens that per-item
+                          // layout stacked duplicate "may cause allergic
+                          // reaction" notes and made the card grow
+                          // unbounded; grouping them still surfaces every
+                          // allergen while keeping the card a fixed height
+                          // regardless of how many are detected.
+                          final matchedAllergenLabels = _matchedUserAllergenLabels(
+                            p,
+                            Localizations.localeOf(context).languageCode,
+                          );
 
-                            switch (e.level) {
-                              case AdvisoryLevel.suitable:
-                                progressColor = const Color(0xFF2E7D32);
-                                badgeBgColor = const Color(0xFFE8F5E9);
-                                badgeTextColor = const Color(0xFF2E7D32);
-                                badgeLabel = 'Suitable';
-                                break;
-                              case AdvisoryLevel.moderate:
-                                progressColor = const Color(0xFFE65100);
-                                badgeBgColor = const Color(0xFFFFF3E0);
-                                badgeTextColor = const Color(0xFFE65100);
-                                badgeLabel = 'Moderate';
-                                break;
-                              case AdvisoryLevel.caution:
-                                progressColor = const Color(0xFFC62828);
-                                badgeBgColor = const Color(0xFFFFEBEE);
-                                badgeTextColor = const Color(0xFFC62828);
-                                badgeLabel = 'Caution';
-                                break;
-                            }
-
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          e.label,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          color: badgeBgColor,
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: Text(
-                                          badgeLabel,
-                                          style: GoogleFonts.inter(
-                                            color: badgeTextColor,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(6),
-                                    child: LinearProgressIndicator(
-                                      value: (e.percentage / 100).clamp(0.0, 1.0),
-                                      backgroundColor: const Color(0xFFE0E0E0),
-                                      valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-                                      minHeight: 12,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    '${_formatValue(e.valuePerServing)}${e.unit} / ${_formatValue(e.limit)}${e.unit} ${loc.dailySuffix} · ${e.percentage.toStringAsFixed(0)}% ${loc.ofWhoLimit}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 12,
-                                      color: colorScheme.onSurfaceVariant,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          });
+                          return [
+                            if (matchedAllergenLabels.isNotEmpty)
+                              _buildAllergyRow(matchedAllergenLabels, colorScheme, loc),
+                            ...orderedEvals.map((e) => _buildConditionRow(e, colorScheme, loc)),
+                          ];
                         })(),
-
-                        // Allergy row -- ONLY for allergens that are both
-                        // (a) present in this product AND (b) saved in the
-                        // user's own health profile. `p.allergens` alone is
-                        // every allergen the PRODUCT contains, not the ones
-                        // relevant to this user; cross-reference against
-                        // `_evaluation.allergenAssessment.matchedContains`
-                        // (computed by WhoCalculator.assessAllergens against
-                        // the signed-in user's saved allergies) so a user
-                        // who only lists "milk" doesn't see unrelated
-                        // allergens like crustaceans/fish/soy/coconut that
-                        // simply happen to be in the product.
-                        //
-                        // -- consolidated into ONE block listing every
-                        // matched allergen together, rather than repeating
-                        // the full title/badge/note layout per allergen.
-                        // With 2+ allergens that per-item layout stacked
-                        // duplicate "may cause allergic reaction" notes and
-                        // made the card grow unbounded; grouping them still
-                        // surfaces every allergen while keeping the card a
-                        // fixed height regardless of how many are detected.
-                        if (_matchedUserAllergenLabels(p, Localizations.localeOf(context).languageCode).isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Allergy - ${_matchedUserAllergenLabels(p, Localizations.localeOf(context).languageCode).join(', ')}',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          color: colorScheme.onSurface,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFEBEE),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text(
-                                        loc.allergenDetectedBadge,
-                                        style: GoogleFonts.inter(
-                                          color: const Color(0xFFC62828),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
 
                         // Legend section - How to understand
                         Column(
@@ -1097,45 +993,51 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ],
                           )
                         else ...[
-                        Row(
-                          children: [
-                            _nutriCard(context, loc.nutriCalories, '${(p.nutritionalFacts.caloriesKcal * _sizeScale).toStringAsFixed(0)} kcal'),
-                            const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriCarbs, '${(p.nutritionalFacts.carbsG * _sizeScale).toStringAsFixed(1)}g'),
-                            const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriSugar, '${(p.nutritionalFacts.sugarsG * _sizeScale).toStringAsFixed(1)}g'),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _nutriCard(context, loc.nutriSodium, '${(p.nutritionalFacts.sodiumMg * _sizeScale).toStringAsFixed(0)}mg'),
-                            const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriProtein, '${(p.nutritionalFacts.proteinG * _sizeScale).toStringAsFixed(1)}g'),
-                            const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriTotalFat, '${(p.nutritionalFacts.totalFatG * _sizeScale).toStringAsFixed(1)}g'),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _nutriCard(context, loc.nutriSatFat, '${(p.nutritionalFacts.saturatedFatG * _sizeScale).toStringAsFixed(1)}g'),
-                            const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriTransFat, '${(p.nutritionalFacts.transFatG * _sizeScale).toStringAsFixed(1)}g'),
-                            const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriFiber, '${(p.nutritionalFacts.fiberG * _sizeScale).toStringAsFixed(1)}g'),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _nutriCard(context, loc.nutriPotassium, '${(p.nutritionalFacts.potassiumMg * _sizeScale).toStringAsFixed(0)}mg'),
-                            const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriCalcium, '${(p.nutritionalFacts.calciumMg * _sizeScale).toStringAsFixed(0)}mg'),
-                            const SizedBox(width: 8),
-                            _nutriCard(context, loc.nutriIron, '${(p.nutritionalFacts.ironMg * _sizeScale).toStringAsFixed(1)}mg'),
-                          ],
-                        ),
+                        (() {
+                          final caloriesVal = p.nutritionalFacts.caloriesKcal * _sizeScale;
+                          final carbsVal = p.nutritionalFacts.carbsG * _sizeScale;
+                          final sugarVal = p.nutritionalFacts.sugarsG * _sizeScale;
+                          final sodiumVal = p.nutritionalFacts.sodiumMg * _sizeScale;
+                          final proteinVal = p.nutritionalFacts.proteinG * _sizeScale;
+                          final totalFatVal = p.nutritionalFacts.totalFatG * _sizeScale;
+                          final satFatVal = p.nutritionalFacts.saturatedFatG * _sizeScale;
+                          final transFatVal = p.nutritionalFacts.transFatG * _sizeScale;
+                          final fiberVal = p.nutritionalFacts.fiberG * _sizeScale;
+                          final potassiumVal = p.nutritionalFacts.potassiumMg * _sizeScale;
+                          final calciumVal = p.nutritionalFacts.calciumMg * _sizeScale;
+                          final ironVal = p.nutritionalFacts.ironMg * _sizeScale;
+
+                          // Only show nutrients with an actual non-zero
+                          // value, so the list doesn't pad itself out with
+                          // rows reading "0g" / "0mg" for facts the
+                          // product simply doesn't have.
+                          final entries = <_NutrientEntry>[
+                            _NutrientEntry(loc.nutriCalories, caloriesVal, '${caloriesVal.toStringAsFixed(0)} kcal'),
+                            _NutrientEntry(loc.nutriCarbs, carbsVal, '${carbsVal.toStringAsFixed(1)}g'),
+                            _NutrientEntry(loc.nutriSugar, sugarVal, '${sugarVal.toStringAsFixed(1)}g'),
+                            _NutrientEntry(loc.nutriSodium, sodiumVal, '${sodiumVal.toStringAsFixed(0)}mg'),
+                            _NutrientEntry(loc.nutriProtein, proteinVal, '${proteinVal.toStringAsFixed(1)}g'),
+                            _NutrientEntry(loc.nutriTotalFat, totalFatVal, '${totalFatVal.toStringAsFixed(1)}g'),
+                            _NutrientEntry(loc.nutriSatFat, satFatVal, '${satFatVal.toStringAsFixed(1)}g'),
+                            _NutrientEntry(loc.nutriTransFat, transFatVal, '${transFatVal.toStringAsFixed(1)}g'),
+                            _NutrientEntry(loc.nutriFiber, fiberVal, '${fiberVal.toStringAsFixed(1)}g'),
+                            _NutrientEntry(loc.nutriPotassium, potassiumVal, '${potassiumVal.toStringAsFixed(0)}mg'),
+                            _NutrientEntry(loc.nutriCalcium, calciumVal, '${calciumVal.toStringAsFixed(0)}mg'),
+                            _NutrientEntry(loc.nutriIron, ironVal, '${ironVal.toStringAsFixed(1)}mg'),
+                          ].where((entry) => entry.value != 0).toList();
+
+                          return Column(
+                            children: [
+                              for (int i = 0; i < entries.length; i++)
+                                _nutriListRow(
+                                  context,
+                                  entries[i].label,
+                                  entries[i].formatted,
+                                  showDivider: i != entries.length - 1,
+                                ),
+                            ],
+                          );
+                        })(),
                         ],
                       ],
                     ),
@@ -1253,6 +1155,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // Returns true if `nutrientKey` corresponds to one of the conditions
+  // saved in the signed-in user's own health profile. Shared by the
+  // reordering logic below and by the row builder, so "is this the row
+  // tied to the user" can never drift between the two.
+  bool _isNutrientKeyRelatedToUser(String nutrientKey) {
+    if (_userHealthProfile == null || _userHealthProfile!.conditions.isEmpty) {
+      return false;
+    }
+    for (final condition in _userHealthProfile!.conditions) {
+      switch (condition) {
+        case HealthCondition.hypertension:
+          if (nutrientKey == 'sodiumMg') return true;
+          break;
+        case HealthCondition.diabetes:
+          if (nutrientKey == 'sugarsG') return true;
+          break;
+        case HealthCondition.heartCondition:
+          if (nutrientKey == 'saturatedFatG') return true;
+          break;
+      }
+    }
+    return false;
+  }
+
   // ── Helper method to reorder nutrient evaluations based on user's health profile ──────
   List<DisplayNutrientEval> _reorderNutrientEvaluations(List<DisplayNutrientEval> evals) {
     if (_userHealthProfile == null || _userHealthProfile!.conditions.isEmpty) {
@@ -1263,31 +1189,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final unrelatedEvals = <DisplayNutrientEval>[];
 
     for (final eval in evals) {
-      bool isRelated = false;
-      
-      // Check if this nutrient is related to user's health conditions
-      for (final condition in _userHealthProfile!.conditions) {
-        switch (condition) {
-          case HealthCondition.hypertension:
-            if (eval.nutrientKey == 'sodiumMg') {
-              isRelated = true;
-            }
-            break;
-          case HealthCondition.diabetes:
-            if (eval.nutrientKey == 'sugarsG') {
-              isRelated = true;
-            }
-            break;
-          case HealthCondition.heartCondition:
-            if (eval.nutrientKey == 'saturatedFatG') {
-              isRelated = true;
-            }
-            break;
-        }
-        if (isRelated) break;
-      }
-
-      if (isRelated) {
+      if (_isNutrientKeyRelatedToUser(eval.nutrientKey)) {
         relatedEvals.add(eval);
       } else {
         unrelatedEvals.add(eval);
@@ -1306,6 +1208,194 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     // Combine: related first, then unrelated
     return [...relatedEvals, ...unrelatedEvals];
+  }
+
+  // Builds a single nutrient row for the Health Analysis card. The row
+  // tied to the user's own health profile shows the full
+  // "<Condition> - <Nutrient>" title (e.g. "Diabetes - Total sugars") so
+  // it's clear *why* it matters to this user; every other row shows just
+  // the nutrient name (e.g. "Total sugars") since the condition prefix
+  // isn't relevant to them. That same related row also gets a tinted,
+  // bordered background and a bolded percentage so it reads as the
+  // priority concern rather than one of several equal rows.
+  Widget _buildConditionRow(DisplayNutrientEval e, ColorScheme colorScheme, AppLocalizations loc) {
+    final isDark = colorScheme.brightness == Brightness.dark;
+    Color progressColor;
+    Color badgeBgColor;
+    Color badgeTextColor;
+    String badgeLabel;
+
+    // badgeBgColor/badgeTextColor are reused for both the small status
+    // pill AND (below) the full-width tint on the highlighted/priority
+    // row -- previously both stayed at their light-mode pastel/dark-text
+    // values even in dark mode, so the priority row's title/percentage
+    // text (which uses colorScheme.onSurface, near-white in dark mode)
+    // sat on a light background with poor contrast. Swapping in a dark
+    // tinted background + lighter accent text in dark mode keeps the
+    // same "priority concern" highlighting while staying readable.
+    switch (e.level) {
+      case AdvisoryLevel.suitable:
+        progressColor = const Color(0xFF2E7D32);
+        badgeBgColor = isDark ? const Color(0xFF1B3320) : const Color(0xFFE8F5E9);
+        badgeTextColor = isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32);
+        badgeLabel = 'Suitable';
+        break;
+      case AdvisoryLevel.moderate:
+        progressColor = const Color(0xFFE65100);
+        badgeBgColor = isDark ? const Color(0xFF3A2A12) : const Color(0xFFFFF3E0);
+        badgeTextColor = isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100);
+        badgeLabel = 'Moderate';
+        break;
+      case AdvisoryLevel.caution:
+        progressColor = const Color(0xFFC62828);
+        badgeBgColor = isDark ? const Color(0xFF3A1414) : const Color(0xFFFFEBEE);
+        badgeTextColor = isDark ? const Color(0xFFEF9A9A) : const Color(0xFFC62828);
+        badgeLabel = 'Caution';
+        break;
+    }
+
+    final isRelated = _isNutrientKeyRelatedToUser(e.nutrientKey);
+    final displayLabel = isRelated ? e.label : e.shortLabel;
+    // colorScheme.primary is a fixed dark maroon -- legible on the light
+    // pastel badgeBgColor above, but not on its dark-mode tinted
+    // counterpart. colorScheme.secondary is already brightness-aware
+    // (a brighter red in dark mode), so use that instead for the bold
+    // highlighted percentage when in dark mode.
+    final highlightAccentColor = isDark ? colorScheme.secondary : colorScheme.primary;
+
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
+                displayLabel,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: badgeBgColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                badgeLabel,
+                style: GoogleFonts.inter(
+                  color: badgeTextColor,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: LinearProgressIndicator(
+            value: (e.percentage / 100).clamp(0.0, 1.0),
+            backgroundColor: colorScheme.surfaceContainerHighest,
+            valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+            minHeight: 12,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: '${_formatValue(e.valuePerServing)}${e.unit} / ${_formatValue(e.limit)}${e.unit} ${loc.dailySuffix} · ',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              TextSpan(
+                text: '${e.percentage.toStringAsFixed(0)}% ${loc.ofWhoLimit}',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: isRelated ? highlightAccentColor : colorScheme.onSurfaceVariant,
+                  fontWeight: isRelated ? FontWeight.bold : FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    if (!isRelated) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: content,
+      );
+    }
+
+    // Priority concern: bleed the tint to the full width of the enclosing
+    // card and cover the title, progress bar, and percentage text as one
+    // unified row -- no border, no inset gap around it.
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: badgeBgColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        child: content,
+      ),
+    );
+  }
+
+  // Builds the Health Analysis card's allergy row for allergens both
+  // present in this product and saved in the user's own health profile.
+  // A direct allergen match forces the overall verdict to Caution
+  // regardless of any nutrient level, so this row always gets the same
+  // "priority concern" tinted background as a matched health condition.
+  Widget _buildAllergyRow(List<String> matchedAllergenLabels, ColorScheme colorScheme, AppLocalizations loc) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              'Allergy - ${matchedAllergenLabels.join(', ')}',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFEBEE),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              loc.allergenDetectedBadge,
+              style: GoogleFonts.inter(
+                color: const Color(0xFFC62828),
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   // ── Helper method to build advisory subtitle with emphasized last sentence ──────
@@ -1682,36 +1772,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // ── Nutritional mini grid card ──────────────────────────────────────────
-  Widget _nutriCard(BuildContext context, String label, String value) {
+  // ── Nutritional linear list row ───────────────────────────────────────
+  // The nutrient label carries the primary visual weight (what it is);
+  // the value is secondary (how much). This intentionally reverses the
+  // old grid-card hierarchy, where the value was bold and the label was
+  // small and gray -- for a list read top-to-bottom, the label is what
+  // the eye should anchor on first.
+  Widget _nutriListRow(BuildContext context, String label, String value, {bool showDivider = true}) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: theme.dividerColor),
-        ),
-        child: Column(
-          children: [
-            Text(label,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                    fontSize: 10,
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500)),
-            const SizedBox(height: 4),
-            Text(value,
-                textAlign: TextAlign.center,
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                value,
                 style: GoogleFonts.outfit(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface)),
-          ],
+                  fontSize: 13,
+                  fontWeight: FontWeight.normal,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+        if (showDivider)
+          Divider(height: 1, thickness: 1, color: theme.dividerColor.withOpacity(0.5)),
+      ],
     );
   }
 
@@ -1792,6 +1892,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Widget _buildFdaBadge() {
     final fda = _fdaResult;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    // CPR/validity/manufacturer text below was hardcoded to black45,
+    // which is unreadable against the dark card background -- switch to
+    // white in dark mode while keeping the original black45 in light mode.
+    final fdaMetaColor = isDark ? Colors.white : Colors.black45;
     if (fda == null) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1858,17 +1963,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(height: 4),
           Text(
             'CPR: ${fda.cprNumber}',
-            style: GoogleFonts.inter(fontSize: 10, color: Colors.black45, fontWeight: FontWeight.bold),
+            style: GoogleFonts.inter(fontSize: 10, color: fdaMetaColor, fontWeight: FontWeight.bold),
           ),
           if (fda.validityDate.isNotEmpty)
             Text(
               'Valid until: ${fda.validityDate}',
-              style: GoogleFonts.inter(fontSize: 10, color: Colors.black45),
+              style: GoogleFonts.inter(fontSize: 10, color: fdaMetaColor),
             ),
           if (fda.manufacturer.isNotEmpty)
             Text(
               fda.manufacturer,
-              style: GoogleFonts.inter(fontSize: 10, color: Colors.black45),
+              style: GoogleFonts.inter(fontSize: 10, color: fdaMetaColor),
             ),
         ],
       ],
@@ -2196,8 +2301,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
 }
 
+// Pairs a Total Nutrition row's label with its raw scaled value (used to
+// decide whether to show the row at all) and its pre-formatted display
+// string (used to render it).
+class _NutrientEntry {
+  final String label;
+  final double value;
+  final String formatted;
+
+  _NutrientEntry(this.label, this.value, this.formatted);
+}
+
 class DisplayNutrientEval {
   final String label;
+  final String shortLabel;
   final String nutrientKey;
   final double valuePerServing;
   final double limit;
@@ -2207,6 +2324,7 @@ class DisplayNutrientEval {
 
   DisplayNutrientEval({
     required this.label,
+    required this.shortLabel,
     required this.nutrientKey,
     required this.valuePerServing,
     required this.limit,
