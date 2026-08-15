@@ -343,7 +343,9 @@
   "noSearchMatchDesc": "No products matched your search.",
   "seeMore": "See More",
 
-  "scanGuideText": "Align product label to scan",
+  "scanGuideTextPrefix": "Please scan the ",
+  "scanGuideTextEmphasis": "FRONT",
+  "scanGuideTextSuffix": " packaging of the product",
   "productCapturedBadge": "Product Captured!",
   "tapToScanHint": "Tap anywhere to scan",
   "productNotRecognizedTitle": "Product Not Recognized",

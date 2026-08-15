@@ -914,7 +914,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get seeMore => 'See More';
 
   @override
-  String get scanGuideText => 'Align product label to scan';
+  String get scanGuideTextPrefix => 'Please scan the ';
+
+  @override
+  String get scanGuideTextEmphasis => 'FRONT';
+
+  @override
+  String get scanGuideTextSuffix => ' packaging of the product';
 
   @override
   String get productCapturedBadge => 'Product Captured!';

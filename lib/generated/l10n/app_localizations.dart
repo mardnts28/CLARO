@@ -1814,11 +1814,23 @@ abstract class AppLocalizations {
   /// **'See More'**
   String get seeMore;
 
-  /// No description provided for @scanGuideText.
+  /// No description provided for @scanGuideTextPrefix.
   ///
   /// In en, this message translates to:
-  /// **'Align product label to scan'**
-  String get scanGuideText;
+  /// **'Please scan the '**
+  String get scanGuideTextPrefix;
+
+  /// No description provided for @scanGuideTextEmphasis.
+  ///
+  /// In en, this message translates to:
+  /// **'FRONT'**
+  String get scanGuideTextEmphasis;
+
+  /// No description provided for @scanGuideTextSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **' packaging of the product'**
+  String get scanGuideTextSuffix;
 
   /// No description provided for @productCapturedBadge.
   ///

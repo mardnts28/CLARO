@@ -756,14 +756,36 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                   ),
                 ),
 
-                // ── Guide text: "Fit to camera to scan" ─────────────
+                // ── Guide text: "Please scan the FRONT packaging..." ─
+                // Split into 3 spans so the "FRONT"/"HARAP" word can be
+                // visually emphasized (bolder + brighter + letter-spaced)
+                // rather than relying on capitalization alone -- users
+                // scanning the back of the pack was a common mistake this
+                // is meant to head off.
                 Positioned(
                   top: topPadding + 105,
                   left: 24,
                   right: 24,
                   child: Center(
-                    child: Text(
-                      AppLocalizations.of(context)!.scanGuideText,
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: AppLocalizations.of(context)!.scanGuideTextPrefix,
+                          ),
+                          TextSpan(
+                            text: AppLocalizations.of(context)!.scanGuideTextEmphasis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                          TextSpan(
+                            text: AppLocalizations.of(context)!.scanGuideTextSuffix,
+                          ),
+                        ],
+                      ),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
                         color: Colors.white.withValues(alpha: 0.8),
