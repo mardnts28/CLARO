@@ -5,7 +5,6 @@ import '../services/auth_service.dart';
 import '../services/validation_service.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../services/haptic_service.dart';
-import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 import '../generated/l10n/app_localizations.dart';
 
@@ -17,9 +16,6 @@ class ChangePasswordScreen extends StatefulWidget {
 }
 
 class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
-  static const Color _primaryRed = Color(0xFF8B1A1A);
-  static const Color _lightRed = Color(0xFFFDF0F0);
-
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();

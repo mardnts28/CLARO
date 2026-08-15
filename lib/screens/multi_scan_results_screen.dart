@@ -4,8 +4,6 @@ import '../models/product_model.dart';
 import '../services/auth_service.dart';
 import '../services/voice_assistant_service.dart';
 import 'product_detail_screen.dart';
-import 'camera_scanner_screen.dart';
-import 'history_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_mic_overlay.dart';
 import '../data/models/ranked_product_result.dart';

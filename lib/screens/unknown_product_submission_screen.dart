@@ -47,7 +47,6 @@ class _UnknownProductSubmissionScreenState
   final List<String> _additionalBackImagePaths = [];
   bool _isSubmitting = false;
   String? _nameError;
-  String _productName = '';
   String _selectedCategory = 'others'; // Default to 'others'
 
   final _authService = AuthService();
@@ -632,7 +631,6 @@ class _UnknownProductSubmissionScreenState
                       inputFormatters: [SanitizingTextInputFormatter()],
                       onChanged: (value) {
                         if (_nameError != null) setState(() => _nameError = null);
-                        setState(() => _productName = value);
                       },
                     ),
                     const SizedBox(height: 6),

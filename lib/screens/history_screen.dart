@@ -5,7 +5,6 @@ import '../services/history_service.dart';
 import '../services/auth_service.dart';
 import '../services/locale_service.dart';
 import '../data/services/backend_locator.dart';
-import 'camera_scanner_screen.dart';
 import 'product_detail_screen.dart';
 import 'compare_products_screen.dart';
 import 'report_detail_screen.dart';

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/report_model.dart';
-import '../generated/l10n/app_localizations.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 
@@ -29,7 +28,6 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final loc = AppLocalizations.of(context)!;
 
     // Status Badge colors
     Color statusBg;

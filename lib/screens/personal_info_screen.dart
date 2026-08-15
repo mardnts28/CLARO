@@ -20,8 +20,6 @@ class PersonalInfoScreen extends StatefulWidget {
 }
 
 class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
-  static const _primaryRed = Color(0xFF8B1A1A);
-  static const _lightRed = Color(0xFFFCE7E7);
   final _authService = AuthService();
 
   String _userName = 'User';
@@ -201,26 +199,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     } catch (e) {
       debugPrint('Error saving user name: $e');
       setState(() => _isSavingName = false);
-    }
-  }
-
-  Future<void> _saveUserAge(String newAge) async {
-    final loc = AppLocalizations.of(context)!;
-    try {
-      final uid = _authService.currentUser?.uid;
-      if (uid == null) return;
-      setState(() => _isSavingAge = true);
-      final ok = await _authService.updateUserData({'age': newAge});
-      setState(() => _isSavingAge = false);
-      if (ok) {
-        await _loadUserData();
-        if (mounted) SuccessFeedbackUtils.showSuccessSnackBar(context, loc.profileUpdateSuccess);
-      } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
-      }
-    } catch (e) {
-      debugPrint('Error saving user age: $e');
-      setState(() => _isSavingAge = false);
     }
   }
 

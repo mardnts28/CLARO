@@ -20,8 +20,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const _primaryRed = Color(0xFF8B1A1A);
-  static const _lightRed = Color(0xFFFCE7E7);
-  static const _navPill = Color(0xFFF6CDCD);
 
   int _selectedIndex = 0;
 
@@ -1025,13 +1023,6 @@ class _HomeScreenState extends State<HomeScreen> {
     Color(0xFFEA3F2D),
   ];
 
-  static const List<String> _processLabels = [
-    'Hindi o bahagyang naproseso',
-    'May naprosesong sangkap sa pagluluto',
-    'Naprosesong pagkain',
-    'Malubhang naprosesong pagkain',
-  ];
-
   Widget _buildProcessCard() {
     final theme = Theme.of(context);
     final primaryColor = theme.brightness == Brightness.dark
@@ -1165,15 +1156,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 MainAxisAlignment.spaceBetween,
 
             children: [
-              Text(
-                loc.processGroupFirst,
-
-                style: TextStyle(
-                  fontSize: 10,
-                  color:
-                      theme.colorScheme
-                          .onSurfaceVariant,
-                  height: 1.2,
+              Flexible(
+                child: Text(
+                  loc.processGroupFirst,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color:
+                        theme.colorScheme
+                            .onSurfaceVariant,
+                    height: 1.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
 
@@ -1203,17 +1196,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
 
-              Text(
-                loc.processGroupFourth,
+              Flexible(
+                child: Text(
+                  loc.processGroupFourth,
 
-                textAlign: TextAlign.right,
+                  textAlign: TextAlign.right,
 
-                style: TextStyle(
-                  fontSize: 10,
-                  color:
-                      theme.colorScheme
-                          .onSurfaceVariant,
-                  height: 1.2,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color:
+                        theme.colorScheme
+                            .onSurfaceVariant,
+                    height: 1.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -1581,51 +1577,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------------------
-  // VOICE BUTTON
-  // -------------------------------------------------------------------------
-
-  Widget _buildVoiceButton() {
-    return PositionedDirectional(
-      bottom: 92,
-      end: 24,
-
-      child: Container(
-        width: 56,
-        height: 56,
-
-        decoration: BoxDecoration(
-          color: _primaryRed,
-          shape: BoxShape.circle,
-
-          boxShadow: [
-            BoxShadow(
-              color:
-                  _primaryRed.withOpacity(0.25),
-
-              blurRadius: 18,
-
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-
-        child: IconButton(
-          icon: const Icon(
-            Icons.mic,
-            color: Colors.white,
-          ),
-
-          onPressed: () {
-            HapticService().vibrate();
-
-            _onNavTap(1);
-          },
-        ),
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------------------
   // SCAN PAGE
   // -------------------------------------------------------------------------
 
@@ -1643,65 +1594,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildHistoryPage() {
     return const HistoryScreen(
       embeddedMode: true,
-    );
-  }
-
-  // -------------------------------------------------------------------------
-  // PLACEHOLDER PAGE
-  // -------------------------------------------------------------------------
-
-  Widget _buildPlaceholderPage(
-    String title,
-    String subtitle,
-  ) {
-    final theme = Theme.of(context);
-
-    final colorScheme = theme.colorScheme;
-
-    final bodyLarge =
-        theme.textTheme.bodyLarge;
-
-    final bodyMedium =
-        theme.textTheme.bodyMedium;
-
-    return Center(
-      child: Padding(
-        padding:
-            const EdgeInsets.symmetric(
-          horizontal: 32,
-        ),
-
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-
-          children: [
-            Text(
-              title,
-
-              style: bodyLarge?.copyWith(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              subtitle,
-
-              textAlign: TextAlign.center,
-
-              style: bodyMedium?.copyWith(
-                fontSize: 14,
-                height: 1.5,
-                color:
-                    colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1892,16 +1784,12 @@ class _HomeScreenState extends State<HomeScreen> {
 // ARROW CLIPPER
 // -----------------------------------------------------------------------------
 
-class _ArrowClipper
-    extends CustomClipper<Path> {
-  final double arrowWidth;
-
-  const _ArrowClipper({
-    this.arrowWidth = 12,
-  });
+class _ArrowClipper extends CustomClipper<Path> {
+  const _ArrowClipper();
 
   @override
   Path getClip(Size size) {
+    const arrowWidth = 12.0;
     final path = Path();
 
     path.moveTo(0, 0);

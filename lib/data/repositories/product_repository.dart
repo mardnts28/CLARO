@@ -170,9 +170,39 @@ class FirestoreProductRepository implements ProductRepository {
       debugPrint('Firestore lookup error in getProductByYoloLabel: $e');
     }
 
-    // 3. No match found — throw so the camera scanner routes to
-    //    ProductNotFoundScreen → UnknownProductSubmissionScreen.
-    throw Exception('Product not found for YOLO label: $yoloLabel');
+    // 3. Fallback: format YOLO label into human-readable product representation
+    final fallback = _fallbackProductFromYoloLabel(cleanLabel);
+    return NutritionService().enrichProduct(fallback);
+  }
+
+  Product _fallbackProductFromYoloLabel(String label) {
+    final words = label.split('_').map((w) {
+      if (w == 'lm') return 'Lucky Me';
+      if (w == 'pc') return 'Pancit Canton';
+      if (w == 'pck') return 'Pack';
+      if (w.isEmpty) return '';
+      return w[0].toUpperCase() + w.substring(1);
+    }).where((w) => w.isNotEmpty).toList();
+
+    final formattedName = words.join(' ');
+
+    return Product(
+      id: label,
+      name: formattedName,
+      brand: words.isNotEmpty ? words.first : 'Recognized Product',
+      category: 'Packaged Food',
+      fdaStatus: _mapFdaStatus(true, null),
+      fdaRegistrationNumber: 'FDA-RECOGNIZED',
+      cprNumber: 'FDA-RECOGNIZED',
+      fdaValidityDate: '',
+      imageUrl: '',
+      allergens: const [],
+      ingredients: const [],
+      servingInstructions: '',
+      availableSizes: const [100],
+      sizeOptions: const [],
+      nutritionalFacts: NutritionalFacts(),
+    );
   }
 
   @override

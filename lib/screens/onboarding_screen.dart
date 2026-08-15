@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
@@ -44,9 +43,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _authService = AuthService();
   int _currentPage = 0;
   bool _isLoading = false;
-
-  static const _red = Color(0xFF8B1A1A);
-  static const _lightRed = Color(0xFFFDF0F0);
 
   // Internal storage keys -- DO NOT translate these, see class doc above.
   final Map<String, bool> _conditions = {

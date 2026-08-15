@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/services.dart';
 import '../generated/l10n/app_localizations.dart';
 
 class DateOfBirthPicker extends StatefulWidget {
@@ -128,7 +126,6 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
   }
 
   void _onYearChanged(int index) {
-    final now = DateTime.now();
     final minDate = widget.firstDate ?? DateTime(1900);
     setState(() {
       _selectedYear = minDate.year + index;

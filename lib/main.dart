@@ -92,10 +92,15 @@ class ClaroApp extends StatelessWidget {
                   darkTheme: _buildTheme(Brightness.dark),
                   navigatorObservers: [VoiceAssistantService.navigatorObserver],
                   builder: (context, child) {
+                    final mediaQuery = MediaQuery.of(context);
+                    // Combine user text size preference with system font scaling,
+                    // clamping to 0.85 - 1.30 so text enlarges clearly while keeping
+                    // all UI cards, headers, buttons, and layouts consistent across screens.
+                    final effectiveScale = (textSize * mediaQuery.textScaler.scale(1.0)).clamp(0.85, 1.30);
                     return _VoiceInteractionStopper(
                       child: MediaQuery(
-                        data: MediaQuery.of(context).copyWith(
-                          textScaler: TextScaler.linear(textSize),
+                        data: mediaQuery.copyWith(
+                          textScaler: TextScaler.linear(effectiveScale),
                         ),
                         child: child!,
                       ),

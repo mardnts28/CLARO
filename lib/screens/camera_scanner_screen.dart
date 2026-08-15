@@ -83,6 +83,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   DateTime? _productFirstDetectedTime;
   DateTime? _lastSeenTime;
 
+  // 5-8s fallback timeout tracking
+  DateTime? _noProductStartTime;
+  bool _isFallbackModalOpen = false;
+
   // Laser animation
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
@@ -132,6 +136,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
     _continuousAnalysisTimer?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _stopImageStreamIfActive();
     _cameraController?.dispose();
     _laserController.dispose();
     WidgetsBinding.instance.removeObserver(this);
@@ -161,7 +166,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       );
       _cameraController = CameraController(
         back,
-        ResolutionPreset.low,
+        ResolutionPreset.medium,
         enableAudio: false,
       );
       await _cameraController!.initialize();
@@ -213,8 +218,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       try {
         _cameraController?.startImageStream((CameraImage image) {
           _frameCount++;
-          // Throttle: process every 4th frame (~7.5 fps target if source is 30fps)
-          if (_frameCount % 4 != 0) return;
+          // Throttle: process every 3rd frame to align with Camera2 ImageReader buffer recycling
+          if (_frameCount % 3 != 0) return;
 
           if (_isProcessing || _isLiveAnalysisRunning || !mounted) return;
 
@@ -261,11 +266,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             }
 
             if (productInGuide && !_isProcessing) {
+              _noProductStartTime = null;
               _productFirstDetectedTime ??= DateTime.now();
               _lastSeenTime = DateTime.now();
               
-              final holdDuration = DateTime.now().difference(_productFirstDetectedTime!).inSeconds;
-              if (holdDuration >= 3) {
+              final holdDurationMs = DateTime.now().difference(_productFirstDetectedTime!).inMilliseconds;
+              if (holdDurationMs >= 1200) {
                 _productFirstDetectedTime = null;
                 _lastSeenTime = null;
                 _performScan();
@@ -277,6 +283,16 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                   _productFirstDetectedTime = null;
                   _lastSeenTime = null;
                 }
+              }
+
+              // Track continuous time without any product in the guide rectangle
+              _noProductStartTime ??= DateTime.now();
+              final noProductDurationMs =
+                  DateTime.now().difference(_noProductStartTime!).inMilliseconds;
+
+              // 6 seconds continuous missing product threshold -> trigger guidance fallback
+              if (noProductDurationMs >= 6000 && !_isFallbackModalOpen) {
+                _showNoProductFallbackDialog();
               }
             }
 
@@ -300,6 +316,145 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     if (!widget.embeddedMode && Navigator.canPop(context)) {
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
+  }
+
+  void _showNoProductFallbackDialog() {
+    if (_isFallbackModalOpen || !mounted) return;
+    _isFallbackModalOpen = true;
+
+    final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
+
+    VoiceAssistantService.instance.speak(
+      isTagalog
+          ? 'Walang produktong nahanap sa camera. Subukang itapat nang mas malapit o ipagbigay-alam ang hindi kilalang produkto.'
+          : 'No product detected on camera. Try moving closer or report the unknown product.',
+    );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF1E1E2C),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        final isTl = Localizations.localeOf(ctx).languageCode == 'tl';
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: 20,
+              right: 20,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Icon(Icons.help_outline_rounded,
+                      color: Colors.amberAccent, size: 48),
+                  const SizedBox(height: 12),
+                  Text(
+                    isTl ? 'Walang Produktong Nahanap' : 'No Product Found',
+                    style: GoogleFonts.inter(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    isTl
+                        ? 'Hindi matukoy ang produkto sa camera. Pumili ng aksyon:'
+                        : 'Could not detect product on camera. Choose an action:',
+                    style: GoogleFonts.inter(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2E7D32),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.report_problem_outlined),
+                      label: Flexible(
+                        child: Text(
+                          isTl
+                              ? 'I-report ang Hindi Kilalang Produkto'
+                              : 'Report Unidentified Product',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        _navigateToReportDirectly();
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white30),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Flexible(
+                        child: Text(
+                          isTl ? 'Subukan Ulit' : 'Try Again',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    ).then((_) {
+      if (mounted) {
+        _isFallbackModalOpen = false;
+        _noProductStartTime = DateTime.now();
+      }
+    });
   }
 
   void _toggleFlash() async {
@@ -783,16 +938,19 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                                 color: Colors.white.withValues(alpha: 0.85),
                               ),
                               const SizedBox(width: 6),
-                              Text(
-                                Localizations.localeOf(context).languageCode == 'tl'
-                                    ? 'Hindi mahanap ang produkto? I-report'
-                                    : 'Can’t scan your product? Report here',
-                                style: GoogleFonts.inter(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: Colors.white70,
+                              Flexible(
+                                child: Text(
+                                  Localizations.localeOf(context).languageCode == 'tl'
+                                      ? 'Hindi mahanap ang produkto? I-report'
+                                      : 'Can’t scan your product? Report here',
+                                  style: GoogleFonts.inter(
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: Colors.white70,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -859,8 +1017,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       statusText = isTagalog ? 'Sinusuri ang Produkto...' : 'Analyzing Product...';
       statusColor = const Color(0xFF00E676);
       iconData = Icons.sync;
+    } else if (_qualityWarning != null && _qualityWarning!.toLowerCase().contains('dark')) {
+      statusText = isTagalog ? 'Masyadong Madilim - Buksan ang Flash' : 'Too Dark - Turn on Flash';
+      statusColor = const Color(0xFFFFB74D);
+      iconData = Icons.flash_on;
     } else if (_isProductInGuide) {
-      statusText = isTagalog ? 'Nakilala ang Produkto' : 'Product Recognized';
+      statusText = isTagalog ? 'I-hold steady nang 1.2s...' : 'Hold steady... (1.2s)';
       statusColor = const Color(0xFF00E676);
       iconData = Icons.check_circle_rounded;
     } else {

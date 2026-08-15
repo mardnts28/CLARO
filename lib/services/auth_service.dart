@@ -360,7 +360,7 @@ class AuthService {
     final templateParams = {
       'service_id': 'service_5y6zi4d',
       'template_id': 'template_te10bxg',
-      'user_id': 'wJyfTyTAuJIC6XQvn',
+      'user_id': _emailJsPublicKey,
       if (_emailJsPrivateKey.isNotEmpty)
         'accessToken': _emailJsPrivateKey,
       'template_params': {

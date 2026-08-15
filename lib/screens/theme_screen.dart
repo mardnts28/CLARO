@@ -15,7 +15,6 @@ class ThemeScreen extends StatefulWidget {
 }
 
 class _ThemeScreenState extends State<ThemeScreen> {
-  static const _primaryRed = Color(0xFF8B1A1A);
   String _selected = 'Default';
   final _authService = AuthService();
 
@@ -75,41 +74,6 @@ class _ThemeScreenState extends State<ThemeScreen> {
     } catch (e) {
       debugPrint('Error saving theme: $e');
     }
-  }
-
-  Widget _option(String label, String asset) {
-    final theme = Theme.of(context);
-    final selected = _selected.toLowerCase() == label.toLowerCase();
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _choose(label),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: selected ? theme.colorScheme.primaryContainer : theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? theme.colorScheme.primary : theme.dividerColor,
-              width: selected ? 2 : 1,
-            ),
-          ),
-          child: Column(
-            children: [
-              Image.asset(asset, height: 100, fit: BoxFit.contain),
-              const SizedBox(height: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: selected ? theme.colorScheme.primary : theme.textTheme.bodyLarge?.color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 
   @override

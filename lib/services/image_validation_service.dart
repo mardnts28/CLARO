@@ -104,10 +104,10 @@ class ImageValidationService {
       final sharpnessScore = (variance * 10).clamp(0.0, 100.0); // scaled variance
 
       // Thresholds:
-      // Too Dark: Avg Brightness Score < 18 (around 45 in 0-255 scale)
-      // Blurry: Sharpness Score < 15
-      final bool isTooDark = brightnessScore < 18.0;
-      final bool isBlurry = sharpnessScore < 12.0;
+      // Too Dark: Avg Brightness Score < 12.0 (relaxed from 18.0)
+      // Blurry: Sharpness Score < 8.0 (relaxed from 12.0)
+      final bool isTooDark = brightnessScore < 12.0;
+      final bool isBlurry = sharpnessScore < 8.0;
 
       String message = "Image quality is optimal.";
       bool isValid = true;

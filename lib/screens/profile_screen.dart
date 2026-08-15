@@ -38,10 +38,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isDeletingAccount = false;
   bool _darkModeEnabled = false;
   String _selectedLanguageCode = 'en';
-  double _speechRate = 0.5;
-  double _speechVolume = 0.7;
-  bool _vibrationFeedback = false;
-  double _textSize = 1.0; // 0.8 - 1.4 range for example
 
 
   @override
@@ -107,10 +103,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // `language` stored as language code ('en'|'tl'). Convert to human label for UI.
                 final code = data['language'] ?? 'en';
                 _selectedLanguageCode = code;
-                _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
-                _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
-                _vibrationFeedback = data['vibrationFeedback'] ?? false;
-                _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : 1.0;
               });
               setAppThemeMode(parseThemeMode(themeString));
               // Keep the shared notifier in sync so HomeScreen's
@@ -135,10 +127,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
               final code = data['language'] ?? 'en';
               _selectedLanguageCode = code;
-              _speechRate = (data['speechRate'] != null) ? (data['speechRate'] as num).toDouble() : 0.5;
-              _speechVolume = (data['speechVolume'] != null) ? (data['speechVolume'] as num).toDouble() : 0.7;
-              _vibrationFeedback = data['vibrationFeedback'] ?? false;
-              _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : 1.0;
             });
             setAppThemeMode(parseThemeMode(themeString));
             AuthService.userNameNotifier.value = _userName;

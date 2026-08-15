@@ -56,8 +56,6 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
     HapticService().vibrate();
     if (_submitting) return;
     setState(() => _submitting = true);
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
     final text = _commentController.text.trim();
     if (_rating < 1) {
