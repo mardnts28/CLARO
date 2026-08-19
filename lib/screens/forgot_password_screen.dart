@@ -75,11 +75,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           return Scaffold(
             backgroundColor: colorScheme.surface,
             body: SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final horizontalPadding = constraints.maxWidth < 400 ? 20.0 : 28.0;
+
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 24),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 560),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                       GestureDetector(
                         onTap: () => Navigator.pop(context),
                         child: Icon(Icons.arrow_back, color: colorScheme.primary, size: 24),
@@ -88,7 +95,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       Center(
                         child: Column(
                           children: [
-                            Image.asset('assets/images/logo.png', height: 90),
+                            Image.asset('assets/images/logo.png', height: 80),
                             const SizedBox(height: 8),
                             Text(
                               'CLARO',
@@ -110,7 +117,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       ),
                       Text(
                         'Enter your email address and we will send you a link to reset your password.',
-                        style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
+                        style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant, height: 1.4),
                       ),
                       const SizedBox(height: 24),
                       _buildTextField(
@@ -183,47 +190,28 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          child: TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: Text(
-                              'Back to Login',
-                              style: TextStyle(
-                                  fontSize: 14,
-                                  color: colorScheme.primary,
-                                  fontWeight: FontWeight.w500),
-                            ),
-                          ),
-                        ),
-                      ] else
-                        const SizedBox(height: 20),
-                      Center(
-                        child: GestureDetector(
-                          onTap: () => Navigator.pop(context),
-                          child: RichText(
-                            text: TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: 'Remember your password? ',
-                                  style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant),
-                                ),
-                                TextSpan(
-                                  text: 'Back to Login',
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: colorScheme.primary,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ],
+                      ],
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: Text(
+                            _emailSent ? 'Back to Login' : 'Remember your password? Back to Login',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
+              );
+                },
               ),
             );
           },

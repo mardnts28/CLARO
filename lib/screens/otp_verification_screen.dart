@@ -38,14 +38,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final _otpController = TextEditingController();
   bool _isVerifying = false;
   bool _isResending = false;
-  int _remainingSeconds = 300;
+  int _remainingSeconds = 30;
   int _attempts = 0;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _startTimer();
+    if (widget.emailSent) {
+      _startTimer();
+    }
   }
 
   @override
@@ -56,7 +58,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   void _startTimer() {
-    _remainingSeconds = 300; // 5 minutes
+    _remainingSeconds = 30;
 
     _timer?.cancel();
 
@@ -139,9 +141,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to resend the verification code.')));
         return;
       }
-      _startTimer();
       final resendEmailSent = otpData['emailSent'] == true;
       if (resendEmailSent) {
+        _startTimer();
         SuccessFeedbackUtils.showSuccessSnackBar(context, 'A new verification code has been sent.');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
