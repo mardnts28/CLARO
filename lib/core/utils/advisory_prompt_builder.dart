@@ -50,12 +50,25 @@ class AdvisoryPromptBuilder {
     String factsBlock;
     if (allergen.hasDirectAllergen) {
       final allergenLabels = allergen.matchedContains.map(_allergenLabel).join(', ');
-      final ingredientList = allergen.matchedIngredients.isNotEmpty
-          ? allergen.matchedIngredients.join(', ')
-          : allergenLabels;
+      // Per-allergen ingredient attribution, using ONLY what
+      // WhoCalculator.assessAllergens reliably established -- direct
+      // or derived. Never invent or guess an ingredient beyond this.
+      final sourceLines = allergen.ingredientSources.map((m) {
+        final label = _allergenLabel(m.allergen);
+        switch (m.matchType) {
+          case AllergenMatchType.direct:
+            return '- $label: the ingredient "${m.ingredient}" directly IS/contains $label.';
+          case AllergenMatchType.derived:
+            return '- $label: the ingredient "${m.ingredient}" is a confirmed $label derivative (not literally named "$label").';
+          case AllergenMatchType.undetermined:
+            // This case should no longer occur since we removed undetermined matches
+            // from allergen assessment. Kept for safety but should never be hit.
+            return '- $label: flagged on the product, but NO specific ingredient in the list could be reliably confirmed as the source (e.g. only a generic "flavors"-type entry with no confirmed derivation). Do not guess or name any ingredient for this one.';
+        }
+      }).join('\n');
       factsBlock =
-          'This product CONTAINS an allergen the user is allergic to: $allergenLabels. '
-          'Specific matching ingredients: $ingredientList.';
+          'This product CONTAINS an allergen the user is allergic to: $allergenLabels.\n'
+          'Ingredient attribution (use exactly this, do not add, guess, or invent beyond it):\n$sourceLines';
     } else if (worst == null) {
       factsBlock =
           'All evaluated nutrients are within the suitable range for this user\'s condition(s).';
@@ -101,6 +114,26 @@ Also write a "comparisonExplanation" field: ONE short sentence explaining why th
   "safeServingSize": ${safeServing != null ? '"$safeServing"' : 'null'}
 }''';
 
+    final instructionsBlock = allergen.hasDirectAllergen
+        ? '''Write a concise health advisory (20-50 words, short sentences) following this exact format:
+
+1. Open by naming the allergen(s) the product is flagged for
+2. For EACH allergen line in the ingredient attribution above, report it using ONLY what that line says:
+   - If it names an ingredient that directly contains the allergen, say so plainly (e.g. "Detected ingredient: Tuna (fish)")
+   - If it names a derived ingredient, say it's derived, not a direct match (e.g. "Detected ingredient: Whey (dairy-derived)")
+3. End with a short recommendation to consume with caution or avoid this product
+
+Do NOT mention: calculations, algorithms, risk scores, WHO, "recommended maximum daily intake"'''
+        : '''Write a concise health advisory (30-60 words, short sentences) following this exact format:
+
+1. State the nutrient amount per serving using the exact values provided
+2. Convert the percentage into natural language (e.g., "about 13% of your daily sodium limit")
+3. Explain health effects simply using everyday language (e.g., "Too much sodium may raise blood pressure")
+4. If a safe serving recommendation is available, end with one practical suggestion (e.g., "Enjoy up to 1 serving at a time")
+5. Sound like a grocery shopping assistant giving quick advice
+
+Do NOT mention: calculations, algorithms, risk scores, WHO, "represents", "contributes", "recommended maximum daily intake", "moderation", "excessive intake", "dietary guideline", "consume", "contributes to hypertension"''';
+
     return '''
 You are a friendly grocery assistant inside a Filipino grocery app called CLARO, writing a quick health tip for a scanned product.
 
@@ -110,17 +143,9 @@ $comparisonBlock
 
 $languageInstruction
 
-Write a concise health advisory (30-60 words, short sentences) following this exact format:
+$instructionsBlock
 
-1. State the nutrient amount per serving using the exact values provided
-2. Convert the percentage into natural language (e.g., "about 13% of your daily sodium limit")
-3. Explain health effects simply using everyday language (e.g., "Too much sodium may raise blood pressure")
-4. If a safe serving recommendation is available, end with one practical suggestion (e.g., "Enjoy up to 1 serving at a time")
-5. Sound like a grocery shopping assistant giving quick advice
-
-Do NOT mention: calculations, algorithms, risk scores, WHO, "represents", "contributes", "recommended maximum daily intake", "moderation", "excessive intake", "dietary guideline", "consume", "contributes to hypertension"
-
-Use ONLY the exact numbers provided in the facts. Do not calculate or change any values.
+Use ONLY the exact numbers/ingredients provided in the facts. Do not calculate, change, invent, or guess any values or ingredient names beyond what's given.
 
 Return ONLY valid JSON, no markdown, matching exactly this shape:
 $jsonFields

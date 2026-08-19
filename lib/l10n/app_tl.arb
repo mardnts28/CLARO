@@ -124,10 +124,11 @@
   "preferenceSaveError": "Hindi ma-save ang preference",
 
   "preferenceTitle": "Preference",
-  "voiceSoundTitle": "Boses at tunog",
+  "voiceSoundTitle": "Mga Setting ng Voice Assistant",
   "selectLanguage": "Piliin ang wika",
   "speechRate": "Bilis ng pagsasalita",
   "previewAudio": "I-tap para sa preview ng audio",
+  "enableVoiceAssistant": "I-enable ang Voice Assistant",
   "vibrationFeedback": "Vibration feedback",
   "vibrateDescription": "Mag-vibrate sa pag-scan, alerto, at pagbabasa",
   "textSize": "Laki ng teksto",

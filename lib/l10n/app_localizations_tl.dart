@@ -322,7 +322,7 @@ class AppLocalizationsTl extends AppLocalizations {
   String get preferenceTitle => 'Preference';
 
   @override
-  String get voiceSoundTitle => 'Boses at tunog';
+  String get voiceSoundTitle => 'Mga Setting ng Voice Assistant';
 
   @override
   String get selectLanguage => 'Piliin ang wika';
@@ -332,6 +332,9 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get previewAudio => 'I-tap para sa preview ng audio';
+
+  @override
+  String get enableVoiceAssistant => 'I-enable ang Voice Assistant';
 
   @override
   String get vibrationFeedback => 'Vibration feedback';

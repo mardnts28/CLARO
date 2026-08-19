@@ -725,7 +725,7 @@ abstract class AppLocalizations {
   /// No description provided for @voiceSoundTitle.
   ///
   /// In en, this message translates to:
-  /// **'Voice & sound'**
+  /// **'Voice Assistant Settings'**
   String get voiceSoundTitle;
 
   /// No description provided for @selectLanguage.
@@ -745,6 +745,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Tap for audio preview'**
   String get previewAudio;
+
+  /// No description provided for @enableVoiceAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable Voice Assistant'**
+  String get enableVoiceAssistant;
 
   /// No description provided for @vibrationFeedback.
   ///
@@ -1703,7 +1709,7 @@ abstract class AppLocalizations {
   /// No description provided for @nutriSatFat.
   ///
   /// In en, this message translates to:
-  /// **'Sat. Fat'**
+  /// **'Saturated Fat'**
   String get nutriSatFat;
 
   /// No description provided for @nutriTransFat.

@@ -746,24 +746,17 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                   ),
                 ),
 
-                // ── Sleek status pill header ─────────────────────────────
-                Positioned(
-                  top: topPadding + 18,
-                  left: 68,
-                  right: 110,
-                  child: Center(
-                    child: _buildStatusPill(),
-                  ),
-                ),
-
-                // ── Guide text: "Please scan the FRONT packaging..." ─
+                // ── Static Guide text: "Please scan the FRONT packaging..." ─
+                // Positioned below the Close / Report / Flash buttons (which
+                // sit at topPadding+16, 40px tall, so their bottom edge is at
+                // topPadding+56) so it never overlaps or renders behind them.
                 // Split into 3 spans so the "FRONT"/"HARAP" word can be
                 // visually emphasized (bolder + brighter + letter-spaced)
                 // rather than relying on capitalization alone -- users
                 // scanning the back of the pack was a common mistake this
                 // is meant to head off.
                 Positioned(
-                  top: topPadding + 105,
+                  top: topPadding + 66,
                   left: 24,
                   right: 24,
                   child: Center(
@@ -891,9 +884,11 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 ),
 
                 // ── Quality warning banner ──────────────────────────
+                // Sits below the static guide text (which now starts at
+                // topPadding + 66 and runs roughly two lines tall).
                 if (_qualityWarning != null)
                   Positioned(
-                    top: topPadding + 70,
+                    top: topPadding + 118,
                     left: 24,
                     right: 24,
                     child: Semantics(
@@ -927,59 +922,73 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                     ),
                   ),
 
-                // ── Subtle bottom helper prompt (Can't scan? Report) ────
+                // ── Dynamic Status Indicator + bottom helper prompt ──────
+                // The status pill ("Scanning for product, hold steady") now
+                // lives in the bottom portion of the screen, stacked
+                // directly above the "Can't scan your product? Report here"
+                // prompt in a single Column. Stacking them (rather than
+                // using two independently-positioned widgets with fixed
+                // pixel offsets) guarantees the pill never overlaps the
+                // helper prompt below it, and its full-width (24/24) bounds
+                // mean the complete status message stays visible instead of
+                // being clipped.
                 Positioned(
                   bottom: 24,
                   left: 24,
                   right: 24,
-                  child: Center(
-                    child: Semantics(
-                      button: true,
-                      label: Localizations.localeOf(context).languageCode == 'tl'
-                          ? 'Hindi mahanap ang produkto? I-report'
-                          : 'Can’t scan your product? Report here',
-                      child: GestureDetector(
-                        onTap: _navigateToReportDirectly,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white24,
-                              width: 1,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildStatusPill(),
+                      const SizedBox(height: 12),
+                      Semantics(
+                        button: true,
+                        label: Localizations.localeOf(context).languageCode == 'tl'
+                            ? 'Hindi mahanap ang produkto? I-report'
+                            : 'Can’t scan your product? Report here',
+                        child: GestureDetector(
+                          onTap: _navigateToReportDirectly,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white24,
+                                width: 1,
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.help_outline_rounded,
-                                size: 14,
-                                color: Colors.white.withValues(alpha: 0.85),
-                              ),
-                              const SizedBox(width: 6),
-                              Flexible(
-                                child: Text(
-                                  Localizations.localeOf(context).languageCode == 'tl'
-                                      ? 'Hindi mahanap ang produkto? I-report'
-                                      : 'Can’t scan your product? Report here',
-                                  style: GoogleFonts.inter(
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: Colors.white70,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.help_outline_rounded,
+                                  size: 14,
+                                  color: Colors.white.withValues(alpha: 0.85),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    Localizations.localeOf(context).languageCode == 'tl'
+                                        ? 'Hindi mahanap ang produkto? I-report'
+                                        : 'Can’t scan your product? Report here',
+                                    style: GoogleFonts.inter(
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: Colors.white70,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                 ),
 
@@ -1058,7 +1067,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       liveRegion: true,
       container: true,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.black.withValues(alpha: 0.75),
           borderRadius: BorderRadius.circular(24),
@@ -1075,8 +1084,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           children: [
             if (_isProcessing)
               const SizedBox(
-                width: 14,
-                height: 14,
+                width: 16,
+                height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: Color(0xFF00E676),
@@ -1085,17 +1094,22 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             else
               Icon(
                 iconData,
-                size: 15,
+                size: 17,
                 color: statusColor,
               ),
             const SizedBox(width: 8),
+            // Font size increased (12 -> 15) for readability; no longer
+            // constrained to a narrow pill width, so the full status
+            // message (e.g. "Scanning for product, hold steady") stays
+            // on-screen instead of being truncated with an ellipsis.
             Flexible(
               child: Text(
                 statusText,
                 overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   color: Colors.white,
-                  fontSize: 12,
+                  fontSize: 15,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.2,
                 ),

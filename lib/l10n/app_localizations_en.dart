@@ -321,7 +321,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get preferenceTitle => 'Preference';
 
   @override
-  String get voiceSoundTitle => 'Voice & sound';
+  String get voiceSoundTitle => 'Voice Assistant Settings';
 
   @override
   String get selectLanguage => 'Select language';
@@ -331,6 +331,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get previewAudio => 'Tap for audio preview';
+
+  @override
+  String get enableVoiceAssistant => 'Enable Voice Assistant';
 
   @override
   String get vibrationFeedback => 'Vibration feedback';

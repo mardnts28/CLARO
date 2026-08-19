@@ -33,16 +33,54 @@ class NutrientEvaluation {
   });
 }
 
+// How reliably an ingredient-level match was established for a matched
+// allergen. Powers the Health Advisory's ingredient attribution: we only
+// ever claim "direct" or "derived" when the ingredient list actually
+// supports it -- never a guess dressed up as a fact.
+enum AllergenMatchType {
+  // The ingredient text IS the allergen (or an unambiguous synonym/species
+  // of it) -- e.g. ingredient "Milk" or "Tuna" for a milk/fish allergy.
+  direct,
+  // The ingredient text is not the allergen by name, but is a well-known
+  // derivative/component of it that the product data confirms -- e.g.
+  // "Whey" or "Casein" for a dairy allergy, "Surimi" for a fish allergy.
+  derived,
+  // DEPRECATED: This value is kept for enum compatibility but is no longer
+  // used in allergen assessment. Label declarations alone are no longer
+  // sufficient for a caution warning - only explicit ingredient matches
+  // (direct or derived) trigger allergen cautions.
+  undetermined,
+}
+
+// Ties ONE matched allergen back to the specific ingredient (if any) that
+// reliably explains it, and how confident that attribution is.
+class AllergenIngredientMatch {
+  final AllergenType allergen;
+  final String? ingredient; // always non-null in current implementation (direct/derived matches only)
+  final AllergenMatchType matchType;
+
+  const AllergenIngredientMatch({
+    required this.allergen,
+    required this.matchType,
+    this.ingredient,
+  });
+}
+
 // Result of checking a product's allergens against the user's allergy list.
 class AllergenAssessment {
   final List<AllergenType> matchedContains; // definite match -> forced last
   final bool hasDirectAllergen;
-  final List<String> matchedIngredients; // specific ingredient strings that matched
+  final List<String> matchedIngredients; // specific ingredient strings that matched (direct + derived only)
+  // One entry per allergen in [matchedContains], describing exactly which
+  // ingredient (if any) reliably explains that match and whether it's a
+  // direct or derived source. See AllergenMatchType for the rules.
+  final List<AllergenIngredientMatch> ingredientSources;
 
   const AllergenAssessment({
     required this.matchedContains,
     required this.hasDirectAllergen,
     this.matchedIngredients = const [],
+    this.ingredientSources = const [],
   });
 }
 

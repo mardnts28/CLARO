@@ -55,63 +55,169 @@ class WhoCalculator {
   }
 
   static AllergenAssessment assessAllergens(Product product, UserHealthProfile user) {
-    // Check explicit allergens list
-    final matchedContains = product.containsAllergens
-        .where((a) => user.allergies.contains(a))
-        .toList();
-
-    // Check ingredients for allergen-derived components (case-insensitive partial match)
-    final matchedIngredients = <AllergenType>[];
+    final matchedAllergens = <AllergenType>[];
     final matchedIngredientStrings = <String>[];
+    final ingredientSources = <AllergenIngredientMatch>[];
+
     for (final allergy in user.allergies) {
-      final allergyKeywords = _getAllergenKeywords(allergy);
-      for (final ingredient in product.ingredients) {
-        final ingredientLower = ingredient.toLowerCase();
-        for (final keyword in allergyKeywords) {
-          if (ingredientLower.contains(keyword)) {
-            if (!matchedIngredients.contains(allergy)) {
-              matchedIngredients.add(allergy);
-            }
-            if (!matchedIngredientStrings.contains(ingredient)) {
-              matchedIngredientStrings.add(ingredient);
-            }
-            break;
-          }
-        }
+      // Direct: the ingredient text IS the allergen (or an unambiguous
+      // species/synonym of it) -- checked first, since a direct match is
+      // always at least as reliable as a derived one.
+      final directIngredient = _findFirstMatchingIngredient(
+        product.ingredients,
+        _getDirectAllergenKeywords(allergy),
+      );
+
+      // Derived: only checked when no direct match was found. These
+      // keywords are deliberately a short, curated list of well-known
+      // allergen *derivatives* (e.g. "whey" for dairy, "surimi" for
+      // fish) -- never generic/ambiguous terms like "flavors" or
+      // "spices", which stay unmatched on purpose (see class 3 in the
+      // module doc: ambiguous ingredients must not be auto-attributed).
+      final derivedIngredient = directIngredient == null
+          ? _findFirstMatchingIngredient(
+              product.ingredients,
+              _getDerivedAllergenKeywords(allergy),
+            )
+          : null;
+
+      final hasIngredientEvidence = directIngredient != null || derivedIngredient != null;
+
+      // Only flag allergens when there's explicit ingredient evidence.
+      // Label declarations alone are not sufficient for a caution warning.
+      if (!hasIngredientEvidence) continue;
+
+      matchedAllergens.add(allergy);
+
+      if (directIngredient != null) {
+        ingredientSources.add(AllergenIngredientMatch(
+          allergen: allergy,
+          ingredient: directIngredient,
+          matchType: AllergenMatchType.direct,
+        ));
+        matchedIngredientStrings.add(directIngredient);
+      } else if (derivedIngredient != null) {
+        ingredientSources.add(AllergenIngredientMatch(
+          allergen: allergy,
+          ingredient: derivedIngredient,
+          matchType: AllergenMatchType.derived,
+        ));
+        matchedIngredientStrings.add(derivedIngredient);
       }
     }
 
-    // Combine both sources of allergen matches
-    final allMatches = {...matchedContains, ...matchedIngredients}.toList();
+    final allMatches = {...matchedAllergens}.toList();
 
     return AllergenAssessment(
       matchedContains: allMatches,
       hasDirectAllergen: allMatches.isNotEmpty,
       matchedIngredients: matchedIngredientStrings,
+      ingredientSources: ingredientSources,
     );
   }
 
-  /// Returns case-insensitive keywords for each allergen type to match against ingredients
-  static List<String> _getAllergenKeywords(AllergenType allergen) {
+  /// Returns the first ingredient string (in label order) whose text
+  /// contains any of [keywords] as a whole word/phrase -- e.g. "fish"
+  /// matches "Fish Sauce" but NOT "Selfish Snacks Co." or "Catfish" being
+  /// treated as a match for an unrelated "cat" keyword. Word-boundary
+  /// matching (rather than plain `.contains`) also prevents false
+  /// positives like "nut" matching inside "coconut" or "nutmeg".
+  /// Also handles plural forms: e.g., "sardine" matches "sardines" and vice versa.
+  static String? _findFirstMatchingIngredient(
+    List<String> ingredients,
+    List<String> keywords,
+  ) {
+    for (final ingredient in ingredients) {
+      final lower = ingredient.toLowerCase();
+      for (final keyword in keywords) {
+        // Try exact word boundary match first
+        final pattern = RegExp(
+          r'(?<![a-z])' + RegExp.escape(keyword.toLowerCase()) + r'(?![a-z])',
+        );
+        if (pattern.hasMatch(lower)) return ingredient;
+        
+        // Try plural/singular variations
+        // If keyword ends with 's', try without 's'
+        if (keyword.toLowerCase().endsWith('s')) {
+          final singular = keyword.toLowerCase().substring(0, keyword.length - 1);
+          final singularPattern = RegExp(
+            r'(?<![a-z])' + RegExp.escape(singular) + r'(?![a-z])',
+          );
+          if (singularPattern.hasMatch(lower)) return ingredient;
+        }
+        
+        // If keyword doesn't end with 's', try with 's' added
+        if (!keyword.toLowerCase().endsWith('s')) {
+          final plural = keyword.toLowerCase() + 's';
+          final pluralPattern = RegExp(
+            r'(?<![a-z])' + RegExp.escape(plural) + r'(?![a-z])',
+          );
+          if (pluralPattern.hasMatch(lower)) return ingredient;
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Keywords where the ingredient name itself directly names the
+  /// allergen (or an unambiguous species/synonym of it) -- e.g. "Tuna" IS
+  /// fish, "Milk" IS dairy. Matching one of these means the ingredient
+  /// directly contains the allergen, not merely derives from it.
+  static List<String> _getDirectAllergenKeywords(AllergenType allergen) {
     switch (allergen) {
       case AllergenType.shellfish:
-        return ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster', 'squid', 'clams', 'mussels', 'oysters', 'scallops', 'octopus', 'abalone',  'snail',  'crustacean', 'lamang dagat', 'lamang-dagat'];
+        return ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster', 'squid', 'clams', 'mussels', 'oysters', 'scallops', 'octopus', 'abalone', 'snail', 'crustacean', 'lamang dagat', 'lamang-dagat'];
       case AllergenType.fish:
-        return ['fish', 'isda', 'anchovy', 'mackarel', 'tuna', 'salmon', 'cod', 'trout'];
+        return ['fish', 'isda', 'anchovy', 'anchovies', 'mackerel', 'mackarel', 'tuna', 'salmon', 'cod', 'trout', 'sardine', 'sardines', 'bangus', 'tilapia'];
       case AllergenType.peanuts:
-        return ['peanut', 'mani', 'groundnut', 'arachis', 'mandelonas'];
+        return ['peanut', 'peanuts', 'mani', 'groundnut', 'arachis', 'mandelonas'];
       case AllergenType.treeNuts:
-        return ['nut', 'almond', 'walnut', 'cashew', 'pecan', 'hazelnut', 'pistachio', 'macadamia'];
+        return ['tree nut', 'tree nuts', 'almond', 'walnut', 'cashew', 'pecan', 'hazelnut', 'pistachio', 'macadamia', 'brazil nut', 'pine nut'];
       case AllergenType.soy:
-        return ['soy', 'soya', 'soybean', 'tofu', 'tempeh', 'tamari', 'shoyu', 'edame', 'miso', 'nato', 'okara'];
+        return ['soy', 'soya', 'soybean', 'tofu', 'tempeh', 'tamari', 'shoyu', 'edamame', 'miso', 'natto', 'okara'];
       case AllergenType.dairy:
-        return ['milk', 'dairy', 'cream', 'cheese', 'yogurt', 'butter', 'gatas', 'lactose', 'casein', 'whey'];
+        return ['milk', 'dairy', 'cream', 'cheese', 'yogurt', 'butter', 'gatas'];
       case AllergenType.eggs:
-        return ['egg', 'itlog', 'albumin', 'ovalbumin', 'mayonnaise'];
+        return ['egg', 'eggs', 'itlog'];
       case AllergenType.wheatGluten:
-        return ['wheat', 'gluten', 'trigo', 'flour', 'barley', 'rye'];
+        return ['wheat', 'trigo', 'barley', 'rye'];
       case AllergenType.msg:
-        return ['msg', 'monosodium glutamate', 'yeast extract', 'hydrolyzed'];
+        return ['msg', 'monosodium glutamate'];
+    }
+  }
+
+  /// Keywords for well-known *derivatives* of an allergen -- the
+  /// ingredient name does not contain the allergen's name, but the food
+  /// data reliably confirms what it's made from (e.g. "Whey" and "Casein"
+  /// are always milk-derived; "Surimi" is always fish-derived). This list
+  /// deliberately excludes anything ambiguous (e.g. bare "flour", which
+  /// could be rice/corn/wheat flour, or bare "flavors", which could be
+  /// derived from anything) -- those must fall through to "undetermined"
+  /// rather than being guessed here.
+  static List<String> _getDerivedAllergenKeywords(AllergenType allergen) {
+    switch (allergen) {
+      case AllergenType.shellfish:
+        return [];
+      case AllergenType.fish:
+        return ['surimi', 'bonito', 'katsuobushi', 'worcestershire', 'fish sauce', 'patis', 'fish oil'];
+      // Peanut-derived ingredients (e.g. "Peanut Oil") already contain the
+      // word "peanut" and are caught by the DIRECT keyword list above, per
+      // the module spec: an ingredient name that explicitly contains the
+      // allergen's name is a direct match, not a derived one.
+      case AllergenType.peanuts:
+        return [];
+      case AllergenType.treeNuts:
+        return ['marzipan', 'praline'];
+      case AllergenType.soy:
+        return ['hydrolyzed vegetable protein', 'soy lecithin', 'soy protein'];
+      case AllergenType.dairy:
+        return ['lactose', 'casein', 'caseinate', 'whey', 'buttermilk', 'ghee'];
+      case AllergenType.eggs:
+        return ['albumin', 'ovalbumin', 'mayonnaise', 'meringue'];
+      case AllergenType.wheatGluten:
+        return ['gluten', 'wheat flour', 'malt', 'semolina', 'durum', 'farina', 'seitan'];
+      case AllergenType.msg:
+        return ['yeast extract', 'autolyzed yeast', 'hydrolyzed vegetable protein'];
     }
   }
 
@@ -168,11 +274,12 @@ class WhoCalculator {
 
     // Table 3.14: food allergy is a THIRD condition row in the same table
     // as hypertension/diabetes, with its own Suitable/Caution classification
-    // (no Moderate -- N/A). A direct allergen match forces the overall
-    // advisory level to Caution, even if every evaluated nutrient came back
-    // Suitable. This does NOT touch riskScore -- Table 3.15 explicitly marks
-    // the Allergen Detected row as N/A for score, using it only to force
-    // last place in ranking (handled separately via allergenOverride below).
+    // (no Moderate -- N/A). An allergen match (confirmed by explicit ingredient
+    // evidence) forces the overall advisory level to Caution, even if every
+    // evaluated nutrient came back Suitable. This does NOT touch riskScore --
+    // Table 3.15 explicitly marks the Allergen Detected row as N/A for score,
+    // using it only to force last place in ranking (handled separately via
+    // allergenOverride below).
     final overallLevel = allergenAssessment.hasDirectAllergen
         ? AdvisoryLevel.caution
         : _worstLevel(nutrientEvals);

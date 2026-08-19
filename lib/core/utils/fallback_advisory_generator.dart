@@ -37,21 +37,25 @@ class FallbackAdvisoryGenerator {
     final isTagalog = languageCode == 'tl';
 
     if (allergen.hasDirectAllergen) {
-      // Build detailed explanation with specific matching ingredients
       final allergenLabels = allergen.matchedContains.map(_allergenLabel).join(', ');
-      final ingredientList = allergen.matchedIngredients.isNotEmpty
-          ? allergen.matchedIngredients.join(', ')
-          : allergenLabels;
+
+      // One sentence per matched allergen, built from the reliable
+      // ingredient-level attribution computed in WhoCalculator.assessAllergens
+      // -- never a guess. See AllergenMatchType for what each branch means.
+      final sourceSentences = allergen.ingredientSources
+          .map((m) => _ingredientSourceSentence(m, isTagalog))
+          .toList();
+      final sourceText = sourceSentences.join(' ');
 
       final explanation = isTagalog
-          ? 'Ang produktong ito ay naglalaman ng $ingredientList, na tumutugma sa iyong naitalang food allergy ($allergenLabels). Inirerekomenda naming kumain nang maingat o iwasan ang produktong ito.'
-          : 'This product contains $ingredientList, which match your recorded food allergy ($allergenLabels). Consume with caution or avoid this product.';
+          ? 'Ang produktong ito ay minarkahan para sa iyong naitalang food allergy ($allergenLabels). $sourceText Inirerekomenda naming kumain nang maingat o iwasan ang produktong ito.'
+          : 'This product is flagged for your recorded food allergy ($allergenLabels). $sourceText Consume with caution or avoid this product.';
 
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.caution,
         warningText: isTagalog
-            ? 'Naglalaman ng allergen na iyong tinukoy'
-            : 'Contains an allergen you flagged',
+            ? 'Naglalaman ng ${allergenLabels} – allergen na natukoy'
+            : 'Contains $allergenLabels – allergen detected',
         explanation: explanation,
         safeServingSize: null,
         source: AdvisorySource.fallbackRuleBased,
@@ -186,6 +190,29 @@ class FallbackAdvisoryGenerator {
         return 'diabetes';
       case HealthCondition.heartCondition:
         return isTagalog ? 'kondisyon sa puso' : 'heart condition';
+    }
+  }
+
+  /// Renders ONE matched allergen's ingredient attribution as a sentence,
+  /// following exactly what [AllergenMatchType] was established for it --
+  /// never presenting a derived source as if it were a direct match.
+  static String _ingredientSourceSentence(AllergenIngredientMatch match, bool isTagalog) {
+    final allergenLabel = _allergenLabel(match.allergen);
+    switch (match.matchType) {
+      case AllergenMatchType.direct:
+        return isTagalog
+            ? 'Nakitang sangkap: ${match.ingredient} ($allergenLabel).'
+            : 'Detected ingredient: ${match.ingredient} ($allergenLabel).';
+      case AllergenMatchType.derived:
+        return isTagalog
+            ? 'Nakitang sangkap: ${match.ingredient} (galing sa $allergenLabel).'
+            : 'Detected ingredient: ${match.ingredient} ($allergenLabel-derived).';
+      case AllergenMatchType.undetermined:
+        // This case should no longer occur since we removed undetermined matches
+        // from allergen assessment. Kept for safety but should never be hit.
+        return isTagalog
+            ? 'Hindi matukoy sa available na impormasyon kung aling partikular na sangkap ang pinagmulan ng $allergenLabel.'
+            : 'Ingredient source could not be determined from the available information.';
     }
   }
 

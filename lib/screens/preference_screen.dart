@@ -35,11 +35,11 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        final doc = await _authService.db.collection('users').doc(uid).get();
+        final doc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
         final data = doc.data();
         if (data != null) {
           setState(() {
-            _vibrationFeedback = data['vibrationFeedback'] ?? false;
+            _vibrationFeedback = data['vibrationFeedback'] ?? HapticService().isEnabled;
             _notificationsEnabled = data['notificationsEnabled'] ?? true;
             _textSize = (data['textSize'] != null) ? (data['textSize'] as num).toDouble() : 1.0;
           });
@@ -108,101 +108,112 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Card title now reads "Voice Assistant Settings" (renamed
+                  // from "Voice & sound"), so the previously-hardcoded
+                  // "Voice assistant settings" sub-label below has been
+                  // removed to avoid showing a duplicate heading when Voice
+                  // Assistant is enabled.
                   Text(loc.voiceSoundTitle, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: theme.colorScheme.onSurface)),
                   const SizedBox(height: 12),
                   ValueListenableBuilder<bool>(
                     valueListenable: VoiceAssistantService.isEnabledNotifier,
                     builder: (context, isVoiceEnabled, _) {
-                      if (!isVoiceEnabled) return const SizedBox.shrink();
-
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Voice assistant settings',
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.onSurface,
+                          if (isVoiceEnabled) ...[
+                            ValueListenableBuilder<double>(
+                              valueListenable: VoiceAssistantService.speechRateNotifier,
+                              builder: (context, speechRate, _) {
+                                return Slider(
+                                  value: speechRate.clamp(0.2, 1.0),
+                                  min: 0.2,
+                                  max: 1.0,
+                                  divisions: 8,
+                                  label: speechRate.toStringAsFixed(1),
+                                  onChanged: (value) {
+                                    VoiceAssistantService.speechRateNotifier.value = value;
+                                  },
+                                  onChangeEnd: (value) async {
+                                    HapticService().vibrate();
+                                    await VoiceAssistantService.instance.updateSpeechRate(value);
+                                    await VoiceAssistantService.instance.speak('Voice speed updated.');
+                                  },
+                                );
+                              },
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          ValueListenableBuilder<double>(
-                            valueListenable: VoiceAssistantService.speechRateNotifier,
-                            builder: (context, speechRate, _) {
-                              return Slider(
-                                value: speechRate.clamp(0.2, 1.0),
-                                min: 0.2,
-                                max: 1.0,
-                                divisions: 8,
-                                label: speechRate.toStringAsFixed(1),
-                                onChanged: (value) {
-                                  VoiceAssistantService.speechRateNotifier.value = value;
-                                },
-                                onChangeEnd: (value) async {
+                            const SizedBox(height: 4),
+                            ValueListenableBuilder<VoiceLang>(
+                              valueListenable: VoiceAssistantService.languageNotifier,
+                              builder: (context, language, _) {
+                                return SegmentedButton<VoiceLang>(
+                                  segments: const [
+                                    ButtonSegment<VoiceLang>(
+                                      value: VoiceLang.english,
+                                      label: Text('English'),
+                                    ),
+                                    ButtonSegment<VoiceLang>(
+                                      value: VoiceLang.tagalog,
+                                      label: Text('Tagalog'),
+                                    ),
+                                  ],
+                                  selected: {language},
+                                  onSelectionChanged: (selection) async {
+                                    final selectedLanguage = selection.first;
+                                    if (selectedLanguage == language) return;
+                                    HapticService().vibrate();
+                                    await VoiceAssistantService.instance.updateLanguage(selectedLanguage);
+                                    final actualLanguage = VoiceAssistantService.languageNotifier.value;
+                                    await VoiceAssistantService.instance.speak(
+                                      actualLanguage == VoiceLang.tagalog
+                                          ? 'Napalitan ang wika sa Tagalog.'
+                                          : selectedLanguage == VoiceLang.tagalog
+                                              ? 'Tagalog is not available on this device. Using English.'
+                                              : 'Language changed to English.',
+                                    );
+                                  },
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          if (isVoiceEnabled)
+                            // Voice Assistant is on: keep the interactive
+                            // audio-preview button.
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
                                   HapticService().vibrate();
-                                  await VoiceAssistantService.instance.updateSpeechRate(value);
-                                  await VoiceAssistantService.instance.speak('Voice speed updated.');
-                                },
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 4),
-                          ValueListenableBuilder<VoiceLang>(
-                            valueListenable: VoiceAssistantService.languageNotifier,
-                            builder: (context, language, _) {
-                              return SegmentedButton<VoiceLang>(
-                                segments: const [
-                                  ButtonSegment<VoiceLang>(
-                                    value: VoiceLang.english,
-                                    label: Text('English'),
-                                  ),
-                                  ButtonSegment<VoiceLang>(
-                                    value: VoiceLang.tagalog,
-                                    label: Text('Tagalog'),
-                                  ),
-                                ],
-                                selected: {language},
-                                onSelectionChanged: (selection) async {
-                                  final selectedLanguage = selection.first;
-                                  if (selectedLanguage == language) return;
-                                  HapticService().vibrate();
-                                  await VoiceAssistantService.instance.updateLanguage(selectedLanguage);
-                                  final actualLanguage = VoiceAssistantService.languageNotifier.value;
                                   await VoiceAssistantService.instance.speak(
-                                    actualLanguage == VoiceLang.tagalog
-                                        ? 'Napalitan ang wika sa Tagalog.'
-                                        : selectedLanguage == VoiceLang.tagalog
-                                            ? 'Tagalog is not available on this device. Using English.'
-                                            : 'Language changed to English.',
+                                    VoiceAssistantService.languageNotifier.value == VoiceLang.tagalog
+                                        ? 'Ito ay isang preview ng boses ng CLARO.'
+                                        : 'This is a preview of the CLARO voice assistant.',
                                   );
                                 },
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 12),
+                                icon: const Icon(Icons.play_arrow, color: _primaryRed),
+                                label: Text(loc.previewAudio, style: const TextStyle(color: _primaryRed)),
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: _primaryRed),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            )
+                          else
+                            // Voice Assistant is off (toggled from the
+                            // Profile screen): there's nothing to preview,
+                            // so the "Tap for audio preview" button is
+                            // hidden and replaced with a hint, styled the
+                            // same as the "Vibrate on scan, alerts, and
+                            // reads" description text below.
+                            Text(
+                              loc.enableVoiceAssistant,
+                              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                            ),
                         ],
                       );
                     },
-                  ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        HapticService().vibrate();
-                        await VoiceAssistantService.instance.speak(
-                          VoiceAssistantService.languageNotifier.value == VoiceLang.tagalog
-                              ? 'Ito ay isang preview ng boses ng CLARO.'
-                              : 'This is a preview of the CLARO voice assistant.',
-                        );
-                      },
-                      icon: const Icon(Icons.play_arrow, color: _primaryRed),
-                      label: Text(loc.previewAudio, style: const TextStyle(color: _primaryRed)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: _primaryRed),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
                   ),
                 ],
               ),
@@ -249,6 +260,12 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                       Switch(
                         value: _vibrationFeedback,
                         onChanged: (v) async {
+                          // Apply the new state to HapticService FIRST --
+                          // vibrate() gates on HapticService().isEnabled, so
+                          // calling it before this line meant turning the
+                          // switch ON always checked the stale (still-off)
+                          // state and silently did nothing on that very tap.
+                          HapticService().isEnabled = v;
                           HapticService().vibrate();
                           setState(() => _vibrationFeedback = v);
                           final ok = await _savePref('vibrationFeedback', v);
