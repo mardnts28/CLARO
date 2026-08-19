@@ -2443,6 +2443,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wrong product? Try reporting here'**
   String get reportButtonToast;
+
+  /// No description provided for @addProductButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Product'**
+  String get addProductButton;
+
+  /// No description provided for @selectProductsToAddTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Products to Add'**
+  String get selectProductsToAddTitle;
+
+  /// No description provided for @alreadyInRankingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Already in your ranking'**
+  String get alreadyInRankingLabel;
+
+  /// No description provided for @noNewProductsDetected.
+  ///
+  /// In en, this message translates to:
+  /// **'No new products detected. Try scanning again.'**
+  String get noNewProductsDetected;
+
+  /// No description provided for @productsAddedToRanking.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} product(s) added to your ranking'**
+  String productsAddedToRanking(int count);
+
+  /// No description provided for @selectAtLeastOneProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least one product to add'**
+  String get selectAtLeastOneProduct;
 }
 
 class _AppLocalizationsDelegate

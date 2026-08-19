@@ -64,47 +64,85 @@ class RankedProductCard extends StatelessWidget {
           ],
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Rank badge
-            Container(
-              width: 28,
-              height: 28,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: _labelColor().withOpacity(0.15),
-                shape: BoxShape.circle,
-                border: Border.all(color: _labelColor()),
-              ),
-              child: Text(
-                '${ranked.rank}',
-                style: GoogleFonts.outfit(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: _labelColor(),
+            // Left column: Rank badge + Product image
+            Column(
+              children: [
+                // Rank badge
+                Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: _labelColor().withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _labelColor()),
+                  ),
+                  child: Text(
+                    '${ranked.rank}',
+                    style: GoogleFonts.outfit(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _labelColor(),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 8),
+                // Product image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    color: colorScheme.surfaceContainerHighest,
+                    child: product.imageUrl.isNotEmpty
+                        ? Image.network(
+                            product.imageUrl,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (_, __, ___) => Icon(
+                                Icons.inventory_2_outlined,
+                                color: colorScheme.primary,
+                                size: 26),
+                          )
+                        : Icon(Icons.inventory_2_outlined,
+                            color: colorScheme.primary, size: 26),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            // Product name + size
+            const SizedBox(width: 12),
+            // Right column: Product name + grams/badge + nutrition
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          quantity != null && quantity! > 1 ? '${product.name} (x$quantity)' : product.name,
-                          style: GoogleFonts.outfit(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                    ],
+                  // Product name (without quantity suffix)
+                  Text(
+                    product.name,
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
+                  // Grams + badge
                   Row(
                     children: [
                       Text(
@@ -144,8 +182,6 @@ class RankedProductCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Arrow
-            Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant, size: 22),
           ],
         ),
       ),

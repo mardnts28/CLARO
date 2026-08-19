@@ -8,13 +8,16 @@ import '../services/history_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
+import '../widgets/selectable_scanned_product_card.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/services/backend_locator.dart';
 import '../core/utils/nutrition_availability.dart';
 import '../core/utils/product_characteristics.dart';
+import '../core/utils/success_feedback_utils.dart';
 import '../data/models/health_profile.dart';
 import '../widgets/ranked_product_card.dart';
 import 'product_detail_screen.dart';
+import 'camera_scanner_screen.dart';
 
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
@@ -286,6 +289,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   /// condition's nutrient(s) without any separate ranking logic. Tag
   /// filtering happens afterward, in _computeFiltered -- it narrows which
   /// of the re-ranked results are shown, it never changes their order.
+  ///
+  /// Also reused by _addProductsToRanking after it appends newly-scanned
+  /// products to _comparisonProducts -- reading _comparisonProducts fresh
+  /// each call means the newly added products get ranked/compared
+  /// together with the existing ones through this exact same pipeline,
+  /// rather than a separate ranking pass.
   void _reRankAndFilter({
     required Set<HealthCondition> conditions,
     required Set<String> typeTags,
@@ -826,13 +835,36 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         ? _filtered.length
         : _filtered.length.clamp(0, _initialVisibleCount);
 
+    // "Add Product" always sits as the last row, after the (possibly
+    // paginated) ranked products -- i.e. at the bottom of the currently
+    // ranked list, scrolling with it rather than floating separately.
+    final addProductIndex = visibleCount + (showSeeMore ? 1 : 0);
+
+    // The Scaffold's body isn't wrapped in a SafeArea and this screen has
+    // no bottomNavigationBar reserving space of its own, so on devices
+    // with a bottom system inset (gesture nav bar / home indicator) a
+    // fixed 16px bottom padding isn't enough to scroll the last row --
+    // "Add Product" -- fully clear of that inset; it ends up scrollable
+    // only halfway into view. Padding the list bottom by that inset
+    // (plus a little extra breathing room, same as the existing 16px
+    // baseline) guarantees the button always has room to scroll fully
+    // into view, on any device and regardless of how many products are
+    // listed (1-5 or more). Only the scroll padding changes here --
+    // the button's own size/styling/position within the list is
+    // untouched.
+    final bottomSafeInset = MediaQuery.of(context).padding.bottom;
+
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      itemCount: visibleCount + (showSeeMore ? 1 : 0),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomSafeInset + 24),
+      itemCount: addProductIndex + 1,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         if (showSeeMore && i == visibleCount) {
           return _buildSeeMoreButton();
+        }
+
+        if (i == addProductIndex) {
+          return _buildAddProductButton();
         }
 
         final ranked = _filtered[i];
@@ -866,6 +898,266 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
           },
         );
       },
+    );
+  }
+
+  /// "Add Product" row -- lets the user scan another product (reusing
+  /// CameraScannerScreen's existing recognition flow) and fold the
+  /// result(s) into this SAME ranking via _addProductsToRanking, rather
+  /// than starting a separate ranking/comparison elsewhere.
+  Widget _buildAddProductButton() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+
+    return GestureDetector(
+      onTap: _openAddProductFlow,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colorScheme.primary.withOpacity(0.4),
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_circle_outline, size: 18, color: colorScheme.primary),
+            const SizedBox(width: 6),
+            Text(
+              loc.addProductButton,
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Launches the existing scanning flow (CameraScannerScreen, YOLO
+  /// recognition + catalog lookup) in "return results" mode so this
+  /// screen gets the recognized product(s) back directly instead of
+  /// navigating away to ProductDetailScreen / MultiScanResultsScreen.
+  Future<void> _openAddProductFlow() async {
+    HapticService().vibrate();
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CameraScannerScreen(returnResultsOnDetect: true),
+      ),
+    );
+
+    if (!mounted || result is! Map) return;
+
+    final recognized = result['products'];
+    if (recognized is! List) return;
+
+    final products = recognized.whereType<Product>().toList();
+    if (products.isEmpty) {
+      final loc = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.noNewProductsDetected)),
+      );
+      return;
+    }
+
+    _showAddProductSheet(products);
+  }
+
+  /// Bottom sheet for picking which recognized product(s) to add. Visual
+  /// styling mirrors PersonalInfoScreen's Allergen Selector (Container
+  /// with a top-rounded 20px sheet, cardColor background, 20px padding),
+  /// and each row reuses HistoryScreen's product-card layout via
+  /// SelectableScannedProductCard (image + name only, no timestamp).
+  void _showAddProductSheet(List<Product> recognizedProducts) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+
+    // De-dupe the scan results themselves (recognition can report the
+    // same product more than once) before checking against the
+    // already-ranked set.
+    final Map<String, Product> distinctById = {
+      for (final p in recognizedProducts) p.id: p,
+    };
+    final products = distinctById.values.toList();
+
+    final existingIds = _comparisonProducts.map((p) => p.id).toSet();
+    final Set<String> selectedIds = {};
+    final bool anySelectable = products.any((p) => !existingIds.contains(p.id));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final hasSelection = selectedIds.isNotEmpty;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+              ),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
+                ),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        loc.selectProductsToAddTitle,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (!anySelectable)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Text(
+                            loc.noNewProductsDetected,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: products.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, i) {
+                            final product = products[i];
+                            final alreadyRanked = existingIds.contains(product.id);
+                            return SelectableScannedProductCard(
+                              product: product,
+                              selected: selectedIds.contains(product.id),
+                              alreadyRanked: alreadyRanked,
+                              onTap: () {
+                                HapticService().vibrate();
+                                setSheetState(() {
+                                  if (selectedIds.contains(product.id)) {
+                                    selectedIds.remove(product.id);
+                                  } else {
+                                    selectedIds.add(product.id);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
+                            disabledBackgroundColor:
+                                colorScheme.primary.withOpacity(0.3),
+                            disabledForegroundColor:
+                                colorScheme.onPrimary.withOpacity(0.7),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          // Disabled (per spec) until at least one product
+                          // is selected -- selecting/deselecting a card
+                          // toggles this via setSheetState above.
+                          onPressed: hasSelection
+                              ? () {
+                                  final selectedProducts = products
+                                      .where((p) => selectedIds.contains(p.id))
+                                      .toList();
+                                  Navigator.pop(sheetContext);
+                                  _addProductsToRanking(selectedProducts);
+                                }
+                              : null,
+                          child: Text(
+                            loc.apply,
+                            style: GoogleFonts.outfit(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Folds newly-selected product(s) into the SAME ranking/comparison
+  /// set this screen already manages -- not a separate ranking. Reuses
+  /// the exact re-ranking pipeline _reRankAndFilter/rankProducts already
+  /// runs on filter changes, so the newly added products are compared
+  /// against the existing ones (and vice versa) exactly as if they'd
+  /// been part of the initial comparison. Previously-ranked products are
+  /// kept; duplicates (already in _comparisonProducts) are skipped.
+  void _addProductsToRanking(List<Product> newProducts) {
+    final profile = _profile;
+    if (profile == null) return;
+
+    final existingIds = _comparisonProducts.map((p) => p.id).toSet();
+    final toAdd = <Product>[];
+    for (final p in newProducts) {
+      if (existingIds.contains(p.id)) continue; // duplicate guard
+      if (toAdd.any((q) => q.id == p.id)) continue; // dupes within selection
+      toAdd.add(p);
+    }
+
+    if (toAdd.isEmpty) return;
+
+    _comparisonProducts = [..._comparisonProducts, ...toAdd];
+    _computeAvailableTags();
+
+    // Re-rank the combined set through the same pipeline used for every
+    // other re-rank on this screen, preserving whatever condition /
+    // Product Type / Flavor filters are currently active.
+    _reRankAndFilter(
+      conditions: _selectedConditions,
+      typeTags: _selectedTypeTags,
+      flavorTags: _selectedFlavorTags,
+    );
+
+    if (!mounted) return;
+    final loc = AppLocalizations.of(context)!;
+    SuccessFeedbackUtils.showSuccessSnackBar(
+      context,
+      loc.productsAddedToRanking(toAdd.length),
     );
   }
 

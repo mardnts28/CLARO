@@ -1267,4 +1267,26 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get reportButtonToast => 'Maling produkto? I-report ito dito';
+
+  @override
+  String get addProductButton => 'Magdagdag ng Produkto';
+
+  @override
+  String get selectProductsToAddTitle => 'Pumili ng Produktong Idaragdag';
+
+  @override
+  String get alreadyInRankingLabel => 'Nasa iyong ranggo na';
+
+  @override
+  String get noNewProductsDetected =>
+      'Walang bagong produktong natukoy. Subukang mag-scan muli.';
+
+  @override
+  String productsAddedToRanking(int count) {
+    return '$count produkto ang naidagdag sa iyong ranggo';
+  }
+
+  @override
+  String get selectAtLeastOneProduct =>
+      'Pumili ng kahit isang produkto para idagdag';
 }

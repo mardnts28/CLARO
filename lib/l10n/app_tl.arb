@@ -467,5 +467,18 @@
   "under18Error": "Dapat kang nasa edad na 18 pataas para magamit ang app na ito",
   "enterDigitCode": "Ilagay ang 6-digit na code",
   "pleaseEnterProductName": "Mangyaring ilagay ang pangalan ng produkto",
-  "reportButtonToast": "Maling produkto? I-report ito dito"
+  "reportButtonToast": "Maling produkto? I-report ito dito",
+  "addProductButton": "Magdagdag ng Produkto",
+  "selectProductsToAddTitle": "Pumili ng Produktong Idaragdag",
+  "alreadyInRankingLabel": "Nasa iyong ranggo na",
+  "noNewProductsDetected": "Walang bagong produktong natukoy. Subukang mag-scan muli.",
+  "productsAddedToRanking": "{count} produkto ang naidagdag sa iyong ranggo",
+  "@productsAddedToRanking": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "selectAtLeastOneProduct": "Pumili ng kahit isang produkto para idagdag"
 }

@@ -1246,4 +1246,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get reportButtonToast => 'Wrong product? Try reporting here';
+
+  @override
+  String get addProductButton => 'Add Product';
+
+  @override
+  String get selectProductsToAddTitle => 'Select Products to Add';
+
+  @override
+  String get alreadyInRankingLabel => 'Already in your ranking';
+
+  @override
+  String get noNewProductsDetected =>
+      'No new products detected. Try scanning again.';
+
+  @override
+  String productsAddedToRanking(int count) {
+    return '$count product(s) added to your ranking';
+  }
+
+  @override
+  String get selectAtLeastOneProduct => 'Select at least one product to add';
 }

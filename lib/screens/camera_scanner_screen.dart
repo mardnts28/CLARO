@@ -22,10 +22,22 @@ import '../generated/l10n/app_localizations.dart';
 class CameraScannerScreen extends StatefulWidget {
   final bool embeddedMode;
   final bool isActive;
+
+  // When true, this screen is being used as a sub-flow (e.g. Product
+  // Ranking's "Add Product" bottom sheet) rather than the main Scan tab.
+  // On a successful recognition it pops itself with the resolved
+  // product(s) instead of navigating on to ProductDetailScreen /
+  // MultiScanResultsScreen -- everything else about the scan (camera,
+  // YOLO detection, catalog lookup, history logging) is unchanged, so
+  // callers get the exact same recognition behavior the rest of the app
+  // uses, just handed back as a result instead of a new screen.
+  final bool returnResultsOnDetect;
+
   const CameraScannerScreen({
     super.key,
     this.embeddedMode = false,
     this.isActive = true,
+    this.returnResultsOnDetect = false,
   });
 
   @override
@@ -312,6 +324,17 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
   void _handleClose() {
     _continuousAnalysisTimer?.cancel();
+
+    if (widget.returnResultsOnDetect) {
+      // Add-product sub-flow: just back out to whoever pushed this screen
+      // (e.g. CompareProductsScreen) without touching the app-wide tab
+      // selection or clearing the rest of the navigation stack.
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      return;
+    }
+
     HomeTabController.switchToTab(0);
     if (!widget.embeddedMode && Navigator.canPop(context)) {
       Navigator.of(context).popUntil((route) => route.isFirst);
@@ -629,7 +652,21 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
         final distinctProducts = resolvedProducts.toSet().toList();
 
-        if (distinctProducts.length == 1) {
+        if (distinctProducts.isNotEmpty && widget.returnResultsOnDetect) {
+          // Add-product sub-flow (Product Ranking screen): hand the
+          // recognized product(s) straight back to the caller instead of
+          // drilling into ProductDetailScreen / MultiScanResultsScreen.
+          // History logging still happens, same as a normal scan.
+          if (mounted) {
+            for (var p in distinctProducts) {
+              HistoryService().addScanRecord(p);
+            }
+            Navigator.pop(context, {
+              'products': distinctProducts,
+              'productCounts': productCounts,
+            });
+          }
+        } else if (distinctProducts.length == 1) {
           if (mounted) {
             final singleProd = distinctProducts.first;
             HistoryService().addScanRecord(singleProd);
