@@ -703,8 +703,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   bool isBasicInfoValid() {
     final hasName = _nameController.text.trim().isNotEmpty;
-    final hasDob = _selectedDateOfBirth != null;
-    return hasName && hasDob;
+    if (_selectedDateOfBirth == null) return false;
+    final now = DateTime.now();
+    final eighteenYearsAgo = DateTime(now.year - 18, now.month, now.day);
+    final is18Plus = !_selectedDateOfBirth!.isAfter(eighteenYearsAgo);
+    return hasName && is18Plus;
   }
 
   bool _isFormValid() {

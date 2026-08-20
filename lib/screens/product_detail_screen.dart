@@ -148,58 +148,60 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       builder: (context) => Positioned(
         top: 72, // Position below the navigation header (56 + 16 padding)
         right: 16, // Position near the right side where Report button is
-        child: Material(
-          color: Colors.transparent,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Stack to position triangle above toast body
-              SizedBox(
-                width: 200,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    // Triangular tip pointing upward, positioned above the toast
-                    Positioned(
-                      top: -6, // Position above the toast
-                      right: 56, // Offset to align with Report button center (Report button is left of Favorite button)
-                      child: CustomPaint(
-                        size: const Size(12, 6),
-                        painter: _TrianglePainter(
-                          color: Colors.grey[700]!,
-                        ),
-                      ),
-                    ),
-                    // Speech bubble body
-                    Container(
-                      width: 200,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[700],
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
+        child: IgnorePointer(
+          child: Material(
+            color: Colors.transparent,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Stack to position triangle above toast body
+                SizedBox(
+                  width: 200,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Triangular tip pointing upward, positioned above the toast
+                      Positioned(
+                        top: -6, // Position above the toast
+                        right: 56, // Offset to align with Report button center (Report button is left of Favorite button)
+                        child: CustomPaint(
+                          size: const Size(12, 6),
+                          painter: _TrianglePainter(
+                            color: Colors.grey[700]!,
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        message,
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
                         ),
-                        textAlign: TextAlign.center,
                       ),
-                    ),
-                  ],
+                      // Speech bubble body
+                      Container(
+                        width: 200,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[700],
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          message,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -468,30 +470,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // Report button
-                      GestureDetector(
-                        onTap: _navigateToReport,
-                        child: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.85),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
+                      Semantics(
+                        button: true,
+                        label: loc.reportProductButton,
+                        child: GestureDetector(
+                          onTap: _navigateToReport,
+                          child: Icon(
                             Icons.report_problem_outlined,
-                            color: Color(0xFFD32F2F),
-                            size: 20,
+                            color: colorScheme.onSurfaceVariant,
+                            size: 24,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 16),
                       // Favorite button
-                      GestureDetector(
-                        onTap: _toggleFavorite,
-                        child: Icon(
-                          _isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: colorScheme.secondary,
-                          size: 26,
+                      Semantics(
+                        button: true,
+                        label: _isFavorite ? 'Remove from favorites' : 'Add to favorites',
+                        child: GestureDetector(
+                          onTap: _toggleFavorite,
+                          child: Icon(
+                            _isFavorite ? Icons.favorite : Icons.favorite_border,
+                            color: _isFavorite ? const Color(0xFFD32F2F) : colorScheme.onSurfaceVariant,
+                            size: 24,
+                          ),
                         ),
                       ),
                     ],
@@ -675,21 +677,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                     ),
 
-                  // ── 2. Age recommendation and LIGTAS I-KONSUMO ──────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        loc.ageRequirementBadge,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
+                  const SizedBox(height: 16),
                   _buildAdvisoryBanner(context, loc),
 
                   const SizedBox(height: 12),

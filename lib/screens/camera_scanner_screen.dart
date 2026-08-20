@@ -13,7 +13,6 @@ import '../services/home_tab_controller.dart';
 import '../services/voice_assistant_service.dart';
 import '../data/services/backend_locator.dart';
 import 'product_detail_screen.dart';
-import 'product_not_found_screen.dart';
 import 'multi_scan_results_screen.dart';
 import 'unknown_product_submission_screen.dart';
 import '../models/product_model.dart';
@@ -198,10 +197,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   }
 
 
-  void _stopImageStreamIfActive() {
+  Future<void> _stopImageStreamIfActive() async {
     if (_cameraController?.value.isStreamingImages == true) {
       try {
-        _cameraController?.stopImageStream();
+        await _cameraController?.stopImageStream();
       } catch (_) {}
     }
   }
@@ -249,10 +248,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               return;
             }
 
-            const vl = (1.0 - 0.88) / 2.0;
-            const vt = 0.12;
-            const vr = vl + 0.88;
-            const vb = 0.88;
+            const vl = (1.0 - 0.96) / 2.0;
+            const vt = 0.04;
+            const vr = vl + 0.96;
+            const vb = 0.96;
             const guideRect = Rect.fromLTRB(vl, vt, vr, vb);
 
             bool productInGuide = false;
@@ -341,7 +340,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     }
   }
 
-  void _showNoProductFallbackDialog() {
+  void _showNoProductFallbackDialog({String? capturedImagePath}) {
     if (_isFallbackModalOpen || !mounted) return;
     _isFallbackModalOpen = true;
 
@@ -434,7 +433,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                       ),
                       onPressed: () {
                         Navigator.pop(ctx);
-                        _navigateToReportDirectly();
+                        _navigateToReportDirectly(capturedImagePath: capturedImagePath);
                       },
                     ),
                   ),
@@ -476,6 +475,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       if (mounted) {
         _isFallbackModalOpen = false;
         _noProductStartTime = DateTime.now();
+        _startContinuousAnalysis();
       }
     });
   }
@@ -494,20 +494,20 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     }
   }
 
-  Future<void> _navigateToReportDirectly() async {
+  Future<void> _navigateToReportDirectly({String? capturedImagePath}) async {
     if (_isProcessing) return;
 
     _continuousAnalysisTimer?.cancel();
 
-    String? capturedPath;
-    if (_cameraController?.value.isInitialized == true) {
+    String? path = capturedImagePath;
+    if ((path == null || path.isEmpty) && _cameraController?.value.isInitialized == true) {
       try {
-        _stopImageStreamIfActive();
+        await _stopImageStreamIfActive();
         await _cameraController!.setFlashMode(
           _isFlashOn ? FlashMode.torch : FlashMode.off,
         );
         final file = await _cameraController!.takePicture();
-        capturedPath = file.path;
+        path = file.path;
       } catch (e) {
         debugPrint('Could not take picture for direct report: $e');
       }
@@ -519,7 +519,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       context,
       MaterialPageRoute(
         builder: (_) => UnknownProductSubmissionScreen(
-          capturedImagePath: capturedPath,
+          capturedImagePath: path,
         ),
       ),
     );
@@ -566,7 +566,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         return;
       }
 
-      _stopImageStreamIfActive();
+      await _stopImageStreamIfActive();
       await _cameraController!.setFlashMode(
         _isFlashOn ? FlashMode.torch : FlashMode.off,
       );
@@ -579,6 +579,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         if (_liveDetections.isNotEmpty) {
            debugPrint('Falling back to live detections.');
         } else {
+           safetyTimer.cancel();
            setState(() {
              _isProcessing = false;
              _qualityWarning = 'Camera busy. Try again.';
@@ -594,6 +595,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       if (imagePath.isNotEmpty) {
         final quality = await _validationService.validateImageQuality(imagePath);
         if (!quality.isValid) {
+          safetyTimer.cancel();
           setState(() {
             _qualityWarning = quality.message;
             _isProcessing = false;
@@ -610,6 +612,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
       debugPrint('CameraScannerScreen: YOLO detected ${detections.length} objects: '
           '${detections.map((d) => "${d.label} (${(d.confidence * 100).toStringAsFixed(1)}%)").join(", ")}');
+
+      safetyTimer.cancel();
 
       setState(() {
         _isProcessing = false;
@@ -670,6 +674,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           if (mounted) {
             final singleProd = distinctProducts.first;
             HistoryService().addScanRecord(singleProd);
+            SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -680,7 +685,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 ),
               ),
             ).then((_) {
-              if (mounted) _startContinuousAnalysis();
+              if (mounted) {
+                SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+                _startContinuousAnalysis();
+              }
             });
           }
         } else if (distinctProducts.length > 1) {
@@ -688,6 +696,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             for (var p in distinctProducts) {
               HistoryService().addScanRecord(p);
             }
+            SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -697,38 +706,24 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 ),
               ),
             ).then((_) {
-              if (mounted) _startContinuousAnalysis();
+              if (mounted) {
+                SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+                _startContinuousAnalysis();
+              }
             });
           }
         } else {
-          // Detections exist but none matched catalog -> ProductNotFoundScreen
+          // Detections exist but none matched catalog -> show camera bottom sheet fallback dialog
           if (!mounted) return;
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ProductNotFoundScreen(
-                capturedImagePath: imagePath,
-              ),
-            ),
-          ).then((_) {
-            if (mounted) _startContinuousAnalysis();
-          });
+          _showNoProductFallbackDialog(capturedImagePath: imagePath);
         }
       } else {
-        // Zero detections -> ProductNotFoundScreen
+        // Zero detections -> show camera bottom sheet fallback dialog
         if (!mounted) return;
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductNotFoundScreen(
-              capturedImagePath: imagePath,
-            ),
-          ),
-        ).then((_) {
-          if (mounted) _startContinuousAnalysis();
-        });
+        _showNoProductFallbackDialog(capturedImagePath: imagePath);
       }
     } catch (e) {
+      safetyTimer.cancel();
       debugPrint('Scan error: $e');
       if (mounted) {
         setState(() {
@@ -880,7 +875,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                             ),
                             child: const Icon(
                               Icons.report_problem_outlined,
-                              color: Color(0xFFD32F2F),
+                              color: Colors.black87,
                               size: 20,
                             ),
                           ),
