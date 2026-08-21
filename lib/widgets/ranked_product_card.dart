@@ -63,126 +63,156 @@ class RankedProductCard extends StatelessWidget {
             ),
           ],
         ),
+        // Layout:
+        //   Row 1: rank badge -> product image -> product name (top-aligned
+        //          beside the image, with grams/badge underneath the name).
+        //   Row 2: calories / protein / sodium mini-stats, spanning the full
+        //          card width directly under the image+name group so it
+        //          lines up with the image's left edge, not the rank badge.
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Left column: Rank badge + Product image
-            Column(
-              children: [
-                // Rank badge
-                Container(
-                  width: 28,
-                  height: 28,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: _labelColor().withOpacity(0.15),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _labelColor()),
-                  ),
-                  child: Text(
-                    '${ranked.rank}',
-                    style: GoogleFonts.outfit(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: _labelColor(),
-                    ),
-                  ),
+            // Rank badge (its own column so it never gets squeezed by
+            // long product names / locales, and stays vertically centered
+            // against the image + text + nutrition block beside it).
+            Container(
+              width: 28,
+              height: 28,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _labelColor().withOpacity(0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: _labelColor()),
+              ),
+              child: Text(
+                '${ranked.rank}',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: _labelColor(),
                 ),
-                const SizedBox(height: 8),
-                // Product image
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    width: 52,
-                    height: 52,
-                    color: colorScheme.surfaceContainerHighest,
-                    child: product.imageUrl.isNotEmpty
-                        ? Image.network(
-                            product.imageUrl,
-                            fit: BoxFit.cover,
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) return child;
-                              return Center(
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: colorScheme.primary,
-                                  ),
-                                ),
-                              );
-                            },
-                            errorBuilder: (_, __, ___) => Icon(
-                                Icons.inventory_2_outlined,
-                                color: colorScheme.primary,
-                                size: 26),
-                          )
-                        : Icon(Icons.inventory_2_outlined,
-                            color: colorScheme.primary, size: 26),
-                  ),
-                ),
-              ],
+              ),
             ),
             const SizedBox(width: 12),
-            // Right column: Product name + grams/badge + nutrition
+            // Everything else: image+name up top, nutrition stats below.
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Product name (without quantity suffix)
-                  Text(
-                    product.name,
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  // Grams + badge
+                  // Image + name/grams/badge
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        product.nutritionalFacts.servingSize,
-                        style: GoogleFonts.inter(
-                            fontSize: 12, color: colorScheme.onSurfaceVariant),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: _labelColor().withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(4),
+                      // Product image
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          color: colorScheme.surfaceContainerHighest,
+                          child: product.imageUrl.isNotEmpty
+                              ? Image.network(
+                                  product.imageUrl,
+                                  fit: BoxFit.cover,
+                                  loadingBuilder: (context, child, progress) {
+                                    if (progress == null) return child;
+                                    return Center(
+                                      child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: colorScheme.primary,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  errorBuilder: (_, __, ___) => Icon(
+                                      Icons.inventory_2_outlined,
+                                      color: colorScheme.primary,
+                                      size: 28),
+                                )
+                              : Icon(Icons.inventory_2_outlined,
+                                  color: colorScheme.primary, size: 28),
                         ),
-                        child: Text(
-                          _labelText(),
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: _labelColor(),
-                          ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Product name + grams/badge, beside the image
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Product name (without quantity suffix)
+                            Text(
+                              product.name,
+                              style: GoogleFonts.outfit(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 6),
+                            // Grams + badge -- wrap so a long serving-size
+                            // string or translated badge label can't force
+                            // a RenderFlex overflow on narrow screens.
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 4,
+                              children: [
+                                Text(
+                                  product.nutritionalFacts.servingSize,
+                                  style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: colorScheme.onSurfaceVariant),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: _labelColor().withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    _labelText(),
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: _labelColor(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  // Nutrition quick-stats row. Uses icons instead of text
-                  // labels ("Calories"/"Protein"/"Sodium") -- those labels
-                  // (especially translated ones) were the widest part of
-                  // this row and pushed it past the available width inside
-                  // the card, causing a RenderFlex overflow. A fixed-size
-                  // icon can't grow with locale/text-scale the way a label
-                  // can, so it keeps this row a predictable width.
-                  Row(
+                  const SizedBox(height: 8),
+                  // Nutrition quick-stats row, under the image. Uses icons
+                  // instead of text labels ("Calories"/"Protein"/"Sodium")
+                  // -- those labels (especially translated ones) were the
+                  // widest part of this row and pushed it past the
+                  // available width inside the card, causing a RenderFlex
+                  // overflow. A fixed-size icon can't grow with
+                  // locale/text-scale the way a label can, so it keeps this
+                  // row a predictable width. Wrap (rather than Row) lets it
+                  // fall onto a second line instead of overflowing if the
+                  // card is ever squeezed narrower than usual.
+                  Wrap(
+                    spacing: 10,
+                    runSpacing: 4,
                     children: [
-                      _miniStatImage(context, 'assets/images/calorie.png', product.nutritionalFacts.calories),
-                      const SizedBox(width: 10),
-                      _miniStatImage(context, 'assets/images/protein.png', product.nutritionalFacts.protein),
-                      const SizedBox(width: 10),
-                      _miniStatImage(context, 'assets/images/sodium.png', product.nutritionalFacts.sodium),
+                      _miniStatImage(context, 'assets/images/calorie.png',
+                          product.nutritionalFacts.calories),
+                      _miniStatImage(context, 'assets/images/protein.png',
+                          product.nutritionalFacts.protein),
+                      _miniStatImage(context, 'assets/images/sodium.png',
+                          product.nutritionalFacts.sodium),
                     ],
                   ),
                 ],
