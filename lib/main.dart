@@ -118,13 +118,14 @@ class ClaroApp extends StatelessWidget {
 
   ThemeData _buildTheme(Brightness brightness) {
     final isLight = brightness == Brightness.light;
+    final primaryColor = isLight ? _primaryRed : Colors.red;
     return ThemeData(
       brightness: brightness,
-      primaryColor: _primaryRed,
+      primaryColor: primaryColor,
       scaffoldBackgroundColor: isLight ? const Color(0xFFF5F0EE) : const Color(0xFF121212),
       colorScheme: ColorScheme(
         brightness: brightness,
-        primary: _primaryRed,
+        primary: primaryColor,
         onPrimary: Colors.white,
         secondary: isLight ? const Color(0xFFD32F2F) : const Color(0xFFEF5350),
         onSecondary: Colors.white,

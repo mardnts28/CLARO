@@ -19,8 +19,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const _primaryRed = Color(0xFF8B1A1A);
-
   int _selectedIndex = 0;
 
   final _authService = AuthService();
@@ -312,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         boxShadow: [
           BoxShadow(
-            color: _primaryRed.withOpacity(
+            color: theme.colorScheme.primary.withOpacity(
               theme.brightness == Brightness.dark
                   ? 0.35
                   : 0.18,
@@ -359,26 +357,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 SizedBox(
                   height: 42,
 
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
+                  child: _ShineSweepButton(
+                    borderRadius: BorderRadius.circular(12),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
 
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+
+                        elevation: 0,
                       ),
 
-                      elevation: 0,
-                    ),
+                      onPressed: () => _onNavTap(1),
 
-                    onPressed: () => _onNavTap(1),
+                      child: Text(
+                        loc.scanNow,
 
-                    child: Text(
-                      loc.scanNow,
-
-                      style: const TextStyle(
-                        color: _primaryRed,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ),
@@ -1821,5 +1822,110 @@ class _ArrowClipper extends CustomClipper<Path> {
     covariant CustomClipper<Path> oldClipper,
   ) {
     return false;
+  }
+}
+
+// -----------------------------------------------------------------------
+// SHINE SWEEP BUTTON
+//
+// Wraps a button with a soft glossy highlight that periodically sweeps
+// across its surface, then pauses, then repeats. Purely decorative -
+// taps pass straight through to the wrapped child.
+// -----------------------------------------------------------------------
+
+class _ShineSweepButton extends StatefulWidget {
+  const _ShineSweepButton({
+    required this.child,
+    required this.borderRadius,
+  });
+
+  final Widget child;
+  final BorderRadius borderRadius;
+
+  @override
+  State<_ShineSweepButton> createState() => _ShineSweepButtonState();
+}
+
+class _ShineSweepButtonState extends State<_ShineSweepButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  // Sweep runs during the first 55% of the cycle, then holds off-screen
+  // for the remaining 45% - this reads as a periodic "flash" rather than
+  // a restless, continuously-moving shimmer.
+  static const _sweepInterval = Interval(0.0, 0.55, curve: Curves.easeInOutCubic);
+  static const _bandWidth = 34.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2400),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: widget.borderRadius,
+      child: Stack(
+        children: [
+          widget.child,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+
+                  return AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, _) {
+                      final t = _sweepInterval.transform(_controller.value);
+                      final left = -_bandWidth + t * (width + _bandWidth * 2);
+
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned(
+                            left: left,
+                            top: -30,
+                            bottom: -30,
+                            width: _bandWidth,
+                            child: Transform.rotate(
+                              angle: 0.45,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                    colors: [
+                                      Colors.white.withOpacity(0.0),
+                                      Colors.white.withOpacity(0.65),
+                                      Colors.white.withOpacity(0.0),
+                                    ],
+                                    stops: const [0.0, 0.5, 1.0],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

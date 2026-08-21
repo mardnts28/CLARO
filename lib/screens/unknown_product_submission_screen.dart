@@ -798,7 +798,7 @@ class _UnknownProductSubmissionScreenState
         color: theme.cardColor,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: theme.brightness == Brightness.dark ? Colors.black.withOpacity(0.25) : Colors.black.withOpacity(0.05),
             blurRadius: 12,
             offset: const Offset(0, -2),
           ),

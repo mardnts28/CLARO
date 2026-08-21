@@ -4,7 +4,6 @@ import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
 import '../services/voice_assistant_service.dart';
-import '../widgets/date_of_birth_picker.dart';
 import 'home_screen.dart';
 
 /// NOTE ON LANGUAGE: this screen's user-facing text now follows the
@@ -39,7 +38,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   final _nameController = TextEditingController();
   String? _nameError;
-  DateTime? _selectedDateOfBirth;
   final _authService = AuthService();
   int _currentPage = 0;
   bool _isLoading = false;
@@ -150,14 +148,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
       }
 
-      // Validate date of birth
-      if (_selectedDateOfBirth == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.invalidDateOfBirth)),
-        );
-        return;
-      }
-
       // Dismiss keyboard/focus before moving to the next page -- Basic
       // Info has text fields but Health Profile doesn't, so carrying
       // focus over serves no purpose and risks the same kind of overflow
@@ -176,24 +166,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         return;
       }
 
-      // Validate date of birth
-      if (_selectedDateOfBirth == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.invalidDateOfBirth)),
-        );
-        return;
-      }
-
-      // Calculate age from DOB
-      final now = DateTime.now();
-      int age = now.year - _selectedDateOfBirth!.year;
-      // Adjust if birthday hasn't occurred yet this year
-      if (now.month < _selectedDateOfBirth!.month ||
-          (now.month == _selectedDateOfBirth!.month && now.day < _selectedDateOfBirth!.day)) {
-        age--;
-      }
-      final ageString = age.toString();
-
       setState(() => _isLoading = true);
 
       final selectedConditions = _conditions.entries
@@ -209,8 +181,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       try {
         await _authService.saveOnboardingData(
           name: _nameController.text.trim(),
-          age: ageString,
-          dateOfBirth: _selectedDateOfBirth,
           conditions: selectedConditions,
           allergens: selectedAllergens,
         );
@@ -226,8 +196,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } catch (e) {
+        debugPrint('Onboarding data save failed: $e');
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
+          SnackBar(
+            content: Text('Failed to save your profile. Please check your connection and try again.'),
+            duration: const Duration(seconds: 4),
+          ),
         );
       }
 
@@ -263,18 +238,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         brightness: Brightness.light,
         primaryColor: const Color(0xFF8B1A1A),
         scaffoldBackgroundColor: const Color(0xFFF5F0EE),
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF8B1A1A),
+        colorScheme: ColorScheme.light(
+          primary: const Color(0xFF8B1A1A),
           onPrimary: Colors.white,
-          secondary: Color(0xFFD32F2F),
+          secondary: const Color(0xFFD32F2F),
           onSecondary: Colors.white,
           surface: Colors.white,
-          onSurface: Color(0xFF1A1A1A),
+          onSurface: const Color(0xFF1A1A1A),
           error: Colors.redAccent,
           onError: Colors.white,
-          surfaceContainerHighest: Color(0xFFE0E0E0),
-          outlineVariant: Color(0xFFBDBDBD),
-          onSurfaceVariant: Color(0xFF757575),
+          surfaceContainerHighest: const Color(0xFFE0E0E0),
+          outlineVariant: const Color(0xFFBDBDBD),
+          onSurfaceVariant: const Color(0xFF757575),
         ),
         useMaterial3: true,
       ),
@@ -337,6 +312,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _nameError = null;
                   });
                 }
+                // Trigger rebuild to update button enabled state
+                setState(() {});
               },
               style: TextStyle(color: colorScheme.onSurface),
               decoration: InputDecoration(
@@ -364,16 +341,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          DateOfBirthPicker(
-            initialDate: _selectedDateOfBirth,
-            requireAdult: true,
-            onDateChanged: (date) {
-              setState(() {
-                _selectedDateOfBirth = date;
-              });
-            },
           ),
           const SizedBox(height: 32),
           _buildButton(
@@ -702,12 +669,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   bool isBasicInfoValid() {
-    final hasName = _nameController.text.trim().isNotEmpty;
-    if (_selectedDateOfBirth == null) return false;
-    final now = DateTime.now();
-    final eighteenYearsAgo = DateTime(now.year - 18, now.month, now.day);
-    final is18Plus = !_selectedDateOfBirth!.isAfter(eighteenYearsAgo);
-    return hasName && is18Plus;
+    return _nameController.text.trim().isNotEmpty;
   }
 
   bool _isFormValid() {

@@ -70,15 +70,15 @@ class NutritionGuideScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       backgroundColor:
-          Theme.of(context).scaffoldBackgroundColor,
+          theme.scaffoldBackgroundColor,
 
       appBar: AppBar(
         elevation: 0,
 
-        backgroundColor:
-            const Color(0xFF8B1A1A),
+        backgroundColor: theme.colorScheme.primary,
 
         foregroundColor: Colors.white,
 

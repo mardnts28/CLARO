@@ -9,6 +9,40 @@ import 'dart:convert';
 import 'haptic_service.dart';
 import 'package:intl/intl.dart';
 
+/// Outcome of a [AuthService.deleteAccount] attempt.
+///
+///  - [success]: both the Firestore doc and the Firebase Auth user are
+///    gone. Nothing further to do -- AuthGate will react to the Auth
+///    sign-out on its own.
+///  - [reauthRequired]: Firebase Auth refused to delete the user because
+///    the current session isn't "recent" enough (`requires-recent-login`).
+///    The user is still signed in at this point -- deliberately NOT
+///    signed out -- so the caller can prompt for fresh credentials and
+///    retry by calling deleteAccount() again with a `credential`. See
+///    [DeleteAccountResult.providerIds] for which credential type to ask
+///    for (password vs. Google).
+///  - [error]: something else failed. Nothing was left half-deleted
+///    (Firestore delete is attempted first specifically so a failure
+///    here never leaves an orphaned Auth user with no matching doc).
+enum DeleteAccountStatus { success, reauthRequired, error }
+
+class DeleteAccountResult {
+  final DeleteAccountStatus status;
+  final String? message;
+  final List<String>? providerIds;
+
+  const DeleteAccountResult._(this.status, this.message, this.providerIds);
+
+  factory DeleteAccountResult.success() =>
+      const DeleteAccountResult._(DeleteAccountStatus.success, null, null);
+
+  factory DeleteAccountResult.reauthRequired(List<String> providerIds) =>
+      DeleteAccountResult._(DeleteAccountStatus.reauthRequired, null, providerIds);
+
+  factory DeleteAccountResult.error(String message) =>
+      DeleteAccountResult._(DeleteAccountStatus.error, message, null);
+}
+
 class AuthService {
   FirebaseAuth? _auth;
   FirebaseFirestore? _db;
@@ -75,15 +109,29 @@ class AuthService {
         password: password,
       );
       final uid = credential.user!.uid;
-      await _firebaseDb.collection('users').doc(uid).set({
-        'uid': uid,
-        'email': email.trim().toLowerCase(),
-        'createdAt': Timestamp.now(),
-      });
+      
+      try {
+        await _firebaseDb.collection('users').doc(uid).set({
+          'uid': uid,
+          'email': email.trim().toLowerCase(),
+          'createdAt': Timestamp.now(),
+        });
+        debugPrint('Firestore user document created successfully for UID: $uid');
+      } on FirebaseException catch (e) {
+        debugPrint('Firestore write failed during signup for UID $uid: ${e.code} - ${e.message}');
+        // Clean up the auth user since we couldn't create their document
+        await credential.user?.delete();
+        return 'Failed to create your account data. Please check your connection and try again.';
+      }
+      
       await _updateSessionId(uid);
       return null;
     } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth signup failed: ${e.code} - ${e.message}');
       return e.message;
+    } catch (e) {
+      debugPrint('Unexpected error during signup: $e');
+      return 'An unexpected error occurred. Please try again.';
     } finally {
       isAuthenticating.value = false;
     }
@@ -236,9 +284,24 @@ class AuthService {
   /// This ensures that if the user logs in elsewhere, this session becomes invalid.
   Future<void> _updateSessionId(String uid) async {
     final sessionId = DateTime.now().microsecondsSinceEpoch.toString();
-    await _firebaseDb.collection('users').doc(uid).update({
-      'currentSessionId': sessionId,
-    });
+    try {
+      await _firebaseDb.collection('users').doc(uid).update({
+        'currentSessionId': sessionId,
+      });
+    } on FirebaseException catch (e) {
+      debugPrint('Failed to update session ID for UID $uid: ${e.code} - ${e.message}');
+      // If the document doesn't exist, try to create it
+      if (e.code == 'not-found') {
+        try {
+          await _firebaseDb.collection('users').doc(uid).set({
+            'uid': uid,
+            'currentSessionId': sessionId,
+          }, SetOptions(merge: true));
+        } catch (e2) {
+          debugPrint('Failed to create user document for session ID: $e2');
+        }
+      }
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('sessionId', sessionId);
   }
@@ -536,13 +599,21 @@ class AuthService {
       final userDoc = await _firebaseDb.collection('users').doc(uid).get();
 
       if (!userDoc.exists) {
-        final displayName = userCredential.user!.displayName ?? '';
-        await _firebaseDb.collection('users').doc(uid).set({
-          'uid': uid,
-          'email': email,
-          'name': displayName,
-          'createdAt': Timestamp.now(),
-        });
+        try {
+          final displayName = userCredential.user!.displayName ?? '';
+          await _firebaseDb.collection('users').doc(uid).set({
+            'uid': uid,
+            'email': email,
+            'name': displayName,
+            'createdAt': Timestamp.now(),
+          });
+          debugPrint('Firestore user document created for Google Sign-In UID: $uid');
+        } on FirebaseException catch (e) {
+          debugPrint('Firestore write failed during Google Sign-In for UID $uid: ${e.code} - ${e.message}');
+          // Clean up the auth user since we couldn't create their document
+          await _firebaseAuth.signOut();
+          return 'Failed to create your account data. Please check your connection and try again.';
+        }
       }
 
       // Same fail-closed MFA check used by login(). See _checkMfaEnabled
@@ -585,40 +656,61 @@ class AuthService {
 
   Future<void> saveOnboardingData({
     required String name,
-    required String age,
+    // age/dateOfBirth are no longer collected during onboarding. Left as
+    // optional (rather than removed outright) so this method still works
+    // if a caller elsewhere in the app (e.g. a future profile/edit screen)
+    // wants to backfill them -- onboarding itself never passes these now.
+    String? age,
     DateTime? dateOfBirth,
     required List<String> conditions,
     required List<String> allergens,
   }) async {
     final uid = _firebaseAuth.currentUser!.uid;
-    final userDoc = await _firebaseDb.collection('users').doc(uid).get();
-
-    final data = <String, dynamic>{
-      'uid': uid,
-      'conditions': conditions,
-      'allergens': allergens,
-      'onboardingComplete': true,
-    };
-
-    final docData = userDoc.data();
-    // Only set name and age if they don't already exist (prevent system overwrites).
-    // NOTE: this method is for the ONE-TIME onboarding flow only. Do NOT call
-    // this method again from a profile/edit screen to change name or age —
-    // this guard will silently block the update. Use updateUserData() instead.
-    if (!userDoc.exists || docData == null || !docData.containsKey('name')) {
-      data['name'] = name;
+    if (uid == null) {
+      debugPrint('saveOnboardingData failed: no authenticated user');
+      throw Exception('No authenticated user found');
     }
-    if (!userDoc.exists || docData == null || !docData.containsKey('age')) {
-      data['age'] = age;
-    }
-    // Store dateOfBirth as Firestore Timestamp if provided
-    if (dateOfBirth != null) {
-      if (!userDoc.exists || docData == null || !docData.containsKey('dateOfBirth')) {
-        data['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
+
+    try {
+      final userDoc = await _firebaseDb.collection('users').doc(uid).get();
+
+      final data = <String, dynamic>{
+        'uid': uid,
+        'conditions': conditions,
+        'allergens': allergens,
+        'onboardingComplete': true,
+      };
+
+      final docData = userDoc.data();
+      // Only set name and age if they don't already exist (prevent system overwrites).
+      // NOTE: this method is for the ONE-TIME onboarding flow only. Do NOT call
+      // this method again from a profile/edit screen to change name or age —
+      // this guard will silently block the update. Use updateUserData() instead.
+      if (!userDoc.exists || docData == null || !docData.containsKey('name')) {
+        data['name'] = name;
       }
-    }
+      if (age != null && (!userDoc.exists || docData == null || !docData.containsKey('age'))) {
+        data['age'] = age;
+      }
+      // Store dateOfBirth as Firestore Timestamp if provided
+      if (dateOfBirth != null) {
+        if (!userDoc.exists || docData == null || !docData.containsKey('dateOfBirth')) {
+          data['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
+        }
+      }
 
-    await _firebaseDb.collection('users').doc(uid).set(data, SetOptions(merge: true));
+      await _firebaseDb.collection('users').doc(uid).set(data, SetOptions(merge: true));
+      debugPrint('Onboarding data saved successfully for UID: $uid');
+      
+      // Update the global name notifier so other screens can display the new name
+      userNameNotifier.value = name;
+    } on FirebaseException catch (e) {
+      debugPrint('Firestore write failed during onboarding for UID $uid: ${e.code} - ${e.message}');
+      rethrow;
+    } catch (e) {
+      debugPrint('Unexpected error during onboarding data save: $e');
+      rethrow;
+    }
   }
 
   Future<bool> hasCompletedOnboarding() async {
@@ -627,16 +719,26 @@ class AuthService {
       if (uid == null) return false;
 
       final userDoc = await _firebaseDb.collection('users').doc(uid).get();
-      if (!userDoc.exists) return false;
+      if (!userDoc.exists) {
+        debugPrint('hasCompletedOnboarding: user document does not exist for UID: $uid');
+        return false;
+      }
 
       final data = userDoc.data();
-      return data != null &&
+      final isComplete = data != null &&
           data.containsKey('name') &&
           data['name'] != null &&
           data['name'].toString().isNotEmpty &&
           data.containsKey('conditions') &&
           data.containsKey('allergens');
+      
+      debugPrint('hasCompletedOnboarding for UID $uid: $isComplete');
+      return isComplete;
+    } on FirebaseException catch (e) {
+      debugPrint('Firestore error in hasCompletedOnboarding: ${e.code} - ${e.message}');
+      return false;
     } catch (e) {
+      debugPrint('Unexpected error in hasCompletedOnboarding: $e');
       return false;
     }
   }
@@ -661,10 +763,15 @@ class AuthService {
       final uid = _firebaseAuth.currentUser?.uid;
       if (uid != null) {
         // Clear session ID in Firestore to prevent race conditions on next login
-        await _firebaseDb.collection('users').doc(uid).update({'currentSessionId': null});
+        try {
+          await _firebaseDb.collection('users').doc(uid).update({'currentSessionId': null});
+        } on FirebaseException catch (e) {
+          debugPrint('Error clearing session ID on sign out for UID $uid: ${e.code} - ${e.message}');
+          // Continue with sign out even if Firestore update fails
+        }
       }
     } catch (e) {
-      debugPrint('Error clearing session ID on sign out: $e');
+      debugPrint('Error during sign out cleanup: $e');
     }
 
     final prefs = await SharedPreferences.getInstance();
@@ -673,15 +780,47 @@ class AuthService {
     await _firebaseAuth.signOut();
   }
 
-  Future<String?> deleteAccount() async {
+  /// Deletes the signed-in user's Firestore doc and Firebase Auth account.
+  ///
+  /// If [credential] is null, this is a first attempt: it deletes the
+  /// Firestore doc, then tries to delete the Auth user with whatever
+  /// session is currently active.
+  ///
+  /// If Firebase Auth reports `requires-recent-login`, the user is left
+  /// signed in on purpose (see [DeleteAccountResult.reauthRequired]) --
+  /// the caller should obtain fresh credentials (via
+  /// [buildGoogleReauthCredential] or [buildEmailReauthCredential]) and
+  /// call this again passing them as [credential]. That retry re-runs the
+  /// Firestore delete too, but deleting an already-deleted doc is a
+  /// harmless no-op, not an error, so it's safe to just replay the whole
+  /// method rather than needing a separate "resume" code path.
+  ///
+  /// This never signs the user out on failure. The previous version did,
+  /// which meant the only way to "retry" was logging back in through the
+  /// normal login() flow -- and login()'s own session-tracking logic
+  /// would silently recreate a bare-bones Firestore doc for the uid,
+  /// undoing the deletion that had already happened and dropping the
+  /// user into onboarding instead of actually finishing the deletion.
+  Future<DeleteAccountResult> deleteAccount({AuthCredential? credential}) async {
     final user = _firebaseAuth.currentUser;
     if (user == null) {
-      return 'No authenticated user found.';
+      return DeleteAccountResult.error('No authenticated user found.');
     }
 
     final uid = user.uid;
 
     try {
+      if (credential != null) {
+        try {
+          await user.reauthenticateWithCredential(credential);
+        } on FirebaseAuthException catch (e) {
+          debugPrint('Reauthentication error: ${e.code} - ${e.message}');
+          return DeleteAccountResult.error(
+            e.message ?? 'Re-authentication failed. Please try again.',
+          );
+        }
+      }
+
       // Delete the Firestore user document FIRST, while the user is still
       // authenticated.
       //
@@ -702,22 +841,25 @@ class AuthService {
         await _firebaseDb.collection('users').doc(uid).delete();
       } catch (e) {
         debugPrint('Firestore user document deletion error: $e');
-        return 'Failed to delete your account data. Please try again.';
+        return DeleteAccountResult.error(
+          'Failed to delete your account data. Please try again.',
+        );
       }
 
       // Now delete the Firebase Authentication account.
-      // This can fail if the user hasn't recently authenticated. At this
-      // point the Firestore document is already gone, so on this
-      // particular failure we still sign the user out and ask them to
-      // re-login and retry -- retrying will simply find no document left
-      // to delete and proceed straight to removing the Auth account.
       try {
         await user.delete();
       } on FirebaseAuthException catch (e) {
         debugPrint('Firebase Auth deletion error: $e');
         if (e.code == 'requires-recent-login') {
-          await _firebaseAuth.signOut();
-          return 'For security reasons, you need to re-login before deleting your account. Please log in again and try.';
+          // Deliberately NOT signing out here -- the caller prompts for
+          // fresh credentials and calls deleteAccount() again with them.
+          // The Firestore doc is already gone at this point; the retry
+          // will just find nothing left to delete there and go straight
+          // to removing the Auth user.
+          return DeleteAccountResult.reauthRequired(
+            user.providerData.map((p) => p.providerId).toList(),
+          );
         }
         rethrow;
       }
@@ -729,14 +871,54 @@ class AuthService {
       // Reset personalized feedback
       HapticService().updateEnabled(false);
 
-      return null;
+      return DeleteAccountResult.success();
     } on FirebaseAuthException catch (e) {
       debugPrint('Firebase Auth deletion error: $e');
-      return e.message ?? 'Failed to delete account. Please try again.';
+      return DeleteAccountResult.error(
+        e.message ?? 'Failed to delete account. Please try again.',
+      );
     } catch (e) {
       debugPrint('Account deletion error: $e');
-      return 'An error occurred while deleting your account. Please try again.';
+      return DeleteAccountResult.error(
+        'An error occurred while deleting your account. Please try again.',
+      );
     }
+  }
+
+  /// Builds a fresh Google credential for re-authentication (e.g. to
+  /// recover from `requires-recent-login` during account deletion) by
+  /// re-triggering the Google account picker. Returns null if the user
+  /// cancels the picker.
+  ///
+  /// This does NOT sign the credential into Firebase itself -- the
+  /// caller (deleteAccount) is expected to pass it to
+  /// `user.reauthenticateWithCredential`, which re-verifies the *current*
+  /// user's identity rather than switching to a different account.
+  Future<AuthCredential?> buildGoogleReauthCredential() async {
+    try {
+      final GoogleSignInAccount? googleUser = await _firebaseGoogleSignIn.signIn();
+      if (googleUser == null) return null;
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      return GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+    } catch (e) {
+      debugPrint('Error building Google reauth credential: $e');
+      return null;
+    }
+  }
+
+  /// Builds an email/password credential for re-authentication, using the
+  /// currently signed-in user's own email address (so this can't be used
+  /// to authenticate as anyone else) and the password the caller collected.
+  /// Returns null if there's no signed-in user or no email on the account
+  /// (e.g. a Google-only account).
+  AuthCredential? buildEmailReauthCredential(String password) {
+    final email = _firebaseAuth.currentUser?.email;
+    if (email == null || email.isEmpty) return null;
+    return EmailAuthProvider.credential(email: email, password: password);
   }
 
   User? get currentUser {

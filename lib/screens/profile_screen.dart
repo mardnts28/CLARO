@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/auth_service.dart';
 import '../services/theme_service.dart';
@@ -455,9 +456,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   'Delete Account',
                   style: TextStyle(
                     fontSize: 15,
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.red
-                        : const Color(0xFF8B1A1A),
+                    color: theme.colorScheme.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -481,9 +480,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   loc.logout,
                   style: TextStyle(
                     fontSize: 15,
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.red
-                        : colorScheme.primary,
+                    color: colorScheme.primary,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -524,9 +521,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showDeleteAccountDialog() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final deleteColor = theme.brightness == Brightness.dark
-        ? Colors.red
-        : const Color(0xFF8B1A1A);
 
     // The phrase the user must type is derived from their current
     // username/name (e.g. "DELETE-john"), not a static "DELETE". Captured
@@ -539,7 +533,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (dialogContext) => _DeleteAccountDialogContent(
         requiredPhrase: requiredDeletePhrase,
         colorScheme: colorScheme,
-        deleteColor: deleteColor,
+        deleteColor: colorScheme.primary,
         onConfirmed: _performAccountDeletion,
       ),
     );
@@ -556,13 +550,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// moment the Firebase Auth account is actually deleted), the overlay
   /// tears down atomically along with everything else instead of being
   /// left dangling on top of a torn-down tree.
-  Future<void> _performAccountDeletion() async {
+  ///
+  /// [credential] is passed when this is a retry after a reauthRequired
+  /// response -- see _showReauthDialog.
+  Future<void> _performAccountDeletion({AuthCredential? credential}) async {
     if (!mounted) return;
     setState(() {
       _isDeletingAccount = true;
     });
 
-    final error = await _authService.deleteAccount();
+    final result = await _authService.deleteAccount(credential: credential);
 
     // If this screen is gone by the time we get here, AuthGate has
     // already reacted to the Auth account being deleted and replaced it
@@ -570,31 +567,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // to do.
     if (!mounted) return;
 
-    if (error != null) {
-      // Deletion failed (and, per deleteAccount's Firestore-first
-      // ordering, nothing was actually deleted), and AuthGate never
-      // touched this screen -- so it's safe to update our own state and
-      // show the error normally.
-      setState(() {
-        _isDeletingAccount = false;
-      });
-      final theme = Theme.of(context);
-      final deleteColor = theme.brightness == Brightness.dark
-          ? Colors.red
-          : const Color(0xFF8B1A1A);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: deleteColor,
-        ),
-      );
-      return;
-    }
+    switch (result.status) {
+      case DeleteAccountStatus.success:
+        // In principle AuthGate's authStateChanges() listener reacts to
+        // the Auth account being gone and swaps this whole screen out
+        // for LoginScreen on its own -- and if that already happened,
+        // this widget wouldn't even be mounted at this point (see the
+        // check above). But that reactive swap isn't guaranteed to land
+        // in the same frame, and this screen has been observed staying
+        // mounted -- overlay spinning forever -- even though deletion
+        // genuinely already succeeded. Rather than keep waiting on a
+        // stream event that may not arrive promptly, explicitly navigate
+        // to LoginScreen now, the same way the Logout button above
+        // already does after AuthService.signOut(). If AuthGate's own
+        // swap wins the race instead, this widget is torn down before
+        // this line runs and pushReplacementNamed is simply never
+        // reached -- no conflict either way.
+        Navigator.of(context).pushReplacementNamed('/');
+        return;
 
-    // Success, but this screen hasn't been torn down yet (AuthGate's
-    // rebuild hasn't landed this frame) -- leave _isDeletingAccount as
-    // true so the overlay stays up. AuthGate will swap in LoginScreen
-    // momentarily; there's nothing else for this screen to do.
+      case DeleteAccountStatus.error:
+        // Deletion failed and nothing further happens automatically --
+        // the user is still signed in, so it's safe to update our own
+        // state and show the error normally.
+        setState(() {
+          _isDeletingAccount = false;
+        });
+        final theme = Theme.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.message!),
+            backgroundColor: theme.colorScheme.primary,
+          ),
+        );
+        return;
+
+      case DeleteAccountStatus.reauthRequired:
+        // The user's session is too old for Firebase Auth to allow the
+        // deletion. They're still signed in (deleteAccount() no longer
+        // signs out on this path), so ask for fresh credentials right
+        // here and retry -- no trip back through LoginScreen needed.
+        setState(() {
+          _isDeletingAccount = false;
+        });
+        _showReauthDialog(result.providerIds ?? const []);
+        return;
+    }
+  }
+
+  /// Shown when deleteAccount() reports `reauthRequired`. Asks for a
+  /// password (email/password accounts) or re-triggers the Google
+  /// picker (Google accounts), then retries deletion with the resulting
+  /// credential.
+  void _showReauthDialog(List<String> providerIds) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isGoogleAccount = providerIds.contains(GoogleAuthProvider.PROVIDER_ID);
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _ReauthDialogContent(
+        isGoogleAccount: isGoogleAccount,
+        colorScheme: colorScheme,
+        accentColor: colorScheme.primary,
+        authService: _authService,
+        onCredentialObtained: (credential) {
+          _performAccountDeletion(credential: credential);
+        },
+      ),
+    );
   }
 
   Widget _buildMenuItemWithArrow({
@@ -962,6 +1003,219 @@ class _DeleteAccountDialogContentState
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// Shown when deleteAccount() reports `reauthRequired` -- the user's
+/// session is too old for Firebase Auth to allow a sensitive operation
+/// like account deletion, so fresh credentials are needed before it can
+/// proceed. The user is still signed in at this point (see
+/// AuthService.deleteAccount), so this collects a credential in place
+/// rather than sending them back through LoginScreen.
+///
+/// Same dedicated-StatefulWidget pattern as _DeleteAccountDialogContent,
+/// for the same reason: the TextEditingController must be disposed by
+/// this State's own dispose() lifecycle, not manually at pop() time,
+/// since the dialog route's exit animation keeps the tree (and the
+/// TextField bound to that controller) around for a moment after pop().
+class _ReauthDialogContent extends StatefulWidget {
+  const _ReauthDialogContent({
+    required this.isGoogleAccount,
+    required this.colorScheme,
+    required this.accentColor,
+    required this.authService,
+    required this.onCredentialObtained,
+  });
+
+  final bool isGoogleAccount;
+  final ColorScheme colorScheme;
+  final Color accentColor;
+  final AuthService authService;
+  final void Function(AuthCredential credential) onCredentialObtained;
+
+  @override
+  State<_ReauthDialogContent> createState() => _ReauthDialogContentState();
+}
+
+class _ReauthDialogContentState extends State<_ReauthDialogContent> {
+  late final TextEditingController _passwordController;
+  String? _errorMessage;
+  bool _isProcessing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleGoogleReauth() async {
+    setState(() {
+      _isProcessing = true;
+      _errorMessage = null;
+    });
+
+    final credential = await widget.authService.buildGoogleReauthCredential();
+
+    if (!mounted) return;
+
+    if (credential == null) {
+      setState(() {
+        _isProcessing = false;
+        _errorMessage = 'Google sign-in was cancelled. Please try again.';
+      });
+      return;
+    }
+
+    // Close this dialog before kicking off deletion, same reasoning as
+    // _DeleteAccountDialogContent: AuthGate can react to the account
+    // actually being deleted before this async call returns, and there
+    // should be no dialog route left over to race against that teardown.
+    Navigator.of(context).pop();
+    widget.onCredentialObtained(credential);
+  }
+
+  void _handleEmailReauth() {
+    final password = _passwordController.text;
+    if (password.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter your password.';
+      });
+      return;
+    }
+
+    final credential = widget.authService.buildEmailReauthCredential(password);
+    if (credential == null) {
+      setState(() {
+        _errorMessage = 'Could not verify your account. Please try again.';
+      });
+      return;
+    }
+
+    Navigator.of(context).pop();
+    widget.onCredentialObtained(credential);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = widget.colorScheme;
+    final accentColor = widget.accentColor;
+
+    return AlertDialog(
+      backgroundColor: colorScheme.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Icon(Icons.lock_clock_rounded, color: accentColor, size: 24),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Confirm It\'s You',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'For security, please verify your identity again before we permanently delete your account.',
+            style: TextStyle(
+              fontSize: 14,
+              color: colorScheme.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (widget.isGoogleAccount) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _isProcessing ? null : _handleGoogleReauth,
+                icon: _isProcessing
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: accentColor,
+                        ),
+                      )
+                    : Icon(Icons.login_rounded, color: accentColor),
+                label: Text(_isProcessing ? 'Verifying...' : 'Continue with Google'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: accentColor,
+                  side: BorderSide(color: accentColor),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ] else ...[
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              onChanged: (value) {
+                if (_errorMessage != null) {
+                  setState(() {
+                    _errorMessage = null;
+                  });
+                }
+              },
+              style: TextStyle(color: colorScheme.onSurface),
+              decoration: InputDecoration(
+                hintText: 'Password',
+                hintStyle: TextStyle(
+                  color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: colorScheme.outlineVariant),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: accentColor, width: 2),
+                ),
+                errorText: _errorMessage,
+                errorStyle: TextStyle(color: accentColor),
+              ),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            HapticService().vibrate();
+            Navigator.of(context).pop();
+          },
+          child: Text(
+            'Cancel',
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        if (!widget.isGoogleAccount)
+          TextButton(
+            onPressed: _handleEmailReauth,
+            child: Text(
+              'Confirm',
+              style: TextStyle(
+                color: accentColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
       ],
     );
   }

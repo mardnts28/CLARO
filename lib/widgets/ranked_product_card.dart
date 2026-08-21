@@ -169,14 +169,20 @@ class RankedProductCard extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // Nutrition quick-stats row
+                  // Nutrition quick-stats row. Uses icons instead of text
+                  // labels ("Calories"/"Protein"/"Sodium") -- those labels
+                  // (especially translated ones) were the widest part of
+                  // this row and pushed it past the available width inside
+                  // the card, causing a RenderFlex overflow. A fixed-size
+                  // icon can't grow with locale/text-scale the way a label
+                  // can, so it keeps this row a predictable width.
                   Row(
                     children: [
-                      _miniStat(context, '⚡', product.nutritionalFacts.calories),
+                      _miniStatImage(context, 'assets/images/calorie.png', product.nutritionalFacts.calories),
                       const SizedBox(width: 10),
-                      _miniStat(context, '🥩', product.nutritionalFacts.protein),
+                      _miniStatImage(context, 'assets/images/protein.png', product.nutritionalFacts.protein),
                       const SizedBox(width: 10),
-                      _miniStat(context, '🫙', product.nutritionalFacts.sodium),
+                      _miniStatImage(context, 'assets/images/sodium.png', product.nutritionalFacts.sodium),
                     ],
                   ),
                 ],
@@ -188,13 +194,41 @@ class RankedProductCard extends StatelessWidget {
     );
   }
 
-  Widget _miniStat(BuildContext context, String emoji, String value) {
+  Widget _miniStat(BuildContext context, IconData icon, String value) {
     final colorScheme = Theme.of(context).colorScheme;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(emoji, style: const TextStyle(fontSize: 11)),
-        const SizedBox(width: 2),
+        Icon(icon, size: 12, color: colorScheme.onSurfaceVariant.withOpacity(0.75)),
+        const SizedBox(width: 3),
+        Text(value,
+            style: GoogleFonts.inter(
+                fontSize: 11,
+                color: colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500)),
+      ],
+    );
+  }
+
+  Widget _miniStatImage(BuildContext context, String assetPath, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset(
+          assetPath,
+          width: 12,
+          height: 12,
+          errorBuilder: (context, error, stackTrace) {
+            // Fallback to icon if image fails to load
+            return Icon(
+              Icons.error_outline,
+              size: 12,
+              color: colorScheme.onSurfaceVariant.withOpacity(0.75),
+            );
+          },
+        ),
+        const SizedBox(width: 3),
         Text(value,
             style: GoogleFonts.inter(
                 fontSize: 11,

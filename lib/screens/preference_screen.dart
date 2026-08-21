@@ -15,7 +15,6 @@ class PreferenceScreen extends StatefulWidget {
 }
 
 class _PreferenceScreenState extends State<PreferenceScreen> {
-  static const _primaryRed = Color(0xFF8B1A1A);
   final _authService = AuthService();
 
   bool _vibrationFeedback = false;
@@ -89,8 +88,8 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
       appBar: AppBar(
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
-        iconTheme: const IconThemeData(color: _primaryRed),
-        title: Text(loc.preferenceTitle, style: const TextStyle(color: _primaryRed)),
+        iconTheme: IconThemeData(color: theme.colorScheme.primary),
+        title: Text(loc.preferenceTitle, style: TextStyle(color: theme.colorScheme.primary)),
       ),
       body: VoiceMicOverlay(
         child: SingleChildScrollView(
@@ -191,10 +190,10 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                                         : 'This is a preview of the CLARO voice assistant.',
                                   );
                                 },
-                                icon: const Icon(Icons.play_arrow, color: _primaryRed),
-                                label: Text(loc.previewAudio, style: const TextStyle(color: _primaryRed)),
+                                icon: Icon(Icons.play_arrow, color: theme.colorScheme.primary),
+                                label: Text(loc.previewAudio, style: TextStyle(color: theme.colorScheme.primary)),
                                 style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(color: _primaryRed),
+                                  side: BorderSide(color: theme.colorScheme.primary),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   padding: const EdgeInsets.symmetric(vertical: 12),
                                 ),
@@ -241,7 +240,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: theme.colorScheme.surfaceContainerHighest),
-                              child: const Icon(Icons.vibration_outlined, color: _primaryRed),
+                              child: Icon(Icons.vibration_outlined, color: theme.colorScheme.primary),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
@@ -273,8 +272,8 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
                           }
                         },
-                        activeThumbColor: _primaryRed,
-                        activeTrackColor: _primaryRed.withAlpha(120),
+                        activeThumbColor: theme.colorScheme.primary,
+                        activeTrackColor: theme.colorScheme.primary.withAlpha(120),
                       ),
                     ],
                   ),

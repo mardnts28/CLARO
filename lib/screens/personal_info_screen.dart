@@ -9,7 +9,6 @@ import '../services/locale_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
-import '../widgets/date_of_birth_picker.dart';
 import 'change_password_screen.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
@@ -23,12 +22,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   final _authService = AuthService();
 
   String _userName = 'User';
-  String _userAge = '';
-  DateTime? _userDateOfBirth;
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _ageController = TextEditingController();
   bool _isSavingName = false;
-  bool _isSavingAge = false;
   Map<String, bool> _conditions = {};
   Map<String, bool> _allergens = {};
   bool _isLoading = true;
@@ -53,12 +48,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _ageController.dispose();
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
 
-  /// Loads the current user's profile (name, age, conditions,
+  /// Loads the current user's profile (name, conditions,
   /// allergens) from Firestore, retrying on transient permission-denied
   /// errors.
   ///
@@ -128,14 +122,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           if (_userName.isEmpty) _userName = 'User';
           _nameController.text = _userName;
 
-          _userAge = data['age'] ?? '';
-          _ageController.text = _userAge;
-
-          // Load dateOfBirth if available
-          if (data['dateOfBirth'] != null) {
-            _userDateOfBirth = (data['dateOfBirth'] as Timestamp).toDate();
-          }
-
           final conditionsList = data['conditions'] as List<dynamic>? ?? [];
           _conditions = {
             'Diabetes': conditionsList.contains('Diabetes') || conditionsList.contains('Diabetes'),
@@ -202,44 +188,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
-  Future<void> _saveDateOfBirth(DateTime? dateOfBirth) async {
-    final loc = AppLocalizations.of(context)!;
-    try {
-      final uid = _authService.currentUser?.uid;
-      if (uid == null) return;
-      setState(() => _isSavingAge = true);
-
-      // Calculate age from DOB
-      if (dateOfBirth != null) {
-        final now = DateTime.now();
-        int age = now.year - dateOfBirth.year;
-        // Adjust if birthday hasn't occurred yet this year
-        if (now.month < dateOfBirth.month ||
-            (now.month == dateOfBirth.month && now.day < dateOfBirth.day)) {
-          age--;
-        }
-        final ageString = age.toString();
-
-        // Save both dateOfBirth and age
-        final ok = await _authService.updateUserData({
-          'dateOfBirth': Timestamp.fromDate(dateOfBirth),
-          'age': ageString,
-        });
-        setState(() => _isSavingAge = false);
-        if (ok) {
-          await _loadUserData();
-          if (mounted) SuccessFeedbackUtils.showSuccessSnackBar(context, loc.profileUpdateSuccess);
-        } else {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
-        }
-      }
-    } catch (e) {
-      debugPrint('Error saving date of birth: $e');
-      setState(() => _isSavingAge = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
-    }
-  }
-
   void _showEditNameDialog() {
     HapticService().vibrate();
     final loc = AppLocalizations.of(context)!;
@@ -287,54 +235,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               ],
             );
           },
-        );
-      },
-    );
-  }
-
-  void _showEditAgeDialog() {
-    HapticService().vibrate();
-    final loc = AppLocalizations.of(context)!;
-    DateTime? tempSelectedDate = _userDateOfBirth;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Theme.of(context).cardColor,
-          title: Text(loc.dateOfBirth, style: TextStyle(color: Theme.of(context).colorScheme.onSurface)),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: DateOfBirthPicker(
-              initialDate: _userDateOfBirth,
-              requireAdult: true,
-              onDateChanged: (date) {
-                tempSelectedDate = date;
-              },
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: Text(loc.cancel)),
-            TextButton(
-              onPressed: _isSavingAge
-                  ? null
-                  : () async {
-                if (tempSelectedDate == null) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(loc.invalidDateOfBirth)),
-                    );
-                  }
-                  return;
-                }
-                Navigator.pop(context);
-                await _saveDateOfBirth(tempSelectedDate);
-              },
-              child: _isSavingAge
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(loc.save),
-            ),
-          ],
         );
       },
     );
@@ -483,18 +383,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 Text('${loc.onboardingNameHint}: $_userName', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
                 const SizedBox(width: 8),
                 Icon(Icons.edit, size: 18, color: theme.colorScheme.onSurfaceVariant),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          GestureDetector(
-            onTap: () => _showEditAgeDialog(),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('${loc.ageLabel}: ${_userAge.isEmpty ? loc.none : _userAge}', style: TextStyle(fontSize: 16, color: theme.colorScheme.onSurface)),
-                const SizedBox(width: 8),
-                Icon(Icons.edit, size: 16, color: theme.colorScheme.onSurfaceVariant),
               ],
             ),
           ),

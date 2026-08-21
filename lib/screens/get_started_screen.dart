@@ -17,7 +17,6 @@ import '../services/get_started_service.dart';
 class GetStartedScreen extends StatelessWidget {
   const GetStartedScreen({super.key});
 
-  static const _red = Color(0xFF8B1A1A);
   static const _bg = Color(0xFFF5F0EE);
 
   Future<void> _onGetStarted() async {
@@ -34,10 +33,10 @@ class GetStartedScreen extends StatelessWidget {
     return Theme(
       data: ThemeData(
         brightness: Brightness.light,
-        primaryColor: _red,
+        primaryColor: const Color(0xFF8B1A1A),
         scaffoldBackgroundColor: _bg,
         colorScheme: const ColorScheme.light(
-          primary: _red,
+          primary: Color(0xFF8B1A1A),
           onPrimary: Colors.white,
           secondary: Color(0xFFD32F2F),
           onSecondary: Colors.white,
