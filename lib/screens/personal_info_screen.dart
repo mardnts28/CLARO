@@ -28,6 +28,25 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   Map<String, bool> _allergens = {};
   bool _isLoading = true;
 
+  // Date of birth is stored once during onboarding and never edited here.
+  // Age is always derived from it at load time rather than stored/edited
+  // directly, so it can never drift out of sync with the actual date.
+  DateTime? _dateOfBirth;
+  int? _age;
+
+  /// Computes age in whole years from [dateOfBirth] as of "now", correctly
+  /// accounting for whether the birthday has occurred yet this year.
+  int _calculateAge(DateTime dateOfBirth) {
+    final now = DateTime.now();
+    int age = now.year - dateOfBirth.year;
+    final birthdayHasOccurredThisYear = (now.month > dateOfBirth.month) ||
+        (now.month == dateOfBirth.month && now.day >= dateOfBirth.day);
+    if (!birthdayHasOccurredThisYear) {
+      age--;
+    }
+    return age;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -121,6 +140,19 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           _userName = data['name'] ?? 'User';
           if (_userName.isEmpty) _userName = 'User';
           _nameController.text = _userName;
+
+          // dateOfBirth is stored as a Firestore Timestamp (see
+          // AuthService.saveOnboardingData). Age is always recalculated
+          // from it here rather than read from any stored "age" value, so
+          // it stays accurate as time passes.
+          final dobValue = data['dateOfBirth'];
+          if (dobValue is Timestamp) {
+            _dateOfBirth = dobValue.toDate();
+            _age = _calculateAge(_dateOfBirth!);
+          } else {
+            _dateOfBirth = null;
+            _age = null;
+          }
 
           final conditionsList = data['conditions'] as List<dynamic>? ?? [];
           _conditions = {
@@ -386,6 +418,15 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               ],
             ),
           ),
+          if (_age != null) ...[
+            const SizedBox(height: 4),
+            // Display-only: age is always derived from the stored date of
+            // birth (see _calculateAge) and is never directly editable.
+            Text(
+              '${loc.ageLabel}: $_age',
+              style: TextStyle(fontSize: 15, color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
         ],
       ),
     );

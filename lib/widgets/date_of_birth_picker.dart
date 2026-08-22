@@ -34,6 +34,13 @@ class _DateOfBirthPickerState extends State<DateOfBirthPicker> {
   void initState() {
     super.initState();
     _initializeDate();
+    // Report the initial (always-valid) date to the parent right away so
+    // consumers that gate a "Next"/"Continue" button on having a selected
+    // date of birth don't require the user to manually scroll a wheel
+    // that's already showing a valid selection.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _notifyDateChanged();
+    });
   }
 
   void _initializeDate() {

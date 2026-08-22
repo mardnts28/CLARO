@@ -281,6 +281,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get termsConditions => 'Terms & Conditions';
 
   @override
+  String get agreeToTermsPrefix => 'I agree to the ';
+
+  @override
+  String get termsConditionsRequiredError =>
+      'You must agree to the Terms and Conditions to continue.';
+
+  @override
+  String get closeButton => 'Close';
+
+  @override
+  String get onboardingDobError => 'Please select your date of birth.';
+
+  @override
+  String get onboardingNameAndDobError =>
+      'Please enter your name and select your date of birth.';
+
+  @override
   String get userGuide => 'User Guide';
 
   @override

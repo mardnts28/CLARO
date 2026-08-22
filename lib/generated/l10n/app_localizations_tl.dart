@@ -283,6 +283,23 @@ class AppLocalizationsTl extends AppLocalizations {
   String get termsConditions => 'Mga Tuntunin at Kundisyon';
 
   @override
+  String get agreeToTermsPrefix => 'Sumasang-ayon ako sa ';
+
+  @override
+  String get termsConditionsRequiredError =>
+      'Kailangan mong sumang-ayon sa Mga Tuntunin at Kundisyon para magpatuloy.';
+
+  @override
+  String get closeButton => 'Isara';
+
+  @override
+  String get onboardingDobError => 'Piliin ang iyong kaarawan.';
+
+  @override
+  String get onboardingNameAndDobError =>
+      'Ilagay ang iyong pangalan at piliin ang iyong kaarawan.';
+
+  @override
   String get userGuide => 'Gabay sa Gumagamit';
 
   @override

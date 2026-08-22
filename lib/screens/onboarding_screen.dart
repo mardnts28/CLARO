@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
 import '../services/voice_assistant_service.dart';
+import '../widgets/date_of_birth_picker.dart';
 import 'home_screen.dart';
 
 /// NOTE ON LANGUAGE: this screen's user-facing text now follows the
@@ -41,6 +42,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _authService = AuthService();
   int _currentPage = 0;
   bool _isLoading = false;
+
+  // Date of birth selected via the wheel picker on the Basic Info page.
+  // DateOfBirthPicker only ever reports a value here when it represents a
+  // valid, non-future date corresponding to someone at least 18 years old
+  // (it reports null otherwise), so this being non-null is sufficient to
+  // treat the date of birth as "selected and valid".
+  DateTime? _dateOfBirth;
+  String? _dobError;
 
   // Internal storage keys -- DO NOT translate these, see class doc above.
   final Map<String, bool> _conditions = {
@@ -134,18 +143,33 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     HapticService().vibrate();
     final loc = AppLocalizations.of(context)!;
     if (_currentPage < 1) {
-      // Validate name
-      if (_nameController.text.trim().isEmpty) {
+      // Validate name and date of birth together so the user gets a single,
+      // clear message covering whichever field(s) are incomplete, rather
+      // than being blocked repeatedly one field at a time.
+      final nameEmpty = _nameController.text.trim().isEmpty;
+      final dobMissing = _dateOfBirth == null;
+
+      if (nameEmpty || dobMissing) {
         setState(() {
-          _nameError = loc.onboardingNameEmpty;
+          _nameError = nameEmpty ? loc.onboardingNameEmpty : null;
+          _dobError = dobMissing ? loc.onboardingDobError : null;
         });
+        HapticService().vibrate();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              nameEmpty && dobMissing
+                  ? loc.onboardingNameAndDobError
+                  : (nameEmpty ? loc.onboardingNameEmpty : loc.onboardingDobError),
+            ),
+          ),
+        );
         return;
       } else {
-        if (_nameError != null) {
-          setState(() {
-            _nameError = null;
-          });
-        }
+        setState(() {
+          _nameError = null;
+          _dobError = null;
+        });
       }
 
       // Dismiss keyboard/focus before moving to the next page -- Basic
@@ -181,6 +205,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       try {
         await _authService.saveOnboardingData(
           name: _nameController.text.trim(),
+          dateOfBirth: _dateOfBirth,
           conditions: selectedConditions,
           allergens: selectedAllergens,
         );
@@ -342,6 +367,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
           ),
+          const SizedBox(height: 24),
+          Semantics(
+            hint: _dobError != null ? 'Error: $_dobError' : null,
+            child: DateOfBirthPicker(
+              initialDate: _dateOfBirth,
+              onDateChanged: (date) {
+                setState(() {
+                  _dateOfBirth = date;
+                  if (date != null && _dobError != null) {
+                    _dobError = null;
+                  }
+                });
+              },
+            ),
+          ),
+          if (_dobError != null) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Row(
+                children: [
+                  Icon(Icons.error_outline, size: 14, color: colorScheme.error),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _dobError!,
+                      style: TextStyle(color: colorScheme.error, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 32),
           _buildButton(
             loc.nextButton,
@@ -669,7 +727,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   bool isBasicInfoValid() {
-    return _nameController.text.trim().isNotEmpty;
+    return _nameController.text.trim().isNotEmpty && _dateOfBirth != null;
   }
 
   bool _isFormValid() {

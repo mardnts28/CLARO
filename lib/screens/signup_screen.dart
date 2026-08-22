@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import '../widgets/custom_text_field.dart';
 import 'login_screen.dart';
@@ -9,6 +10,7 @@ import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
+import '../widgets/terms_and_conditions_dialog.dart';
 
 // NOTE ON LANGUAGE: the headline text, field hints, and primary buttons on
 // this screen now follow the app-wide selected language (see
@@ -68,6 +70,14 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   bool _isLoading = false;
+
+  // Terms & Conditions agreement. Required before ANY account-creation
+  // path on this screen (email/password sign-up or Google sign-in) is
+  // allowed to proceed -- see _validateTermsAgreement().
+  bool _agreedToTerms = false;
+  String? _termsError;
+  final _termsLinkRecognizer = TapGestureRecognizer();
+  final _termsPrefixRecognizer = TapGestureRecognizer();
 
   // Inline, per-field error state. Null = no error shown.
   String? _emailError;
@@ -157,6 +167,8 @@ class _SignupScreenState extends State<SignupScreen> {
     _emailFocus.dispose();
     _passwordFocus.dispose();
     _confirmPasswordFocus.dispose();
+    _termsLinkRecognizer.dispose();
+    _termsPrefixRecognizer.dispose();
     super.dispose();
   }
 
@@ -242,6 +254,8 @@ class _SignupScreenState extends State<SignupScreen> {
       _passwordError = null;
       _confirmPasswordError = null;
       _formError = null;
+      _agreedToTerms = false;
+      _termsError = null;
     });
     HapticService().vibrate();
   }
@@ -313,14 +327,32 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
+  /// Checks the Terms & Conditions checkbox and surfaces a clear error if
+  /// it hasn't been agreed to. Called from every account-creation path on
+  /// this screen (email/password sign-up AND Google sign-in) so the
+  /// requirement can't be bypassed via either button.
+  bool _validateTermsAgreement() {
+    final loc = AppLocalizations.of(context)!;
+    if (!_agreedToTerms) {
+      setState(() => _termsError = loc.termsConditionsRequiredError);
+      HapticService().vibrate();
+      return false;
+    }
+    if (_termsError != null) {
+      setState(() => _termsError = null);
+    }
+    return true;
+  }
+
   Future<void> _handleSignUp() async {
     // Re-run all validators together on submit so every relevant field
     // shows its error at once (inline), instead of one snackbar at a time.
     final emailOk = _validateEmail();
     final passwordOk = _validatePassword();
     final confirmOk = _validateConfirmPassword();
+    final termsOk = _validateTermsAgreement();
 
-    if (!emailOk || !passwordOk || !confirmOk) {
+    if (!emailOk || !passwordOk || !confirmOk || !termsOk) {
       HapticService().vibrate();
       return; // Nothing is cleared — user's input is preserved as-is.
     }
@@ -369,6 +401,13 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     HapticService().vibrate();
+    // Same Terms & Conditions requirement applies to Google sign-in as to
+    // the email/password path -- this screen has only these two ways to
+    // create an account, and both must be gated so the checkbox can't be
+    // bypassed by using the other button.
+    if (!_validateTermsAgreement()) {
+      return;
+    }
     setState(() {
       _formError = null;
       _isLoading = true;
@@ -559,6 +598,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             requirements: _confirmPasswordRequirements,
                             value: _rawConfirmPassword,
                           ),
+                          const SizedBox(height: 20),
+                          _buildTermsAgreementSection(context, colorScheme, loc),
                           const SizedBox(height: 24),
                           SizedBox(
                             width: double.infinity,
@@ -628,6 +669,111 @@ class _SignupScreenState extends State<SignupScreen> {
           },
         ),
       );
+  }
+
+  /// Terms & Conditions agreement row: checkbox + "I agree to the Terms
+  /// and Conditions" text, where "Terms and Conditions" is a tappable
+  /// link that opens the full text in a modal (see
+  /// terms_and_conditions_dialog.dart). Shows an inline error if the user
+  /// tries to submit without checking it.
+  Widget _buildTermsAgreementSection(
+      BuildContext context, ColorScheme colorScheme, AppLocalizations loc) {
+    final hasError = _termsError != null;
+    return Semantics(
+      hint: hasError ? 'Error: $_termsError' : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: _agreedToTerms,
+                  activeColor: colorScheme.primary,
+                  // Shrink the tap target itself (rather than clipping it
+                  // via the surrounding SizedBox) so the checkbox lays
+                  // out cleanly at this size instead of being squeezed.
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                  side: BorderSide(
+                    color: hasError ? colorScheme.error : colorScheme.outlineVariant,
+                  ),
+                  onChanged: (value) {
+                    HapticService().vibrate();
+                    setState(() {
+                      _agreedToTerms = value ?? false;
+                      if (_agreedToTerms) _termsError = null;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                // No outer GestureDetector here on purpose: nesting one
+                // around a RichText that also has its own per-span
+                // TapGestureRecognizer creates two competing recognizers
+                // in the same gesture arena, which makes taps on the link
+                // unreliable. Each span gets its own recognizer instead.
+                child: RichText(
+                  text: TextSpan(
+                    style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+                    children: [
+                      TextSpan(
+                        text: loc.agreeToTermsPrefix,
+                        recognizer: _termsPrefixRecognizer
+                          ..onTap = () {
+                            HapticService().vibrate();
+                            setState(() {
+                              _agreedToTerms = !_agreedToTerms;
+                              if (_agreedToTerms) _termsError = null;
+                            });
+                          },
+                      ),
+                      TextSpan(
+                        text: loc.termsConditions,
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.underline,
+                        ),
+                        recognizer: _termsLinkRecognizer
+                          ..onTap = () {
+                            HapticService().vibrate();
+                            FocusScope.of(context).unfocus();
+                            showTermsAndConditionsDialog(context);
+                          },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (hasError) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 32),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.error_outline, size: 14, color: colorScheme.error),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      _termsError!,
+                      style: TextStyle(fontSize: 12, color: colorScheme.error),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildFormErrorBanner(BuildContext context, String message) {

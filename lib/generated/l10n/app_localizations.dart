@@ -620,6 +620,36 @@ abstract class AppLocalizations {
   /// **'Terms & Conditions'**
   String get termsConditions;
 
+  /// No description provided for @agreeToTermsPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'I agree to the '**
+  String get agreeToTermsPrefix;
+
+  /// No description provided for @termsConditionsRequiredError.
+  ///
+  /// In en, this message translates to:
+  /// **'You must agree to the Terms and Conditions to continue.'**
+  String get termsConditionsRequiredError;
+
+  /// No description provided for @closeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get closeButton;
+
+  /// No description provided for @onboardingDobError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please select your date of birth.'**
+  String get onboardingDobError;
+
+  /// No description provided for @onboardingNameAndDobError.
+  ///
+  /// In en, this message translates to:
+  /// **'Please enter your name and select your date of birth.'**
+  String get onboardingNameAndDobError;
+
   /// No description provided for @userGuide.
   ///
   /// In en, this message translates to:
