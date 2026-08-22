@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'haptic_service.dart';
 import 'package:intl/intl.dart';
+import '../core/utils/health_data_crypto.dart';
 
 /// Outcome of a [AuthService.deleteAccount] attempt.
 ///
@@ -674,10 +675,17 @@ class AuthService {
     try {
       final userDoc = await _firebaseDb.collection('users').doc(uid).get();
 
+      // Encrypt conditions/allergens before they ever reach Firestore --
+      // these are the two fields that qualify as "sensitive personal
+      // information" under RA 10173 (Sec. 3(l)). See
+      // core/utils/health_data_crypto.dart for the encryption scheme and
+      // its disclosed threat-model limitations. Every other field here
+      // (name, dateOfBirth, onboardingComplete) is unaffected and stays
+      // plaintext.
       final data = <String, dynamic>{
         'uid': uid,
-        'conditions': conditions,
-        'allergens': allergens,
+        'conditions': HealthDataCrypto.encryptField(conditions),
+        'allergens': HealthDataCrypto.encryptField(allergens),
         'onboardingComplete': true,
       };
 

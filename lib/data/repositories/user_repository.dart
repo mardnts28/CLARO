@@ -6,6 +6,7 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../core/utils/health_data_crypto.dart';
 import '../models/health_profile.dart';
 import 'firestore_label_mappings.dart';
 import 'mock_data/mock_users.dart';
@@ -59,15 +60,26 @@ class FirebaseUserRepository implements UserRepository {
     }
     final data = snapshot.data()!;
 
+    // 'conditions'/'allergens' are stored encrypted (see
+    // core/utils/health_data_crypto.dart). Decrypt back into the same
+    // List<String> of English/Tagalog labels mapConditionLabels() and
+    // mapAllergenLabels() already expected -- this is the ONLY place
+    // decryption needs to happen for the advisory/ranking/comparison
+    // pipeline, since everything downstream of this repository already
+    // consumes the resulting UserHealthProfile, never raw Firestore
+    // fields directly.
+    final decryptedConditions = HealthDataCrypto.decryptField(
+      data['conditions'] as String?,
+    );
+    final decryptedAllergens = HealthDataCrypto.decryptField(
+      data['allergens'] as String?,
+    );
+
     return UserHealthProfile(
       userId: userId,
       displayName: data['name'] as String? ?? '',
-      conditions: mapConditionLabels(
-        data['conditions'] as List<dynamic>? ?? const [],
-      ),
-      allergies: mapAllergenLabels(
-        data['allergens'] as List<dynamic>? ?? const [],
-      ),
+      conditions: mapConditionLabels(decryptedConditions),
+      allergies: mapAllergenLabels(decryptedAllergens),
       voiceAssistant: data['voiceAssistant'] as bool? ?? false,
     );
   }

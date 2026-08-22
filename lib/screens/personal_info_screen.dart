@@ -3,6 +3,7 @@ import '../widgets/custom_text_field.dart';
 import '../core/utils/sanitizing_text_input_formatter.dart';
 import '../core/utils/success_feedback_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/utils/health_data_crypto.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
@@ -154,7 +155,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             _age = null;
           }
 
-          final conditionsList = data['conditions'] as List<dynamic>? ?? [];
+          // 'conditions'/'allergens' are stored encrypted (see
+          // core/utils/health_data_crypto.dart) -- this screen reads the
+          // raw Firestore doc directly rather than going through
+          // FirebaseUserRepository, so it has to decrypt here itself
+          // before the .contains() pre-checks below can work.
+          final conditionsList = HealthDataCrypto.decryptField(
+            data['conditions'] as String?,
+          );
           _conditions = {
             'Diabetes': conditionsList.contains('Diabetes') || conditionsList.contains('Diabetes'),
             'Hypertension': conditionsList.contains('Hypertension') || conditionsList.contains('Alta-presyon'),
@@ -163,7 +171,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             'None': conditionsList.contains('None') || conditionsList.contains('Wala'),
           };
 
-          final allergensList = data['allergens'] as List<dynamic>? ?? [];
+          final allergensList = HealthDataCrypto.decryptField(
+            data['allergens'] as String?,
+          );
           _allergens = {
             'Fish': allergensList.contains('Fish') || allergensList.contains('Isda'),
             'Milk/Dairy': allergensList.contains('Milk/Dairy') || allergensList.contains('Gatas'),
@@ -278,7 +288,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       if (uid != null) {
         // Always save English versions to Firestore for consistency
         final selectedConditions = _conditions.entries.where((e) => e.value).map((e) => e.key).toList();
-        final ok = await _authService.updateUserData({'conditions': selectedConditions});
+        // Encrypted before it ever leaves the device -- see
+        // core/utils/health_data_crypto.dart.
+        final ok = await _authService.updateUserData({
+          'conditions': HealthDataCrypto.encryptField(selectedConditions),
+        });
         if (ok) {
           if (selectedConditions.contains('Low vision')) {
             await VoiceAssistantService.instance.updateEnabled(true);
@@ -297,7 +311,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       if (uid != null) {
         // Always save English versions to Firestore for consistency
         final selectedAllergens = _allergens.entries.where((e) => e.value).map((e) => e.key).toList();
-        final ok = await _authService.updateUserData({'allergens': selectedAllergens});
+        // Encrypted before it ever leaves the device -- see
+        // core/utils/health_data_crypto.dart.
+        final ok = await _authService.updateUserData({
+          'allergens': HealthDataCrypto.encryptField(selectedAllergens),
+        });
         if (ok) await _loadUserData();
       }
     } catch (e) {
