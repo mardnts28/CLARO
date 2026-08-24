@@ -212,8 +212,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     
     // Auto-dismiss after 6 seconds
     Future.delayed(const Duration(seconds: 6), () {
-      if (_toastOverlay != null) {
-        _toastOverlay!.remove();
+      if (mounted && _toastOverlay != null) {
+        _toastOverlay?.remove();
         _toastOverlay = null;
       }
     });
@@ -222,7 +222,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   @override
   void dispose() {
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
-    _toastOverlay?.remove();
+    if (_toastOverlay != null) {
+      _toastOverlay?.remove();
+      _toastOverlay = null;
+    }
     super.dispose();
   }
 

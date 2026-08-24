@@ -69,10 +69,10 @@ class FirebaseUserRepository implements UserRepository {
     // consumes the resulting UserHealthProfile, never raw Firestore
     // fields directly.
     final decryptedConditions = HealthDataCrypto.decryptField(
-      data['conditions'] as String?,
+      data['conditions'],
     );
     final decryptedAllergens = HealthDataCrypto.decryptField(
-      data['allergens'] as String?,
+      data['allergens'],
     );
 
     return UserHealthProfile(

@@ -161,7 +161,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           // FirebaseUserRepository, so it has to decrypt here itself
           // before the .contains() pre-checks below can work.
           final conditionsList = HealthDataCrypto.decryptField(
-            data['conditions'] as String?,
+            data['conditions'],
           );
           _conditions = {
             'Diabetes': conditionsList.contains('Diabetes') || conditionsList.contains('Diabetes'),
@@ -172,7 +172,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           };
 
           final allergensList = HealthDataCrypto.decryptField(
-            data['allergens'] as String?,
+            data['allergens'],
           );
           _allergens = {
             'Fish': allergensList.contains('Fish') || allergensList.contains('Isda'),

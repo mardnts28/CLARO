@@ -95,13 +95,14 @@ class HealthDataCrypto {
   /// Reverses [encryptField]. Returns `[]` for a null/empty stored value
   /// (matches "no conditions/allergens selected").
   ///
-  /// Fails safe: if the stored value can't be decrypted (wrong/rotated
-  /// key, corrupted data, or -- during migration -- a legacy plaintext
-  /// array left over from before this feature shipped) this returns an
-  /// empty list and logs via debugPrint, rather than throwing and
-  /// crashing the advisory/ranking pipeline that depends on this data.
-  static List<String> decryptField(String? stored) {
-    if (stored == null || stored.isEmpty) return [];
+  /// Handles both encrypted Base64 String payloads and unencrypted legacy List<dynamic>
+  /// arrays gracefully, ensuring backward compatibility without runtime type-cast crashes.
+  static List<String> decryptField(dynamic stored) {
+    if (stored == null) return [];
+    if (stored is List) {
+      return stored.map((e) => e.toString()).toList();
+    }
+    if (stored is! String || stored.isEmpty) return [];
 
     try {
       final key = _currentUserKey();
