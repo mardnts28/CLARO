@@ -74,6 +74,15 @@ class UserHealthProfile {
   bool get hasHeartCondition => conditions.contains(HealthCondition.heartCondition);
   bool get hasAnyAllergy => allergies.isNotEmpty;
 
+  /// Unique deterministic fingerprint representing the user's current health state.
+  /// Any change in conditions or allergies alters this string, automatically
+  /// invalidating cached AI advisories that depended on the previous state.
+  String get profileFingerprint {
+    final sortedConditions = conditions.map((c) => c.name).toList()..sort();
+    final sortedAllergies = allergies.map((a) => a.name).toList()..sort();
+    return '${userId}_c[${sortedConditions.join(",")}]_a[${sortedAllergies.join(",")}]';
+  }
+
   factory UserHealthProfile.fromJson(Map<String, dynamic> json) {
     return UserHealthProfile(
       userId: json['userId'] as String,

@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/health_advisory.dart';
 import '../models/health_profile.dart';
@@ -31,8 +32,13 @@ class GeminiAdvisoryService {
 
   final Map<String, HealthAdvisory> _cache = {};
 
-  String _cacheKey(String scanEventId, String productId, bool isComparison) =>
-      '$scanEventId::$productId${isComparison ? '::cmp' : ''}';
+  String _persistentCacheKey({
+    required String fingerprint,
+    required String productId,
+    required String languageCode,
+    required bool isComparison,
+  }) =>
+      'advisory_cache_${fingerprint}_${productId}_${languageCode}${isComparison ? '_cmp' : ''}';
 
   Future<HealthAdvisory> generateAdvisory({
     required String scanEventId,
@@ -43,9 +49,31 @@ class GeminiAdvisoryService {
     String languageCode = 'en',
   }) async {
     final isComparison = comparisonFact != null;
-    final key = _cacheKey(scanEventId, evaluation.product.id, isComparison);
-    final cached = _cache[key];
-    if (cached != null) return cached;
+    final pKey = _persistentCacheKey(
+      fingerprint: user.profileFingerprint,
+      productId: evaluation.product.id,
+      languageCode: languageCode,
+      isComparison: isComparison,
+    );
+
+    // 1. Check in-memory RAM cache for instantaneous response
+    final cachedInMemory = _cache[pKey];
+    if (cachedInMemory != null) return cachedInMemory;
+
+    // 2. Check persistent disk cache (survives app restarts and rescans across weeks)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedJsonStr = prefs.getString(pKey);
+      if (cachedJsonStr != null && cachedJsonStr.isNotEmpty) {
+        final decoded = jsonDecode(cachedJsonStr) as Map<String, dynamic>;
+        final advisory = HealthAdvisory.fromJson(decoded);
+        _cache[pKey] = advisory;
+        return advisory;
+      }
+    } catch (e) {
+      // Non-fatal: continue to generate or fallback if cache read fails
+      print('Persistent advisory cache read warning: $e');
+    }
 
     // Skip the API entirely when nothing is flagged and this isn't a
     // comparison call -- the fallback template covers "suitable" just as
@@ -58,7 +86,8 @@ class GeminiAdvisoryService {
         reason: FallbackReason.notNeeded,
         languageCode: languageCode,
       );
-      _cache[key] = advisory;
+      _cache[pKey] = advisory;
+      _persistAdvisory(pKey, advisory);
       return advisory;
     }
 
@@ -94,8 +123,17 @@ class GeminiAdvisoryService {
       );
     }
 
-    _cache[key] = advisory;
+    _cache[pKey] = advisory;
+    _persistAdvisory(pKey, advisory);
     return advisory;
+  }
+
+  void _persistAdvisory(String key, HealthAdvisory advisory) {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString(key, jsonEncode(advisory.toJson()));
+    }).catchError((e) {
+      print('Failed to persist advisory to cache: $e');
+    });
   }
 
   HealthAdvisory _parseResponse(String? text, ProductEvaluation evaluation, String languageCode) {

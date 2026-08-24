@@ -28,4 +28,34 @@ class HealthAdvisory {
   });
 
   bool get isFallback => source == AdvisorySource.fallbackRuleBased;
+
+  Map<String, dynamic> toJson() => {
+        'overallLevel': overallLevel.name,
+        'warningText': warningText,
+        'explanation': explanation,
+        'safeServingSize': safeServingSize,
+        'comparisonExplanation': comparisonExplanation,
+        'source': source.name,
+        'generatedAt': generatedAt.toIso8601String(),
+      };
+
+  factory HealthAdvisory.fromJson(Map<String, dynamic> json) {
+    return HealthAdvisory(
+      overallLevel: AdvisoryLevel.values.firstWhere(
+        (e) => e.name == json['overallLevel'],
+        orElse: () => AdvisoryLevel.caution,
+      ),
+      warningText: json['warningText'] as String? ?? '',
+      explanation: json['explanation'] as String? ?? '',
+      safeServingSize: json['safeServingSize'] as String?,
+      comparisonExplanation: json['comparisonExplanation'] as String?,
+      source: AdvisorySource.values.firstWhere(
+        (e) => e.name == json['source'],
+        orElse: () => AdvisorySource.aiGenerated,
+      ),
+      generatedAt: json['generatedAt'] != null
+          ? DateTime.tryParse(json['generatedAt'] as String) ?? DateTime.now()
+          : DateTime.now(),
+    );
+  }
 }
