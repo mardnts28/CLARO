@@ -10,6 +10,7 @@ import '../screens/suggestion_screen.dart';
 import '../screens/change_password_screen.dart';
 import '../screens/theme_screen.dart';
 import '../screens/review_history_screen.dart';
+import '../screens/compare_products_screen.dart';
 
 // Placeholder URL - replace with actual CLARO website URL when available
 const String claroWebsiteUrl = 'https://example.com/about-claro';
@@ -106,6 +107,16 @@ class VoiceCommandRouter {
       return;
     }
 
+    if (target == 'compare_products' &&
+        VoiceAssistantService.latestScanProductNotifier.value == null) {
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Walang produktong maihahambing. Mag-scan muna ng produkto.'
+            : 'No product available to compare. Please scan a product first.',
+      );
+      return;
+    }
+
     if (_tabPageKeys.containsKey(target)) {
       HomeTabController.switchToTab(_tabPageKeys[target]!);
       await VoiceAssistantService.instance.speak(
@@ -162,6 +173,18 @@ class VoiceCommandRouter {
       case 'review_history':
         await Navigator.push(context, MaterialPageRoute(builder: (_) => const ReviewHistoryScreen()));
         return true;
+      case 'compare_products':
+        final currentProduct = VoiceAssistantService.latestScanProductNotifier.value;
+        if (currentProduct == null) return false;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CompareProductsScreen(
+              sourceProduct: currentProduct,
+            ),
+          ),
+        );
+        return true;
       default:
         return false;
     }
@@ -169,6 +192,10 @@ class VoiceCommandRouter {
 
   String? _targetFromTranscript(String transcript) {
     final normalized = transcript.toLowerCase().replaceAll(RegExp(r'[^a-z ]'), ' ');
+    if (RegExp(r'\b(compare|comparison|comparisons|compare products|compare product|ihambing|paghambingin|pagkumparahin|ikumpera|ikumpra)\b')
+        .hasMatch(normalized)) {
+      return 'compare_products';
+    }
     if (RegExp(r'\b(personal information|personal info|my information|account information)\b')
         .hasMatch(normalized)) {
       return 'personal_info';
@@ -206,6 +233,10 @@ class VoiceCommandRouter {
       'personal_information': 'personal_info',
       'personal_info_page': 'personal_info',
       'my_information': 'personal_info',
+      'compare': 'compare_products',
+      'comparison': 'compare_products',
+      'compare_product': 'compare_products',
+      'product_comparison': 'compare_products',
     };
     return aliases[normalized] ?? normalized;
   }
@@ -217,6 +248,7 @@ class VoiceCommandRouter {
       'scan' => localeKey == 'fil' ? 'scanner' : 'scanner',
       'history' => localeKey == 'fil' ? 'history' : 'history',
       'profile' => localeKey == 'fil' ? 'profile' : 'profile',
+      'compare_products' => localeKey == 'fil' ? 'paghahambing ng produkto' : 'product comparison',
       _ => target.replaceAll('_', ' '),
     };
     if (localeKey == 'fil') {
