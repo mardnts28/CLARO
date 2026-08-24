@@ -4,6 +4,7 @@ import '../models/product_model.dart';
 import '../services/auth_service.dart';
 import '../services/voice_assistant_service.dart';
 import 'product_detail_screen.dart';
+import 'camera_scanner_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_mic_overlay.dart';
 import '../data/models/ranked_product_result.dart';
@@ -11,8 +12,10 @@ import '../data/models/health_profile.dart';
 import '../core/utils/nutrition_availability.dart';
 import '../data/services/backend_locator.dart';
 import '../widgets/ranked_product_card.dart';
+import '../widgets/selectable_scanned_product_card.dart';
 import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
+import '../core/utils/success_feedback_utils.dart';
 
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
@@ -47,6 +50,11 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   // narrowed to that single condition.
   HealthCondition? _selectedCondition;
 
+  // Comparison products set that can be extended via "Add Product" button
+  // (mirrors CompareProductsScreen._comparisonProducts). Starts as a copy
+  // of widget.detectedProducts and grows as new products are added.
+  List<Product> _comparisonProducts = [];
+
   @override
   void initState() {
     super.initState();
@@ -56,6 +64,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
       VoiceAssistantService.instance.announcePage('multi_scan_results');
     }
+    _comparisonProducts = List.from(widget.detectedProducts);
     _rankProducts();
   }
 
@@ -95,7 +104,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
           : await BackendLocator.userRepository.getHealthProfile(uid);
 
       final ranked = BackendLocator.productRankingService.rankProducts(
-        products: widget.detectedProducts,
+        products: _comparisonProducts,
         user: profile,
       );
 
@@ -131,7 +140,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
           );
 
     final reRanked = BackendLocator.productRankingService.rankProducts(
-      products: widget.detectedProducts,
+      products: _comparisonProducts,
       user: effectiveProfile,
     );
 
@@ -210,6 +219,261 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// Launches the existing scanning flow (CameraScannerScreen, YOLO
+  /// recognition + catalog lookup) in "return results" mode so this
+  /// screen gets the recognized product(s) back directly instead of
+  /// navigating away to ProductDetailScreen / MultiScanResultsScreen.
+  Future<void> _openAddProductFlow() async {
+    HapticService().vibrate();
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CameraScannerScreen(returnResultsOnDetect: true),
+      ),
+    );
+
+    if (!mounted || result is! Map) return;
+
+    final recognized = result['products'];
+    if (recognized is! List) return;
+
+    final products = recognized.whereType<Product>().toList();
+    if (products.isEmpty) {
+      final loc = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(loc.noNewProductsDetected)),
+      );
+      return;
+    }
+
+    _showAddProductSheet(products);
+  }
+
+  /// Bottom sheet for picking which recognized product(s) to add. Visual
+  /// styling mirrors PersonalInfoScreen's Allergen Selector (Container
+  /// with a top-rounded 20px sheet, cardColor background, 20px padding),
+  /// and each row reuses HistoryScreen's product-card layout via
+  /// SelectableScannedProductCard (image + name only, no timestamp).
+  void _showAddProductSheet(List<Product> recognizedProducts) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+
+    // De-dupe the scan results themselves (recognition can report the
+    // same product more than once) before checking against the
+    // already-ranked set.
+    final Map<String, Product> distinctById = {
+      for (final p in recognizedProducts) p.id: p,
+    };
+    final products = distinctById.values.toList();
+
+    final existingIds = _comparisonProducts.map((p) => p.id).toSet();
+    final Set<String> selectedIds = {};
+    final bool anySelectable = products.any((p) => !existingIds.contains(p.id));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            final hasSelection = selectedIds.isNotEmpty;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+              ),
+              child: Container(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(sheetContext).size.height * 0.85,
+                ),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.cardColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        loc.selectProductsToAddTitle,
+                        style: GoogleFonts.outfit(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      if (!anySelectable)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Text(
+                            loc.noNewProductsDetected,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: products.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, i) {
+                            final product = products[i];
+                            final alreadyRanked = existingIds.contains(product.id);
+                            return SelectableScannedProductCard(
+                              product: product,
+                              selected: selectedIds.contains(product.id),
+                              alreadyRanked: alreadyRanked,
+                              onTap: () {
+                                HapticService().vibrate();
+                                setSheetState(() {
+                                  if (selectedIds.contains(product.id)) {
+                                    selectedIds.remove(product.id);
+                                  } else {
+                                    selectedIds.add(product.id);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
+                            disabledBackgroundColor:
+                                colorScheme.primary.withOpacity(0.3),
+                            disabledForegroundColor:
+                                colorScheme.onPrimary.withOpacity(0.7),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          // Disabled (per spec) until at least one product
+                          // is selected -- selecting/deselecting a card
+                          // toggles this via setSheetState above.
+                          onPressed: hasSelection
+                              ? () {
+                                  final selectedProducts = products
+                                      .where((p) => selectedIds.contains(p.id))
+                                      .toList();
+                                  Navigator.pop(sheetContext);
+                                  _addProductsToRanking(selectedProducts);
+                                }
+                              : null,
+                          child: Text(
+                            loc.apply,
+                            style: GoogleFonts.outfit(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Folds newly-selected product(s) into the SAME ranking/comparison
+  /// set this screen already manages -- not a separate ranking. Reuses
+  /// the exact re-ranking pipeline _selectConditionFilter/rankProducts already
+  /// runs on filter changes, so the newly added products are compared
+  /// against the existing ones (and vice versa) exactly as if they'd
+  /// been part of the initial comparison. Previously-ranked products are
+  /// kept; duplicates (already in _comparisonProducts) are skipped.
+  void _addProductsToRanking(List<Product> newProducts) {
+    final profile = _profile;
+    if (profile == null) return;
+
+    final existingIds = _comparisonProducts.map((p) => p.id).toSet();
+    final toAdd = <Product>[];
+    for (final p in newProducts) {
+      if (existingIds.contains(p.id)) continue; // duplicate guard
+      if (toAdd.any((q) => q.id == p.id)) continue; // dupes within selection
+      toAdd.add(p);
+    }
+
+    if (toAdd.isEmpty) return;
+
+    _comparisonProducts = [..._comparisonProducts, ...toAdd];
+
+    // Re-rank the combined set through the same pipeline used for every
+    // other re-rank on this screen, preserving whatever condition filter
+    // is currently active.
+    _selectConditionFilter(_selectedCondition);
+
+    if (!mounted) return;
+    final loc = AppLocalizations.of(context)!;
+    SuccessFeedbackUtils.showSuccessSnackBar(
+      context,
+      loc.productsAddedToRanking(toAdd.length),
+    );
+  }
+
+  /// "Add Product" row -- lets the user scan another product (reusing
+  /// CameraScannerScreen's existing recognition flow) and fold the
+  /// result(s) into this SAME ranking via _addProductsToRanking, rather
+  /// than starting a separate ranking/comparison elsewhere.
+  Widget _buildAddProductButton() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+
+    return GestureDetector(
+      onTap: _openAddProductFlow,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: colorScheme.primary.withOpacity(0.4),
+            style: BorderStyle.solid,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_circle_outline, size: 18, color: colorScheme.primary),
+            const SizedBox(width: 6),
+            Text(
+              loc.addProductButton,
+              style: GoogleFonts.outfit(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -365,10 +629,14 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         ),
                       )
                     : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-                    itemCount: _ranked.length,
+                    padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + MediaQuery.of(context).padding.bottom + 24),
+                    itemCount: _ranked.length + 1,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (context, i) {
+                      if (i == _ranked.length) {
+                        return _buildAddProductButton();
+                      }
+
                       final ranked = _ranked[i];
                       return RankedProductCard(
                         ranked: ranked,

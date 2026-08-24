@@ -32,7 +32,6 @@
 
 import 'dart:convert';
 import 'dart:typed_data';
-
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:encrypt/encrypt.dart' as enc;
 import 'package:firebase_auth/firebase_auth.dart';
