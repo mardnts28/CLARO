@@ -129,6 +129,9 @@ By using CLARO, you acknowledge that you have read and understood this Privacy P
             <p className="doc-section-text">
               Because health-related information may be sensitive, CLARO applies access controls and security measures intended to prevent unauthorized access.
             </p>
+            <p className="doc-section-text">
+              In addition to standard infrastructure protections, your health conditions and food allergies are individually encrypted before being stored, providing an added layer of protection for this specific data.
+            </p>
           </div>
 
           <div className="doc-section">
@@ -148,6 +151,7 @@ By using CLARO, you acknowledge that you have read and understood this Privacy P
               <li>Access restrictions for user-owned data</li>
               <li>Encryption of data in transit through HTTPS/TLS</li>
               <li>Encryption of data at rest provided by the underlying Firebase infrastructure</li>
+              <li>Additional field-level encryption applied specifically to health conditions and food allergies stored in your profile</li>
               <li>Controlled administrator access</li>
               <li>Security and audit logging for administrative activities</li>
             </ul>
