@@ -19,6 +19,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/otp_verification_screen.dart';
 import 'screens/select_language_screen.dart';
 import 'screens/get_started_screen.dart';
+import 'data/services/backend_locator.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -322,6 +323,9 @@ class AuthGate extends StatelessWidget {
                         if (VoiceAssistantService.isEnabledNotifier.value != voicePref) {
                           VoiceAssistantService.isEnabledNotifier.value = voicePref;
                         }
+
+                        // Warm user health profile cache asynchronously in the background
+                        BackendLocator.userRepository.getHealthProfile(user.uid).catchError((_) {});
                       });
 
                       final bool onboarded = data?['onboardingComplete'] ?? false;

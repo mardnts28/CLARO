@@ -1850,22 +1850,28 @@ abstract class AppLocalizations {
   /// **'See More'**
   String get seeMore;
 
+  /// No description provided for @scanGuideText.
+  ///
+  /// In en, this message translates to:
+  /// **'Point camera at product'**
+  String get scanGuideText;
+
   /// No description provided for @scanGuideTextPrefix.
   ///
   /// In en, this message translates to:
-  /// **'Please scan the '**
+  /// **'Point camera at '**
   String get scanGuideTextPrefix;
 
   /// No description provided for @scanGuideTextEmphasis.
   ///
   /// In en, this message translates to:
-  /// **'FRONT'**
+  /// **'product'**
   String get scanGuideTextEmphasis;
 
   /// No description provided for @scanGuideTextSuffix.
   ///
   /// In en, this message translates to:
-  /// **' packaging of the product'**
+  /// **''**
   String get scanGuideTextSuffix;
 
   /// No description provided for @productCapturedBadge.

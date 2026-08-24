@@ -349,9 +349,10 @@
   "noSearchMatchDesc": "Walang mga produktong tumutugma sa iyong paghahanap.",
   "seeMore": "Tingnan Pa",
 
-  "scanGuideTextPrefix": "Pakiscan ang ",
-  "scanGuideTextEmphasis": "HARAP",
-  "scanGuideTextSuffix": " na bahagi ng packaging ng produkto",
+  "scanGuideText": "Itapat ang camera sa produkto",
+  "scanGuideTextPrefix": "Itapat ang camera sa ",
+  "scanGuideTextEmphasis": "produkto",
+  "scanGuideTextSuffix": "",
   "productCapturedBadge": "Nakuha na ang Produkto!",
   "tapToScanHint": "I-tap kahit saan para i-scan",
   "productNotRecognizedTitle": "Hindi Kilalang Produkto",

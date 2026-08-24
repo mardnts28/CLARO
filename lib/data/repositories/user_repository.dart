@@ -1,10 +1,6 @@
-// lib/data/repositories/user_repository.dart
-//
-// Same interface-first pattern as ProductRepository. Your advisory logic
-// only depends on this abstraction, not on where the profile actually
-// comes from.
-
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/utils/health_data_crypto.dart';
 import '../models/health_profile.dart';
@@ -12,62 +8,87 @@ import 'firestore_label_mappings.dart';
 import 'mock_data/mock_users.dart';
 
 abstract class UserRepository {
-  Future<UserHealthProfile> getHealthProfile(String userId);
+  Future<UserHealthProfile> getHealthProfile(String userId, {bool forceRefresh = false});
+  void invalidateCache([String? userId]);
+  void updateCachedProfile(UserHealthProfile profile);
 }
 
 class MockUserRepository implements UserRepository {
   static const _simulatedDelay = Duration(milliseconds: 200);
+  final Map<String, UserHealthProfile> _memoryCache = {};
 
   @override
-  Future<UserHealthProfile> getHealthProfile(String userId) async {
+  Future<UserHealthProfile> getHealthProfile(String userId, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _memoryCache.containsKey(userId)) {
+      return _memoryCache[userId]!;
+    }
     await Future.delayed(_simulatedDelay);
     final match = mockUsersJson.firstWhere(
       (u) => u['userId'] == userId,
       orElse: () => throw Exception('User profile not found: $userId'),
     );
-    return UserHealthProfile.fromJson(match);
+    final profile = UserHealthProfile.fromJson(match);
+    _memoryCache[userId] = profile;
+    return profile;
+  }
+
+  @override
+  void invalidateCache([String? userId]) {
+    if (userId != null) {
+      _memoryCache.remove(userId);
+    } else {
+      _memoryCache.clear();
+    }
+  }
+
+  @override
+  void updateCachedProfile(UserHealthProfile profile) {
+    _memoryCache[profile.userId] = profile;
   }
 }
 
-// Reads from your groupmate's `users/{uid}` collection. The document ID is
-// expected to be the Firebase Auth uid (confirmed from the schema
-// screenshot -- the doc ID matches Auth's 28-char uid format).
-//
-// The user doc stores exactly: id (doc ID), name, health condition(s),
-// allergy(ies), and voiceAssistant -- no dietary restrictions field.
-//
-// Field-name/shape differences from UserHealthProfile.fromJson() are
-// translated here rather than in the model, so the model stays a clean
-// representation of what your logic layer expects, independent of how any
-// one data source happens to store it:
-//   - Firestore's `name`      -> our `displayName`
-//   - Firestore's `allergens` -> our `allergies`
-//   - Firestore's `conditions`/`allergens` are English/Tagalog display
-//     labels from the app's language toggle (e.g. "Alta-presyon" or
-//     "Hypertension" for the same underlying selection), translated via
-//     firestore_label_mappings.dart.
+// Reads from your groupmate's `users/{uid}` collection with local memory
+// and persistent storage caching so subsequent scans/screens load instantly.
 class FirebaseUserRepository implements UserRepository {
   FirebaseUserRepository({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
+  final Map<String, UserHealthProfile> _memoryCache = {};
+
+  static String _persistentCacheKey(String userId) =>
+      'user_health_profile_cache_$userId';
 
   @override
-  Future<UserHealthProfile> getHealthProfile(String userId) async {
+  Future<UserHealthProfile> getHealthProfile(String userId, {bool forceRefresh = false}) async {
+    // 1. Check in-memory cache first for instant (<1ms) response
+    if (!forceRefresh && _memoryCache.containsKey(userId)) {
+      return _memoryCache[userId]!;
+    }
+
+    // 2. Check persistent disk cache (survives app restarts and eliminates Firestore read)
+    if (!forceRefresh) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedJson = prefs.getString(_persistentCacheKey(userId));
+        if (cachedJson != null && cachedJson.isNotEmpty) {
+          final decoded = jsonDecode(cachedJson) as Map<String, dynamic>;
+          final profile = UserHealthProfile.fromJson(decoded);
+          _memoryCache[userId] = profile;
+          return profile;
+        }
+      } catch (e) {
+        // Non-fatal: fallback to Firestore if cache read fails
+      }
+    }
+
+    // 3. Remote fetch from Firestore
     final snapshot = await _firestore.collection('users').doc(userId).get();
     if (!snapshot.exists) {
       throw Exception('User profile not found: $userId');
     }
     final data = snapshot.data()!;
 
-    // 'conditions'/'allergens' are stored encrypted (see
-    // core/utils/health_data_crypto.dart). Decrypt back into the same
-    // List<String> of English/Tagalog labels mapConditionLabels() and
-    // mapAllergenLabels() already expected -- this is the ONLY place
-    // decryption needs to happen for the advisory/ranking/comparison
-    // pipeline, since everything downstream of this repository already
-    // consumes the resulting UserHealthProfile, never raw Firestore
-    // fields directly.
     final decryptedConditions = HealthDataCrypto.decryptField(
       data['conditions'],
     );
@@ -75,12 +96,42 @@ class FirebaseUserRepository implements UserRepository {
       data['allergens'],
     );
 
-    return UserHealthProfile(
+    final profile = UserHealthProfile(
       userId: userId,
       displayName: data['name'] as String? ?? '',
       conditions: mapConditionLabels(decryptedConditions),
       allergies: mapAllergenLabels(decryptedAllergens),
       voiceAssistant: data['voiceAssistant'] as bool? ?? false,
     );
+
+    _memoryCache[userId] = profile;
+    _persistProfile(userId, profile);
+    return profile;
+  }
+
+  @override
+  void invalidateCache([String? userId]) {
+    if (userId != null) {
+      _memoryCache.remove(userId);
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.remove(_persistentCacheKey(userId));
+      }).catchError((_) {});
+    } else {
+      _memoryCache.clear();
+    }
+  }
+
+  @override
+  void updateCachedProfile(UserHealthProfile profile) {
+    _memoryCache[profile.userId] = profile;
+    _persistProfile(profile.userId, profile);
+  }
+
+  void _persistProfile(String userId, UserHealthProfile profile) {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString(_persistentCacheKey(userId), jsonEncode(profile.toJson()));
+    }).catchError((e) {
+      // Non-fatal logging
+    });
   }
 }

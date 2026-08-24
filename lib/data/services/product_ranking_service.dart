@@ -135,6 +135,34 @@ class ProductRankingService {
     );
   }
 
+  /// Prefetches and caches the health advisory for [product] and [user] in the background
+  /// so that when the user transitions to the product detail screen,
+  /// the advisory is already generated and in memory/disk cache.
+  Future<void> prefetchAdvisory({
+    required Product product,
+    required UserHealthProfile user,
+    String languageCode = 'en',
+    String scanEventId = 'prefetch',
+  }) async {
+    try {
+      final ranked = rankProducts(
+        products: [product],
+        user: user,
+      );
+      if (ranked.isEmpty) return;
+      final target = ranked.first;
+
+      await _geminiService.generateAdvisory(
+        scanEventId: scanEventId,
+        evaluation: target.evaluation,
+        user: user,
+        languageCode: languageCode,
+      );
+    } catch (e) {
+      // Non-blocking prefetch
+    }
+  }
+
   Future<String> _generateRankingExplanation({
     required RankedProductResult target,
     required List<RankedProductResult> comparisonSet,

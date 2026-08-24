@@ -11,6 +11,7 @@ import '../services/image_validation_service.dart';
 import '../services/history_service.dart';
 import '../services/home_tab_controller.dart';
 import '../services/voice_assistant_service.dart';
+import '../services/auth_service.dart';
 import '../data/services/backend_locator.dart';
 import 'product_detail_screen.dart';
 import 'multi_scan_results_screen.dart';
@@ -101,6 +102,35 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   // Laser animation
   late AnimationController _laserController;
   late Animation<double> _laserAnimation;
+
+  // Background advisory prefetch cache tracking
+  final Set<String> _prefetchedLabels = {};
+
+  void _triggerAdvisoryPrefetch(List<DetectionResult> detections) {
+    final uid = AuthService().currentUser?.uid;
+    if (uid == null) return;
+
+    for (final det in detections) {
+      if (det.confidence >= 0.50 && !_prefetchedLabels.contains(det.label)) {
+        _prefetchedLabels.add(det.label);
+        unawaited(() async {
+          try {
+            final product = await BackendLocator.productRepository.getProductByYoloLabel(det.label);
+            final profile = await BackendLocator.userRepository.getHealthProfile(uid);
+            final languageCode = mounted ? Localizations.localeOf(context).languageCode : 'en';
+            await BackendLocator.productRankingService.prefetchAdvisory(
+              product: product,
+              user: profile,
+              languageCode: languageCode,
+            );
+            debugPrint('CameraScannerScreen: Background advisory prefetch completed for ${det.label}');
+          } catch (e) {
+            debugPrint('CameraScannerScreen: Advisory prefetch skipped for ${det.label}: $e');
+          }
+        }());
+      }
+    }
+  }
 
 
   @override
@@ -280,6 +310,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               _noProductStartTime = null;
               _productFirstDetectedTime ??= DateTime.now();
               _lastSeenTime = DateTime.now();
+              _triggerAdvisoryPrefetch(detections);
               
               final holdDurationMs = DateTime.now().difference(_productFirstDetectedTime!).inMilliseconds;
               if (holdDurationMs >= 1200) {
@@ -778,44 +809,23 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                   ),
                 ),
 
-                // ── Static Guide text: "Please scan the FRONT packaging..." ─
+                // ── Static Guide text: "Point camera at product" ────────────
                 // Positioned below the Close / Report / Flash buttons (which
                 // sit at topPadding+16, 40px tall, so their bottom edge is at
                 // topPadding+56) so it never overlaps or renders behind them.
-                // Split into 3 spans so the "FRONT"/"HARAP" word can be
-                // visually emphasized (bolder + brighter + letter-spaced)
-                // rather than relying on capitalization alone -- users
-                // scanning the back of the pack was a common mistake this
-                // is meant to head off.
                 Positioned(
                   top: topPadding + 66,
                   left: 24,
                   right: 24,
                   child: Center(
-                    child: Text.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: AppLocalizations.of(context)!.scanGuideTextPrefix,
-                          ),
-                          TextSpan(
-                            text: AppLocalizations.of(context)!.scanGuideTextEmphasis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.6,
-                            ),
-                          ),
-                          TextSpan(
-                            text: AppLocalizations.of(context)!.scanGuideTextSuffix,
-                          ),
-                        ],
-                      ),
+                    child: Text(
+                      AppLocalizations.of(context)!.scanGuideText,
                       textAlign: TextAlign.center,
                       style: GoogleFonts.inter(
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
                         shadows: const [
                           Shadow(
                             color: Colors.black54,

@@ -10,6 +10,7 @@ import '../services/locale_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
+import '../data/services/backend_locator.dart';
 import 'change_password_screen.dart';
 
 class PersonalInfoScreen extends StatefulWidget {
@@ -294,6 +295,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           'conditions': HealthDataCrypto.encryptField(selectedConditions),
         });
         if (ok) {
+          BackendLocator.userRepository.invalidateCache(uid);
           if (selectedConditions.contains('Low vision')) {
             await VoiceAssistantService.instance.updateEnabled(true);
           }
@@ -316,7 +318,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         final ok = await _authService.updateUserData({
           'allergens': HealthDataCrypto.encryptField(selectedAllergens),
         });
-        if (ok) await _loadUserData();
+        if (ok) {
+          BackendLocator.userRepository.invalidateCache(uid);
+          await _loadUserData();
+        }
       }
     } catch (e) {
       debugPrint('Error updating allergens: $e');

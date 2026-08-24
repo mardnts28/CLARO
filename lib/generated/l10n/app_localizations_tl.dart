@@ -948,13 +948,16 @@ class AppLocalizationsTl extends AppLocalizations {
   String get seeMore => 'Tingnan Pa';
 
   @override
-  String get scanGuideTextPrefix => 'Pakiscan ang ';
+  String get scanGuideText => 'Itapat ang camera sa produkto';
 
   @override
-  String get scanGuideTextEmphasis => 'HARAP';
+  String get scanGuideTextPrefix => 'Itapat ang camera sa ';
 
   @override
-  String get scanGuideTextSuffix => ' na bahagi ng packaging ng produkto';
+  String get scanGuideTextEmphasis => 'produkto';
+
+  @override
+  String get scanGuideTextSuffix => '';
 
   @override
   String get productCapturedBadge => 'Nakuha na ang Produkto!';
