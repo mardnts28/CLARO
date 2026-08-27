@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
@@ -197,14 +198,13 @@ class YoloRecognitionService {
           return [];
         }
 
-        // Copy raw Float32List byte view directly into C++ Tensor 0 pointer.
-        // This preserves Tensor 0's pre-allocated 4D shape descriptor [1, 3, 800, 800] (dims = 4)
-        // and prevents tflite_flutter from calling resizeInputTensor(0) or allocateTensors().
-        final inputTensor = _interpreter!.getInputTensor(0);
-        inputTensor.data = inputBuffer.buffer.asUint8List(
-          inputBuffer.offsetInBytes,
-          inputBuffer.lengthInBytes,
-        );
+        // Ensure tensors are allocated before copying data and running inference
+        if (!_interpreter!.isAllocated) {
+          _interpreter!.allocateTensors();
+        }
+
+        // Copy input data directly into Tensor 0 buffer to prevent "lacks data" / unallocated memory errors
+        _interpreter!.getInputTensor(0).copyFrom(inputBuffer);
 
         // Execute native C++ TFLite engine directly
         _isInferring = true;
@@ -338,11 +338,10 @@ class YoloRecognitionService {
       }
     }
 
-    final inputTensor = _interpreter!.getInputTensor(0);
-    inputTensor.data = flatInput.buffer.asUint8List(
-      flatInput.offsetInBytes,
-      flatInput.lengthInBytes,
-    );
+    if (!_interpreter!.isAllocated) {
+      _interpreter!.allocateTensors();
+    }
+    _interpreter!.getInputTensor(0).copyFrom(flatInput);
     _interpreter!.invoke();
 
     final int dim1 = _outputShape.length >= 2 ? _outputShape[1] : 61;
@@ -709,4 +708,20 @@ Map<String, dynamic> _preprocessFrameIsolate(Map<String, dynamic> args) {
     'padX': padX,
     'padY': padY,
   };
+}
+
+/// Extension on [Tensor] to provide safe, direct buffer copying without
+/// triggering dynamic resizing or leaving native memory uninitialized.
+extension TensorCopyExtension on Tensor {
+  /// Safely copies input data (Float32List, Uint8List, ByteBuffer, or Object)
+  /// into the allocated native C++ TFLite tensor buffer.
+  void copyFrom(Object input) {
+    if (input is Float32List) {
+      setTo(input.buffer.asUint8List(input.offsetInBytes, input.lengthInBytes));
+    } else if (input is ByteBuffer) {
+      setTo(input.asUint8List());
+    } else {
+      setTo(input);
+    }
+  }
 }
