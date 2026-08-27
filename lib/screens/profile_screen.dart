@@ -522,11 +522,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // The phrase the user must type is derived from their current
-    // username/name (e.g. "DELETE-john"), not a static "DELETE". Captured
-    // once when the dialog opens so it stays stable for the lifetime of
-    // the dialog even if _userName were to change underneath it.
-    final String requiredDeletePhrase = 'DELETE-$_userName';
+    // The phrase the user must type combines the last 5 characters of
+    // their Firebase UID with their current display name (e.g.
+    // "77Bh2-khae"), not a static "DELETE-<name>". Captured once when
+    // the dialog opens so it stays stable for the lifetime of the
+    // dialog even if _userName were to change underneath it.
+    //
+    // Falls back to the full uid if it's shorter than 5 characters
+    // (shouldn't happen with real Firebase UIDs, which are always 28
+    // characters, but guards against a malformed/test uid instead of
+    // throwing a RangeError on the substring below).
+    final String uid = _authService.currentUser?.uid ?? '';
+    final String uidSuffix = uid.length >= 5 ? uid.substring(uid.length - 5) : uid;
+    final String requiredDeletePhrase = '$uidSuffix-$_userName';
 
     showDialog(
       context: context,

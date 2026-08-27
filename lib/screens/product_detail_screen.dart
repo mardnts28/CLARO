@@ -1668,9 +1668,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               ),
             );
           }),
+          // Only show an allergen warning here if WhoCalculator.assessAllergens
+          // actually confirmed it via ingredient-text evidence for THIS
+          // product (_evaluation.allergenAssessment.matchedContains) --
+          // the exact same set the Health Advisory, Health Analysis, and
+          // Ingredients cards already use. Previously this trusted
+          // matrix.allergenRows' presence check alone, which only looks at
+          // the product's raw declared-allergen label (product.containsAllergens)
+          // with no ingredient evidence required -- so a product whose label
+          // lists an allergen the ingredient list doesn't actually support
+          // showed a warning here while every other card on the same screen
+          // correctly stayed silent about it.
           for (final row in matrix.allergenRows)
-            if (row.cells.any((c) =>
-                c.productId == productId && c.presence != AllergenPresence.none))
+            if ((_evaluation?.allergenAssessment.matchedContains.contains(row.allergen) ?? false) &&
+                row.cells.any((c) =>
+                    c.productId == productId && c.presence != AllergenPresence.none))
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(

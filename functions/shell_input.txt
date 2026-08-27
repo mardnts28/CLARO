@@ -1,3 +1,0 @@
-voiceIntent({ transcript: "take me to my history", language: "en" }, { auth: { uid: "test-user-123" } })
-voiceIntent({ transcript: "what is 2 plus 2", language: "en" }, { auth: { uid: "test-user-123" } })
-exit

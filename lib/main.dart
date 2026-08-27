@@ -33,6 +33,14 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  // TODO: remove before submission
+  FirebaseAuth.instance.authStateChanges().listen((user) async {
+    if (user != null) {
+      final idToken = await user.getIdToken();
+      print('DEBUG TOKEN: $idToken');
+    }
+  });
+
   final prefs = await SharedPreferences.getInstance();
   final packageInfo = await PackageInfo.fromPlatform();
   final currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';

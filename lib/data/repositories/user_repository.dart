@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../core/utils/health_data_crypto.dart';
 import '../models/health_profile.dart';
 import 'firestore_label_mappings.dart';
 import 'mock_data/mock_users.dart';
+
+const _workerUrl = 'https://health-data-worker.claro-app.workers.dev';
 
 abstract class UserRepository {
   Future<UserHealthProfile> getHealthProfile(String userId, {bool forceRefresh = false});
@@ -49,6 +52,9 @@ class MockUserRepository implements UserRepository {
 
 // Reads from your groupmate's `users/{uid}` collection with local memory
 // and persistent storage caching so subsequent scans/screens load instantly.
+// Health-sensitive fields (conditions, allergens) are decrypted server-side
+// by the Cloudflare Worker -- never decrypted on-device, never handled with
+// a client-held key.
 class FirebaseUserRepository implements UserRepository {
   FirebaseUserRepository({FirebaseFirestore? firestore})
       : _firestore = firestore ?? FirebaseFirestore.instance;
@@ -66,7 +72,8 @@ class FirebaseUserRepository implements UserRepository {
       return _memoryCache[userId]!;
     }
 
-    // 2. Check persistent disk cache (survives app restarts and eliminates Firestore read)
+    // 2. Check persistent disk cache (survives app restarts and eliminates
+    //    a network round trip to the Worker)
     if (!forceRefresh) {
       try {
         final prefs = await SharedPreferences.getInstance();
@@ -78,29 +85,38 @@ class FirebaseUserRepository implements UserRepository {
           return profile;
         }
       } catch (e) {
-        // Non-fatal: fallback to Firestore if cache read fails
+        // Non-fatal: fallback to remote fetch if cache read fails
       }
     }
 
-    // 3. Remote fetch from Firestore
+    // 3. Remote fetch: plain fields still come straight from Firestore,
+    //    but conditions/allergens go through the Cloudflare Worker, which
+    //    verifies the caller's Firebase ID token and decrypts server-side.
     final snapshot = await _firestore.collection('users').doc(userId).get();
     if (!snapshot.exists) {
       throw Exception('User profile not found: $userId');
     }
     final data = snapshot.data()!;
 
-    final decryptedConditions = HealthDataCrypto.decryptField(
-      data['conditions'],
+    final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (idToken == null) {
+      throw Exception('No authenticated user; cannot fetch health profile');
+    }
+
+    final res = await http.get(
+      Uri.parse('$_workerUrl/health-profile'),
+      headers: {'Authorization': 'Bearer $idToken'},
     );
-    final decryptedAllergens = HealthDataCrypto.decryptField(
-      data['allergens'],
-    );
+    if (res.statusCode != 200) {
+      throw Exception('Failed to fetch health profile: ${res.statusCode} ${res.body}');
+    }
+    final healthData = jsonDecode(res.body) as Map<String, dynamic>;
 
     final profile = UserHealthProfile(
       userId: userId,
       displayName: data['name'] as String? ?? '',
-      conditions: mapConditionLabels(decryptedConditions),
-      allergies: mapAllergenLabels(decryptedAllergens),
+      conditions: mapConditionLabels(List<String>.from(healthData['conditions'] ?? [])),
+      allergies: mapAllergenLabels(List<String>.from(healthData['allergens'] ?? [])),
       voiceAssistant: data['voiceAssistant'] as bool? ?? false,
     );
 

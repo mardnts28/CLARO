@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../widgets/custom_text_field.dart';
 import '../core/utils/sanitizing_text_input_formatter.dart';
 import '../core/utils/success_feedback_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../core/utils/health_data_crypto.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
@@ -13,6 +14,10 @@ import '../widgets/voice_assistant_fab.dart';
 import '../data/services/backend_locator.dart';
 import 'change_password_screen.dart';
 
+// Base URL for the Cloudflare Worker that performs server-side encryption
+// and decryption of health conditions/allergens. The key never lives on
+// the client -- see health-data-worker/ for the Worker implementation.
+const _workerUrl = 'https://health-data-worker.claro-app.workers.dev';
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
 
@@ -49,6 +54,61 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     return age;
   }
 
+  /// Fetches the current user's decrypted conditions/allergens from the
+  /// Cloudflare Worker. Returns null on failure (missing token, network
+  /// error, non-200 response) so callers can fail gracefully rather than
+  /// crash the whole screen load.
+  Future<Map<String, dynamic>?> _fetchHealthData() async {
+    try {
+      final idToken = await _authService.currentUser?.getIdToken();
+      if (idToken == null) return null;
+
+      final res = await http.get(
+        Uri.parse('$_workerUrl/health-profile'),
+        headers: {'Authorization': 'Bearer $idToken'},
+      );
+      if (res.statusCode != 200) {
+        debugPrint('Worker health-profile fetch failed: ${res.statusCode} ${res.body}');
+        return null;
+      }
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Error fetching health data from Worker: $e');
+      return null;
+    }
+  }
+
+  /// Sends updated conditions/allergens to the Cloudflare Worker, which
+  /// encrypts them server-side before writing to Firestore. Only the
+  /// field(s) provided are updated -- pass null to leave a field
+  /// unchanged.
+  Future<bool> _pushHealthData({List<String>? conditions, List<String>? allergens}) async {
+    try {
+      final idToken = await _authService.currentUser?.getIdToken();
+      if (idToken == null) return false;
+
+      final res = await http.post(
+        Uri.parse('$_workerUrl/health-profile'),
+        headers: {
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          if (conditions != null) 'conditions': conditions,
+          if (allergens != null) 'allergens': allergens,
+        }),
+      );
+      if (res.statusCode != 200) {
+        debugPrint('Worker health-profile update failed: ${res.statusCode} ${res.body}');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('Error pushing health data to Worker: $e');
+      return false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -74,8 +134,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   /// Loads the current user's profile (name, conditions,
-  /// allergens) from Firestore, retrying on transient permission-denied
-  /// errors.
+  /// allergens), retrying on transient permission-denied errors for the
+  /// Firestore-held plain fields.
   ///
   /// IMPORTANT: right after a password change, updatePassword() issues
   /// the user a fresh ID token. Firestore's security rules can take a
@@ -83,13 +143,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   /// after can throw permission-denied even though the user is fully
   /// authenticated and the document is intact — the exact same race
   /// AuthService already retries around in isSessionValid() and
-  /// _checkMfaEnabled(). Previously this method only tried the server
-  /// once, fell back to a single plain .get() on any error, and if that
-  /// SECOND read also hit the same propagation delay, the outer catch
-  /// swallowed it — leaving name/age/conditions/allergens silently
-  /// blank in the UI even though Firestore still had the data. This
-  /// version retries a few times before giving up, matching the
-  /// established pattern elsewhere in the app.
+  /// _checkMfaEnabled(). This method retries a few times before giving
+  /// up, matching the established pattern elsewhere in the app.
   Future<void> _loadUserData() async {
     final uid = _authService.currentUser?.uid;
     if (uid == null) {
@@ -135,6 +190,13 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       }
     }
 
+    // Conditions/allergens no longer live in this Firestore doc read at
+    // all -- they're encrypted at rest, so they're fetched separately
+    // through the Cloudflare Worker, which verifies this user's ID token
+    // and decrypts server-side. Fetched in parallel with the Firestore
+    // read finishing above since the two are independent.
+    final healthData = await _fetchHealthData();
+
     if (userDoc != null && userDoc.exists) {
       final data = userDoc.data() as Map<String, dynamic>?;
       if (data != null) {
@@ -156,14 +218,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             _age = null;
           }
 
-          // 'conditions'/'allergens' are stored encrypted (see
-          // core/utils/health_data_crypto.dart) -- this screen reads the
-          // raw Firestore doc directly rather than going through
-          // FirebaseUserRepository, so it has to decrypt here itself
-          // before the .contains() pre-checks below can work.
-          final conditionsList = HealthDataCrypto.decryptField(
-            data['conditions'],
-          );
+          final conditionsList = List<String>.from(healthData?['conditions'] ?? []);
           _conditions = {
             'Diabetes': conditionsList.contains('Diabetes') || conditionsList.contains('Diabetes'),
             'Hypertension': conditionsList.contains('Hypertension') || conditionsList.contains('Alta-presyon'),
@@ -172,9 +227,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             'None': conditionsList.contains('None') || conditionsList.contains('Wala'),
           };
 
-          final allergensList = HealthDataCrypto.decryptField(
-            data['allergens'],
-          );
+          final allergensList = List<String>.from(healthData?['allergens'] ?? []);
           _allergens = {
             'Fish': allergensList.contains('Fish') || allergensList.contains('Isda'),
             'Milk/Dairy': allergensList.contains('Milk/Dairy') || allergensList.contains('Gatas'),
@@ -200,8 +253,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   }
 
   /// Pull-to-refresh handler. Re-fetches the user's personal info,
-  /// conditions and allergens from Firestore (server-first) and gives a
-  /// short haptic tap for feedback while the refresh is in progress.
+  /// conditions and allergens (server-first) and gives a short haptic
+  /// tap for feedback while the refresh is in progress.
   Future<void> _onRefresh() async {
     HapticService().vibrate();
     await _loadUserData();
@@ -287,13 +340,11 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        // Always save English versions to Firestore for consistency
+        // Always save English versions for consistency. Encryption now
+        // happens server-side inside the Cloudflare Worker -- this
+        // client only ever handles plaintext in memory, never the key.
         final selectedConditions = _conditions.entries.where((e) => e.value).map((e) => e.key).toList();
-        // Encrypted before it ever leaves the device -- see
-        // core/utils/health_data_crypto.dart.
-        final ok = await _authService.updateUserData({
-          'conditions': HealthDataCrypto.encryptField(selectedConditions),
-        });
+        final ok = await _pushHealthData(conditions: selectedConditions);
         if (ok) {
           BackendLocator.userRepository.invalidateCache(uid);
           if (selectedConditions.contains('Low vision')) {
@@ -311,13 +362,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        // Always save English versions to Firestore for consistency
+        // Always save English versions for consistency. Encryption now
+        // happens server-side inside the Cloudflare Worker.
         final selectedAllergens = _allergens.entries.where((e) => e.value).map((e) => e.key).toList();
-        // Encrypted before it ever leaves the device -- see
-        // core/utils/health_data_crypto.dart.
-        final ok = await _authService.updateUserData({
-          'allergens': HealthDataCrypto.encryptField(selectedAllergens),
-        });
+        final ok = await _pushHealthData(allergens: selectedAllergens);
         if (ok) {
           BackendLocator.userRepository.invalidateCache(uid);
           await _loadUserData();

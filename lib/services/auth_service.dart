@@ -8,8 +8,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'haptic_service.dart';
 import 'package:intl/intl.dart';
-import '../core/utils/health_data_crypto.dart';
 
+// Base URL for the Cloudflare Worker that performs server-side encryption
+// and decryption of health conditions/allergens. The key never lives on
+// the client -- see health-data-worker/ for the Worker implementation.
+const _workerUrl = 'https://health-data-worker.claro-app.workers.dev';
 /// Outcome of a [AuthService.deleteAccount] attempt.
 ///
 ///  - [success]: both the Firestore doc and the Firebase Auth user are
@@ -126,6 +129,20 @@ class AuthService {
       }
       
       await _updateSessionId(uid);
+      
+      // TEMPORARY: Print Firebase ID token for API testing
+      try {
+        final user = _firebaseAuth.currentUser;
+        if (user != null) {
+          final idToken = await user.getIdToken(true);
+          debugPrint('=== FIREBASE ID TOKEN FOR API TESTING ===');
+          debugPrint(idToken);
+          debugPrint('=== END TOKEN ===');
+        }
+      } catch (e) {
+        debugPrint('Error getting ID token: $e');
+      }
+      
       return null;
     } on FirebaseAuthException catch (e) {
       debugPrint('Firebase Auth signup failed: ${e.code} - ${e.message}');
@@ -185,6 +202,20 @@ class AuthService {
       }
 
       await _updateSessionId(uid);
+      
+      // TEMPORARY: Print Firebase ID token for API testing
+      try {
+        final user = _firebaseAuth.currentUser;
+        if (user != null) {
+          final idToken = await user.getIdToken(true);
+          debugPrint('=== FIREBASE ID TOKEN FOR API TESTING ===');
+          debugPrint(idToken);
+          debugPrint('=== END TOKEN ===');
+        }
+      } catch (e) {
+        debugPrint('Error getting ID token: $e');
+      }
+      
       isAuthenticating.value = false;
       return null;
     } on FirebaseAuthException catch (e) {
@@ -244,6 +275,20 @@ class AuthService {
   Future<void> finishMfaLogin() async {
     final uid = _firebaseAuth.currentUser?.uid;
     if (uid != null) await _updateSessionId(uid);
+    
+    // TEMPORARY: Print Firebase ID token for API testing
+    try {
+      final user = _firebaseAuth.currentUser;
+      if (user != null) {
+        final idToken = await user.getIdToken(true);
+        debugPrint('=== FIREBASE ID TOKEN FOR API TESTING ===');
+        debugPrint(idToken);
+        debugPrint('=== END TOKEN ===');
+      }
+    } catch (e) {
+      debugPrint('Error getting ID token: $e');
+    }
+    
     pendingMfaChallenge.value = null;
     isAuthenticating.value = false;
   }
@@ -644,6 +689,20 @@ class AuthService {
       }
 
       await _updateSessionId(uid);
+      
+      // TEMPORARY: Print Firebase ID token for API testing
+      try {
+        final user = _firebaseAuth.currentUser;
+        if (user != null) {
+          final idToken = await user.getIdToken(true);
+          debugPrint('=== FIREBASE ID TOKEN FOR API TESTING ===');
+          debugPrint(idToken);
+          debugPrint('=== END TOKEN ===');
+        }
+      } catch (e) {
+        debugPrint('Error getting ID token: $e');
+      }
+      
       isAuthenticating.value = false;
       return null;
     } catch (e) {
@@ -652,6 +711,44 @@ class AuthService {
         return 'Google Sign-In Error (10): This usually means the SHA-1 fingerprint is missing or the package name is incorrect in the Firebase Console.';
       }
       return e.toString();
+    }
+  }
+
+  /// Sends [conditions]/[allergens] to the Cloudflare Worker for
+  /// server-side encryption. Returns true on success. This is the ONLY
+  /// path that writes those two fields anywhere -- Firestore Security
+  /// Rules reject direct client writes to them (see Phase 10 of the
+  /// migration guide), so this call is required, not optional, for
+  /// onboarding to actually persist a user's health data.
+  Future<bool> _pushHealthDataToWorker({
+    required List<String> conditions,
+    required List<String> allergens,
+  }) async {
+    try {
+      final idToken = await _firebaseAuth.currentUser?.getIdToken();
+      if (idToken == null) {
+        debugPrint('_pushHealthDataToWorker failed: no authenticated user / no ID token');
+        return false;
+      }
+      final res = await http.post(
+        Uri.parse('$_workerUrl/health-profile'),
+        headers: {
+          'Authorization': 'Bearer $idToken',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'conditions': conditions,
+          'allergens': allergens,
+        }),
+      );
+      if (res.statusCode != 200) {
+        debugPrint('_pushHealthDataToWorker failed: ${res.statusCode} ${res.body}');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      debugPrint('_pushHealthDataToWorker error: $e');
+      return false;
     }
   }
 
@@ -675,17 +772,16 @@ class AuthService {
     try {
       final userDoc = await _firebaseDb.collection('users').doc(uid).get();
 
-      // Encrypt conditions/allergens before they ever reach Firestore --
-      // these are the two fields that qualify as "sensitive personal
-      // information" under RA 10173 (Sec. 3(l)). See
-      // core/utils/health_data_crypto.dart for the encryption scheme and
-      // its disclosed threat-model limitations. Every other field here
-      // (name, dateOfBirth, onboardingComplete) is unaffected and stays
-      // plaintext.
+      // conditions/allergens are NOT included in this write. Firestore
+      // Security Rules now reject direct client writes to those two
+      // fields entirely (they qualify as "sensitive personal
+      // information" under RA 10173 Sec. 3(l)) -- they're sent to the
+      // Cloudflare Worker separately below, which encrypts them
+      // server-side before persisting. Every other field here (name,
+      // dateOfBirth, onboardingComplete) is unaffected and stays
+      // plaintext, written directly as before.
       final data = <String, dynamic>{
         'uid': uid,
-        'conditions': HealthDataCrypto.encryptField(conditions),
-        'allergens': HealthDataCrypto.encryptField(allergens),
         'onboardingComplete': true,
       };
 
@@ -708,8 +804,25 @@ class AuthService {
       }
 
       await _firebaseDb.collection('users').doc(uid).set(data, SetOptions(merge: true));
-      debugPrint('Onboarding data saved successfully for UID: $uid');
-      
+      debugPrint('Onboarding data (plain fields) saved successfully for UID: $uid');
+
+      // Now send conditions/allergens to the Worker for server-side
+      // encryption. This must succeed for onboarding to be considered
+      // complete from a data standpoint -- if it fails, the user's
+      // Firestore doc exists but has no encrypted health data yet, so
+      // this throws rather than silently continuing, letting the
+      // caller's error handling / retry UI take over.
+      final healthDataSaved = await _pushHealthDataToWorker(
+        conditions: conditions,
+        allergens: allergens,
+      );
+      if (!healthDataSaved) {
+        throw Exception(
+          'Failed to save health conditions and allergens. Please check your connection and try again.',
+        );
+      }
+      debugPrint('Onboarding health data (encrypted) saved successfully for UID: $uid');
+
       // Update the global name notifier so other screens can display the new name
       userNameNotifier.value = name;
     } on FirebaseException catch (e) {
@@ -733,6 +846,10 @@ class AuthService {
       }
 
       final data = userDoc.data();
+      // 'conditions'/'allergens' no longer live on this Firestore doc as
+      // plaintext-checkable keys the way they used to -- they're still
+      // present as encrypted strings, so containsKey(...) still works
+      // the same as before; this check doesn't need to change.
       final isComplete = data != null &&
           data.containsKey('name') &&
           data['name'] != null &&
@@ -948,6 +1065,12 @@ class AuthService {
   /// Safely updates the current user's document with [data]. This is the
   /// method profile/edit screens should call to change name/age — it has
   /// no "only set if missing" guard, unlike saveOnboardingData().
+  ///
+  /// NOTE: do NOT pass 'conditions' or 'allergens' in [data] -- Firestore
+  /// Security Rules reject direct client writes to those two fields (see
+  /// Phase 10 of the migration guide). Use AuthService's Worker-backed
+  /// path (or PersonalInfoScreen's _pushHealthData) for those instead.
+  ///
   /// Returns true on success, false on failure. Errors are logged via
   /// debugPrint; if edits still don't show up in Firestore, check your
   /// console output for a permission-denied error from your security rules.
