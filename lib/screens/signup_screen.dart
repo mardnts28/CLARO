@@ -8,6 +8,7 @@ import 'home_screen.dart';
 import 'otp_verification_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
+import '../services/home_tab_controller.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
 import '../widgets/terms_and_conditions_dialog.dart';
@@ -290,6 +291,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _routeAfterAuth() async {
     final onboarded = await _authService.hasCompletedOnboarding();
     if (!mounted) return;
+    HomeTabController.switchToTab(0);
     // Dismiss the keyboard/field focus before navigating away -- see
     // LoginScreen._routeAfterAuth for why this matters.
     FocusScope.of(context).unfocus();
@@ -386,6 +388,7 @@ class _SignupScreenState extends State<SignupScreen> {
       // users go straight to OnboardingScreen, which now opens on the
       // Basic Information page.
       FocusScope.of(context).unfocus();
+      HomeTabController.switchToTab(0);
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const OnboardingScreen()),
             (route) => false,

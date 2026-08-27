@@ -8,6 +8,7 @@ import 'home_screen.dart';
 import 'otp_verification_screen.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
+import '../services/home_tab_controller.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
 
@@ -113,6 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _routeAfterAuth() async {
     final onboarded = await _authService.hasCompletedOnboarding();
     if (!mounted) return;
+    HomeTabController.switchToTab(0);
     // Dismiss the keyboard/field focus before navigating away -- carrying
     // focus over to the next screen (which may not have a matching text
     // field under the cursor position) is what caused the

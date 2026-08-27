@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'haptic_service.dart';
+import 'home_tab_controller.dart';
 import 'package:intl/intl.dart';
 
 // Base URL for the Cloudflare Worker that performs server-side encryption
@@ -763,7 +764,7 @@ class AuthService {
     required List<String> conditions,
     required List<String> allergens,
   }) async {
-    final uid = _firebaseAuth.currentUser!.uid;
+    final uid = _firebaseAuth.currentUser?.uid;
     if (uid == null) {
       debugPrint('saveOnboardingData failed: no authenticated user');
       throw Exception('No authenticated user found');
@@ -881,6 +882,7 @@ class AuthService {
 
   Future<void> signOut() async {
     isAuthenticating.value = false;
+    HomeTabController.switchToTab(0);
     // Reset personalized feedback on logout
     HapticService().updateEnabled(false);
 

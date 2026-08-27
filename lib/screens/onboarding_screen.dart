@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
+import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
 import '../services/voice_assistant_service.dart';
@@ -215,6 +216,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         }
 
         if (!mounted) return;
+        HomeTabController.switchToTab(0);
         FocusScope.of(context).unfocus();
         Navigator.pushReplacement(
           context,

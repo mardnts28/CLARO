@@ -471,6 +471,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: TextButton(
                 onPressed: () async {
                   HapticService().vibrate();
+                  HomeTabController.switchToTab(0);
                   await _authService.signOut();
                   if (mounted) {
                     Navigator.pushReplacementNamed(context, '/');
