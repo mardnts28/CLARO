@@ -114,6 +114,8 @@ class RankedProductCard extends StatelessWidget {
                               ? Image.network(
                                   product.imageUrl,
                                   fit: BoxFit.cover,
+                                  cacheWidth: 150,
+                                  cacheHeight: 150,
                                   loadingBuilder: (context, child, progress) {
                                     if (progress == null) return child;
                                     return Center(

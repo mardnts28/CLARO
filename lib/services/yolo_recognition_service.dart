@@ -211,27 +211,15 @@ class YoloRecognitionService {
         _interpreter!.invoke();
         _isInferring = false;
 
-        // Extract output float data directly from C++ Output Tensor 0 pointer
+        // Extract output float data directly from C++ Output Tensor 0 pointer without heap allocations
         final outputTensor = _interpreter!.getOutputTensor(0);
         final Float32List outputBuffer = outputTensor.data.buffer.asFloat32List(
           outputTensor.data.offsetInBytes,
           outputTensor.numElements(),
         );
 
-        // Reconstruct output structure for _decodeOutput compatibility
-        final outputTensorData = List.generate(
-          1,
-          (_) => List.generate(
-            dim1,
-            (r) => List<double>.generate(
-              dim2,
-              (c) => outputBuffer[r * dim2 + c],
-            ),
-          ),
-        );
-
         return _decodeOutput(
-          output: outputTensorData,
+          outputBuffer: outputBuffer,
           dim1: dim1,
           dim2: dim2,
           targetW: targetW,
@@ -353,18 +341,8 @@ class YoloRecognitionService {
       outputTensor.numElements(),
     );
 
-    final output = List.generate(
-      1,
-      (_) => List.generate(
-        dim1,
-        (r) => List<double>.generate(
-          dim2,
-          (c) => outputBuffer[r * dim2 + c],
-        ),
-      ),
-    );
     return _decodeOutput(
-      output: output,
+      outputBuffer: outputBuffer,
       dim1: dim1,
       dim2: dim2,
       targetW: targetW,
@@ -375,9 +353,8 @@ class YoloRecognitionService {
       padY: padY,
     );
   }
-
   List<DetectionResult> _decodeOutput({
-    required List<dynamic> output,
+    required Float32List outputBuffer,
     required int dim1,
     required int dim2,
     required int targetW,
@@ -388,28 +365,24 @@ class YoloRecognitionService {
     required int padY,
   }) {
     final int numClasses = _labels.length;
-    final int numBoxes = dim2;
     final List<_RawCandidate> candidates = [];
 
     double applyConfidence(double raw) {
       if (raw > 1.0 || raw < 0.0) {
-        // YOLOv8 exports output raw logits; apply Sigmoid activation to get 0.0 - 1.0 probability
         return 1.0 / (1.0 + exp(-raw));
       }
       return raw;
     }
 
     final bool isTransposed = dim1 == (4 + numClasses);
+    final int numBoxes = isTransposed ? dim2 : dim1;
     double globalMaxRawScore = -1e9;
 
     if (isTransposed) {
-      // Auto-detect coordinate format: peek at the first box with a
-      // reasonable score. If cx/cy values are > 1.5, coordinates are
-      // absolute pixel values; otherwise they are normalized [0,1].
       bool coordsAreAbsolute = false;
       for (int col = 0; col < min(numBoxes, 100); col++) {
-        final double peekCx = output[0][0][col];
-        final double peekCy = output[0][1][col];
+        final double peekCx = outputBuffer[0 * dim2 + col];
+        final double peekCy = outputBuffer[1 * dim2 + col];
         if (peekCx > 1.5 || peekCy > 1.5) {
           coordsAreAbsolute = true;
           break;
@@ -417,15 +390,15 @@ class YoloRecognitionService {
       }
 
       for (int col = 0; col < numBoxes; col++) {
-        final double cx = output[0][0][col];
-        final double cy = output[0][1][col];
-        final double bw = output[0][2][col];
-        final double bh = output[0][3][col];
+        final double cx = outputBuffer[0 * dim2 + col];
+        final double cy = outputBuffer[1 * dim2 + col];
+        final double bw = outputBuffer[2 * dim2 + col];
+        final double bh = outputBuffer[3 * dim2 + col];
 
         double maxScore = -1e9;
         int bestClass = 0;
         for (int c = 0; c < numClasses; c++) {
-          final s = output[0][4 + c][col];
+          final s = outputBuffer[(4 + c) * dim2 + col];
           if (s > maxScore) {
             maxScore = s;
             bestClass = c;
@@ -457,11 +430,10 @@ class YoloRecognitionService {
         ));
       }
     } else {
-      // Auto-detect coordinate format for non-transposed layout
       bool coordsAreAbsolute = false;
       for (int row = 0; row < min(numBoxes, 100); row++) {
-        final double peekCx = output[0][row][0];
-        final double peekCy = output[0][row][1];
+        final double peekCx = outputBuffer[row * dim2 + 0];
+        final double peekCy = outputBuffer[row * dim2 + 1];
         if (peekCx > 1.5 || peekCy > 1.5) {
           coordsAreAbsolute = true;
           break;
@@ -469,15 +441,15 @@ class YoloRecognitionService {
       }
 
       for (int row = 0; row < numBoxes; row++) {
-        final double cx = output[0][row][0];
-        final double cy = output[0][row][1];
-        final double bw = output[0][row][2];
-        final double bh = output[0][row][3];
+        final double cx = outputBuffer[row * dim2 + 0];
+        final double cy = outputBuffer[row * dim2 + 1];
+        final double bw = outputBuffer[row * dim2 + 2];
+        final double bh = outputBuffer[row * dim2 + 3];
 
         double maxScore = -1e9;
         int bestClass = 0;
         for (int c = 0; c < numClasses; c++) {
-          final s = output[0][row][4 + c];
+          final s = outputBuffer[row * dim2 + 4 + c];
           if (s > maxScore) {
             maxScore = s;
             bestClass = c;

@@ -156,6 +156,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                         child: Image.network(
                           widget.report.frontImageUrl,
                           fit: BoxFit.cover,
+                          cacheWidth: 600,
                           errorBuilder: (_, __, ___) => Container(
                             height: 200,
                             decoration: BoxDecoration(
@@ -205,6 +206,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                         child: Image.network(
                           widget.report.backImageUrl,
                           fit: BoxFit.cover,
+                          cacheWidth: 600,
                           errorBuilder: (_, __, ___) => Container(
                             height: 200,
                             decoration: BoxDecoration(

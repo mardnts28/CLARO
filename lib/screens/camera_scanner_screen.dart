@@ -272,7 +272,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           _yoloService
               .detectProductsFromCameraImage(image, sensorOrientation)
               .then((detections) {
-            debugPrint('Live scan detections count: ${detections.length} (${detections.map((d) => d.label).join(", ")})');
             if (!mounted) {
               _isLiveAnalysisRunning = false;
               return;
@@ -1251,8 +1250,7 @@ class _ScannerOverlayPainter extends CustomPainter {
     canvas.drawPath(pathBL, bracketPaint);
     canvas.drawPath(pathBR, bracketPaint);
 
-    // Draw live bounding boxes for detected products — green when detected,
-    // default (white semi-transparent) when nothing is detected. Limit to top 5 products.
+    // Draw live bounding boxes for detected products — strictly clipped within the viewfinder
     final boxColor = detections.isNotEmpty
         ? const Color(0xFF00E676)
         : Colors.white54;
@@ -1260,6 +1258,9 @@ class _ScannerOverlayPainter extends CustomPainter {
       ..color = boxColor.withOpacity(0.85)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
+
+    canvas.save();
+    canvas.clipRect(Rect.fromLTWH(vl, vt, vw, vh));
 
     for (final det in detections.take(5)) {
       final rect = Rect.fromLTRB(
@@ -1273,6 +1274,7 @@ class _ScannerOverlayPainter extends CustomPainter {
         boxPaint,
       );
     }
+    canvas.restore();
     // (Label/text overlays on bounding boxes removed for clean camera view)
 
     // Laser scan animation line
