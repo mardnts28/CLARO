@@ -1,11 +1,8 @@
-.app-review-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-  gap: 12px;
+.page-title {
+  margin: 0 0 14px;
+  text-align: center;
 }
+
 
 .filters-row {
   display: flex;
@@ -20,12 +17,12 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #fff;
+  background: #e9e2e0;
   border: 1px solid #e5d8d5;
-  padding: 10px 16px;
+  padding: 15px 21px;
   border-radius: 8px;
   font-size: 13.5px;
-  color: #333;
+  color: #444;
   cursor: pointer;
   min-width: 120px;
   justify-content: space-between;
@@ -55,11 +52,66 @@
   background: #f5eeee;
 }
 
+
+/* =========================================
+   APP REVIEW TABLE SCROLL
+   Same pattern as Activity Log
+   ========================================= */
+
+.app-review-table-scroll {
+  overflow-y: auto;
+  overflow-x: auto;
+  flex: 1;
+}
+
+
+/* Custom scrollbar */
+.app-review-table-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.app-review-table-scroll::-webkit-scrollbar-track {
+  background: #f5f5f5;
+}
+
+.app-review-table-scroll::-webkit-scrollbar-thumb {
+  background: #c9c9c9;
+  border-radius: 10px;
+}
+
+.app-review-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: #aaa;
+}
+
+
+/* =========================================
+   KEEP HEADER STICKY
+   ========================================= */
+
+.app-review-table-scroll .reports-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f7f7f7;
+}
+
+
+/* =========================================
+   REVIEW TEXT
+   ========================================= */
+
 .review-text-cell {
   color: #333;
   font-size: 13.5px;
   max-width: 220px;
+  min-width: 220px;
 }
+
+
+/* =========================================
+   STATUS BADGES
+   ========================================= */
 
 .badge-new {
   background: #e3e0fb;
@@ -69,4 +121,36 @@
 .badge-progress {
   background: #fbf1c8;
   color: #8a6d00;
+}
+
+
+/* =========================================
+   DATE
+   ========================================= */
+
+.time {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: #9a9a9a;
+}
+
+
+/* =========================================
+   RESPONSIVE
+   ========================================= */
+
+@media (max-width: 768px) {
+  .app-review-header {
+    align-items: flex-start;
+  }
+
+  .filters-row {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .filter-btn {
+    min-width: 130px;
+  }
 }

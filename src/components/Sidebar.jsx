@@ -23,9 +23,7 @@ export default function Sidebar({ collapsed }) {
   return (
     <aside className={`sidebar ${collapsed ? "sidebar-collapsed" : ""}`}>
       <div className="sidebar-brand">
-        <div className="sidebar-logo-box">
           <img src={logo} alt="CLARO Logo" className="sidebar-logo" />
-        </div>
         {!collapsed && <span className="sidebar-brand-text">CLARO</span>}
       </div>
 

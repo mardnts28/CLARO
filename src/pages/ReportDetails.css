@@ -1,311 +1,712 @@
+/* =========================================================
+   REPORT DETAILS - FULL WIDTH DESKTOP DESIGN
+   ========================================================= */
+
 .details-header {
   display: flex;
   justify-content: flex-start;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .details-title {
+  margin: 0 0 14px;
   text-align: center;
-  margin-bottom: 24px;
 }
+
+/* =========================================================
+   BACK BUTTON
+   ========================================================= */
 
 .back-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  background: #fff;
+  gap: 7px;
+
+  background: #ffffff;
   border: 1px solid #e5d8d5;
-  padding: 9px 16px;
+
+  padding: 7px 13px;
   border-radius: 8px;
-  font-size: 13.5px;
+
+  font-size: 13px;
   font-weight: 600;
   color: #333;
+
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
+.back-btn:hover {
+  background: #f8f3f1;
+  border-color: #d8c8c4;
+}
+
+/* =========================================================
+   MAIN CARD
+   ========================================================= */
+
 .details-card {
-  background: #fff;
-  border-radius: 14px;
-  padding: 36px 40px;
-  max-width: 1000px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: none;
+
+  margin: 0;
+
+  background: #ffffff;
+  border-radius: 12px;
+
+  padding: 20px 26px;
+
+  box-sizing: border-box;
+
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-/* ── Top identity block: name, description, reporter, date ──────────── */
+/* =========================================================
+   PRODUCT HEADER
+   ========================================================= */
+
 .details-header-block {
-  text-align: center;
-  margin-bottom: 24px;
+  text-align: left;
+  margin-bottom: 14px;
 }
 
 .details-product {
-  font-size: 20px;
-  font-weight: 700;
+  margin: 0 0 2px;
+
+  font-size: 21px;
+  line-height: 1.2;
+  font-weight: 800;
+
   color: #1a1a1a;
-  margin: 0 0 4px;
 }
 
 .details-product-desc {
+  margin: 0 0 12px;
+
   color: #6b6b6b;
-  font-size: 14px;
-  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.35;
 }
 
+/* =========================================================
+   META INFORMATION
+   ========================================================= */
+
 .details-meta-row {
-  display: flex;
-  justify-content: center;
-  gap: 48px;
-  padding-top: 18px;
+  display: grid !important;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr)) !important;
+
+  gap: 10px !important;
+
+  padding-top: 10px !important;
+
   border-top: 1px solid #efe6e4;
+
+  margin-bottom: 10px !important;
 }
 
 .details-meta-item {
-  text-align: center;
+  text-align: left;
+
+  background: #faf7f6;
+
+  border-radius: 8px;
+
+  padding: 9px 12px;
+
+  min-width: 0;
 }
 
 .details-label {
   display: block;
-  font-size: 12.5px;
+
+  font-size: 11px;
+  font-weight: 500;
+
   color: #8a8a8a;
-  margin-bottom: 4px;
+
+  margin-bottom: 2px;
 }
 
 .details-value {
-  font-size: 14px;
+  font-size: 13px;
+
   color: #1a1a1a;
-  font-weight: 500;
+  font-weight: 600;
+
+  line-height: 1.3;
 }
 
-.details-actions {
-  display: flex;
-  gap: 14px;
-  margin-top: 28px;
+.details-meta-status {
+  display: flex !important;
+
+  flex-direction: column;
+
+  align-items: flex-start;
+
+  justify-content: center;
 }
 
-.reject-btn,
-.approve-btn {
-  flex: 1;
-  padding: 12px;
-  border-radius: 8px;
+.details-meta-status .details-label {
+  margin-bottom: 3px !important;
+}
+
+/* =========================================================
+   BADGES
+   ========================================================= */
+
+.badge {
+  display: inline-flex;
+
+  align-items: center;
+  justify-content: center;
+
+  padding: 4px 10px;
+
+  border-radius: 6px;
+
+  font-size: 11px;
   font-weight: 700;
-  font-size: 14px;
-  cursor: pointer;
-  border: 1px solid transparent;
 }
 
-.reject-btn {
-  background: #fbe2e2;
-  color: #c23b3b;
-  border-color: #f5c2c2;
+.badge-pending {
+  background: #fbf1c8;
+  color: #8a6d00;
 }
 
-.approve-btn {
-  background: #e2f7e6;
+.badge-rejected {
+  background: #fbdede;
+  color: #b42318;
+}
+
+.badge-approved {
+  background: #dcf6e3;
   color: #1a7f37;
-  border-color: #bfe8c8;
 }
 
-.reject-btn:disabled,
-.approve-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* ── Status + photos section ─────────────────────────────────────────── */
-.details-status-row {
-  text-align: center;
-  margin: 24px 0;
-  padding-bottom: 24px;
-  border-bottom: 1px solid #efe6e4;
-}
-
-.details-status-row .details-label {
-  margin-bottom: 8px;
-}
+/* =========================================================
+   PHOTOS
+   ========================================================= */
 
 .details-photos {
-  display: flex;
-  gap: 16px;
-  margin: 0 0 8px;
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 14px;
+
+  margin: 0 0 14px;
 }
 
 .photo-box {
-  flex: 1;
+  min-width: 0;
 }
 
 .photo-box-label {
   display: block;
-  text-align: center;
-  font-size: 13px;
-  color: #8a8a8a;
-  margin-bottom: 6px;
+
+  text-align: left;
+
+  font-size: 11.5px;
+  font-weight: 600;
+
+  color: #666;
+
+  margin-bottom: 5px;
 }
 
 .photo-box img {
   width: 100%;
-  height: 160px;
-  object-fit: cover;
-  border-radius: 10px;
+  height: 170px;
+
+  object-fit: contain;
+
+  border-radius: 9px;
+
   border: 1px solid #e5d8d5;
+
   cursor: zoom-in;
+
   display: block;
+
   background: #f6f2f1;
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.photo-box img:hover {
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .photo-box-empty {
   width: 100%;
-  height: 160px;
-  border-radius: 10px;
+  height: 170px;
+
+  border-radius: 9px;
+
   border: 1px dashed #d8c9c5;
+
   display: flex;
+
   align-items: center;
   justify-content: center;
+
   color: #a89d99;
-  font-size: 13px;
+
+  font-size: 12px;
+
   background: #faf7f6;
 }
 
-/* ── Additional Back Photos ─────────────────────────────────────────────── */
+/* =========================================================
+   ADDITIONAL PHOTOS
+   ========================================================= */
+
 .additional-photos {
   width: 100%;
+
+  margin-bottom: 12px;
 }
 
 .additional-photos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 12px;
-  margin-top: 8px;
-}
 
-.additional-photo-item {
-  position: relative;
+  grid-template-columns:
+    repeat(auto-fill, minmax(95px, 1fr));
+
+  gap: 8px;
+
+  margin-top: 6px;
 }
 
 .additional-photo-item img {
   width: 100%;
-  height: 120px;
+  height: 90px;
+
   object-fit: cover;
-  border-radius: 8px;
+
+  border-radius: 7px;
+
   border: 1px solid #e5d8d5;
+
   cursor: zoom-in;
+
   display: block;
+
   background: #f6f2f1;
 }
 
-/* ── Lightbox modal ─────────────────────────────────────────────────────── */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
+/* =========================================================
+   EXTRACTION SECTION
+   ========================================================= */
 
-/* ── Extracted data review section ───────────────────────────────────── */
 .extraction-section {
-  margin-top: 28px;
-  padding-top: 24px;
+  margin-top: 16px;
+
+  padding-top: 16px;
+
   border-top: 1px solid #efe6e4;
 }
 
 .extraction-section-title {
-  font-size: 15px;
-  font-weight: 700;
+  margin: 0 0 3px;
+
+  font-size: 16px;
+  font-weight: 800;
+
   color: #1a1a1a;
-  margin: 0 0 4px;
+}
+
+.extraction-pending-note,
+.confidence-note {
+  font-size: 11.5px;
+
+  line-height: 1.4;
+
+  border-radius: 7px;
+
+  padding: 8px 11px;
+
+  margin: 7px 0 11px;
 }
 
 .extraction-pending-note {
-  font-size: 13px;
-  color: #a87d1f;
+  color: #8a6d00;
+
   background: #fdf3e0;
+
   border: 1px solid #f2ddab;
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin: 10px 0 20px;
 }
 
 .confidence-note {
-  font-size: 13px;
   color: #8a5a1f;
+
   background: #fdf3e0;
+
   border: 1px solid #f2ddab;
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin: 10px 0 20px;
 }
 
 .confidence-note ul {
-  margin: 8px 0 0 0;
-  padding-left: 20px;
+  margin: 5px 0 0;
+
+  padding-left: 17px;
 }
 
 .confidence-note li {
+  margin-bottom: 2px;
+}
+
+/* =========================================================
+   FORM ROWS
+   ========================================================= */
+
+.field-row {
+  display: grid;
+
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+
+  gap: 12px;
+
+  margin-bottom: 10px;
+}
+
+.field-group {
+  min-width: 0;
+
+  margin-bottom: 10px;
+}
+
+.field-row .field-group {
+  margin-bottom: 0;
+}
+
+.field-label {
+  display: block;
+
+  font-size: 11.5px;
+  font-weight: 600;
+
+  color: #555;
+
   margin-bottom: 4px;
 }
 
+/* =========================================================
+   INPUTS
+   ========================================================= */
+
+.field-input,
+.field-textarea,
+select.field-input {
+  width: 100%;
+
+  border: 1px solid #e5d8d5;
+
+  border-radius: 7px;
+
+  padding: 7px 9px;
+
+  font-size: 12.5px;
+
+  color: #1a1a1a;
+
+  font-family: inherit;
+
+  box-sizing: border-box;
+
+  background-color: #ffffff;
+
+  outline: none;
+
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.field-input:focus,
+.field-textarea:focus,
+select.field-input:focus {
+  border-color: #8b1e24;
+
+  box-shadow:
+    0 0 0 2px rgba(139, 30, 36, 0.08);
+}
+
+.field-input:disabled,
+.field-textarea:disabled {
+  background: #f8f8f8;
+
+  color: #666;
+
+  cursor: not-allowed;
+}
+
+select.field-input {
+  cursor: pointer;
+}
+
+select.field-input:disabled {
+  background-color: #f5f5f5;
+
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   NUMBER INPUT
+   ========================================================= */
+
+.field-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.field-input[type="number"]::-webkit-outer-spin-button,
+.field-input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+
+  margin: 0;
+}
+
+.nutrition-unit {
+  font-size: 10px;
+
+  color: #aaa;
+}
+
+/* =========================================================
+   INGREDIENTS
+   ========================================================= */
+
+.field-textarea {
+  resize: vertical;
+
+  height: 110px !important;
+
+  min-height: 90px;
+
+  max-height: 300px;
+
+  overflow-y: auto;
+
+  line-height: 1.4;
+}
+
+/* =========================================================
+   =========================================================
+   MAIN EXTRACTION LAYOUT
+
+   LEFT COLUMN:
+   Product Data
+   +
+   Allergen Guide
+
+   RIGHT COLUMN:
+   Nutrition
+   +
+   Allergen Selection
+   =========================================================
+   ========================================================= */
+
+.extraction-content-grid {
+  display: grid !important;
+
+  grid-template-columns:
+    minmax(0, 1.18fr)
+    minmax(0, 0.82fr) !important;
+
+  gap: 26px !important;
+
+  width: 100% !important;
+
+  align-items: start !important;
+
+  box-sizing: border-box !important;
+}
+
+.extraction-product-column,
+.extraction-nutrition-column {
+  min-width: 0 !important;
+
+  width: 100% !important;
+
+  box-sizing: border-box !important;
+}
+
+/* =========================================================
+   RIGHT COLUMN
+   ========================================================= */
+
+.extraction-nutrition-column {
+  border-left: 1px solid #efe6e4 !important;
+
+  padding-left: 26px !important;
+}
+
+/* =========================================================
+   NUTRITION
+   ========================================================= */
+
+.extraction-nutrition-column .nutrition-section {
+  width: 100%;
+
+  margin-bottom: 22px !important;
+}
+
+.extraction-nutrition-column .nutrition-grid {
+  display: grid !important;
+
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr)) !important;
+
+  gap: 11px !important;
+
+  width: 100% !important;
+
+  box-sizing: border-box !important;
+}
+
+.extraction-nutrition-column
+.nutrition-grid
+.field-group {
+  min-width: 0 !important;
+
+  margin-bottom: 0 !important;
+}
+
+.extraction-nutrition-column .field-input {
+  width: 100% !important;
+
+  min-width: 0 !important;
+}
+
+/* =========================================================
+   ALLERGEN SECTION
+   ========================================================= */
+
+.allergen-section {
+  width: 100%;
+
+  margin-top: 14px;
+}
+
+/* =========================================================
+   ALLERGEN GUIDE
+
+   MUCH WIDER THAN BEFORE.
+
+   It now fills the ENTIRE LEFT COLUMN.
+   ========================================================= */
+
 .allergen-guide {
+  display: block !important;
+
+  width: 100% !important;
+
+  box-sizing: border-box !important;
+
   font-size: 12px;
+
   color: #6b6b6b;
+
   background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  line-height: 1.5;
+
+  border: 1px solid #e1e5e8;
+
+  border-radius: 9px;
+
+  padding: 12px 14px;
+
+  margin: 0;
+
+  line-height: 1.4;
+}
+
+.allergen-guide-expanded {
+  width: 100% !important;
 }
 
 .allergen-guide strong {
   display: block;
-  margin-bottom: 10px;
+
+  margin-bottom: 8px;
+
   color: #495057;
+
   font-size: 13px;
 }
 
+/* =========================================================
+   ALLERGEN TABLE
+   ========================================================= */
+
 .allergen-table {
   width: 100%;
+
   border-collapse: collapse;
-  margin-top: 10px;
-  font-size: 12px;
+
+  margin-top: 6px;
+
+  font-size: 11.5px;
+
   border-spacing: 0;
+
+  table-layout: fixed;
 }
 
 .allergen-table th,
 .allergen-table td {
   border: 1px solid #dee2e6;
-  padding: 10px 14px;
+
+  padding: 7px 9px;
+
   text-align: left;
+
   vertical-align: top;
 }
 
 .allergen-table th {
   background: #e9ecef;
-  font-weight: 600;
+
+  font-weight: 700;
+
   color: #343a40;
+
   text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.5px;
+
+  font-size: 10px;
+
+  letter-spacing: 0.2px;
 }
 
 .allergen-table th:first-child {
-  width: 20%;
+  width: 23%;
+}
+
+.allergen-table th:nth-child(2) {
+  width: 77%;
 }
 
 .allergen-table td {
   color: #495057;
-  line-height: 1.6;
+
+  line-height: 1.35;
+
+  word-wrap: break-word;
 }
 
 .allergen-table td:first-child {
-  font-weight: 500;
+  font-weight: 600;
+
   color: #343a40;
-  width: 20%;
+
+  width: 23%;
 }
 
 .allergen-table tr:nth-child(even) {
@@ -316,127 +717,503 @@
   background: #e9ecef;
 }
 
-.field-group {
-  margin-bottom: 16px;
-}
+/* =========================================================
+   ALLERGEN SELECTION
 
-.field-label {
-  display: block;
-  font-size: 13px;
-  color: #8a8a8a;
-  margin-bottom: 5px;
-}
+   THIS IS NOW IN THE SAME COLUMN AS NUTRITION.
+   ========================================================= */
 
-.field-input,
-.field-textarea,
-select.field-input {
+.allergen-selection-section {
   width: 100%;
-  border: 1px solid #e5d8d5;
-  border-radius: 8px;
-  padding: 9px 11px;
-  font-size: 14px;
-  color: #1a1a1a;
-  font-family: inherit;
-  box-sizing: border-box;
-  background-color: #fff;
+
+  margin-top: 20px;
+
+  padding-top: 16px;
+
+  border-top: 1px solid #efe6e4;
 }
 
-/* Hide number input spinners */
-.field-input[type="number"] {
-  -moz-appearance: textfield;
-  -webkit-appearance: textfield;
-  appearance: textfield;
+.allergen-selection-section .field-label {
+  margin-bottom: 7px;
 }
 
-.field-input[type="number"]::-webkit-outer-spin-button,
-.field-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
+/* =========================================================
+   ALLERGEN GRID
 
-.field-input[type="number"]::-moz-number-spin-box {
-  -moz-appearance: textfield;
-}
+   Uses the entire RIGHT COLUMN.
+   ========================================================= */
 
-select.field-input {
-  cursor: pointer;
-}
+.allergen-selection-section .allergen-grid {
+  display: grid !important;
 
-select.field-input:disabled {
-  background-color: #f5f5f5;
-  cursor: not-allowed;
-}
+  width: 100% !important;
 
-.field-textarea {
-  resize: none;
-  height: 250px;
-  overflow: visible;
-}
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr)) !important;
 
-.field-row {
-  display: flex;
-  gap: 12px;
-}
+  gap: 9px !important;
 
-.field-row .field-group {
-  flex: 1;
-}
+  margin: 0 !important;
 
-.nutrition-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.nutrition-grid .field-group {
-  margin-bottom: 0;
-}
-
-.nutrition-grid .field-input[type="number"] {
-  -moz-appearance: textfield;
-  -webkit-appearance: textfield;
-  appearance: textfield;
-}
-
-.nutrition-grid .field-input[type="number"]::-webkit-outer-spin-button,
-.nutrition-grid .field-input[type="number"]::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.nutrition-unit {
-  font-size: 12px;
-  color: #a8a1a0;
-}
-
-/* ── Allergen checklist ──────────────────────────────────────────────── */
-.allergen-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
+  box-sizing: border-box !important;
 }
 
 .allergen-chip {
   display: flex;
+
   align-items: center;
-  gap: 7px;
-  padding: 8px 14px;
-  border-radius: 20px;
+
+  gap: 8px;
+
+  min-height: 39px;
+
+  padding: 8px 10px;
+
+  border-radius: 8px;
+
   border: 1px solid #e5d8d5;
-  background: #fff;
-  font-size: 13.5px;
+
+  background: #ffffff;
+
+  font-size: 12.5px;
+
   color: #4a4a4a;
+
   cursor: pointer;
+
   user-select: none;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+
+  min-width: 0;
+
+  box-sizing: border-box;
+}
+
+.allergen-chip:hover {
+  background: #faf5f4;
+
+  border-color: #d8c8c4;
+
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .allergen-chip input {
   accent-color: #c23b3b;
+
+  margin: 0;
+
+  width: 15px;
+
+  height: 15px;
+
+  flex-shrink: 0;
 }
 
 .allergen-chip.checked {
   background: #fbe9e9;
+
   border-color: #eab8b8;
+
   color: #a4302f;
+
   font-weight: 600;
+}
+
+/* =========================================================
+   ACTION BUTTONS
+   ========================================================= */
+
+.details-actions {
+  display: grid;
+
+  grid-template-columns:
+    1fr 1fr;
+
+  gap: 10px;
+
+  margin-top: 16px;
+
+  padding-top: 14px;
+
+  border-top: 1px solid #efe6e4;
+}
+
+.reject-btn,
+.approve-btn {
+  padding: 9px 14px;
+
+  border-radius: 7px;
+
+  font-weight: 700;
+
+  font-size: 12.5px;
+
+  cursor: pointer;
+
+  border: 1px solid transparent;
+
+  transition: all 0.2s ease;
+}
+
+.reject-btn {
+  background: #fbe2e2;
+
+  color: #c23b3b;
+
+  border-color: #f5c2c2;
+}
+
+.reject-btn:hover {
+  background: #f8d3d3;
+}
+
+.approve-btn {
+  background: #e2f7e6;
+
+  color: #1a7f37;
+
+  border-color: #bfe8c8;
+}
+
+.approve-btn:hover {
+  background: #d2f1d9;
+}
+
+.reject-btn:disabled,
+.approve-btn:disabled {
+  opacity: 0.5;
+
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   ERRORS
+   ========================================================= */
+
+.form-error {
+  color: #d32f2f;
+
+  font-size: 12px;
+
+  margin: 10px 0 0;
+}
+
+/* =========================================================
+   LIGHTBOX
+   ========================================================= */
+
+.modal-overlay {
+  position: fixed;
+
+  inset: 0;
+
+  background: rgba(0, 0, 0, 0.85);
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  z-index: 1000;
+
+  padding: 20px;
+
+  box-sizing: border-box;
+}
+
+.modal-overlay img {
+  max-width: 92vw !important;
+
+  max-height: 92vh !important;
+
+  border-radius: 8px;
+
+  object-fit: contain;
+}
+
+/* =========================================================
+   LARGE DESKTOP
+   ========================================================= */
+
+@media (min-width: 1200px) {
+
+  .details-card {
+    padding: 20px 28px;
+  }
+
+  .details-photos {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+
+  .photo-box img,
+  .photo-box-empty {
+    height: 175px;
+  }
+
+  .extraction-content-grid {
+    grid-template-columns:
+      minmax(0, 1.18fr)
+      minmax(0, 0.82fr) !important;
+
+    gap: 28px !important;
+  }
+
+  .extraction-nutrition-column {
+    padding-left: 28px !important;
+  }
+
+  .extraction-nutrition-column .nutrition-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .allergen-table {
+    font-size: 12px;
+  }
+
+  .allergen-table th {
+    font-size: 10.5px;
+  }
+
+  .allergen-guide {
+    padding: 13px 15px;
+  }
+
+  .allergen-chip {
+    min-height: 41px;
+
+    font-size: 13px;
+  }
+}
+
+/* =========================================================
+   VERY LARGE DESKTOP
+   ========================================================= */
+
+@media (min-width: 1500px) {
+
+  .details-card {
+    padding: 20px 30px;
+  }
+
+  .photo-box img,
+  .photo-box-empty {
+    height: 185px;
+  }
+
+  .extraction-content-grid {
+    grid-template-columns:
+      minmax(0, 1.2fr)
+      minmax(0, 0.8fr) !important;
+
+    gap: 32px !important;
+  }
+
+  .extraction-nutrition-column {
+    padding-left: 30px !important;
+  }
+
+  .allergen-guide {
+    padding: 14px 16px;
+
+    font-size: 12.5px;
+  }
+
+  .allergen-guide strong {
+    font-size: 13.5px;
+  }
+
+  .allergen-table {
+    font-size: 12px;
+  }
+
+  .allergen-table th,
+  .allergen-table td {
+    padding: 8px 10px;
+  }
+
+  .allergen-chip {
+    min-height: 42px;
+
+    padding: 9px 11px;
+
+    font-size: 13px;
+  }
+}
+
+/* =========================================================
+   TABLET
+   ========================================================= */
+
+@media (max-width: 900px) {
+
+  .details-card {
+    padding: 18px 20px;
+  }
+
+  .details-photos {
+    grid-template-columns:
+      1fr 1fr;
+  }
+
+  .nutrition-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr));
+  }
+
+  /* Stack the two main columns */
+  .extraction-content-grid {
+    grid-template-columns: 1fr !important;
+
+    gap: 18px !important;
+  }
+
+  .extraction-nutrition-column {
+    border-left: none !important;
+
+    border-top: 1px solid #efe6e4 !important;
+
+    padding-left: 0 !important;
+
+    padding-top: 18px !important;
+  }
+
+  .extraction-nutrition-column .nutrition-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .allergen-selection-section .allergen-grid {
+    grid-template-columns:
+      repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .allergen-table {
+    font-size: 11px;
+  }
+}
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 700px) {
+
+  .details-title {
+    text-align: left;
+  }
+
+  .details-meta-row {
+    grid-template-columns:
+      1fr !important;
+  }
+
+  .details-photos {
+    grid-template-columns:
+      1fr;
+  }
+
+  .photo-box img,
+  .photo-box-empty {
+    height: 180px;
+  }
+
+  .field-row {
+    grid-template-columns:
+      1fr;
+
+    gap: 0;
+  }
+
+  .extraction-content-grid {
+    grid-template-columns:
+      1fr !important;
+  }
+
+  .extraction-nutrition-column {
+    border-left: none !important;
+
+    border-top: 1px solid #efe6e4 !important;
+
+    padding-left: 0 !important;
+
+    padding-top: 18px !important;
+  }
+
+  .nutrition-grid,
+  .extraction-nutrition-column .nutrition-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .allergen-selection-section .allergen-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .allergen-table {
+    font-size: 10.5px;
+  }
+
+  .allergen-table th,
+  .allergen-table td {
+    padding: 6px 7px;
+  }
+
+  .allergen-chip {
+    font-size: 12px;
+  }
+
+  .details-actions {
+    grid-template-columns:
+      1fr;
+  }
+
+  .details-card {
+    padding: 16px;
+  }
+
+  .details-status-row {
+    width: 100%;
+
+    box-sizing: border-box;
+  }
+}
+
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 450px) {
+
+  .nutrition-grid,
+  .extraction-nutrition-column .nutrition-grid {
+    grid-template-columns:
+      1fr !important;
+  }
+
+  .allergen-selection-section .allergen-grid {
+    grid-template-columns:
+      1fr !important;
+  }
+
+  .allergen-table {
+    font-size: 10px;
+  }
+
+  .allergen-table th,
+  .allergen-table td {
+    padding: 5px 6px;
+  }
+
+  .allergen-chip {
+    font-size: 12px;
+  }
 }
