@@ -147,7 +147,7 @@ class AuthService {
       return null;
     } on FirebaseAuthException catch (e) {
       debugPrint('Firebase Auth signup failed: ${e.code} - ${e.message}');
-      return e.message;
+      return getFriendlyAuthErrorMessage(e);
     } catch (e) {
       debugPrint('Unexpected error during signup: $e');
       return 'An unexpected error occurred. Please try again.';
@@ -221,10 +221,10 @@ class AuthService {
       return null;
     } on FirebaseAuthException catch (e) {
       isAuthenticating.value = false;
-      return e.message ?? 'Invalid email or password';
+      return getFriendlyAuthErrorMessage(e);
     } catch (e) {
       isAuthenticating.value = false;
-      return e.toString();
+      return 'An unexpected error occurred. Please try again.';
     }
   }
 
@@ -876,7 +876,7 @@ class AuthService {
       await _firebaseAuth.sendPasswordResetEmail(email: email);
       return null;
     } on FirebaseAuthException catch (e) {
-      return e.message;
+      return getFriendlyAuthErrorMessage(e);
     }
   }
 
@@ -943,7 +943,9 @@ class AuthService {
         } on FirebaseAuthException catch (e) {
           debugPrint('Reauthentication error: ${e.code} - ${e.message}');
           return DeleteAccountResult.error(
-            e.message ?? 'Re-authentication failed. Please try again.',
+            e.code == 'wrong-password' || e.code == 'invalid-credential'
+                ? 'Incorrect password. Please try again.'
+                : getFriendlyAuthErrorMessage(e),
           );
         }
       }
@@ -1002,7 +1004,7 @@ class AuthService {
     } on FirebaseAuthException catch (e) {
       debugPrint('Firebase Auth deletion error: $e');
       return DeleteAccountResult.error(
-        e.message ?? 'Failed to delete account. Please try again.',
+        getFriendlyAuthErrorMessage(e),
       );
     } catch (e) {
       debugPrint('Account deletion error: $e');
@@ -1018,15 +1020,13 @@ class AuthService {
   /// cancels the picker.
   ///
   /// This does NOT sign the credential into Firebase itself -- the
-  /// caller (deleteAccount) is expected to pass it to
-  /// `user.reauthenticateWithCredential`, which re-verifies the *current*
-  /// user's identity rather than switching to a different account.
+  /// returned credential is only used with reauthenticateWithCredential().
   Future<AuthCredential?> buildGoogleReauthCredential() async {
     try {
-      final GoogleSignInAccount? googleUser = await _firebaseGoogleSignIn.signIn();
+      final googleUser = await _firebaseGoogleSignIn.signIn();
       if (googleUser == null) return null;
-
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final googleAuth = await googleUser.authentication;
+      if (googleAuth.idToken == null) return null;
       return GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -1103,6 +1103,53 @@ class AuthService {
     } catch (e) {
       debugPrint('updateUserData unexpected error: $e');
       return false;
+    }
+  }
+
+  /// Converts raw Firebase Auth error codes and messages into clean,
+  /// user-friendly sentences suitable for direct display in the UI.
+  static String getFriendlyAuthErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-credential':
+      case 'wrong-password':
+        return 'Incorrect email or password. Please try again.';
+      case 'user-not-found':
+        return 'No account found with this email address.';
+      case 'invalid-email':
+        return 'Please enter a valid email address.';
+      case 'user-disabled':
+        return 'This account has been disabled. Please contact support.';
+      case 'too-many-requests':
+        return 'Too many failed login attempts. Please try again later or reset your password.';
+      case 'network-request-failed':
+        return 'No internet connection. Please check your network and try again.';
+      case 'email-already-in-use':
+        return 'That email is already registered. Try logging in instead.';
+      case 'weak-password':
+        return 'That password is too weak. Please choose a stronger password.';
+      case 'operation-not-allowed':
+        return 'This sign-in method is currently disabled.';
+      case 'requires-recent-login':
+        return 'This operation is sensitive and requires recent login. Please log in again.';
+      case 'channel-error':
+        return 'Please enter all required fields.';
+      default:
+        final msg = e.message ?? '';
+        final lower = msg.toLowerCase();
+        if (lower.contains('credential') ||
+            lower.contains('malformed') ||
+            lower.contains('expired') ||
+            lower.contains('wrong password') ||
+            lower.contains('incorrect')) {
+          return 'Incorrect email or password. Please try again.';
+        }
+        if (lower.contains('user-not-found') || lower.contains('no user record')) {
+          return 'No account found with this email address.';
+        }
+        if (lower.contains('network')) {
+          return 'No internet connection. Please check your network and try again.';
+        }
+        return msg.isNotEmpty ? msg : 'Authentication failed. Please try again.';
     }
   }
 }

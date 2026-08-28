@@ -110,7 +110,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _isLoading = false);
-      _showError(e.message ?? loc.errorChangingPassword);
+      final msg = (e.code == 'wrong-password' ||
+              e.code == 'invalid-credential' ||
+              (e.message ?? '').toLowerCase().contains('credential'))
+          ? 'Incorrect current password. Please try again.'
+          : AuthService.getFriendlyAuthErrorMessage(e);
+      _showError(msg);
     } catch (e) {
       setState(() => _isLoading = false);
       _showError(loc.unexpectedError);

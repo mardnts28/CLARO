@@ -19,6 +19,10 @@ class NutritionService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _dataCollection = 'product_nutrition_data';
 
+  // In-memory cache for nutrition documents so repeat lookups (e.g. in History,
+  // Favorites, and Compare) return instantly with 0 Firestore read operations.
+  static final Map<String, Map<String, dynamic>> _nutritionDocCache = {};
+
   // ─── Main entry point ──────────────────────────────────────────────────
   /// Returns [product] with nutritionalFacts/allergens/ingredients filled in
   /// from `product_nutrition_data`, merged onto the FDA-sourced fields
@@ -31,14 +35,21 @@ class NutritionService {
   Future<Product> enrichProduct(Product product) async {
     if (product.name.isEmpty) return product;
 
+    final cachedData = _nutritionDocCache[product.id];
+    if (cachedData != null) {
+      return _mergeDataDoc(product, cachedData);
+    }
+
     try {
       final doc = await _db
           .collection(_dataCollection)
           .doc(product.id)
           .get()
-          .timeout(const Duration(milliseconds: 1500));
+          .timeout(const Duration(milliseconds: 6000));
       if (!doc.exists) return product;
-      return _mergeDataDoc(product, doc.data()!);
+      final data = doc.data()!;
+      _nutritionDocCache[product.id] = data;
+      return _mergeDataDoc(product, data);
     } catch (_) {
       // Read failure or timeout -- fail safe, return the product unenriched rather
       // than throwing and breaking the whole product fetch.

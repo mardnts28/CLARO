@@ -197,7 +197,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result != null) {
         // Either an error message (String) or an MFA challenge (Map).
         if (result is String) {
-          setState(() => _formError = result);
+          setState(() => _formError = _friendlyLoginError(result));
           return;
         }
         // MFA_REQUIRED case — navigate explicitly (see
@@ -214,6 +214,36 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// Maps technical/backend auth errors to friendly, intuitive messages for users.
+  String _friendlyLoginError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('credential') ||
+        lower.contains('wrong-password') ||
+        lower.contains('malformed') ||
+        lower.contains('expired') ||
+        lower.contains('invalid-credential') ||
+        lower.contains('wrong password') ||
+        (lower.contains('password') && lower.contains('incorrect'))) {
+      return 'Incorrect email or password. Please try again.';
+    }
+    if (lower.contains('user-not-found') || lower.contains('no user record')) {
+      return 'No account found with this email address.';
+    }
+    if (lower.contains('network') || lower.contains('network-request-failed')) {
+      return 'No internet connection. Please check your network and try again.';
+    }
+    if (lower.contains('too-many-requests')) {
+      return 'Too many failed login attempts. Please try again later or reset your password.';
+    }
+    if (lower.contains('user-disabled')) {
+      return 'This account has been disabled. Please contact support.';
+    }
+    if (lower.contains('invalid-email')) {
+      return 'Please enter a valid email address.';
+    }
+    return raw;
   }
 
   Future<void> _handleGoogleSignIn() async {
@@ -233,7 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (result is String) {
-        setState(() => _formError = result);
+        setState(() => _formError = _friendlyLoginError(result));
         return;
       }
 

@@ -409,6 +409,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ? Image.network(
                                   product.imageUrl,
                                   fit: BoxFit.cover,
+                                  cacheWidth: 150,
+                                  cacheHeight: 150,
                                   loadingBuilder: (context, child, progress) {
                                     if (progress == null) return child;
                                     return Center(
@@ -569,46 +571,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       ),
     ),
-    );
-  }
-
-  Widget _buildGroupSection(String label, List<HistoryItem> items) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 18),
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface),
-        ),
-        const SizedBox(height: 10),
-        ...items.map((item) => item.type == HistoryType.comparison
-            ? _buildCompareCard(item)
-            : _buildScanCard(item)),
-      ],
-    );
-  }
-
-  Widget _buildReportGroupSection(String label, List<ReportModel> reports) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 18),
-        Text(
-          label,
-          style: GoogleFonts.outfit(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface),
-        ),
-        const SizedBox(height: 10),
-        ...reports.map((report) => _buildReportCard(report)),
-      ],
     );
   }
 
@@ -823,6 +785,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
         : _historyService.getItems(filter: _activeTab, searchQuery: _searchQuery);
     final grouped = _groupItems(items);
 
+    final groupedReportsMap = _groupReports(_reports);
+    final flattenedReports = <dynamic>[];
+    for (final entry in groupedReportsMap.entries) {
+      flattenedReports.add(entry.key);
+      flattenedReports.addAll(entry.value);
+    }
+
+    final flattenedHistory = <dynamic>[];
+    for (final entry in grouped.entries) {
+      flattenedHistory.add(entry.key);
+      flattenedHistory.addAll(entry.value);
+    }
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       floatingActionButton: widget.embeddedMode ? null : const VoiceAssistantFab(),
@@ -880,7 +855,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         child: TextField(
                           controller: _searchController,
                           style: GoogleFonts.inter(
-                              fontSize: 14, color: colorScheme.onSurface),
+                               fontSize: 14, color: colorScheme.onSurface),
                           decoration: InputDecoration(
                             hintText: loc.searchHint,
                             hintStyle: GoogleFonts.inter(
@@ -965,36 +940,69 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
 
-          // ── Scrollable content ───────────────────────────────────────────
+          // ── Scrollable content (virtualized on-demand rendering) ───────────
           Expanded(
             child: _activeTab == 'Mga Ulat'
                 ? (_reportsLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : _groupReports(_reports).isEmpty
+                    : flattenedReports.isEmpty
                         ? _buildEmptyState()
-                        : ListView(
+                        : ListView.builder(
                             key: const PageStorageKey<String>('reports_scroll'),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 4),
-                            children: _groupReports(_reports)
-                                .entries
-                                .map((e) =>
-                                    _buildReportGroupSection(e.key, e.value))
-                                .toList(),
+                            itemCount: flattenedReports.length,
+                            itemBuilder: (context, index) {
+                              final item = flattenedReports[index];
+                              if (item is String) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 18, bottom: 10),
+                                  child: Text(
+                                    item,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                );
+                              } else if (item is ReportModel) {
+                                return _buildReportCard(item);
+                              }
+                              return const SizedBox.shrink();
+                            },
                           ))
                 : ((_activeTab == 'Paborito' && _favoritesLoading) ||
                         _historyService.isLoading)
                     ? const Center(child: CircularProgressIndicator())
-                    : grouped.isEmpty
+                    : flattenedHistory.isEmpty
                         ? _buildEmptyState()
-                        : ListView(
+                        : ListView.builder(
                             key: const PageStorageKey<String>('history_scroll'),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 4),
-                            children: grouped.entries
-                                .map((e) =>
-                                    _buildGroupSection(e.key, e.value))
-                                .toList(),
+                            itemCount: flattenedHistory.length,
+                            itemBuilder: (context, index) {
+                              final item = flattenedHistory[index];
+                              if (item is String) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 18, bottom: 10),
+                                  child: Text(
+                                    item,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                );
+                              } else if (item is HistoryItem) {
+                                return item.type == HistoryType.comparison
+                                    ? _buildCompareCard(item)
+                                    : _buildScanCard(item);
+                              }
+                              return const SizedBox.shrink();
+                            },
                           ),
           ),
         ],

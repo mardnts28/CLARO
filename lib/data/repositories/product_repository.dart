@@ -58,12 +58,21 @@ class FirestoreProductRepository implements ProductRepository {
   final FirebaseFirestore _db;
   static const String _collection = 'fda_products';
 
+  // Global in-memory product cache to avoid redundant Firestore reads
+  static final Map<String, Product> _productCache = {};
+
   @override
   Future<Product> getProductById(String id) async {
+    final cached = _productCache[id];
+    if (cached != null) return cached;
+
     final doc = await _db.collection(_collection).doc(id).get();
     if (doc.exists) {
       final base = _productFromDoc(doc.id, doc.data()!);
-      return NutritionService().enrichProduct(base);
+      final enriched = await NutritionService().enrichProduct(base);
+      _productCache[id] = enriched;
+      _productCache[enriched.id] = enriched;
+      return enriched;
     }
 
     // Fallback: match by normalized product name or slug if doc.id differs from YOLO label
@@ -78,7 +87,10 @@ class FirestoreProductRepository implements ProductRepository {
           pName.contains(normId) ||
           normId.contains(pName)) {
         final base = _productFromDoc(d.id, d.data());
-        return NutritionService().enrichProduct(base);
+        final enriched = await NutritionService().enrichProduct(base);
+        _productCache[id] = enriched;
+        _productCache[enriched.id] = enriched;
+        return enriched;
       }
     }
 
@@ -90,19 +102,24 @@ class FirestoreProductRepository implements ProductRepository {
   @override
   Future<Product> getProductByYoloLabel(String yoloLabel) async {
     final cleanLabel = yoloLabel.trim().toLowerCase();
+    final cached = _productCache[cleanLabel];
+    if (cached != null) return cached;
 
-    // 1. Direct Firestore query on the yolo_label field (with 2s timeout)
+    // 1. Direct Firestore query on the yolo_label field (with 6s timeout)
     try {
       final query = await _db
           .collection(_collection)
           .where('yolo_label', isEqualTo: cleanLabel)
           .limit(1)
           .get()
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 6));
       if (query.docs.isNotEmpty) {
         final d = query.docs.first;
         final base = _productFromDoc(d.id, d.data());
-        return NutritionService().enrichProduct(base);
+        final enriched = await NutritionService().enrichProduct(base);
+        _productCache[cleanLabel] = enriched;
+        _productCache[enriched.id] = enriched;
+        return enriched;
       }
     } catch (_) {}
 
@@ -112,7 +129,7 @@ class FirestoreProductRepository implements ProductRepository {
         final snapshot = await _db
             .collection(_collection)
             .get()
-            .timeout(const Duration(seconds: 2));
+            .timeout(const Duration(seconds: 6));
         _cachedCatalogDocs = snapshot.docs;
       }
       final docs = _cachedCatalogDocs!;
@@ -164,7 +181,10 @@ class FirestoreProductRepository implements ProductRepository {
 
       if (bestDoc != null && maxMatches >= 2) {
         final base = _productFromDoc(bestDoc.id, bestDoc.data());
-        return NutritionService().enrichProduct(base);
+        final enriched = await NutritionService().enrichProduct(base);
+        _productCache[cleanLabel] = enriched;
+        _productCache[enriched.id] = enriched;
+        return enriched;
       }
     } catch (e) {
       debugPrint('Firestore lookup error in getProductByYoloLabel: $e');
@@ -172,7 +192,10 @@ class FirestoreProductRepository implements ProductRepository {
 
     // 3. Fallback: format YOLO label into human-readable product representation
     final fallback = _fallbackProductFromYoloLabel(cleanLabel);
-    return NutritionService().enrichProduct(fallback);
+    final enriched = await NutritionService().enrichProduct(fallback);
+    _productCache[cleanLabel] = enriched;
+    _productCache[enriched.id] = enriched;
+    return enriched;
   }
 
   Product _fallbackProductFromYoloLabel(String label) {

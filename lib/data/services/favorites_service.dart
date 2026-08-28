@@ -55,15 +55,16 @@ class FavoritesService {
   }
 
   Future<List<Product>> _resolveProducts(List<String> ids) async {
-    final products = <Product>[];
-    for (final id in ids) {
+    final futures = ids.map((id) async {
       try {
-        products.add(await _productRepository.getProductById(id));
+        return await _productRepository.getProductById(id);
       } catch (_) {
         // Product may have been removed from the catalog since being
         // favorited -- skip it rather than crash the whole favorites list.
+        return null;
       }
-    }
-    return products;
+    });
+    final results = await Future.wait(futures);
+    return results.whereType<Product>().toList();
   }
 }
