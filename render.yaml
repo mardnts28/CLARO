@@ -1,0 +1,43 @@
+# Render Deployment Configuration for CLARO Admin Dashboard
+# This configuration deploys a static React application built with Vite
+
+services:
+  # Type: Static Site (for React/Vite build output)
+  - type: web
+    name: claro-admin
+    runtime: static
+    buildCommand: npm run build
+    # Output directory from Vite build
+    staticPublishPath: ./dist
+
+    # Required so client-side routes (react-router-dom) resolve on
+    # refresh/direct navigation instead of 404ing
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+    # Node version for build process
+    envVars:
+      - key: NODE_VERSION
+        value: 18
+    
+    # Render-specific environment variables
+    # These should be set in the Render dashboard, not here
+    # Required variables:
+    # - VITE_FIREBASE_API_KEY
+    # - VITE_FIREBASE_AUTH_DOMAIN
+    # - VITE_FIREBASE_PROJECT_ID
+    # - VITE_FIREBASE_STORAGE_BUCKET
+    # - VITE_FIREBASE_MESSAGING_SENDER_ID
+    # - VITE_FIREBASE_APP_ID
+    # - VITE_FIREBASE_MEASUREMENT_ID
+    # - VITE_EMAILJS_SERVICE_ID
+    # - VITE_EMAILJS_TEMPLATE_ID
+    # - VITE_EMAILJS_PUBLIC_KEY
+    
+    # Auto-deploy on push to merged-works branch
+    branch: merged-works
+    git:
+      branch: merged-works
+      deployOnPush: true

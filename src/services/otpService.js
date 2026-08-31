@@ -5,10 +5,15 @@ import emailjs from "@emailjs/browser";
 export const OTP_EXPIRY_MINUTES = 5;
 const MAX_ATTEMPTS = 5;
 
-// EmailJS config — from https://www.emailjs.com dashboard
-const EMAILJS_SERVICE_ID = "service_5y6zi4d";
-const EMAILJS_TEMPLATE_ID = "template_aarxuyn";
-const EMAILJS_PUBLIC_KEY = "wJyfTyTAuJIC6XQvn";
+// EmailJS config — from environment variables
+const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
+const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
+const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+
+// Validate that required EmailJS environment variables are set
+if (!EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID || !EMAILJS_PUBLIC_KEY) {
+  throw new Error('Missing required EmailJS environment variables. Please check your .env file for VITE_EMAILJS_SERVICE_ID, VITE_EMAILJS_TEMPLATE_ID, and VITE_EMAILJS_PUBLIC_KEY.');
+}
 
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();

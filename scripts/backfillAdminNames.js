@@ -7,12 +7,15 @@
 import fs from 'fs';
 import admin from 'firebase-admin';
 
-const SERVICE_ACCOUNT = process.env.SERVICE_ACCOUNT || './serviceAccountKey.json';
+const SERVICE_ACCOUNT = process.env.SERVICE_ACCOUNT || process.env.SERVICE_ACCOUNT_PATH || './serviceAccountKey.json';
 
 if (!fs.existsSync(SERVICE_ACCOUNT)) {
   console.error('Service account JSON not found at', SERVICE_ACCOUNT);
+  console.error('Please set the SERVICE_ACCOUNT environment variable or place the file at the default path.');
   process.exit(1);
 }
+
+console.log('Using service account from:', SERVICE_ACCOUNT);
 
 const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT, 'utf8'));
 

@@ -1,6 +1,6 @@
 import { signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs, setDoc } from "firebase/firestore";
-import { auth, db } from "../firebase/firebase";
+import { db, auth } from "../firebase/firebase";
 
 export const firebaseErrorMessages = {
   "auth/user-not-found": "No administrator account found.",
