@@ -83,10 +83,12 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
       }
 
       final userName = await _fetchUserName(uid);
+      final userEmail = _authService.currentUser?.email ?? '';
 
       await _authService.db.collection('suhestiyon').add({
         'uid': uid,
         'userName': userName,
+        'userEmail': userEmail,
         'starNumber': _rating,
         'text': text,
         'createdAt': FieldValue.serverTimestamp(),
