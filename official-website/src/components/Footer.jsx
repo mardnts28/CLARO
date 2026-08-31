@@ -68,7 +68,7 @@ export default function Footer() {
           <div className="footer-bottom-links">
             <Link to="/privacy-policy" className="footer-link">Privacy</Link>
             <Link to="/terms-and-conditions" className="footer-link">Terms</Link>
-            <a href="http://localhost:5174/login" className="footer-link" target="_blank" rel="noopener noreferrer">Admin</a>
+            <a href="https://claro-admin.onrender.com" className="footer-link" target="_blank" rel="noopener noreferrer">Admin</a>
           </div>
         </div>
       </div>
