@@ -146,25 +146,28 @@ class Product {
   };
 
   factory Product.fromJson(Map<String, dynamic> json) => Product(
-    id: json['id'] as String? ?? '',
-    name: json['name'] as String? ?? '',
-    brand: json['brand'] as String? ?? '',
-    variant: json['variant'] as String? ?? '',
-    category: json['category'] as String? ?? '',
-    imageUrl: json['imageUrl'] as String? ?? '',
-    fdaStatus: json['fdaStatus'] as String? ?? 'UNVERIFIED',
-    fdaRegistrationNumber: json['fdaRegistrationNumber'] as String? ?? '',
-    fdaValidityDate: json['fdaValidityDate'] as String? ?? '',
-    fdaManufacturer: json['fdaManufacturer'] as String? ?? '',
-    cprNumber: json['cprNumber'] as String? ?? '',
-    allergens: List<String>.from(json['allergens'] as List? ?? []),
-    ingredients: List<String>.from(json['ingredients'] as List? ?? []),
-    servingInstructions: json['servingInstructions'] as String? ?? '',
+    id: json['id']?.toString() ?? '',
+    name: json['name']?.toString() ?? '',
+    brand: json['brand']?.toString() ?? '',
+    variant: json['variant']?.toString() ?? '',
+    category: json['category']?.toString() ?? '',
+    imageUrl: json['imageUrl']?.toString() ?? '',
+    fdaStatus: json['fdaStatus']?.toString() ?? 'UNVERIFIED',
+    fdaRegistrationNumber: json['fdaRegistrationNumber']?.toString() ?? '',
+    fdaValidityDate: json['fdaValidityDate']?.toString() ?? '',
+    fdaManufacturer: json['fdaManufacturer']?.toString() ?? '',
+    cprNumber: json['cprNumber']?.toString() ?? '',
+    allergens: List<String>.from(
+        (json['allergens'] as List? ?? []).map((e) => e.toString())),
+    ingredients: List<String>.from(
+        (json['ingredients'] as List? ?? []).map((e) => e.toString())),
+    servingInstructions: json['servingInstructions']?.toString() ?? '',
     availableSizes: (json['availableSizes'] as List? ?? [])
         .map((s) => (s as num).toDouble())
         .toList(),
     sizeOptions: (json['sizeOptions'] as List? ?? [])
-        .map((s) => ProductSizeOption.fromJson(s as Map<String, dynamic>))
+        .whereType<Map<String, dynamic>>()
+        .map((s) => ProductSizeOption.fromJson(s))
         .toList(),
     nutritionalFacts: json['nutritionalFacts'] != null
         ? NutritionalFacts.fromJson(
@@ -285,8 +288,8 @@ class NutritionalFacts {
 
   factory NutritionalFacts.fromJson(Map<String, dynamic> json) =>
       NutritionalFacts(
-        servingSize: json['servingSize'] as String? ?? '',
-        servingsPerContainer: json['servingsPerContainer'] as String? ?? '',
+        servingSize: json['servingSize']?.toString() ?? '',
+        servingsPerContainer: json['servingsPerContainer']?.toString() ?? '',
         caloriesKcal: (json['caloriesKcal'] as num?)?.toDouble() ?? 0.0,
         proteinG: (json['proteinG'] as num?)?.toDouble() ?? 0.0,
         carbsG: (json['carbsG'] as num?)?.toDouble() ?? 0.0,

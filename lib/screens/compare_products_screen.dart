@@ -618,6 +618,23 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     );
   }
 
+  void _handleBack() {
+    HapticService().vibrate();
+    if (widget.saveToHistory) {
+      Navigator.pop(
+        context,
+        _allRanked.isNotEmpty
+            ? {
+                'product': widget.sourceProduct,
+                'comparisonSet': _allRanked,
+              }
+            : null,
+      );
+    } else {
+      Navigator.pop(context);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -625,39 +642,42 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     final loc = AppLocalizations.of(context)!;
     final topPadding = MediaQuery.of(context).padding.top;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header row: back + title ──────────────────────────────
-          Container(
-            color: colorScheme.surface,
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: topPadding + 14,
-              bottom: 14,
-            ),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    HapticService().vibrate();
-                    Navigator.pop(context);
-                  },
-                  child: Icon(Icons.arrow_back,
-                      color: colorScheme.primary, size: 24),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  loc.similarProductsTitle,
-                  style: GoogleFonts.outfit(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.primary,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header row: back + title ──────────────────────────────
+            Container(
+              color: colorScheme.surface,
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: topPadding + 14,
+                bottom: 14,
+              ),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: _handleBack,
+                    child: Icon(Icons.arrow_back,
+                        color: colorScheme.primary, size: 24),
                   ),
-                ),
+                  const SizedBox(width: 12),
+                  Text(
+                    loc.similarProductsTitle,
+                    style: GoogleFonts.outfit(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.primary,
+                    ),
+                  ),
                 const Spacer(),
                 if (_profile != null)
                   GestureDetector(
@@ -820,8 +840,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
 
       // ── Floating mic button (matching design) ─────────────────────
       floatingActionButton: const VoiceAssistantFab(),
-    );
-  }
+    ),
+  );
+}
 
   /// Builds the ranked list with Scenario B's "top 5 + See More" behavior.
   /// While a search query is active, this is bypassed entirely -- every

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../core/utils/number_format_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -82,7 +83,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   // Toast notification state
   bool _hasShownReportToast = false;
-  OverlayEntry? _toastOverlay;
+  bool _isReportTooltipVisible = false;
+  Timer? _reportToastTimer;
 
   void _initSizes(Product product) {
     final originalG = product.servingSizeG > 0 ? product.servingSizeG : 100.0;
@@ -123,10 +125,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   /// Navigates to the report screen for reporting incorrect product information
   void _navigateToReport() {
+    _dismissReportTooltip();
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => UnknownProductSubmissionScreen(
+        builder: (_) => const UnknownProductSubmissionScreen(
           capturedImagePath: null, // No pre-captured image when reporting from detail screen
         ),
       ),
@@ -135,97 +138,107 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   /// Shows the toast notification to help users discover the report button
   void _showReportToast() {
-    if (_hasShownReportToast) return;
-    
-    final loc = AppLocalizations.of(context)!;
-    final theme = Theme.of(context);
-    
-    // Remove emoji from the message
-    String message = loc.reportButtonToast.replaceAll('🔔 ', '');
-    
-    // Create custom speech bubble toast with proper pointer positioning
-    _toastOverlay = OverlayEntry(
-      builder: (context) => Positioned(
-        top: 72, // Position below the navigation header (56 + 16 padding)
-        right: 16, // Position near the right side where Report button is
-        child: IgnorePointer(
-          child: Material(
-            color: Colors.transparent,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Stack to position triangle above toast body
-                SizedBox(
-                  width: 200,
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Triangular tip pointing upward, positioned above the toast
-                      Positioned(
-                        top: -6, // Position above the toast
-                        right: 56, // Offset to align with Report button center (Report button is left of Favorite button)
-                        child: CustomPaint(
-                          size: const Size(12, 6),
-                          painter: _TrianglePainter(
-                            color: Colors.grey[700]!,
-                          ),
-                        ),
-                      ),
-                      // Speech bubble body
-                      Container(
-                        width: 200,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[700],
-                          borderRadius: BorderRadius.circular(8),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.2),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Text(
-                          message,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-    
-    Overlay.of(context).insert(_toastOverlay!);
-    setState(() => _hasShownReportToast = true);
-    
-    // Auto-dismiss after 6 seconds
-    Future.delayed(const Duration(seconds: 6), () {
-      if (mounted && _toastOverlay != null) {
-        _toastOverlay?.remove();
-        _toastOverlay = null;
+    if (_hasShownReportToast || !mounted) return;
+    setState(() {
+      _hasShownReportToast = true;
+      _isReportTooltipVisible = true;
+    });
+
+    _reportToastTimer?.cancel();
+    _reportToastTimer = Timer(const Duration(seconds: 6), () {
+      if (mounted) {
+        setState(() => _isReportTooltipVisible = false);
       }
     });
   }
 
+  void _dismissReportTooltip() {
+    _reportToastTimer?.cancel();
+    if (_isReportTooltipVisible && mounted) {
+      setState(() => _isReportTooltipVisible = false);
+    }
+  }
+
+  Widget _buildReportTooltip(double topPadding, AppLocalizations loc) {
+    String message = loc.reportButtonToast.replaceAll('🔔 ', '');
+    return Positioned(
+      top: topPadding + 56 + 4,
+      right: 12,
+      child: Material(
+        color: Colors.transparent,
+        child: SizedBox(
+          width: 210,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Triangular tip pointing upward, exactly aligned to the Report button center
+              // Screen right: 16 padding + 24 favorite + 16 gap + 12 (half of report button) = 68px.
+              // Container right is 12px -> 68px - 12px = 56px center -> right = 50px (with 12px tip width).
+              Positioned(
+                top: -6,
+                right: 50,
+                child: CustomPaint(
+                  size: const Size(12, 6),
+                  painter: _TrianglePainter(
+                    color: Colors.grey[800]!,
+                  ),
+                ),
+              ),
+              // Speech bubble body
+              Container(
+                width: 210,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.grey[800],
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: _navigateToReport,
+                        child: Text(
+                          message,
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                            height: 1.3,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: _dismissReportTooltip,
+                      child: const Icon(
+                        Icons.close,
+                        size: 15,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _reportToastTimer?.cancel();
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
-    if (_toastOverlay != null) {
-      _toastOverlay?.remove();
-      _toastOverlay = null;
-    }
     super.dispose();
   }
 
@@ -359,10 +372,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       // "Suitable" and skew ranking/comparison for every product alongside
       // it. Detect that up front and skip the whole pipeline rather than
       // feed it bad data; none of those services themselves are touched.
-      final productsInvolved = _currentComparisonSet != null && _currentComparisonSet!.length > 1
-          ? _currentComparisonSet!.map((r) => r.evaluation.product)
-          : [_currentProduct];
-      if (!NutritionAvailability.allAvailable(productsInvolved)) {
+      if (!NutritionAvailability.isAvailable(_currentProduct)) {
         if (mounted) {
           setState(() {
             _nutritionUnavailable = true;
@@ -378,13 +388,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         setState(() => _userHealthProfile = profile);
       }
 
-      // If a comparisonSet was handed to us (from Compare / multi-scan),
+      // Filter comparison set to only include products with available nutrition data
+      final validComparisonSet = _currentComparisonSet
+          ?.where((r) => NutritionAvailability.isAvailable(r.evaluation.product))
+          .toList();
+
+      // If a valid comparisonSet was handed to us (from Compare / multi-scan),
       // use it as-is -- it's already ranked. Otherwise this is a solo
       // scan: rank just this one product so we still get a proper
       // ProductEvaluation out of WhoCalculator.
       List<RankedProductResult> ranked;
-      if (_currentComparisonSet != null && _currentComparisonSet!.length > 1) {
-        ranked = _currentComparisonSet!;
+      if (validComparisonSet != null && validComparisonSet.length > 1) {
+        ranked = validComparisonSet;
       } else {
         ranked = BackendLocator.productRankingService.rankProducts(
           products: [_currentProduct],
@@ -434,38 +449,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Column(
+      body: Stack(
         children: [
-          // ── Header bar: back, Resulta, heart (perfectly centered Stack) ──
-          Container(
-            color: colorScheme.surface,
-            height: topPadding + 56,
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: topPadding,
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Centered Title
-                Text(
-                  loc.resultsTitle,
-                  style: GoogleFonts.outfit(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.primary,
-                  ),
+          Column(
+            children: [
+              // ── Header bar: back, Resulta, heart (perfectly centered Stack) ──
+              Container(
+                color: colorScheme.surface,
+                height: topPadding + 56,
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: topPadding,
                 ),
-                // Left Back Button
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
-                    child: Icon(Icons.arrow_back,
-                        color: colorScheme.primary, size: 24),
-                  ),
-                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // Centered Title
+                    Text(
+                      loc.resultsTitle,
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    // Left Back Button
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: GestureDetector(
+                        onTap: () {
+                          _dismissReportTooltip();
+                          Navigator.pop(context);
+                        },
+                        child: Icon(Icons.arrow_back,
+                            color: colorScheme.primary, size: 24),
+                      ),
+                    ),
                 // Right Heart Button + Report Button
                 Align(
                   alignment: Alignment.centerRight,
@@ -1101,6 +1121,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       height: 50,
                       child: ElevatedButton(
                         onPressed: () async {
+                          _dismissReportTooltip();
                           final result = await Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1142,8 +1163,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ],
       ),
-      floatingActionButton: const VoiceAssistantFab(),
-    );
+      if (_isReportTooltipVisible)
+        _buildReportTooltip(topPadding, loc),
+    ],
+  ),
+  floatingActionButton: const VoiceAssistantFab(),
+);
   }
 
   // Returns true if `nutrientKey` corresponds to one of the conditions
@@ -1582,7 +1607,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // ── Nutrient comparison card (ComparisonMatrixBuilder output) ───────────
   Widget _buildComparisonCard(BuildContext context, AppLocalizations loc) {
     final matrix = _comparisonMatrix!;
-    final productId = widget.product.id;
+    final productId = _currentProduct.id;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -1631,7 +1656,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ],
           const SizedBox(height: 12),
           ...matrix.nutrientRows.map((row) {
-            final cell = row.cells.firstWhere((c) => c.productId == productId);
+            final cell = row.cells.firstWhere(
+              (c) => c.productId == productId,
+              orElse: () => row.cells.first,
+            );
             final Color dotColor;
             switch (cell.highlight) {
               case ComparisonHighlight.favorable:
@@ -1720,13 +1748,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // title here always matches that tag's text and color for the same
   // product.
   String _getRankLevelLabel() {
-    if (widget.comparisonSet == null) {
+    final comparisonSet = _currentComparisonSet ?? widget.comparisonSet;
+    if (comparisonSet == null || comparisonSet.isEmpty) {
       return 'Product Ranking';
     }
 
-    final currentProduct = widget.comparisonSet!.firstWhere(
-      (r) => r.evaluation.product.id == widget.product.id,
-      orElse: () => widget.comparisonSet!.first,
+    final currentProduct = comparisonSet.firstWhere(
+      (r) => r.evaluation.product.id == _currentProduct.id,
+      orElse: () => comparisonSet.first,
     );
 
     return RankLabelHelper.label(
@@ -1737,13 +1766,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Color _getRankLevelColor() {
-    if (widget.comparisonSet == null) {
+    final comparisonSet = _currentComparisonSet ?? widget.comparisonSet;
+    if (comparisonSet == null || comparisonSet.isEmpty) {
       return Colors.green;
     }
 
-    final currentProduct = widget.comparisonSet!.firstWhere(
-      (r) => r.evaluation.product.id == widget.product.id,
-      orElse: () => widget.comparisonSet!.first,
+    final currentProduct = comparisonSet.firstWhere(
+      (r) => r.evaluation.product.id == _currentProduct.id,
+      orElse: () => comparisonSet.first,
     );
 
     return RankLabelHelper.color(

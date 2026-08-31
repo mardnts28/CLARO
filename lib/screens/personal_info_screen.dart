@@ -347,9 +347,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         final ok = await _pushHealthData(conditions: selectedConditions);
         if (ok) {
           BackendLocator.userRepository.invalidateCache(uid);
-          if (selectedConditions.contains('Low vision')) {
-            await VoiceAssistantService.instance.updateEnabled(true);
-          }
           await _loadUserData();
         }
       }

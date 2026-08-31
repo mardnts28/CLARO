@@ -39,6 +39,7 @@
 // "See More" rather than this service truncating it.
 
 import '../models/health_profile.dart';
+import '../../core/utils/nutrition_availability.dart';
 import '../../core/utils/product_characteristics.dart';
 import '../../models/product_model.dart';
 import '../models/ranked_product_result.dart';
@@ -73,13 +74,11 @@ class ProductComparisonService {
     // SELECTION: same category is necessary but not sufficient -- only
     // keep alternatives that share an actual product characteristic
     // (protein/type, e.g. "sardines", OR flavor/preparation, e.g. "tomato
-    // sauce") with the scanned product. "Canned Sardines in Tomato Sauce"
-    // vs. "Canned Corn" share neither -> excluded, even though both are
-    // "Canned Goods". vs. "Tuna in Tomato Sauce" share the flavor token
-    // ("tomato sauce") even though the protein differs -> included. See
-    // _isRelevantCandidate for the matching rule.
+    // sauce") with the scanned product and have nutrition facts available.
     final relevantAlternatives = deduped
-        .where((p) => _isRelevantCandidate(scannedProduct, p))
+        .where((p) =>
+            _isRelevantCandidate(scannedProduct, p) &&
+            NutritionAvailability.isAvailable(p))
         .toList();
 
     final comparisonSet = [scannedProduct, ...relevantAlternatives];

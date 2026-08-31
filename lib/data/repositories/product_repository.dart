@@ -335,7 +335,7 @@ class FirestoreProductRepository implements ProductRepository {
   Product _productFromDoc(String docId, Map<String, dynamic> data) {
     final isRegistered = data['registration_status'] as bool? ?? false;
     final validUntil = (data['validity_date'] as Timestamp?)?.toDate();
-    final cprNumber = data['cpr_number'] as String? ?? '';
+    final cprNumber = data['cpr_number']?.toString() ?? '';
     final rawSizes = data['available_sizes'] as List? ?? [];
     final sizeOptions = rawSizes
         .map(_parseSizeOption)
@@ -345,9 +345,9 @@ class FirestoreProductRepository implements ProductRepository {
 
     return Product(
       id: docId,
-      name: data['product_name'] as String? ?? '',
-      brand: data['brand'] as String? ?? '',
-      category: _formatCategory(data['product_category'] as String? ?? ''),
+      name: data['product_name']?.toString() ?? '',
+      brand: data['brand']?.toString() ?? '',
+      category: _formatCategory(data['product_category']?.toString() ?? ''),
       fdaStatus: _mapFdaStatus(isRegistered, validUntil),
       // fda_products only has one registration-number field (cpr_number);
       // mapped onto both of Product's corresponding fields so either one
@@ -355,7 +355,7 @@ class FirestoreProductRepository implements ProductRepository {
       fdaRegistrationNumber: cprNumber,
       cprNumber: cprNumber,
       fdaValidityDate: validUntil != null ? _formatIsoDate(validUntil) : '',
-      imageUrl: data['imageURL'] as String? ?? '',
+      imageUrl: (data['imageURL'] ?? data['imageUrl'])?.toString() ?? '',
       allergens: const [],
       ingredients: const [],
       servingInstructions: '',

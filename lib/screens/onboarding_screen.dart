@@ -211,10 +211,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           allergens: selectedAllergens,
         );
 
-        if (selectedConditions.contains('Mababang Paningin')) {
-          await VoiceAssistantService.instance.updateEnabled(true);
-        }
-
         if (!mounted) return;
         HomeTabController.switchToTab(0);
         FocusScope.of(context).unfocus();

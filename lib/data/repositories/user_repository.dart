@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
@@ -103,20 +104,31 @@ class FirebaseUserRepository implements UserRepository {
       throw Exception('No authenticated user; cannot fetch health profile');
     }
 
-    final res = await http.get(
-      Uri.parse('$_workerUrl/health-profile'),
-      headers: {'Authorization': 'Bearer $idToken'},
-    );
-    if (res.statusCode != 200) {
-      throw Exception('Failed to fetch health profile: ${res.statusCode} ${res.body}');
+    Map<String, dynamic> healthData = {};
+    try {
+      final res = await http.get(
+        Uri.parse('$_workerUrl/health-profile'),
+        headers: {'Authorization': 'Bearer $idToken'},
+      ).timeout(const Duration(seconds: 4));
+      if (res.statusCode == 200) {
+        healthData = jsonDecode(res.body) as Map<String, dynamic>;
+      }
+    } catch (e) {
+      debugPrint('Cloudflare worker health-profile fetch error or timeout: $e');
     }
-    final healthData = jsonDecode(res.body) as Map<String, dynamic>;
+
+    final rawConditions = healthData['conditions'] != null
+        ? List<String>.from(healthData['conditions'] as List)
+        : List<String>.from(data['conditions'] as List? ?? []);
+    final rawAllergens = healthData['allergens'] != null
+        ? List<String>.from(healthData['allergens'] as List)
+        : List<String>.from(data['allergens'] as List? ?? []);
 
     final profile = UserHealthProfile(
       userId: userId,
       displayName: data['name'] as String? ?? '',
-      conditions: mapConditionLabels(List<String>.from(healthData['conditions'] ?? [])),
-      allergies: mapAllergenLabels(List<String>.from(healthData['allergens'] ?? [])),
+      conditions: mapConditionLabels(rawConditions),
+      allergies: mapAllergenLabels(rawAllergens),
       voiceAssistant: data['voiceAssistant'] as bool? ?? false,
     );
 

@@ -85,13 +85,21 @@ class UserHealthProfile {
 
   factory UserHealthProfile.fromJson(Map<String, dynamic> json) {
     return UserHealthProfile(
-      userId: json['userId'] as String,
-      displayName: json['displayName'] as String,
-      conditions: (json['conditions'] as List<dynamic>)
-          .map((c) => HealthCondition.values.firstWhere((e) => e.name == c))
+      userId: json['userId']?.toString() ?? '',
+      displayName: json['displayName']?.toString() ?? '',
+      conditions: (json['conditions'] as List<dynamic>? ?? [])
+          .map((c) => HealthCondition.values.cast<HealthCondition?>().firstWhere(
+                (e) => e?.name == c?.toString(),
+                orElse: () => null,
+              ))
+          .whereType<HealthCondition>()
           .toList(),
-      allergies: (json['allergies'] as List<dynamic>)
-          .map((a) => AllergenType.values.firstWhere((e) => e.name == a))
+      allergies: (json['allergies'] as List<dynamic>? ?? [])
+          .map((a) => AllergenType.values.cast<AllergenType?>().firstWhere(
+                (e) => e?.name == a?.toString(),
+                orElse: () => null,
+              ))
+          .whereType<AllergenType>()
           .toList(),
       voiceAssistant: json['voiceAssistant'] as bool? ?? false,
     );

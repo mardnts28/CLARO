@@ -475,6 +475,47 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  Future<Product?> _findProductForComparison(HistoryItem item) async {
+    final targetId = item.sourceProductId ?? item.productId;
+    if (targetId != null && targetId.isNotEmpty) {
+      final p = await _lookupProduct(targetId);
+      if (p != null) return p;
+    }
+
+    try {
+      final allProducts = await BackendLocator.productRepository.getAllProducts();
+      if (allProducts.isEmpty) return null;
+
+      final cleanTitle = item.title
+          .replaceAll(RegExp(r'\s+Comparison\s+Result', caseSensitive: false), '')
+          .replaceAll(RegExp(r'\s+Resulta\s+ng\s+Paghahambing', caseSensitive: false), '')
+          .trim()
+          .toLowerCase();
+
+      if (cleanTitle.isNotEmpty) {
+        for (final p in allProducts) {
+          final pName = p.name.toLowerCase();
+          if (pName == cleanTitle || pName.contains(cleanTitle) || cleanTitle.contains(pName)) {
+            return p;
+          }
+        }
+      }
+
+      final parts = item.subtitle.split(':');
+      if (parts.length > 1) {
+        final cat = parts.sublist(1).join(':').trim().toLowerCase();
+        for (final p in allProducts) {
+          if (p.category.toLowerCase() == cat) {
+            return p;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('HistoryScreen: error looking up comparison product: $e');
+    }
+    return null;
+  }
+
   // ── Build a single comparison-type card (same layout as scan card) ─────────
   Widget _buildCompareCard(HistoryItem item) {
     final theme = Theme.of(context);
@@ -495,21 +536,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () async {
-          // Reopen the comparison by navigating to CompareProductsScreen
-          // Set saveToHistory: false to avoid creating duplicate history entries
-          if (item.sourceProductId != null) {
-            final sourceProduct = await _lookupProduct(item.sourceProductId!);
-            if (sourceProduct != null && mounted) {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => CompareProductsScreen(
-                    sourceProduct: sourceProduct,
-                    saveToHistory: false,
-                  ),
+          HapticService().vibrate();
+          final sourceProduct = await _findProductForComparison(item);
+          if (sourceProduct != null && mounted) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CompareProductsScreen(
+                  sourceProduct: sourceProduct,
+                  saveToHistory: false,
                 ),
-              );
-            }
+              ),
+            );
           }
         },
         child: Container(

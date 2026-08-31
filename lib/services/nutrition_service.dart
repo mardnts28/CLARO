@@ -64,7 +64,7 @@ class NutritionService {
 
     return product.copyWith(
       nutritionalFacts: NutritionalFacts(
-        servingSize: (doc['serving_size'] as String?) ?? '',
+        servingSize: doc['serving_size']?.toString() ?? '',
         caloriesKcal: n('calories_kcal'),
         proteinG: n('protein_g'),
         carbsG: n('carbs_g'),
