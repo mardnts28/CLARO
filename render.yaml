@@ -36,8 +36,10 @@ services:
     # - VITE_EMAILJS_TEMPLATE_ID
     # - VITE_EMAILJS_PUBLIC_KEY
     
-    # Auto-deploy on push to merged-works branch
-    branch: merged-works
+    # Auto-deploy on push to M9 branch (this is the branch where
+    # admin-claro's files live at the repo root; on merged-works,
+    # admin-claro is only a git submodule pointer, not real files)
+    branch: M9
     git:
-      branch: merged-works
+      branch: M9
       deployOnPush: true
