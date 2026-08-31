@@ -266,7 +266,7 @@ export default function AppReview() {
                         </span>
 
                         <span className="user-email">
-                          {r.uid}
+                          {r.userEmail}
                         </span>
                       </div>
                     </td>
