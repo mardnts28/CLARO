@@ -25,9 +25,11 @@ import '../../core/constants/canonical_allergens.dart';
 import '../models/product_extraction_result.dart';
 
 class ProductExtractionService {
-  ProductExtractionService({required String apiKey})
-      : _model = GenerativeModel(
-          model: 'gemini-2.5-flash',
+  ProductExtractionService({
+    required String apiKey,
+    String model = 'gemini-3.7-flash',
+  }) : _model = GenerativeModel(
+          model: model,
           apiKey: apiKey,
           generationConfig: GenerationConfig(
             responseMimeType: 'application/json',

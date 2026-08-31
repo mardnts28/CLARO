@@ -12,6 +12,7 @@ import '../services/history_service.dart';
 import '../services/home_tab_controller.dart';
 import '../services/voice_assistant_service.dart';
 import '../services/auth_service.dart';
+import '../services/haptic_service.dart';
 import '../data/services/backend_locator.dart';
 import 'product_detail_screen.dart';
 import 'multi_scan_results_screen.dart';
@@ -98,6 +99,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   // 5-8s fallback timeout tracking
   DateTime? _noProductStartTime;
   bool _isFallbackModalOpen = false;
+  bool _isScreenActive = true;
 
   // Laser animation
   late AnimationController _laserController;
@@ -262,7 +264,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           // Throttle: process every 3rd frame to align with Camera2 ImageReader buffer recycling
           if (_frameCount % 3 != 0) return;
 
-          if (_isProcessing || _isLiveAnalysisRunning || !mounted) return;
+          if (_isProcessing || _isLiveAnalysisRunning || !mounted || !_isScreenActive) return;
 
           _isLiveAnalysisRunning = true;
 
@@ -299,6 +301,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             final changed = _liveDetections.length != detections.length ||
                 _isProductInGuide != productInGuide;
             if (changed) {
+              if (productInGuide && !_isProductInGuide) {
+                // Instant visual haptic & sound confirmation the exact millisecond a product locks
+                // Aligned with the 'Vibration Feedback' toggle in Preferences / Settings
+                HapticService().vibrate();
+                SystemSound.play(SystemSoundType.click);
+              }
               setState(() {
                 _liveDetections = detections;
                 _isProductInGuide = productInGuide;
@@ -312,7 +320,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               _triggerAdvisoryPrefetch(detections);
               
               final holdDurationMs = DateTime.now().difference(_productFirstDetectedTime!).inMilliseconds;
-              if (holdDurationMs >= 1200) {
+              if (holdDurationMs >= 600) {
                 _productFirstDetectedTime = null;
                 _lastSeenTime = null;
                 _performScan();
@@ -371,7 +379,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   }
 
   void _showNoProductFallbackDialog({String? capturedImagePath}) {
-    if (_isFallbackModalOpen || !mounted) return;
+    if (_isFallbackModalOpen || !mounted || !_isScreenActive) return;
     _isFallbackModalOpen = true;
 
     final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
@@ -562,12 +570,23 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   Future<void> _performScan() async {
     if (_isProcessing) return;
 
+    // Fast-path: If live analysis already detected product(s), resolve and navigate instantly!
+    if (_liveDetections.isNotEmpty) {
+      setState(() {
+        _isProcessing = true;
+        _qualityWarning = null;
+      });
+      _stopImageStreamIfActive();
+      await _resolveAndNavigateDetections(_liveDetections, '');
+      return;
+    }
+
     _continuousAnalysisTimer?.cancel();
 
     // Wait for any in-flight live analysis to finish
     int waitAttempts = 0;
-    while (_isLiveAnalysisRunning && waitAttempts < 20) {
-      await Future.delayed(const Duration(milliseconds: 100));
+    while (_isLiveAnalysisRunning && waitAttempts < 10) {
+      await Future.delayed(const Duration(milliseconds: 50));
       waitAttempts++;
     }
 
@@ -576,9 +595,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       _qualityWarning = null;
     });
 
-    // Safety timer: if scanning resolution gets interrupted or hangs,
-    // auto-reset _isProcessing state after 3.5 seconds.
-    Timer? safetyTimer = Timer(const Duration(milliseconds: 3500), () {
+    // Safety timer: generous 8.0s timeout for hardware picture capture + deep validation
+    Timer? safetyTimer = Timer(const Duration(milliseconds: 8000), () {
       if (mounted && _isProcessing) {
         debugPrint('CameraScannerScreen: Safety timer triggered, resetting analyze state.');
         setState(() {
@@ -621,7 +639,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
       final String imagePath = file?.path ?? '';
       
-      // If we fell back to live detections, we skip quality check (or assume valid enough)
       if (imagePath.isNotEmpty) {
         final quality = await _validationService.validateImageQuality(imagePath);
         if (!quality.isValid) {
@@ -635,7 +652,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         }
       }
 
-      // YOLO detection
+      // YOLO detection on captured still photo
       final List<DetectionResult> detections = imagePath.isNotEmpty 
           ? await _yoloService.detectProducts(imagePath) 
           : _liveDetections;
@@ -644,124 +661,135 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           '${detections.map((d) => "${d.label} (${(d.confidence * 100).toStringAsFixed(1)}%)").join(", ")}');
 
       safetyTimer.cancel();
-
-      setState(() {
-        _isProcessing = false;
-      });
-
-      if (detections.isNotEmpty) {
-        final List<Product> resolvedProducts = [];
-        final Map<String, int> productCounts = {};
-
-        // Extract unique YOLO labels and their counts first
-        final Map<String, int> labelCounts = {};
-        for (var det in detections) {
-          labelCounts[det.label] = (labelCounts[det.label] ?? 0) + 1;
-        }
-
-        // Query database once per unique label
-        for (var entry in labelCounts.entries) {
-          final label = entry.key;
-          final count = entry.value;
-          try {
-            final prod =
-                await BackendLocator.productRepository.getProductByYoloLabel(label);
-            resolvedProducts.add(prod);
-            productCounts[prod.id] = (productCounts[prod.id] ?? 0) + count;
-          } catch (e) {
-            debugPrint('CameraScannerScreen: product lookup failed for $label: $e');
-            // Fire-and-forget background log so UI navigation is instant
-            unawaited(() async {
-              try {
-                for (int i = 0; i < count; i++) {
-                  await FirebaseFirestore.instance.collection('unmatched_yolo_scans').add({
-                    'label': label,
-                    'timestamp': FieldValue.serverTimestamp(),
-                  });
-                }
-              } catch (_) {}
-            }());
-          }
-        }
-
-        final distinctProducts = resolvedProducts.toSet().toList();
-
-        if (distinctProducts.isNotEmpty && widget.returnResultsOnDetect) {
-          // Add-product sub-flow (Product Ranking screen): hand the
-          // recognized product(s) straight back to the caller instead of
-          // drilling into ProductDetailScreen / MultiScanResultsScreen.
-          // History logging still happens, same as a normal scan.
-          if (mounted) {
-            for (var p in distinctProducts) {
-              HistoryService().addScanRecord(p);
-            }
-            Navigator.pop(context, {
-              'products': distinctProducts,
-              'productCounts': productCounts,
-            });
-          }
-        } else if (distinctProducts.length == 1) {
-          if (mounted) {
-            final singleProd = distinctProducts.first;
-            HistoryService().addScanRecord(singleProd);
-            SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ProductDetailScreen(
-                  product: singleProd,
-                  confidence: detections.first.confidence,
-                  productCounts: productCounts,
-                ),
-              ),
-            ).then((_) {
-              if (mounted) {
-                SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-                _startContinuousAnalysis();
-              }
-            });
-          }
-        } else if (distinctProducts.length > 1) {
-          if (mounted) {
-            for (var p in distinctProducts) {
-              HistoryService().addScanRecord(p);
-            }
-            SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => MultiScanResultsScreen(
-                  detectedProducts: distinctProducts,
-                  productCounts: productCounts,
-                ),
-              ),
-            ).then((_) {
-              if (mounted) {
-                SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-                _startContinuousAnalysis();
-              }
-            });
-          }
-        } else {
-          // Detections exist but none matched catalog -> show camera bottom sheet fallback dialog
-          if (!mounted) return;
-          _showNoProductFallbackDialog(capturedImagePath: imagePath);
-        }
-      } else {
-        // Zero detections -> show camera bottom sheet fallback dialog
-        if (!mounted) return;
-        _showNoProductFallbackDialog(capturedImagePath: imagePath);
-      }
+      await _resolveAndNavigateDetections(detections, imagePath);
     } catch (e) {
       safetyTimer.cancel();
       debugPrint('Scan error: $e');
       if (mounted) {
         setState(() {
           _isProcessing = false;
-          _qualityWarning = 'Scan failed. Please try again.';
+          _qualityWarning = 'Scan error. Please try again.';
         });
         _startContinuousAnalysis();
       }
+    }
+  }
+
+  Future<void> _resolveAndNavigateDetections(
+    List<DetectionResult> detections,
+    String imagePath,
+  ) async {
+    setState(() {
+      _isProcessing = false;
+    });
+
+    if (detections.isNotEmpty) {
+      final List<Product> resolvedProducts = [];
+      final Map<String, int> productCounts = {};
+
+      // Extract unique YOLO labels and their counts first
+      final Map<String, int> labelCounts = {};
+      for (var det in detections) {
+        labelCounts[det.label] = (labelCounts[det.label] ?? 0) + 1;
+      }
+
+      // Query database once per unique label
+      for (var entry in labelCounts.entries) {
+        final label = entry.key;
+        final count = entry.value;
+        try {
+          final prod =
+              await BackendLocator.productRepository.getProductByYoloLabel(label);
+          resolvedProducts.add(prod);
+          productCounts[prod.id] = (productCounts[prod.id] ?? 0) + count;
+        } catch (e) {
+          debugPrint('CameraScannerScreen: product lookup failed for $label: $e');
+          unawaited(() async {
+            try {
+              for (int i = 0; i < count; i++) {
+                await FirebaseFirestore.instance.collection('unmatched_yolo_scans').add({
+                  'label': label,
+                  'timestamp': FieldValue.serverTimestamp(),
+                });
+              }
+            } catch (_) {}
+          }());
+        }
+      }
+
+      final distinctProducts = resolvedProducts.toSet().toList();
+
+      if (distinctProducts.isNotEmpty && widget.returnResultsOnDetect) {
+        if (mounted) {
+          for (var p in distinctProducts) {
+            HistoryService().addScanRecord(p);
+          }
+          Navigator.pop(context, {
+            'products': distinctProducts,
+            'productCounts': productCounts,
+          });
+        }
+      } else if (distinctProducts.length == 1) {
+        if (mounted) {
+          final singleProd = distinctProducts.first;
+          HistoryService().addScanRecord(singleProd);
+          _isScreenActive = false;
+          _noProductStartTime = null;
+          await _stopImageStreamIfActive();
+          if (!mounted) return;
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ProductDetailScreen(
+                product: singleProd,
+                confidence: detections.first.confidence,
+                productCounts: productCounts,
+              ),
+            ),
+          ).then((_) {
+            if (mounted) {
+              _isScreenActive = true;
+              _noProductStartTime = null;
+              SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+              _startContinuousAnalysis();
+            }
+          });
+        }
+      } else if (distinctProducts.length > 1) {
+        if (mounted) {
+          for (var p in distinctProducts) {
+            HistoryService().addScanRecord(p);
+          }
+          _isScreenActive = false;
+          _noProductStartTime = null;
+          await _stopImageStreamIfActive();
+          if (!mounted) return;
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MultiScanResultsScreen(
+                detectedProducts: distinctProducts,
+                productCounts: productCounts,
+              ),
+            ),
+          ).then((_) {
+            if (mounted) {
+              _isScreenActive = true;
+              _noProductStartTime = null;
+              SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+              _startContinuousAnalysis();
+            }
+          });
+        }
+      } else {
+        if (!mounted) return;
+        _showNoProductFallbackDialog(capturedImagePath: imagePath);
+      }
+    } else {
+      if (!mounted) return;
+      _showNoProductFallbackDialog(capturedImagePath: imagePath);
     }
   }
 

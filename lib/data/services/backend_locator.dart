@@ -27,6 +27,8 @@ class BackendLocator {
   // dependency. Update the key name below if your .env uses a different
   // variable name than GEMINI_API_KEY.
   static String get _geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
+  static String get _geminiModel =>
+      dotenv.env['GEMINI_MODEL'] ?? 'gemini-3.7-flash';
 
   // Update these key names if your .env uses different variable names --
   // see cloudinary_upload_service.dart's header comment for one-time
@@ -65,14 +67,14 @@ class BackendLocator {
   static final HistoryRepository historyRepository = FirebaseHistoryRepository();
 
   static final GeminiAdvisoryService geminiAdvisoryService =
-      GeminiAdvisoryService(apiKey: _geminiApiKey);
+      GeminiAdvisoryService(apiKey: _geminiApiKey, model: _geminiModel);
 
   // Gemini's 3rd role in this system (see product_extraction_service.dart) --
   // reads front+back product photos and returns structured brand/nutrition/
   // ingredient/allergen data. Used by the unknown-product report flow
   // (Phase 3) to populate a submission before it reaches admin review.
   static final ProductExtractionService productExtractionService =
-      ProductExtractionService(apiKey: _geminiApiKey);
+      ProductExtractionService(apiKey: _geminiApiKey, model: _geminiModel);
 
   // Used by the unknown-product report flow to upload front/back label
   // photos before submitting a report -- see cloudinary_upload_service.dart.

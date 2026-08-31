@@ -16,9 +16,11 @@ import '../../core/utils/comparison_calculator.dart';
 import '../../core/utils/fallback_advisory_generator.dart';
 
 class GeminiAdvisoryService {
-  GeminiAdvisoryService({required String apiKey})
-      : _model = GenerativeModel(
-          model: 'gemini-2.5-flash',
+  GeminiAdvisoryService({
+    required String apiKey,
+    String model = 'gemini-3.7-flash',
+  }) : _model = GenerativeModel(
+          model: model,
           apiKey: apiKey,
           generationConfig: GenerationConfig(
             responseMimeType: 'application/json',

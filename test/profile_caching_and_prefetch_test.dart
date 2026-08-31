@@ -3,8 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:claro/data/models/health_profile.dart';
 import 'package:claro/models/product_model.dart';
-import 'package:claro/data/models/product_evaluation.dart';
-import 'package:claro/data/models/health_advisory.dart';
 import 'package:claro/data/repositories/user_repository.dart';
 import 'package:claro/data/services/gemini_advisory_service.dart';
 import 'package:claro/data/services/product_ranking_service.dart';

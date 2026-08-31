@@ -13,6 +13,17 @@ class ProductSizeOption {
   final String? imageUrl;
 
   const ProductSizeOption({required this.sizeGrams, this.imageUrl});
+
+  Map<String, dynamic> toJson() => {
+    'sizeGrams': sizeGrams,
+    'imageUrl': imageUrl,
+  };
+
+  factory ProductSizeOption.fromJson(Map<String, dynamic> json) =>
+      ProductSizeOption(
+        sizeGrams: (json['sizeGrams'] as num?)?.toDouble() ?? 0.0,
+        imageUrl: json['imageUrl'] as String?,
+      );
 }
 
 class Product {
@@ -114,6 +125,53 @@ class Product {
     );
   }
 
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'brand': brand,
+    'variant': variant,
+    'category': category,
+    'imageUrl': imageUrl,
+    'fdaStatus': fdaStatus,
+    'fdaRegistrationNumber': fdaRegistrationNumber,
+    'fdaValidityDate': fdaValidityDate,
+    'fdaManufacturer': fdaManufacturer,
+    'cprNumber': cprNumber,
+    'allergens': allergens,
+    'ingredients': ingredients,
+    'servingInstructions': servingInstructions,
+    'availableSizes': availableSizes,
+    'sizeOptions': sizeOptions.map((s) => s.toJson()).toList(),
+    'nutritionalFacts': nutritionalFacts.toJson(),
+  };
+
+  factory Product.fromJson(Map<String, dynamic> json) => Product(
+    id: json['id'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    brand: json['brand'] as String? ?? '',
+    variant: json['variant'] as String? ?? '',
+    category: json['category'] as String? ?? '',
+    imageUrl: json['imageUrl'] as String? ?? '',
+    fdaStatus: json['fdaStatus'] as String? ?? 'UNVERIFIED',
+    fdaRegistrationNumber: json['fdaRegistrationNumber'] as String? ?? '',
+    fdaValidityDate: json['fdaValidityDate'] as String? ?? '',
+    fdaManufacturer: json['fdaManufacturer'] as String? ?? '',
+    cprNumber: json['cprNumber'] as String? ?? '',
+    allergens: List<String>.from(json['allergens'] as List? ?? []),
+    ingredients: List<String>.from(json['ingredients'] as List? ?? []),
+    servingInstructions: json['servingInstructions'] as String? ?? '',
+    availableSizes: (json['availableSizes'] as List? ?? [])
+        .map((s) => (s as num).toDouble())
+        .toList(),
+    sizeOptions: (json['sizeOptions'] as List? ?? [])
+        .map((s) => ProductSizeOption.fromJson(s as Map<String, dynamic>))
+        .toList(),
+    nutritionalFacts: json['nutritionalFacts'] != null
+        ? NutritionalFacts.fromJson(
+            json['nutritionalFacts'] as Map<String, dynamic>)
+        : NutritionalFacts(),
+  );
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -204,6 +262,47 @@ class NutritionalFacts {
         fiberG = fiberG ?? (dietaryFiber != null ? double.tryParse(dietaryFiber.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),
         sugarsG = sugarsG ?? (sugars != null ? double.tryParse(sugars.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),
         addedSugarsG = addedSugarsG ?? 0.0;
+
+  Map<String, dynamic> toJson() => {
+    'servingSize': servingSize,
+    'servingsPerContainer': servingsPerContainer,
+    'caloriesKcal': caloriesKcal,
+    'proteinG': proteinG,
+    'carbsG': carbsG,
+    'totalFatG': totalFatG,
+    'saturatedFatG': saturatedFatG,
+    'transFatG': transFatG,
+    'cholesterolMg': cholesterolMg,
+    'sodiumMg': sodiumMg,
+    'potassiumMg': potassiumMg,
+    'calciumMg': calciumMg,
+    'ironMg': ironMg,
+    'fiberG': fiberG,
+    'sugarsG': sugarsG,
+    'addedSugarsG': addedSugarsG,
+    'hasNutritionData': hasNutritionData,
+  };
+
+  factory NutritionalFacts.fromJson(Map<String, dynamic> json) =>
+      NutritionalFacts(
+        servingSize: json['servingSize'] as String? ?? '',
+        servingsPerContainer: json['servingsPerContainer'] as String? ?? '',
+        caloriesKcal: (json['caloriesKcal'] as num?)?.toDouble() ?? 0.0,
+        proteinG: (json['proteinG'] as num?)?.toDouble() ?? 0.0,
+        carbsG: (json['carbsG'] as num?)?.toDouble() ?? 0.0,
+        totalFatG: (json['totalFatG'] as num?)?.toDouble() ?? 0.0,
+        saturatedFatG: (json['saturatedFatG'] as num?)?.toDouble() ?? 0.0,
+        transFatG: (json['transFatG'] as num?)?.toDouble() ?? 0.0,
+        cholesterolMg: (json['cholesterolMg'] as num?)?.toDouble() ?? 0.0,
+        sodiumMg: (json['sodiumMg'] as num?)?.toDouble() ?? 0.0,
+        potassiumMg: (json['potassiumMg'] as num?)?.toDouble() ?? 0.0,
+        calciumMg: (json['calciumMg'] as num?)?.toDouble() ?? 0.0,
+        ironMg: (json['ironMg'] as num?)?.toDouble() ?? 0.0,
+        fiberG: (json['fiberG'] as num?)?.toDouble() ?? 0.0,
+        sugarsG: (json['sugarsG'] as num?)?.toDouble() ?? 0.0,
+        addedSugarsG: (json['addedSugarsG'] as num?)?.toDouble() ?? 0.0,
+        hasNutritionData: json['hasNutritionData'] as bool? ?? false,
+      );
 }
 
 class DetectionResult {

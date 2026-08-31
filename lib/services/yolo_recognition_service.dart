@@ -40,8 +40,8 @@ class YoloRecognitionService {
   List<int> get inputShape => _inputShape;
   List<int> get outputShape => _outputShape;
 
-  // Detection thresholds — tuned for real-world live camera recognition
-  double confidenceThreshold = 0.10;
+  // Detection thresholds — matched to training evaluation benchmarks
+  double confidenceThreshold = 0.40;
   double iouThreshold = 0.45;
 
   // Cached tensor metadata
@@ -247,8 +247,8 @@ class YoloRecognitionService {
   List<DetectionResult> _runInference(img.Image source) {
     if (_interpreter == null) return [];
 
-    final int targetW = _inputShape.length == 4 ? (_isNCHW ? _inputShape[3] : _inputShape[2]) : 800;
-    final int targetH = _inputShape.length == 4 ? (_isNCHW ? _inputShape[2] : _inputShape[1]) : 800;
+    final int targetW = _inputShape.length == 4 ? (_isNCHW ? _inputShape[3] : _inputShape[2]) : 640;
+    final int targetH = _inputShape.length == 4 ? (_isNCHW ? _inputShape[2] : _inputShape[1]) : 640;
 
     final double scale = min(targetW / source.width, targetH / source.height);
     final int newW = (source.width * scale).round();
@@ -261,8 +261,8 @@ class YoloRecognitionService {
     img.fill(letterboxed, color: img.ColorRgb8(114, 114, 114));
     img.compositeImage(letterboxed, resized, dstX: padX, dstY: padY);
 
-    // Primary pass: normalized [0, 1] input
-    List<DetectionResult> results = _inferencePass(
+    // Primary pass: standard normalized [0.0, 1.0] input (Ultralytics standard)
+    return _inferencePass(
       letterboxed: letterboxed,
       divisor: 255.0,
       targetW: targetW,
@@ -272,22 +272,6 @@ class YoloRecognitionService {
       padX: padX,
       padY: padY,
     );
-
-    // Fallback pass: raw [0, 255]
-    if (results.isEmpty) {
-      results = _inferencePass(
-        letterboxed: letterboxed,
-        divisor: 1.0,
-        targetW: targetW,
-        targetH: targetH,
-        newW: newW,
-        newH: newH,
-        padX: padX,
-        padY: padY,
-      );
-    }
-
-    return results;
   }
 
   List<DetectionResult> _inferencePass({
@@ -332,7 +316,7 @@ class YoloRecognitionService {
     _interpreter!.getInputTensor(0).copyFrom(flatInput);
     _interpreter!.invoke();
 
-    final int dim1 = _outputShape.length >= 2 ? _outputShape[1] : 61;
+    final int dim1 = _outputShape.length >= 2 ? _outputShape[1] : 55;
     final int dim2 = _outputShape.length >= 3 ? _outputShape[2] : 8400;
 
     final outputTensor = _interpreter!.getOutputTensor(0);
@@ -364,7 +348,8 @@ class YoloRecognitionService {
     required int padX,
     required int padY,
   }) {
-    final int numClasses = _labels.length;
+    final int modelClasses = (dim1 < dim2) ? (dim1 - 4) : (dim2 - 4);
+    final int numClasses = min(_labels.length, max(0, modelClasses));
     final List<_RawCandidate> candidates = [];
 
     double applyConfidence(double raw) {
@@ -374,7 +359,9 @@ class YoloRecognitionService {
       return raw;
     }
 
-    final bool isTransposed = dim1 == (4 + numClasses);
+    // In YOLOv8 exported TFLite models:
+    // [1, channels, anchors] -> dim1 < dim2 (e.g. 55 < 8400 or 61 < 13125)
+    final bool isTransposed = dim1 < dim2 || dim1 == (4 + modelClasses);
     final int numBoxes = isTransposed ? dim2 : dim1;
     double globalMaxRawScore = -1e9;
 
@@ -506,28 +493,32 @@ class _RawCandidate {
 
 List<DetectionResult> _applyNMSStatic(
     List<_RawCandidate> candidates, List<String> labels, double iouThreshold) {
-  final Map<int, List<_RawCandidate>> byClass = {};
-  for (final c in candidates) {
-    byClass.putIfAbsent(c.classId, () => []).add(c);
+  if (candidates.isEmpty) return [];
+
+  // Sort all candidates globally by confidence descending
+  final sorted = List<_RawCandidate>.from(candidates)
+    ..sort((a, b) => b.score.compareTo(a.score));
+
+  final kept = <_RawCandidate>[];
+  for (final cand in sorted) {
+    // Suppress any lower-scoring candidate that heavily overlaps with an already-accepted detection
+    if (kept.any((k) => _iouStatic(cand.box, k.box) > iouThreshold)) {
+      continue;
+    }
+    kept.add(cand);
   }
 
   final List<DetectionResult> out = [];
-  for (final entry in byClass.entries) {
-    final list = entry.value..sort((a, b) => b.score.compareTo(a.score));
-    final kept = <_RawCandidate>[];
-    for (final cand in list) {
-      if (kept.any((k) => _iouStatic(cand.box, k.box) > iouThreshold)) {
-        continue;
-      }
-      kept.add(cand);
-    }
-    final label = (entry.key >= 0 && entry.key < labels.length)
-        ? labels[entry.key]
-        : 'class_${entry.key}';
-    for (final k in kept) {
-      out.add(
-          DetectionResult(label: label, confidence: k.score, boundingBox: k.box));
-    }
+  for (final k in kept) {
+    final label = (k.classId >= 0 && k.classId < labels.length)
+        ? labels[k.classId]
+        : 'class_${k.classId}';
+    debugPrint('YOLO Detection: classId=${k.classId} -> "$label" (conf=${(k.score * 100).toStringAsFixed(1)}%)');
+    out.add(DetectionResult(
+      label: label,
+      confidence: k.score,
+      boundingBox: k.box,
+    ));
   }
   return out;
 }
@@ -583,49 +574,53 @@ Map<String, dynamic> _preprocessFrameIsolate(Map<String, dynamic> args) {
   final int maxUvIdx = min(uBuf.length, vBuf.length) - 1;
 
   if (isNCHW) {
-    for (int c = 0; c < 3; c++) {
-      final int cOffset = c * targetH * targetW;
-      for (int y = 0; y < targetH; y++) {
-        final int yOffset = cOffset + y * targetW;
-        for (int x = 0; x < targetW; x++) {
-          if (x >= padX && x < padX + newW && y >= padY && y < padY + newH) {
-            final int rx = ((x - padX) / scale).floor().clamp(0, realW - 1);
-            final int ry = ((y - padY) / scale).floor().clamp(0, realH - 1);
+    final int channelSize = targetH * targetW;
+    final int rOffset = 0;
+    final int gOffset = channelSize;
+    final int bOffset = channelSize * 2;
 
-            int sx, sy;
-            if (sensorOrientation == 270) {
-              sx = rotate ? (srcW - 1 - ry) : rx;
-              sy = rotate ? rx : ry;
-            } else if (sensorOrientation == 90) {
-              sx = rotate ? ry : rx;
-              sy = rotate ? (srcH - 1 - rx) : ry;
-            } else {
-              sx = rx;
-              sy = ry;
-            }
+    for (int y = 0; y < targetH; y++) {
+      final int rowOffset = y * targetW;
+      for (int x = 0; x < targetW; x++) {
+        if (x >= padX && x < padX + newW && y >= padY && y < padY + newH) {
+          final int rx = ((x - padX) / scale).floor().clamp(0, realW - 1);
+          final int ry = ((y - padY) / scale).floor().clamp(0, realH - 1);
 
-            final int yIdx = (sy * yStride + sx).clamp(0, maxYIdx);
-            final int uvIdx =
-                ((sy ~/ 2) * uvStride + (sx ~/ 2) * uvPixStep).clamp(0, maxUvIdx);
-
-            final int yp = yBuf[yIdx];
-            final int up = uBuf[uvIdx] - 128;
-            final int vp = vBuf[uvIdx] - 128;
-
-            double value;
-            if (c == 0) {
-              value = (yp + 1.402 * vp).clamp(0, 255).toDouble() / divisor;
-            } else if (c == 1) {
-              value =
-                  (yp - 0.344136 * up - 0.714136 * vp).clamp(0, 255).toDouble() /
-                      divisor;
-            } else {
-              value = (yp + 1.772 * up).clamp(0, 255).toDouble() / divisor;
-            }
-            inputBuffer[yOffset + x] = value;
+          int sx, sy;
+          if (sensorOrientation == 270) {
+            sx = rotate ? (srcW - 1 - ry) : rx;
+            sy = rotate ? rx : ry;
+          } else if (sensorOrientation == 90) {
+            sx = rotate ? ry : rx;
+            sy = rotate ? (srcH - 1 - rx) : ry;
           } else {
-            inputBuffer[yOffset + x] = gray;
+            sx = rx;
+            sy = ry;
           }
+
+          final int yIdx = (sy * yStride + sx).clamp(0, maxYIdx);
+          final int uvIdx =
+              ((sy ~/ 2) * uvStride + (sx ~/ 2) * uvPixStep).clamp(0, maxUvIdx);
+
+          final int yp = yBuf[yIdx];
+          final int up = uBuf[uvIdx] - 128;
+          final int vp = vBuf[uvIdx] - 128;
+
+          final double r =
+              (yp + 1.402 * vp).clamp(0, 255).toDouble() / divisor;
+          final double g =
+              (yp - 0.344136 * up - 0.714136 * vp).clamp(0, 255).toDouble() /
+                  divisor;
+          final double b =
+              (yp + 1.772 * up).clamp(0, 255).toDouble() / divisor;
+
+          inputBuffer[rOffset + rowOffset + x] = r;
+          inputBuffer[gOffset + rowOffset + x] = g;
+          inputBuffer[bOffset + rowOffset + x] = b;
+        } else {
+          inputBuffer[rOffset + rowOffset + x] = gray;
+          inputBuffer[gOffset + rowOffset + x] = gray;
+          inputBuffer[bOffset + rowOffset + x] = gray;
         }
       }
     }

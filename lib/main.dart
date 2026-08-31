@@ -19,7 +19,9 @@ import 'screens/onboarding_screen.dart';
 import 'screens/otp_verification_screen.dart';
 import 'screens/select_language_screen.dart';
 import 'screens/get_started_screen.dart';
+import 'dart:async';
 import 'data/services/backend_locator.dart';
+import 'data/repositories/product_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +74,17 @@ void main() async {
   await TextSizeService.initialize();
   await VoiceAssistantService.initialize();
   runApp(const ClaroApp());
+
+  // Fire-and-forget background sync: Pre-caches top FDA products to persistent offline storage
+  // so that nutrition lookup, Nutri-Score, NOVA, and WHO evaluations work seamlessly in grocery basements.
+  unawaited(() async {
+    try {
+      final repo = BackendLocator.productRepository;
+      if (repo is FirestoreProductRepository) {
+        await repo.preloadOfflineCatalog();
+      }
+    } catch (_) {}
+  }());
 }
 
 class ClaroApp extends StatelessWidget {
@@ -333,7 +346,9 @@ class AuthGate extends StatelessWidget {
                         }
 
                         // Warm user health profile cache asynchronously in the background
-                        BackendLocator.userRepository.getHealthProfile(user.uid).catchError((_) {});
+                        unawaited(BackendLocator.userRepository
+                            .getHealthProfile(user.uid)
+                            .then((_) {}, onError: (_) {}));
                       });
 
                       final bool onboarded = data?['onboardingComplete'] ?? false;
