@@ -40,6 +40,4 @@ services:
     # admin-claro's files live at the repo root; on merged-works,
     # admin-claro is only a git submodule pointer, not real files)
     branch: M9
-    git:
-      branch: M9
-      deployOnPush: true
+    autoDeploy: true
