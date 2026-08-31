@@ -107,6 +107,7 @@
   "agreeToTermsPrefix": "Sumasang-ayon ako sa ",
   "termsConditionsRequiredError": "Kailangan mong sumang-ayon sa Mga Tuntunin at Kundisyon para magpatuloy.",
   "closeButton": "Isara",
+  "agreeButton": "Sumasang-ayon",
   "onboardingDobError": "Piliin ang iyong kaarawan.",
   "onboardingNameAndDobError": "Ilagay ang iyong pangalan at piliin ang iyong kaarawan.",
   "userGuide": "Gabay sa Gumagamit",

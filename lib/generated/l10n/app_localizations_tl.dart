@@ -293,6 +293,9 @@ class AppLocalizationsTl extends AppLocalizations {
   String get closeButton => 'Isara';
 
   @override
+  String get agreeButton => 'Sumasang-ayon';
+
+  @override
   String get onboardingDobError => 'Piliin ang iyong kaarawan.';
 
   @override

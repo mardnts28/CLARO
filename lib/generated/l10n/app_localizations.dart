@@ -638,6 +638,12 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get closeButton;
 
+  /// No description provided for @agreeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Agree'**
+  String get agreeButton;
+
   /// No description provided for @onboardingDobError.
   ///
   /// In en, this message translates to:

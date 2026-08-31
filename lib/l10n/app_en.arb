@@ -107,6 +107,7 @@
   "agreeToTermsPrefix": "I agree to the ",
   "termsConditionsRequiredError": "You must agree to the Terms and Conditions to continue.",
   "closeButton": "Close",
+  "agreeButton": "Agree",
   "onboardingDobError": "Please select your date of birth.",
   "onboardingNameAndDobError": "Please enter your name and select your date of birth.",
   "userGuide": "User Guide",

@@ -291,6 +291,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get closeButton => 'Close';
 
   @override
+  String get agreeButton => 'Agree';
+
+  @override
   String get onboardingDobError => 'Please select your date of birth.';
 
   @override

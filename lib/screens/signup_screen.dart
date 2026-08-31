@@ -72,9 +72,11 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _showConfirmPassword = false;
   bool _isLoading = false;
 
-  // Terms & Conditions agreement. Required before ANY account-creation
-  // path on this screen (email/password sign-up or Google sign-in) is
-  // allowed to proceed -- see _validateTermsAgreement().
+  // Terms & Conditions agreement (checkbox on this form). Required only
+  // for the email/password sign-up path -- see _validateTermsAgreement().
+  // Google sign-up does NOT use this checkbox; instead it shows a
+  // separate, mandatory "Agree"-only dialog after Google authentication
+  // succeeds (see _handleGoogleSignIn).
   bool _agreedToTerms = false;
   String? _termsError;
   final _termsLinkRecognizer = TapGestureRecognizer();
@@ -330,9 +332,10 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   /// Checks the Terms & Conditions checkbox and surfaces a clear error if
-  /// it hasn't been agreed to. Called from every account-creation path on
-  /// this screen (email/password sign-up AND Google sign-in) so the
-  /// requirement can't be bypassed via either button.
+  /// it hasn't been agreed to. Only called from the email/password
+  /// sign-up path (_handleSignUp) -- Google sign-up gates agreement via
+  /// a separate mandatory dialog shown after Google authentication
+  /// succeeds instead (see _handleGoogleSignIn).
   bool _validateTermsAgreement() {
     final loc = AppLocalizations.of(context)!;
     if (!_agreedToTerms) {
@@ -404,13 +407,12 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     HapticService().vibrate();
-    // Same Terms & Conditions requirement applies to Google sign-in as to
-    // the email/password path -- this screen has only these two ways to
-    // create an account, and both must be gated so the checkbox can't be
-    // bypassed by using the other button.
-    if (!_validateTermsAgreement()) {
-      return;
-    }
+    // Unlike email/password sign-up, Google sign-up does NOT require the
+    // on-screen Terms & Conditions checkbox to be ticked first -- ticking
+    // it here would duplicate/pre-empt the mandatory "Agree" dialog we
+    // show after Google authentication succeeds (see below), and could
+    // let the checkbox alone stand in for that explicit acknowledgement.
+    // The checkbox on this form is scoped to _handleSignUp only.
     setState(() {
       _formError = null;
       _isLoading = true;
@@ -421,14 +423,26 @@ class _SignupScreenState extends State<SignupScreen> {
       if (!mounted) return;
 
       if (result == null) {
-        // Google sign-in succeeded, no MFA required. Previously this
-        // relied on AuthGate to notice the auth-state change and
-        // redirect automatically, but this screen is reached via
-        // Navigator.pushReplacement from LoginScreen — meaning it lives
-        // OUTSIDE AuthGate's widget tree, so nothing was listening and
-        // the user got stuck here even though Firebase had already
-        // logged them in. We now navigate explicitly instead of
-        // waiting on AuthGate.
+        // Google sign-in succeeded, no MFA required. Before continuing,
+        // require the user to explicitly agree to the Terms &
+        // Conditions via a blocking, "Agree"-only dialog -- there is no
+        // Skip/Cancel/Decline, and the dialog cannot be dismissed any
+        // other way (see showTermsAndConditionsDialog doc comment).
+        // Declining isn't an option in this flow: the user simply stays
+        // on the dialog until they tap "Agree".
+        final agreed = await showTermsAndConditionsDialog(
+          context,
+          requireAgreement: true,
+        );
+        if (!mounted || !agreed) return;
+
+        // Previously this relied on AuthGate to notice the auth-state
+        // change and redirect automatically, but this screen is reached
+        // via Navigator.pushReplacement from LoginScreen — meaning it
+        // lives OUTSIDE AuthGate's widget tree, so nothing was listening
+        // and the user got stuck here even though Firebase had already
+        // logged them in. We now navigate explicitly instead of waiting
+        // on AuthGate.
         await _routeAfterAuth();
         return;
       }

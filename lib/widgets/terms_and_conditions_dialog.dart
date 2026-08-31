@@ -429,15 +429,37 @@ final List<_TermsSection> _termsSections = [
 ];
 
 /// Shows the Terms & Conditions in a modal card with a fixed width/height,
-/// a header (title + close button) that stays put, and only the body text
-/// scrolling underneath it. Follows the app's existing theme (light/dark)
-/// via [Theme.of], so it renders correctly regardless of which mode is
-/// active in the surrounding context.
-Future<void> showTermsAndConditionsDialog(BuildContext context) {
+/// a header that stays put, and only the body text scrolling underneath
+/// it. Follows the app's existing theme (light/dark) via [Theme.of], so it
+/// renders correctly regardless of which mode is active in the surrounding
+/// context.
+///
+/// By default (`requireAgreement: false`) this is the informational
+/// variant used from the Sign Up form's "Terms & Conditions" link: it has
+/// a close (X) button in the header, no footer button, can be dismissed by
+/// tapping the barrier, and always resolves to `false` since agreeing
+/// isn't required just to read the terms.
+///
+/// When `requireAgreement: true` (used for the post-Google-auth gate) the
+/// dialog becomes a blocking acceptance step instead of a reader: there is
+/// no close (X) button, no Skip/Cancel/Decline button, the barrier cannot
+/// be tapped away, and the hardware/system back gesture is suppressed.
+/// The ONLY way to leave the dialog is the single "Agree" button in the
+/// footer, which resolves the returned future to `true`. Everything else
+/// (dimensions, theming, header title, body content/scrolling) is shared
+/// with the informational variant so the two never visually diverge.
+///
+/// Returns `true` if the user tapped "Agree" (only possible when
+/// `requireAgreement` is true), `false` otherwise (dismissed, closed, or
+/// the informational variant was used).
+Future<bool> showTermsAndConditionsDialog(
+  BuildContext context, {
+  bool requireAgreement = false,
+}) async {
   final loc = AppLocalizations.of(context)!;
-  return showDialog<void>(
+  final result = await showDialog<bool>(
     context: context,
-    barrierDismissible: true,
+    barrierDismissible: !requireAgreement,
     builder: (dialogContext) {
       final theme = Theme.of(dialogContext);
       final colorScheme = theme.colorScheme;
@@ -448,7 +470,7 @@ Future<void> showTermsAndConditionsDialog(BuildContext context) {
       final cardWidth = screenSize.width * 0.9;
       final cardHeight = (screenSize.height * 0.8).clamp(400.0, 640.0);
 
-      return Dialog(
+      final dialogCard = Dialog(
         backgroundColor: theme.cardColor,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -457,7 +479,8 @@ Future<void> showTermsAndConditionsDialog(BuildContext context) {
           height: cardHeight,
           child: Column(
             children: [
-              // Fixed header: title + close button never scroll away.
+              // Fixed header: title (+ close button, informational
+              // variant only) never scrolls away.
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
                 decoration: BoxDecoration(
@@ -477,11 +500,16 @@ Future<void> showTermsAndConditionsDialog(BuildContext context) {
                         ),
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
-                      tooltip: loc.closeButton,
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                    ),
+                    // The close (X) button only exists in the
+                    // informational variant. When agreement is required,
+                    // there must be no way to dismiss the dialog other
+                    // than tapping "Agree" -- see doc comment above.
+                    if (!requireAgreement)
+                      IconButton(
+                        icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
+                        tooltip: loc.closeButton,
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                      ),
                   ],
                 ),
               ),
@@ -586,10 +614,56 @@ Future<void> showTermsAndConditionsDialog(BuildContext context) {
                   ),
                 ),
               ),
+              // Fixed footer: the single, mandatory "Agree" action.
+              // Informational variant has no footer at all -- reading the
+              // terms never required an explicit acknowledgement.
+              if (requireAgreement)
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  decoration: BoxDecoration(
+                    border: Border(
+                      top: BorderSide(color: theme.dividerColor),
+                    ),
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      // The only way out of a mandatory dialog: pop `true`.
+                      onPressed: () => Navigator.of(dialogContext).pop(true),
+                      child: Text(
+                        loc.agreeButton,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
       );
+
+      if (!requireAgreement) return dialogCard;
+
+      // Belt-and-suspenders: barrierDismissible is already false above,
+      // but PopScope also blocks the Android hardware/gesture back
+      // action, which is a separate dismissal path from the barrier.
+      // Without this, a user could back-gesture out of a "required"
+      // dialog without ever tapping "Agree".
+      return PopScope(
+        canPop: false,
+        child: dialogCard,
+      );
     },
   );
+  return result ?? false;
 }
