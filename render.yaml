@@ -18,9 +18,10 @@ services:
         destination: /index.html
 
     # Node version for build process
+    # Vite 8's rolldown bundler requires Node ^20.19.0 or >=22.12.0
     envVars:
       - key: NODE_VERSION
-        value: 18
+        value: 22.12.0
     
     # Render-specific environment variables
     # These should be set in the Render dashboard, not here
