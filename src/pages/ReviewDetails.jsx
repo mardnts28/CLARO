@@ -129,7 +129,7 @@ export default function ReviewDetails() {
         <div className="review-summary">
           <div className="review-user">
             <span className="user-name">{review.userName}</span>
-            <span className="user-email">{review.uid}</span>
+            <span className="user-email">{review.userEmail}</span>
           </div>
           <StarRating rating={review.starNumber || 0} showNumber />
           <div className="date-cell">
