@@ -106,6 +106,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     super.initState();
     LocaleService.localeNotifier.addListener(_onLocaleChanged);
     VoiceAssistantService.setLatestScanProduct(widget.product);
+    VoiceAssistantService.activeResultProductNotifier.value = widget.product;
     _currentProduct = widget.product;
     _currentComparisonSet = widget.comparisonSet;
     _scanEventId = '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}';
@@ -237,6 +238,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   void dispose() {
+    if (VoiceAssistantService.activeResultProductNotifier.value?.id == _currentProduct.id) {
+      VoiceAssistantService.activeResultProductNotifier.value = null;
+    }
     _reportToastTimer?.cancel();
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
@@ -245,6 +249,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   /// Updates the currently displayed product and reloads all associated data.
   /// Called when returning from Compare with a selected product.
   void _updateProduct(Product newProduct, List<RankedProductResult>? newComparisonSet) {
+    VoiceAssistantService.setLatestScanProduct(newProduct);
+    VoiceAssistantService.activeResultProductNotifier.value = newProduct;
     setState(() {
       _currentProduct = newProduct;
       _currentComparisonSet = newComparisonSet;

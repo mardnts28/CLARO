@@ -47,17 +47,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     HomeTabController.tabNotifier.addListener(_handleTabChange);
     _announceIfVisible();
     _loadUserData();
-    // Listen to the shared name notifier so this header updates
-    // instantly if the name is changed elsewhere (e.g.
-    // PersonalInfoScreen), without requiring a manual refresh.
-    //
-    // Previously, ProfileScreen and HomeScreen are sibling tabs kept
-    // alive inside HomeScreen's IndexedStack — editing the name on
-    // PersonalInfoScreen (pushed on top) only updated Firestore, and
-    // returning here never recreated this widget or told it anything
-    // had changed, so the old name stayed on screen until a manual
-    // pull-to-refresh.
     AuthService.userNameNotifier.addListener(_handleNameChanged);
+    themeModeNotifier.addListener(_handleThemeChanged);
+    AuthService.mfaNotifier.addListener(_handleMfaChanged);
+    VoiceAssistantService.isEnabledNotifier.addListener(_handleVoiceAssistantChanged);
   }
 
   void _handleTabChange() {
@@ -76,12 +69,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
     AuthService.userNameNotifier.removeListener(_handleNameChanged);
+    themeModeNotifier.removeListener(_handleThemeChanged);
+    AuthService.mfaNotifier.removeListener(_handleMfaChanged);
+    VoiceAssistantService.isEnabledNotifier.removeListener(_handleVoiceAssistantChanged);
     super.dispose();
   }
 
   void _handleNameChanged() {
     if (!mounted) return;
     setState(() => _userName = AuthService.userNameNotifier.value);
+  }
+
+  void _handleThemeChanged() {
+    if (!mounted) return;
+    final isDark = themeModeNotifier.value == ThemeMode.dark;
+    if (_darkModeEnabled != isDark) {
+      setState(() => _darkModeEnabled = isDark);
+    }
+  }
+
+  void _handleMfaChanged() {
+    if (!mounted) return;
+    if (_mfaEnabled != AuthService.mfaNotifier.value) {
+      setState(() => _mfaEnabled = AuthService.mfaNotifier.value);
+    }
+  }
+
+  void _handleVoiceAssistantChanged() {
+    if (!mounted) return;
+    if (_voiceAssistantEnabled != VoiceAssistantService.isEnabledNotifier.value) {
+      setState(() => _voiceAssistantEnabled = VoiceAssistantService.isEnabledNotifier.value);
+    }
   }
 
   Future<void> _loadUserData() async {
@@ -95,19 +113,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
             final data = userDoc.data();
             if (data != null) {
               final themeString = data['theme'] ?? 'Default';
+              final mfaVal = data['mfaEnabled'] ?? false;
+              final voiceVal = data['voiceAssistant'] ?? false;
               setState(() {
                 _userName = data['name'] ?? 'User';
                 _userEmail = data['email'] ?? '';
-                _voiceAssistantEnabled = data['voiceAssistant'] ?? false;
-                _mfaEnabled = data['mfaEnabled'] ?? false;
+                _voiceAssistantEnabled = voiceVal;
+                _mfaEnabled = mfaVal;
                 _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
-                // `language` stored as language code ('en'|'tl'). Convert to human label for UI.
                 final code = data['language'] ?? 'en';
                 _selectedLanguageCode = code;
               });
+              AuthService.mfaNotifier.value = mfaVal;
+              VoiceAssistantService.isEnabledNotifier.value = voiceVal;
               setAppThemeMode(parseThemeMode(themeString));
-              // Keep the shared notifier in sync so HomeScreen's
-              // greeting reflects whatever this screen just loaded.
               AuthService.userNameNotifier.value = _userName;
             }
             return;
@@ -120,15 +139,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
           final data = userDoc.data();
           if (data != null) {
             final themeString = data['theme'] ?? 'Default';
+            final mfaVal = data['mfaEnabled'] ?? false;
+            final voiceVal = data['voiceAssistant'] ?? false;
             setState(() {
               _userName = data['name'] ?? 'User';
               _userEmail = data['email'] ?? '';
-              _voiceAssistantEnabled = data['voiceAssistant'] ?? false;
-              _mfaEnabled = data['mfaEnabled'] ?? false;
+              _voiceAssistantEnabled = voiceVal;
+              _mfaEnabled = mfaVal;
               _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
               final code = data['language'] ?? 'en';
               _selectedLanguageCode = code;
             });
+            AuthService.mfaNotifier.value = mfaVal;
+            VoiceAssistantService.isEnabledNotifier.value = voiceVal;
             setAppThemeMode(parseThemeMode(themeString));
             AuthService.userNameNotifier.value = _userName;
           }

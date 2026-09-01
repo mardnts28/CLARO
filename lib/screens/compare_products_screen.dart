@@ -186,6 +186,8 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
             .toSet();
       });
 
+      _updateVoiceSummary(ranked);
+
       // Save comparison session to history immediately after successful generation
       // Only save if this is a new comparison (not viewing a saved one)
       if (widget.saveToHistory) {
@@ -204,6 +206,18 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         });
       }
     }
+  }
+
+  void _updateVoiceSummary(List<RankedProductResult> ranked) {
+    if (ranked.isEmpty) return;
+    final source = widget.sourceProduct;
+    final top = ranked.first;
+    final topProduct = top.evaluation.product;
+    final isTagalog = VoiceAssistantService.languageNotifier.value == VoiceLang.tagalog;
+    final summary = isTagalog
+        ? 'Resulta ng paghahambing para sa ${source.name}. Mayroong ${ranked.length} na mga produkto sa kategoryang ito. Ang nangungunang rekomendasyon ay ${topProduct.name}.'
+        : 'Comparison results for ${source.name}. Found ${ranked.length} products in this category. The top recommendation is ${topProduct.name}.';
+    VoiceAssistantService.setLatestScanSummary(summary);
   }
 
   /// Scans the fixed comparison set once (after load) to find which

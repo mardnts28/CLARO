@@ -68,6 +68,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void initState() {
     super.initState();
     HomeTabController.tabNotifier.addListener(_handleTabChange);
+    HomeTabController.historySubTabNotifier.addListener(_handleSubTabChange);
     _announceIfVisible();
     _subscription = _historyService.onUpdate.listen((_) {
       if (mounted) setState(() {});
@@ -84,6 +85,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _subscribeReports();
     // Listen for language changes to refresh the UI with localized labels
     LocaleService.localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  void _handleSubTabChange() {
+    if (mounted) {
+      setState(() {
+        _activeTab = HomeTabController.historySubTabNotifier.value;
+      });
+    }
   }
 
   void _onLocaleChanged() {
@@ -107,6 +116,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void dispose() {
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
+    HomeTabController.historySubTabNotifier.removeListener(_handleSubTabChange);
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     _subscription?.cancel();
     _favoritesSubscription?.cancel();

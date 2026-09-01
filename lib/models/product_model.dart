@@ -250,7 +250,7 @@ class NutritionalFacts {
     String? dietaryFiber,
     String? sugars,
     String? protein,
-    this.hasNutritionData = false,
+    bool? hasNutritionData,
   })  : caloriesKcal = caloriesKcal ?? (calories != null ? double.tryParse(calories.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),
         proteinG = proteinG ?? (protein != null ? double.tryParse(protein.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),
         carbsG = carbsG ?? (totalCarbohydrate != null ? double.tryParse(totalCarbohydrate.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),
@@ -264,7 +264,14 @@ class NutritionalFacts {
         ironMg = ironMg ?? 0.0,
         fiberG = fiberG ?? (dietaryFiber != null ? double.tryParse(dietaryFiber.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),
         sugarsG = sugarsG ?? (sugars != null ? double.tryParse(sugars.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0),
-        addedSugarsG = addedSugarsG ?? 0.0;
+        addedSugarsG = addedSugarsG ?? 0.0,
+        hasNutritionData = hasNutritionData ??
+            ((caloriesKcal ?? (calories != null ? double.tryParse(calories.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0)) > 0 ||
+             (proteinG ?? (protein != null ? double.tryParse(protein.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0)) > 0 ||
+             (totalFatG ?? (totalFat != null ? double.tryParse(totalFat.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0)) > 0 ||
+             (sodiumMg ?? (sodium != null ? double.tryParse(sodium.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0)) > 0 ||
+             (carbsG ?? (totalCarbohydrate != null ? double.tryParse(totalCarbohydrate.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0)) > 0 ||
+             (sugarsG ?? (sugars != null ? double.tryParse(sugars.replaceAll(RegExp(r'[^0-9.]'), '')) ?? 0.0 : 0.0)) > 0);
 
   Map<String, dynamic> toJson() => {
     'servingSize': servingSize,
@@ -286,26 +293,44 @@ class NutritionalFacts {
     'hasNutritionData': hasNutritionData,
   };
 
-  factory NutritionalFacts.fromJson(Map<String, dynamic> json) =>
-      NutritionalFacts(
-        servingSize: json['servingSize']?.toString() ?? '',
-        servingsPerContainer: json['servingsPerContainer']?.toString() ?? '',
-        caloriesKcal: (json['caloriesKcal'] as num?)?.toDouble() ?? 0.0,
-        proteinG: (json['proteinG'] as num?)?.toDouble() ?? 0.0,
-        carbsG: (json['carbsG'] as num?)?.toDouble() ?? 0.0,
-        totalFatG: (json['totalFatG'] as num?)?.toDouble() ?? 0.0,
-        saturatedFatG: (json['saturatedFatG'] as num?)?.toDouble() ?? 0.0,
-        transFatG: (json['transFatG'] as num?)?.toDouble() ?? 0.0,
-        cholesterolMg: (json['cholesterolMg'] as num?)?.toDouble() ?? 0.0,
-        sodiumMg: (json['sodiumMg'] as num?)?.toDouble() ?? 0.0,
-        potassiumMg: (json['potassiumMg'] as num?)?.toDouble() ?? 0.0,
-        calciumMg: (json['calciumMg'] as num?)?.toDouble() ?? 0.0,
-        ironMg: (json['ironMg'] as num?)?.toDouble() ?? 0.0,
-        fiberG: (json['fiberG'] as num?)?.toDouble() ?? 0.0,
-        sugarsG: (json['sugarsG'] as num?)?.toDouble() ?? 0.0,
-        addedSugarsG: (json['addedSugarsG'] as num?)?.toDouble() ?? 0.0,
-        hasNutritionData: json['hasNutritionData'] as bool? ?? false,
-      );
+  factory NutritionalFacts.fromJson(Map<String, dynamic> json) {
+    final cal = (json['caloriesKcal'] as num?)?.toDouble() ?? 0.0;
+    final prot = (json['proteinG'] as num?)?.toDouble() ?? 0.0;
+    final carb = (json['carbsG'] as num?)?.toDouble() ?? 0.0;
+    final fat = (json['totalFatG'] as num?)?.toDouble() ?? 0.0;
+    final satFat = (json['saturatedFatG'] as num?)?.toDouble() ?? 0.0;
+    final trans = (json['transFatG'] as num?)?.toDouble() ?? 0.0;
+    final chol = (json['cholesterolMg'] as num?)?.toDouble() ?? 0.0;
+    final sod = (json['sodiumMg'] as num?)?.toDouble() ?? 0.0;
+    final pot = (json['potassiumMg'] as num?)?.toDouble() ?? 0.0;
+    final calc = (json['calciumMg'] as num?)?.toDouble() ?? 0.0;
+    final iron = (json['ironMg'] as num?)?.toDouble() ?? 0.0;
+    final fib = (json['fiberG'] as num?)?.toDouble() ?? 0.0;
+    final sug = (json['sugarsG'] as num?)?.toDouble() ?? 0.0;
+    final addSug = (json['addedSugarsG'] as num?)?.toDouble() ?? 0.0;
+    final explicit = json['hasNutritionData'] as bool?;
+    final hasData = explicit ?? (cal > 0 || prot > 0 || fat > 0 || sod > 0 || carb > 0 || sug > 0);
+
+    return NutritionalFacts(
+      servingSize: json['servingSize']?.toString() ?? '',
+      servingsPerContainer: json['servingsPerContainer']?.toString() ?? '',
+      caloriesKcal: cal,
+      proteinG: prot,
+      carbsG: carb,
+      totalFatG: fat,
+      saturatedFatG: satFat,
+      transFatG: trans,
+      cholesterolMg: chol,
+      sodiumMg: sod,
+      potassiumMg: pot,
+      calciumMg: calc,
+      ironMg: iron,
+      fiberG: fib,
+      sugarsG: sug,
+      addedSugarsG: addSug,
+      hasNutritionData: hasData,
+    );
+  }
 }
 
 class DetectionResult {

@@ -21,10 +21,23 @@ class _ThemeScreenState extends State<ThemeScreen> {
   @override
   void initState() {
     super.initState();
+    themeModeNotifier.addListener(_handleThemeChanged);
     if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
       VoiceAssistantService.instance.announcePage('theme');
     }
     _load();
+  }
+
+  @override
+  void dispose() {
+    themeModeNotifier.removeListener(_handleThemeChanged);
+    super.dispose();
+  }
+
+  void _handleThemeChanged() {
+    if (!mounted) return;
+    final isDark = themeModeNotifier.value == ThemeMode.dark;
+    setState(() => _selected = isDark ? 'Dark Mode' : 'Default');
   }
 
   Future<void> _load() async {

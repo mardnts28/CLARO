@@ -24,14 +24,18 @@ class FavoritesService {
     return _favoritesRepository.isFavorite(userId: userId, productId: productId);
   }
 
+  Future<void> addFavorite({required String userId, required String productId}) {
+    return _favoritesRepository.addFavorite(userId: userId, productId: productId);
+  }
+
+  Future<void> removeFavorite({required String userId, required String productId}) {
+    return _favoritesRepository.removeFavorite(userId: userId, productId: productId);
+  }
+
   /// Toggles the heart-button state for a product. Returns the NEW state
   /// (true = now favorited, false = now un-favorited) so the UI can update
   /// the icon immediately without a second round-trip.
   Future<bool> toggleFavorite({required String userId, required String productId}) {
-    // Delegate to the repository's own toggle rather than doing a separate
-    // isFavorite() read here first -- that read-then-write pattern has a
-    // race window on rapid double-taps; the repository's toggle reads and
-    // writes as one step.
     return _favoritesRepository.toggleFavorite(userId: userId, productId: productId);
   }
 

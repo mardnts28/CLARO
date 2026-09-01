@@ -59,18 +59,10 @@ class AuthService {
   static final pendingMfaChallenge = ValueNotifier<Map<String, dynamic>?>(null);
 
   /// Shared, app-wide notifier for the current user's display name.
-  /// HomeScreen's greeting and ProfileScreen's header both listen to
-  /// this instead of caching their own independent copy of the name.
-  ///
-  /// Previously, editing the name on PersonalInfoScreen only updated
-  /// Firestore — HomeScreen and ProfileScreen are sibling tabs kept
-  /// alive inside HomeScreen's IndexedStack, so navigating back from
-  /// PersonalInfoScreen never recreated either of them or told them
-  /// anything had changed. The old name stayed on screen until the
-  /// user manually pulled to refresh. Any screen that loads or saves
-  /// the name should update this notifier so every listener updates
-  /// immediately.
   static final ValueNotifier<String> userNameNotifier = ValueNotifier<String>('User');
+
+  /// Shared notifier for MFA enabled state
+  static final ValueNotifier<bool> mfaNotifier = ValueNotifier<bool>(false);
 
   bool get _isFirebaseReady => Firebase.apps.isNotEmpty;
 
@@ -422,6 +414,7 @@ class AuthService {
     final refreshedUid = _firebaseAuth.currentUser?.uid;
     if (refreshedUid == null) return;
     await _firebaseDb.collection('users').doc(refreshedUid).set({'mfaEnabled': enabled}, SetOptions(merge: true));
+    mfaNotifier.value = enabled;
   }
 
   /// EmailJS Public Key (a.k.a. "user_id"). Safe to keep in client code —

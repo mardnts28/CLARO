@@ -83,35 +83,33 @@ class GeminiService {
   }
 
   Future<String> summarizeScan({required VoiceLang language}) async {
-    final langValue = language == VoiceLang.tagalog ? 'fil' : 'en';
     final activeSummary = VoiceAssistantService.latestScanSummaryNotifier.value;
     if (activeSummary != null && activeSummary.trim().isNotEmpty) {
       return activeSummary;
     }
 
-    try {
-      final callable = FirebaseFunctions.instance.httpsCallable('summarizeScan');
-      final result = await callable.call(<String, dynamic>{
-        'language': langValue,
-      });
-
-      final data = result.data;
-      if (data is Map && data['summary'] is String) {
-        final summary = (data['summary'] as String).trim();
-        if (summary.isNotEmpty) return summary;
-      }
-
-      debugPrint('Scan summary error: callable returned unexpected data: $data');
-      final localSummary = await _buildLocalReportSummary(language);
-        return localSummary ?? await _buildLocalProductSummary(language) ??
-          await _buildLocalScanRecordSummary(language) ?? _noScanSummary(language);
-    } catch (error, stackTrace) {
-      debugPrint('Scan summary callable failed: $error');
-      debugPrint('$stackTrace');
-      final localSummary = await _buildLocalReportSummary(language);
-        return localSummary ?? await _buildLocalProductSummary(language) ??
-          await _buildLocalScanRecordSummary(language) ?? _noScanSummary(language);
+    final activeProduct = VoiceAssistantService.activeResultProductNotifier.value ??
+        VoiceAssistantService.latestScanProductNotifier.value;
+    if (activeProduct != null) {
+      return _formatProductSummary(activeProduct, language);
     }
+
+    final localSummary = await _buildLocalReportSummary(language);
+    if (localSummary != null && localSummary.isNotEmpty) {
+      return localSummary;
+    }
+
+    final productSummary = await _buildLocalProductSummary(language);
+    if (productSummary != null && productSummary.isNotEmpty) {
+      return productSummary;
+    }
+
+    final recordSummary = await _buildLocalScanRecordSummary(language);
+    if (recordSummary != null && recordSummary.isNotEmpty) {
+      return recordSummary;
+    }
+
+    return _noScanSummary(language);
   }
 
   Future<String?> _buildLocalReportSummary(VoiceLang language) async {
@@ -160,7 +158,8 @@ class GeminiService {
 
   Future<String?> _buildLocalProductSummary(VoiceLang language) async {
     try {
-      final currentProduct = VoiceAssistantService.latestScanProductNotifier.value;
+      final currentProduct = VoiceAssistantService.activeResultProductNotifier.value ??
+          VoiceAssistantService.latestScanProductNotifier.value;
       if (currentProduct != null) {
         return _formatProductSummary(currentProduct, language);
       }
@@ -180,26 +179,25 @@ class GeminiService {
   }
 
   String _formatProductSummary(Product product, VoiceLang language) {
-      final facts = product.nutritionalFacts;
-      final size = _displayValue(
-        facts.servingSize.isNotEmpty ? facts.servingSize : product.servingInstructions,
-        'unknown size',
-      );
-      final nutrition = facts.hasNutritionData
-          ? 'calories ${facts.caloriesKcal}, protein ${facts.proteinG}g, '
-              'carbs ${facts.carbsG}g, fat ${facts.totalFatG}g, '
-              'sugars ${facts.sugarsG}g, sodium ${facts.sodiumMg}mg'
-          : 'not available';
+    final facts = product.nutritionalFacts;
+    final size = _displayValue(
+      facts.servingSize.isNotEmpty ? facts.servingSize : product.servingInstructions,
+      language == VoiceLang.tagalog ? 'hindi tinukoy' : 'unknown size',
+    );
+    final nutrition = facts.hasNutritionData
+        ? (language == VoiceLang.tagalog
+            ? '${facts.caloriesKcal} calories, ${facts.proteinG}g protein, '
+              '${facts.carbsG}g carbs, ${facts.totalFatG}g taba, '
+              '${facts.sugarsG}g asukal, ${facts.sodiumMg}mg sodium'
+            : '${facts.caloriesKcal} calories, ${facts.proteinG}g protein, '
+              '${facts.carbsG}g carbs, ${facts.totalFatG}g fat, '
+              '${facts.sugarsG}g sugars, ${facts.sodiumMg}mg sodium')
+        : (language == VoiceLang.tagalog ? 'hindi available' : 'not available');
 
-      if (language == VoiceLang.tagalog) {
-        return 'Brand ${_displayValue(product.brand, 'hindi alam')}, laki $size, '
-            'FDA status ${product.fdaStatus}. Health advisory: hindi available. '
-            'Nutritional scores: $nutrition.';
-      }
-      return 'Product ${_displayValue(product.name, 'unknown')}, brand '
-          '${_displayValue(product.brand, 'unknown')}, size $size, '
-          'FDA status ${product.fdaStatus}. Health advisory: not available. '
-          'Nutritional scores: $nutrition.';
+    if (language == VoiceLang.tagalog) {
+      return 'Produkto: ${_displayValue(product.name, 'Hindi alam')}, brand: ${_displayValue(product.brand, 'Hindi alam')}, laki: $size, FDA status: ${product.fdaStatus}. Mga sustansya: $nutrition.';
+    }
+    return 'Product: ${_displayValue(product.name, 'Unknown')}, brand: ${_displayValue(product.brand, 'Unknown')}, size: $size, FDA status: ${product.fdaStatus}. Nutrition: $nutrition.';
   }
 
   Future<String?> _buildLocalScanRecordSummary(VoiceLang language) async {

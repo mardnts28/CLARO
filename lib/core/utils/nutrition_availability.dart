@@ -28,8 +28,17 @@ class NutritionAvailability {
   /// Gemini pipeline and served from `product_nutrition_data`) -- i.e. it's
   /// safe to feed into WhoCalculator / GeminiAdvisoryService /
   /// ProductRankingService / ProductComparisonService.
-  static bool isAvailable(Product product) =>
-      product.nutritionalFacts.hasNutritionData;
+  static bool isAvailable(Product product) {
+    final facts = product.nutritionalFacts;
+    if (facts.hasNutritionData) return true;
+    return facts.caloriesKcal > 0 ||
+        facts.proteinG > 0 ||
+        facts.totalFatG > 0 ||
+        facts.sodiumMg > 0 ||
+        facts.carbsG > 0 ||
+        facts.sugarsG > 0 ||
+        facts.saturatedFatG > 0;
+  }
 
   /// True only if EVERY product in [products] has real nutrition data.
   /// Ranking and comparison operate on the whole list at once (relative

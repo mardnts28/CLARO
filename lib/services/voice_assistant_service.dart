@@ -44,6 +44,9 @@ class VoiceAssistantService {
   static final ValueNotifier<Product?> latestScanProductNotifier = ValueNotifier<Product?>(null);
   static final ValueNotifier<String?> latestScanSummaryNotifier = ValueNotifier<String?>(null);
 
+  /// Stores the currently open product on ProductDetailScreen, or null when closed
+  static final ValueNotifier<Product?> activeResultProductNotifier = ValueNotifier<Product?>(null);
+
   static void setLatestScanProduct(Product product) {
     latestScanProductNotifier.value = product;
     latestScanSummaryNotifier.value = null;
@@ -283,17 +286,37 @@ class VoiceAssistantService {
     try {
       await _flutterTts.stop();
       isListeningNotifier.value = true;
+
+      final completer = Completer<String?>();
+      String recognizedText = '';
+      Timer? silenceDebounce;
+
+      void completeWithText() {
+        silenceDebounce?.cancel();
+        if (!completer.isCompleted) {
+          final trimmed = recognizedText.trim();
+          completer.complete(trimmed.isNotEmpty ? trimmed : null);
+        }
+      }
+
       final available = await _speechToText.initialize(
-        onError: (error) => debugPrint('Speech recognition error: $error'),
-        onStatus: (status) => debugPrint('Speech recognition status: $status'),
+        onError: (error) {
+          debugPrint('Speech recognition error: $error');
+          completeWithText();
+        },
+        onStatus: (status) {
+          debugPrint('Speech recognition status: $status');
+          if (status == 'notListening' || status == 'done') {
+            completeWithText();
+          }
+        },
       );
       if (!available) {
         debugPrint('Speech recognition: engine unavailable.');
         return null;
       }
 
-      final completer = Completer<String?>();
-      String recognizedText = '';
+      final locale = languageNotifier.value.ttsLanguageCode;
 
       await _speechToText.listen(
         onResult: (result) {
@@ -302,22 +325,32 @@ class VoiceAssistantService {
             'Speech recognition result: "$recognizedText" '
             '(final=${result.finalResult})',
           );
-          if (result.finalResult && !completer.isCompleted) {
-            completer.complete(recognizedText);
+          if (result.finalResult) {
+            completeWithText();
+          } else if (recognizedText.trim().isNotEmpty) {
+            // Reset speech debounce: if no new words arrive within 1.5s, finish gracefully
+            silenceDebounce?.cancel();
+            silenceDebounce = Timer(const Duration(milliseconds: 1500), () {
+              completeWithText();
+            });
           }
         },
+        listenFor: const Duration(seconds: 25),
+        pauseFor: const Duration(seconds: 3),
+        localeId: locale,
+        partialResults: true,
+        listenMode: ListenMode.dictation,
       );
 
       final transcript = await completer.future.timeout(
         const Duration(seconds: 15),
         onTimeout: () {
-          if (!completer.isCompleted) {
-            completer.complete(recognizedText);
-          }
-          return recognizedText.isEmpty ? null : recognizedText;
+          completeWithText();
+          return recognizedText.trim().isEmpty ? null : recognizedText.trim();
         },
       );
 
+      silenceDebounce?.cancel();
       await _speechToText.stop();
       return transcript;
     } catch (e) {
