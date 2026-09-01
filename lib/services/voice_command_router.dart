@@ -11,6 +11,10 @@ import '../screens/change_password_screen.dart';
 import '../screens/theme_screen.dart';
 import '../screens/review_history_screen.dart';
 import '../screens/compare_products_screen.dart';
+import '../screens/product_detail_screen.dart';
+import 'history_service.dart';
+import '../data/services/backend_locator.dart';
+import '../models/product_model.dart';
 
 // Placeholder URL - replace with actual CLARO website URL when available
 const String claroWebsiteUrl = 'https://example.com/about-claro';
@@ -50,6 +54,14 @@ class VoiceCommandRouter {
       debugPrint('Voice command intent: type=VoiceIntentType.summarizeScan (local match)');
       await _handleSummarizeIntent(language);
       return;
+    }
+
+    // Check if user is searching for a specific product from history
+    final productSearchQuery = _extractProductSearchQuery(transcript);
+    if (productSearchQuery != null && productSearchQuery.isNotEmpty) {
+      debugPrint('Voice command intent: product search for "$productSearchQuery"');
+      final handled = await _handleProductSearch(context, productSearchQuery, language);
+      if (handled) return;
     }
 
     final intent = await GeminiService.instance.classifyIntent(
@@ -255,5 +267,119 @@ class VoiceCommandRouter {
       return 'Binubuksan ko ang $pageName.';
     }
     return 'Opening your $pageName.';
+  }
+
+  String? _extractProductSearchQuery(String transcript) {
+    final t = transcript.trim().toLowerCase();
+
+    // General navigation destinations to exclude from product search
+    const excludedPages = {
+      'home', 'main', 'scan', 'scanner', 'camera', 'history', 'records',
+      'profile', 'account', 'personal info', 'personal information',
+      'compare', 'compare products', 'comparison', 'settings', 'theme',
+      'change password', 'suggestion', 'preference', 'about claro',
+      'review history'
+    };
+
+    final patterns = [
+      RegExp(r'^(?:please\s+)?(?:find|search(?:\s+for)?|look\s+for|show|open)\s+(?:me\s+)?(.+?)(?:\s+(?:in|from)\s+(?:my\s+)?history|\s+from\s+last\s+week|\s+from\s+yesterday|\s+product|\s+details)?$', caseSensitive: false),
+      RegExp(r'^(?:paki-?)?(?:hanapin|hanap|pahanap|buksan|tingnan|ipakita)\s+(?:po\s+)?(?:ang|yung|ng)?\s*(.+?)(?:\s+sa\s+(?:aking\s+)?history|\s+sa\s+mga\s+na-?scan)?$', caseSensitive: false),
+    ];
+
+    for (final pattern in patterns) {
+      final match = pattern.firstMatch(t);
+      if (match != null && match.groupCount >= 1) {
+        String query = match.group(1)?.trim() ?? '';
+        query = query.replaceAll(RegExp(r'\s+(?:in|from)\s+(?:my\s+)?history.*$', caseSensitive: false), '');
+        query = query.replaceAll(RegExp(r'\s+sa\s+(?:aking\s+)?history.*$', caseSensitive: false), '');
+        query = query.replaceAll(RegExp(r'\s+(?:from\s+)?(?:last\s+week|yesterday|earlier|kanina).*$', caseSensitive: false), '');
+        query = query.replaceAll(RegExp(r'\s+(?:product|details|screen|scan)$', caseSensitive: false), '').trim();
+
+        if (query.isNotEmpty && !excludedPages.contains(query)) {
+          return query;
+        }
+      }
+    }
+    return null;
+  }
+
+  Future<bool> _handleProductSearch(
+    BuildContext context,
+    String query,
+    VoiceLang language,
+  ) async {
+    final isTagalog = language == VoiceLang.tagalog;
+    final normalizedQuery = query.toLowerCase().trim();
+
+    // 1. Search in user's scan history first
+    final historyService = HistoryService();
+    final historyItems = historyService.getItems(
+      filter: 'Lahat',
+      searchQuery: query,
+    );
+
+    Product? matchedProduct;
+
+    if (historyItems.isNotEmpty) {
+      for (final item in historyItems) {
+        final pId = item.productId;
+        if (pId != null && pId.isNotEmpty) {
+          try {
+            matchedProduct = await BackendLocator.productRepository.getProductById(pId);
+            if (matchedProduct != null) break;
+          } catch (e) {
+            debugPrint('Voice search: failed to fetch product by id: $e');
+          }
+        }
+      }
+    }
+
+    // 2. Fallback: Search all products in catalog
+    if (matchedProduct == null) {
+      try {
+        final allProducts = await BackendLocator.productRepository.getAllProducts();
+        final matches = allProducts.where((p) {
+          final pName = p.name.toLowerCase();
+          final pBrand = p.brand.toLowerCase();
+          return pName.contains(normalizedQuery) ||
+              normalizedQuery.contains(pName) ||
+              '$pBrand $pName'.toLowerCase().contains(normalizedQuery);
+        }).toList();
+
+        if (matches.isNotEmpty) {
+          matchedProduct = matches.first;
+        }
+      } catch (e) {
+        debugPrint('Voice search: failed to search all products: $e');
+      }
+    }
+
+    if (!context.mounted) return true;
+
+    if (matchedProduct != null) {
+      VoiceAssistantService.setLatestScanProduct(matchedProduct);
+
+      final reply = isTagalog
+          ? 'Nahanap ko ang ${matchedProduct.name} sa iyong history. Binubuksan ang mga detalye ng produkto.'
+          : 'Found ${matchedProduct.name} from your history. Opening product details.';
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProductDetailScreen(
+            product: matchedProduct!,
+          ),
+        ),
+      );
+
+      await VoiceAssistantService.instance.speak(reply);
+      return true;
+    } else {
+      final notFoundReply = isTagalog
+          ? 'Hindi ko mahanap ang "$query" sa iyong history.'
+          : 'I could not find "$query" in your history.';
+      await VoiceAssistantService.instance.speak(notFoundReply);
+      return true;
+    }
   }
 }

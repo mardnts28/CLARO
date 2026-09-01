@@ -35,5 +35,22 @@ void main() {
       expect(VoiceAssistantService.latestScanProductNotifier.value, equals(sampleProduct));
       expect(VoiceAssistantService.latestScanProductNotifier.value?.name, equals('Century Tuna Flakes in Oil'));
     });
+
+    test('Voice product search patterns correctly match English and Tagalog commands', () {
+      final patterns = [
+        RegExp(r'^(?:please\s+)?(?:find|search(?:\s+for)?|look\s+for|show|open)\s+(?:me\s+)?(.+?)(?:\s+(?:in|from)\s+(?:my\s+)?history|\s+from\s+last\s+week|\s+from\s+yesterday|\s+product|\s+details)?$', caseSensitive: false),
+        RegExp(r'^(?:paki-?)?(?:hanapin|hanap|pahanap|buksan|tingnan|ipakita)\s+(?:po\s+)?(?:ang|yung|ng)?\s*(.+?)(?:\s+sa\s+(?:aking\s+)?history|\s+sa\s+mga\s+na-?scan)?$', caseSensitive: false),
+      ];
+
+      bool matchesAny(String input) => patterns.any((p) => p.hasMatch(input.trim()));
+
+      expect(matchesAny('find blue bay tuna from last week'), isTrue);
+      expect(matchesAny('search for century tuna in my history'), isTrue);
+      expect(matchesAny('look for lucky 7 carne norte'), isTrue);
+      expect(matchesAny('open star carne norte'), isTrue);
+      expect(matchesAny('hanapin ang blue bay tuna sa history'), isTrue);
+      expect(matchesAny('buksan ang 555 sardines'), isTrue);
+      expect(matchesAny('pahanap ng century tuna'), isTrue);
+    });
   });
 }
