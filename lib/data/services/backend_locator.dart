@@ -28,7 +28,7 @@ class BackendLocator {
   // variable name than GEMINI_API_KEY.
   static String get _geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
   static String get _geminiModel =>
-      dotenv.env['GEMINI_MODEL'] ?? 'gemini-3.7-flash';
+      dotenv.env['GEMINI_MODEL'] ?? 'gemini-3.5-flash';
 
   // Update these key names if your .env uses different variable names --
   // see cloudinary_upload_service.dart's header comment for one-time

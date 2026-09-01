@@ -27,7 +27,7 @@ import '../models/product_extraction_result.dart';
 class ProductExtractionService {
   ProductExtractionService({
     required String apiKey,
-    String model = 'gemini-3.7-flash',
+    String model = 'gemini-3.5-flash',
   }) : _model = GenerativeModel(
           model: model,
           apiKey: apiKey,
@@ -38,16 +38,14 @@ class ProductExtractionService {
             // GeminiAdvisoryService's 0.4, which is generating explanatory
             // text rather than extracting fixed facts.
             temperature: 0.1,
-            // 2048 risked truncating mid-response on products with long
-            // ingredient lists, producing invalid JSON instead of a
-            // usable result (see tools/bulk-import's PROMPT_SCHEMA.md --
-            // kept in sync with that tool's same fix).
-            maxOutputTokens: 4096,
+            // 8192 allows long ingredient lists and full nutrition objects
+            // without risk of truncation while only charging for actual tokens.
+            maxOutputTokens: 8192,
           ),
         );
 
   final GenerativeModel _model;
-  static const _timeout = Duration(seconds: 20);
+  static const _timeout = Duration(seconds: 45);
 
   /// Reads [frontImageBytes] + [backImageBytes] (JPEG/PNG bytes -- the
   /// caller handles picking/compressing the photos) and returns structured
@@ -153,7 +151,18 @@ Rules:
       );
     }
     try {
-      final json = jsonDecode(text) as Map<String, dynamic>;
+      String cleaned = text.trim();
+      if (cleaned.startsWith('```json')) {
+        cleaned = cleaned.substring(7);
+      } else if (cleaned.startsWith('```')) {
+        cleaned = cleaned.substring(3);
+      }
+      if (cleaned.endsWith('```')) {
+        cleaned = cleaned.substring(0, cleaned.length - 3);
+      }
+      cleaned = cleaned.trim();
+
+      final json = jsonDecode(cleaned) as Map<String, dynamic>;
       final nutritionJson =
           json['nutrition_per_100g'] as Map<String, dynamic>? ?? {};
 

@@ -18,7 +18,7 @@ import '../../core/utils/fallback_advisory_generator.dart';
 class GeminiAdvisoryService {
   GeminiAdvisoryService({
     required String apiKey,
-    String model = 'gemini-3.7-flash',
+    String model = 'gemini-3.5-flash',
   }) : _model = GenerativeModel(
           model: model,
           apiKey: apiKey,
@@ -148,7 +148,18 @@ class GeminiAdvisoryService {
       );
     }
     try {
-      final json = jsonDecode(text) as Map<String, dynamic>;
+      String cleaned = text.trim();
+      if (cleaned.startsWith('```json')) {
+        cleaned = cleaned.substring(7);
+      } else if (cleaned.startsWith('```')) {
+        cleaned = cleaned.substring(3);
+      }
+      if (cleaned.endsWith('```')) {
+        cleaned = cleaned.substring(0, cleaned.length - 3);
+      }
+      cleaned = cleaned.trim();
+
+      final json = jsonDecode(cleaned) as Map<String, dynamic>;
       final warningText = json['warningText'] as String?;
       final explanation = json['explanation'] as String?;
       final safeServingSize = json['safeServingSize'] as String?;
@@ -252,7 +263,18 @@ class GeminiAdvisoryService {
       throw const FormatException('Empty response');
     }
     try {
-      final json = jsonDecode(text) as Map<String, dynamic>;
+      String cleaned = text.trim();
+      if (cleaned.startsWith('```json')) {
+        cleaned = cleaned.substring(7);
+      } else if (cleaned.startsWith('```')) {
+        cleaned = cleaned.substring(3);
+      }
+      if (cleaned.endsWith('```')) {
+        cleaned = cleaned.substring(0, cleaned.length - 3);
+      }
+      cleaned = cleaned.trim();
+
+      final json = jsonDecode(cleaned) as Map<String, dynamic>;
       final explanation = json['explanation'] as String?;
 
       if (explanation == null) {
