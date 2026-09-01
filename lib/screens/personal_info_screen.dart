@@ -479,8 +479,17 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             onTap: () => _showEditNameDialog(),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text('${loc.onboardingNameHint}: $_userName', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface)),
+                Flexible(
+                  child: Text(
+                    '${loc.onboardingNameHint}: $_userName',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                    textAlign: TextAlign.center,
+                    maxLines: null,
+                    overflow: TextOverflow.visible,
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Icon(Icons.edit, size: 18, color: theme.colorScheme.onSurfaceVariant),
               ],
