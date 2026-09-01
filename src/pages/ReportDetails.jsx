@@ -62,7 +62,7 @@ const NUTRITION_FIELDS = [
 ];
 
 // Builds the editable form state
-function buildFormState(extractedData) {
+function buildFormState(extractedData, reportCategory) {
   const ed = extractedData || {};
   const nutrition = ed.nutrition || {};
 
@@ -82,7 +82,8 @@ function buildFormState(extractedData) {
     return match ? Number(match[1]) : "";
   }
 
-  const categoryValue = ed.category || "";
+  // Prioritize the user-selected category from the report, fall back to extracted data
+  const categoryValue = reportCategory || ed.category || "";
   const categoryLower = categoryValue.toLowerCase().trim();
 
   const matchedCategory = PRODUCT_CATEGORIES.find(
@@ -134,7 +135,7 @@ export default function ReportDetails() {
         const data = await getReportById(id);
 
         setReport(data);
-        setForm(buildFormState(data.extractedData));
+        setForm(buildFormState(data.extractedData, data.category));
 
         if (data.reportedBy) {
           try {
