@@ -56,16 +56,28 @@ class ProductExtractionService {
   Future<ProductExtractionResult> extract({
     required Uint8List frontImageBytes,
     required Uint8List backImageBytes,
+    List<Uint8List> additionalBackImageBytes = const [],
     String frontMimeType = 'image/jpeg',
     String backMimeType = 'image/jpeg',
   }) async {
     try {
+      final parts = <Part>[
+        TextPart(_buildPrompt()),
+      ];
+      if (frontImageBytes.isNotEmpty) {
+        parts.add(DataPart(frontMimeType, frontImageBytes));
+      }
+      if (backImageBytes.isNotEmpty) {
+        parts.add(DataPart(backMimeType, backImageBytes));
+      }
+      for (final extraBytes in additionalBackImageBytes) {
+        if (extraBytes.isNotEmpty) {
+          parts.add(DataPart(backMimeType, extraBytes));
+        }
+      }
+
       final response = await _model.generateContent([
-        Content.multi([
-          TextPart(_buildPrompt()),
-          DataPart(frontMimeType, frontImageBytes),
-          DataPart(backMimeType, backImageBytes),
-        ]),
+        Content.multi(parts),
       ]).timeout(_timeout);
 
       return _parseResponse(response.text);

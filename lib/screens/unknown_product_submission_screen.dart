@@ -231,11 +231,13 @@ class _UnknownProductSubmissionScreenState
       final backBytes = await File(_backImagePath!).readAsBytes();
 
       // Upload additional back photos
+      List<Uint8List> additionalBackBytesList = [];
       List<Future<String?>> additionalUploads = [];
       for (int i = 0; i < _additionalBackImagePaths.length; i++) {
         final additionalFile = File(_additionalBackImagePaths[i]);
         if (await additionalFile.exists()) {
           final additionalBytes = await additionalFile.readAsBytes();
+          additionalBackBytesList.add(additionalBytes);
           additionalUploads.add(
             BackendLocator.cloudinaryUploadService.upload(
               additionalBytes,
@@ -296,7 +298,12 @@ class _UnknownProductSubmissionScreenState
       // may navigate away before this finishes. Only Firestore writes
       // happen here, which are safe regardless of whether this screen is
       // still mounted.
-      _runBackgroundExtraction(docRef.id, frontBytes, backBytes);
+      _runBackgroundExtraction(
+        docRef.id,
+        frontBytes,
+        backBytes,
+        additionalBackBytesList,
+      );
     } catch (e) {
       debugPrint('Report submission error: $e');
       if (mounted) {
@@ -322,11 +329,13 @@ class _UnknownProductSubmissionScreenState
     String reportId,
     Uint8List frontBytes,
     Uint8List backBytes,
+    List<Uint8List> additionalBackBytes,
   ) async {
     try {
       final result = await BackendLocator.productExtractionService.extract(
         frontImageBytes: frontBytes,
         backImageBytes: backBytes,
+        additionalBackImageBytes: additionalBackBytes,
       );
       await FirebaseFirestore.instance.collection('reports').doc(reportId).update({
         'extractedData': result.toReportExtractedDataMap(),
