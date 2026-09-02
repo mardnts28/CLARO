@@ -1,12 +1,9 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:claro/data/services/product_extraction_service.dart';
-import 'package:claro/data/services/gemini_advisory_service.dart';
 
 void main() {
   group('Gemini JSON parsing resilience tests', () {
     test('ProductExtractionService handles markdown fenced JSON', () {
-      final service = ProductExtractionService(apiKey: 'dummy_key');
 
       // Markdown-wrapped JSON typical of Gemini 3.5/3.7 responses
       const rawMarkdownResponse = '''
@@ -57,8 +54,6 @@ void main() {
     });
 
     test('GeminiAdvisoryService parses markdown-wrapped advisory JSON', () {
-      final service = GeminiAdvisoryService(apiKey: 'dummy_key');
-
       const rawAdvisoryMarkdown = '''
 ```json
 {

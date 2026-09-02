@@ -226,21 +226,6 @@ class RankedProductCard extends StatelessWidget {
     );
   }
 
-  Widget _miniStat(BuildContext context, IconData icon, String value) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 12, color: colorScheme.onSurfaceVariant.withOpacity(0.75)),
-        const SizedBox(width: 3),
-        Text(value,
-            style: GoogleFonts.inter(
-                fontSize: 11,
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w500)),
-      ],
-    );
-  }
 
   Widget _miniStatImage(BuildContext context, String assetPath, String value) {
     final colorScheme = Theme.of(context).colorScheme;

@@ -24,67 +24,70 @@ import 'data/services/backend_locator.dart';
 import 'data/repositories/product_repository.dart';
 
 void main() async {
+  final totalStartupStopwatch = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Loads .env (declared as an asset in pubspec.yaml) into dotenv.env so
-  // BackendLocator can read GEMINI_API_KEY from it. Must happen before
-  // anything touches dotenv.env -- see data/services/backend_locator.dart.
-  await dotenv.load(fileName: '.env');
+  // 1. Concurrently load .env, Firebase, SharedPreferences, and PackageInfo
+  final preInitStopwatch = Stopwatch()..start();
+  final results = await Future.wait([
+    dotenv.load(fileName: '.env'),
+    Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ),
+    SharedPreferences.getInstance(),
+    PackageInfo.fromPlatform(),
+  ]);
+  preInitStopwatch.stop();
+  debugPrint('TIMING [Startup]: Core parallel I/O (dotenv, Firebase, SharedPreferences, PackageInfo) took ${preInitStopwatch.elapsedMilliseconds}ms');
 
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // TODO: remove before submission
-  FirebaseAuth.instance.authStateChanges().listen((user) async {
-    if (user != null) {
-      final idToken = await user.getIdToken();
-      print('DEBUG TOKEN: $idToken');
-    }
-  });
-
-  final prefs = await SharedPreferences.getInstance();
-  final packageInfo = await PackageInfo.fromPlatform();
+  final prefs = results[2] as SharedPreferences;
+  final packageInfo = results[3] as PackageInfo;
   final currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
   final lastRunVersion = prefs.getString('last_run_version');
 
   // Only force a sign-out when this launch follows an app UPDATE
-  // (the recorded version/build differs from the current one). A
-  // normal relaunch -- closing and reopening the app with no update --
-  // must NOT sign the user out. Previously this ran unconditionally on
-  // every cold start, which meant any time Android killed the
-  // backgrounded process (common: low memory, long background time,
-  // aggressive OEM battery managers) the user would be dumped back to
-  // LoginScreen on reopen even though nothing about their session had
-  // actually changed.
-  //
-  // Reinstall doesn't need explicit handling here: uninstalling wipes
-  // this app's SharedPreferences AND Firebase Auth's local persistence
-  // together, so a fresh install already starts with lastRunVersion ==
-  // null and no logged-in user -- there's nothing to sign out of.
   if (lastRunVersion != null && lastRunVersion != currentVersion) {
     await AuthService().signOut();
   }
   await prefs.setString('last_run_version', currentVersion);
 
-  await initializeThemeMode();
-  await LocaleService.initializeLocale();
-  await GetStartedService.initialize();
-  await HapticService().init();
-  await TextSizeService.initialize();
-  await VoiceAssistantService.initialize();
-  runApp(const ClaroApp());
+  // 2. Synchronous/Fast In-memory preferences initialization
+  final prefsInitStopwatch = Stopwatch()..start();
+  await Future.wait([
+    initializeThemeMode(),
+    LocaleService.initializeLocale(),
+    GetStartedService.initialize(),
+    HapticService().init(),
+    TextSizeService.initialize(),
+  ]);
+  prefsInitStopwatch.stop();
+  debugPrint('TIMING [Startup]: Preferences initialization took ${prefsInitStopwatch.elapsedMilliseconds}ms');
 
-  // Fire-and-forget background sync: Pre-caches top FDA products to persistent offline storage
-  // so that nutrition lookup, Nutri-Score, NOVA, and WHO evaluations work seamlessly in grocery basements.
-  unawaited(() async {
-    try {
-      final repo = BackendLocator.productRepository;
-      if (repo is FirestoreProductRepository) {
-        await repo.preloadOfflineCatalog();
+  // 3. Immediately render the first UI frame
+  runApp(const ClaroApp());
+  totalStartupStopwatch.stop();
+  debugPrint('TIMING [Startup]: Total main() execution until runApp() took ${totalStartupStopwatch.elapsedMilliseconds}ms');
+
+  // 4. Defer non-critical platform services after first frame to eliminate startup Davey jank
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final firstFrameStopwatch = Stopwatch()..start();
+    debugPrint('TIMING [Startup]: First frame successfully rendered to display at ${totalStartupStopwatch.elapsedMilliseconds}ms post-boot');
+
+    unawaited(() async {
+      try {
+        await VoiceAssistantService.initialize();
+        firstFrameStopwatch.stop();
+        debugPrint('TIMING [Startup]: Deferred background services (VoiceAssistant, TTS) initialized in ${firstFrameStopwatch.elapsedMilliseconds}ms');
+
+        final repo = BackendLocator.productRepository;
+        if (repo is FirestoreProductRepository) {
+          await repo.preloadOfflineCatalog();
+        }
+      } catch (e) {
+        debugPrint('TIMING [Startup]: Deferred background service init warning: $e');
       }
-    } catch (_) {}
-  }());
+    }());
+  });
 }
 
 class ClaroApp extends StatelessWidget {
@@ -207,14 +210,6 @@ class _VoiceInteractionStopperState extends State<_VoiceInteractionStopper> {
 /// 1. Language not yet explicitly selected → SelectLanguageScreen
 /// 2. Get Started not yet seen → GetStartedScreen
 /// 3. Otherwise → AuthGate (Login/Sign Up → onboarding → Home, as below)
-///
-/// This produces the chronological flow: Select Language → Get Started →
-/// Login/Sign Up → Basic Information → Health Profile → Home/Dashboard.
-///
-/// Steps 1 and 2 are each shown once per device (persisted via
-/// LocaleService.hasSelectedLanguageNotifier and
-/// GetStartedService.hasSeenGetStartedNotifier) -- reopening the app, or
-/// logging out and back in, does not show them again.
 class RootGate extends StatelessWidget {
   const RootGate({super.key});
 
@@ -242,8 +237,7 @@ class RootGate extends StatelessWidget {
 
 /// Routes users based on authentication state:
 /// - Not logged in → LoginScreen
-/// - Logged in but onboarding incomplete → OnboardingScreen (Basic
-///   Information → Health Profile)
+/// - Logged in but onboarding incomplete → OnboardingScreen
 /// - Logged in and onboarded → HomeScreen
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -264,9 +258,6 @@ class AuthGate extends StatelessWidget {
         return ValueListenableBuilder<bool>(
           valueListenable: AuthService.isAuthenticating,
           builder: (context, isAuthenticating, _) {
-            // Only force LoginScreen if the user is truly null.
-            // If they are authenticating but 'user' exists, show a loader
-            // instead of snapping back to the LoginScreen.
             if (user == null) {
               return const LoginScreen();
             }
@@ -291,7 +282,7 @@ class AuthGate extends StatelessWidget {
               );
             }
 
-            // Verify that this session is still the active one (Session Lockout)
+            // Verify session validity
             return FutureBuilder<bool>(
               future: AuthService().isSessionValid(user.uid),
               builder: (context, sessionSnap) {
@@ -301,13 +292,11 @@ class AuthGate extends StatelessWidget {
                   );
                 }
 
-                // If there's an error (e.g. permission-denied), sign out and return to Login
                 if (sessionSnap.hasError || sessionSnap.data == false) {
                   AuthService().signOut();
                   return const LoginScreen();
                 }
 
-                // Check if onboarding is complete
                 return FutureBuilder(
                   future: AuthService().db.collection('users').doc(user.uid).get(),
                   builder: (context, AsyncSnapshot docSnap) {
@@ -325,12 +314,6 @@ class AuthGate extends StatelessWidget {
                     if (docSnap.hasData && docSnap.data.exists) {
                       final data = docSnap.data.data() as Map<String, dynamic>?;
 
-                      // Sync user preferences AFTER the current build frame
-                      // completes to avoid triggering setState/markNeedsBuild
-                      // during build (TextSizeService.textSizeNotifier is
-                      // listened to above AuthGate by a ValueListenableBuilder
-                      // that wraps MaterialApp — mutating it here causes an
-                      // infinite rebuild cascade).
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         final hapticPref = data?['vibrationFeedback'] ?? false;
                         HapticService().updateEnabled(hapticPref);
@@ -345,7 +328,6 @@ class AuthGate extends StatelessWidget {
                           VoiceAssistantService.isEnabledNotifier.value = voicePref;
                         }
 
-                        // Warm user health profile cache asynchronously in the background
                         unawaited(BackendLocator.userRepository
                             .getHealthProfile(user.uid)
                             .then((_) {}, onError: (_) {}));

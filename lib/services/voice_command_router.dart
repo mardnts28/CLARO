@@ -263,13 +263,13 @@ class VoiceCommandRouter {
       try {
         await AuthService().setMfaEnabled(enabled: true);
         final msg = localeKey == 'fil'
-            ? 'Naka-on na ang multi-factor authentication.'
-            : 'Multi-factor authentication enabled.';
+            ? 'Matagumpay na na-on ang multi-factor authentication para sa iyong account.'
+            : 'Multi-factor authentication has been successfully enabled for your account.';
         await VoiceAssistantService.instance.speak(msg);
       } catch (_) {
         final msg = localeKey == 'fil'
-            ? 'Hindi ma-enable ang multi-factor authentication.'
-            : 'Could not enable multi-factor authentication.';
+            ? 'Hindi ma-on ang multi-factor authentication sa ngayon.'
+            : 'Unable to enable multi-factor authentication at this time.';
         await VoiceAssistantService.instance.speak(msg);
       }
       return;
@@ -278,13 +278,13 @@ class VoiceCommandRouter {
       try {
         await AuthService().setMfaEnabled(enabled: false);
         final msg = localeKey == 'fil'
-            ? 'Naka-off na ang multi-factor authentication.'
-            : 'Multi-factor authentication disabled.';
+            ? 'Matagumpay na na-off ang multi-factor authentication.'
+            : 'Multi-factor authentication has been successfully disabled.';
         await VoiceAssistantService.instance.speak(msg);
       } catch (_) {
         final msg = localeKey == 'fil'
-            ? 'Hindi ma-disable ang multi-factor authentication.'
-            : 'Could not disable multi-factor authentication.';
+            ? 'Hindi ma-off ang multi-factor authentication sa ngayon.'
+            : 'Unable to disable multi-factor authentication at this time.';
         await VoiceAssistantService.instance.speak(msg);
       }
       return;
@@ -292,9 +292,24 @@ class VoiceCommandRouter {
     if (target == 'mfa') {
       HomeTabController.switchToTab(3);
       final msg = localeKey == 'fil'
-          ? 'Ipinapakita ang multi-factor authentication sa iyong profile.'
-          : 'Showing multi-factor authentication in your profile.';
+          ? 'Binubuksan ang mga setting ng multi-factor authentication sa iyong profile.'
+          : 'Opening multi-factor authentication settings in your profile.';
       unawaited(VoiceAssistantService.instance.speak(msg));
+      return;
+    }
+
+    // Logout / Sign out
+    if (target == 'logout') {
+      try {
+        final msg = localeKey == 'fil'
+            ? 'Matagumpay kang nai-log out. Babalik sa login screen.'
+            : 'You have been successfully logged out. Returning to the login screen.';
+        await VoiceAssistantService.instance.speak(msg);
+        await AuthService().signOut();
+      } catch (_) {
+        final msg = localeKey == 'fil' ? 'Hindi ma-proseso ang pag-logout.' : 'Could not complete log out.';
+        await VoiceAssistantService.instance.speak(msg);
+      }
       return;
     }
 
@@ -589,15 +604,15 @@ class VoiceCommandRouter {
     }
 
     // MFA ON / OFF
-    if (RegExp(r'\b(turn off (?:mfa|multi factor|two factor|2fa)|mfa off|2fa off|disable (?:mfa|multi factor|two factor|2fa)|i\s*off ang mfa|patayin ang mfa)\b')
+    if (RegExp(r'\b(turn off (?:mfa|multi factor|two factor|2fa)|disable (?:mfa|multi factor|two factor|2fa)|deactivate (?:mfa|multi factor|two factor|2fa)|switch off (?:mfa|2fa)|mfa off|2fa off|i\s*off ang (?:mfa|multi factor|two factor|2fa)|patayin ang (?:mfa|multi factor|two factor|2fa)|isara ang (?:mfa|multi factor|two factor|2fa)|i\s*disable ang (?:mfa|2fa)|i\s*deactivate ang (?:mfa|2fa))\b')
         .hasMatch(normalized)) {
       return 'mfa_off';
     }
-    if (RegExp(r'\b(turn on (?:mfa|multi factor|two factor|2fa)|mfa on|2fa on|enable (?:mfa|multi factor|two factor|2fa)|i\s*on ang mfa|buhayin ang mfa)\b')
+    if (RegExp(r'\b(turn on (?:mfa|multi factor|two factor|2fa)|enable (?:mfa|multi factor|two factor|2fa)|activate (?:mfa|multi factor|two factor|2fa)|switch on (?:mfa|2fa)|mfa on|2fa on|i\s*on ang (?:mfa|multi factor|two factor|2fa)|buhayin ang (?:mfa|multi factor|two factor|2fa)|buksan ang (?:mfa|multi factor|two factor|2fa)|i\s*enable ang (?:mfa|2fa)|i\s*activate ang (?:mfa|2fa))\b')
         .hasMatch(normalized)) {
       return 'mfa_on';
     }
-    if (RegExp(r'\b(multi factor authentication|two factor authentication|multi factor|two factor|mfa|2fa|dalawang yugtong pagpapatunay)\b')
+    if (RegExp(r'\b(multi factor authentication|two factor authentication|multi factor|two factor|mfa|2fa|dalawang yugtong pagpapatunay|mfa settings|2fa settings)\b')
         .hasMatch(normalized)) {
       return 'mfa';
     }
@@ -671,9 +686,15 @@ class VoiceCommandRouter {
         .hasMatch(normalized)) {
       return 'user_guide';
     }
-    if (RegExp(r'\b(change password|reset password|palitan ang password|baguhin ang password|update password|i-reset ang password|password)\b')
+    if (RegExp(r'\b(change password|reset password|palitan ang password|baguhin ang password|update password|i-reset ang password|password|security settings)\b')
         .hasMatch(normalized)) {
       return 'change_password';
+    }
+
+    // Logout / Sign out
+    if (RegExp(r'\b(log out|logout|sign out|signout|mag log out|maglog out|mag sign out|magsign out|lumabas sa account|i\s*log out)\b')
+        .hasMatch(normalized)) {
+      return 'logout';
     }
 
     return null;
@@ -745,24 +766,24 @@ class VoiceCommandRouter {
   String _navigationReply(String target, String localeKey) {
     final pageName = switch (target) {
       'personal_info' => localeKey == 'fil' ? 'personal na impormasyon' : 'personal information',
-      'home' => localeKey == 'fil' ? 'home page' : 'home page',
-      'scan' => localeKey == 'fil' ? 'scanner' : 'scanner',
-      'history' => localeKey == 'fil' ? 'history' : 'history',
-      'profile' => localeKey == 'fil' ? 'profile' : 'profile',
+      'home' => localeKey == 'fil' ? 'pangunahing screen' : 'home page',
+      'scan' => localeKey == 'fil' ? 'scanner ng produkto' : 'scanner',
+      'history' => localeKey == 'fil' ? 'kasaysayan ng pag-scan' : 'scan history',
+      'profile' => localeKey == 'fil' ? 'profile at mga setting ng account' : 'profile and account settings',
       'theme' => localeKey == 'fil' ? 'mga setting ng tema' : 'theme settings',
-      'preference' => localeKey == 'fil' ? 'mga kagustuhan' : 'preferences',
-      'suggestion' => localeKey == 'fil' ? 'mungkahi at feedback' : 'suggestions',
-      'change_password' => localeKey == 'fil' ? 'pagpapalit ng password' : 'change password',
-      'review_history' => localeKey == 'fil' ? 'mga review ng app' : 'app reviews',
-      'about_claro' => localeKey == 'fil' ? 'About CLARO sa external link' : 'About CLARO in an external link',
-      'privacy_policy' => localeKey == 'fil' ? 'Privacy Policy sa external link' : 'Privacy Policy in an external link',
-      'terms_conditions' => localeKey == 'fil' ? 'Terms and Conditions sa external link' : 'Terms and Conditions in an external link',
-      'user_guide' => localeKey == 'fil' ? 'User Guide sa external link' : 'User Guide in an external link',
+      'preference' => localeKey == 'fil' ? 'mga kagustuhan sa kalusugan at pagkain' : 'health preferences',
+      'suggestion' => localeKey == 'fil' ? 'screen ng mungkahi at feedback' : 'suggestions and feedback',
+      'change_password' => localeKey == 'fil' ? 'mga setting ng password at seguridad' : 'password and security settings',
+      'review_history' => localeKey == 'fil' ? 'kasaysayan ng mga review' : 'app reviews',
+      'about_claro' => localeKey == 'fil' ? 'impormasyon tungkol sa CLARO' : 'About CLARO',
+      'privacy_policy' => localeKey == 'fil' ? 'Patakaran sa Privacy' : 'Privacy Policy',
+      'terms_conditions' => localeKey == 'fil' ? 'mga Tuntunin at Kundisyon' : 'Terms and Conditions',
+      'user_guide' => localeKey == 'fil' ? 'Gabay sa Paggamit' : 'User Guide',
       'compare_products' => localeKey == 'fil' ? 'paghahambing ng produkto' : 'product comparison',
       _ => target.replaceAll('_', ' '),
     };
     if (localeKey == 'fil') {
-      return 'Binubuksan ko ang $pageName.';
+      return 'Binubuksan ang $pageName.';
     }
     return 'Opening your $pageName.';
   }
@@ -787,7 +808,8 @@ class VoiceCommandRouter {
       'change password', 'reset password', 'update password',
       'about claro', 'about app', 'about us', 'about the app',
       'compare', 'compare products', 'comparison', 'product comparison',
-      'review history', 'advisory', 'health advisory', 'results', 'result'
+      'review history', 'advisory', 'health advisory', 'results', 'result',
+      'log out', 'logout', 'sign out', 'signout'
     };
 
     if (excludedPages.contains(t)) return null;
@@ -838,11 +860,11 @@ class VoiceCommandRouter {
   ) async {
     final isTagalog = language == VoiceLang.tagalog;
     final normalizedQuery = query.toLowerCase().trim();
-    final queryTokens = normalizedQuery.split(RegExp(r'\s+')).where((w) => w.length > 1).toList();
 
     Product? matchedProduct;
 
-    // 1. Check local ScanHistoryService
+    // Search strictly within user's scanned history:
+    // 1. Check local session scan history (ScanHistoryService)
     final localHistory = ScanHistoryService().localHistory;
     if (localHistory.isNotEmpty) {
       for (final p in localHistory) {
@@ -855,7 +877,7 @@ class VoiceCommandRouter {
       }
     }
 
-    // 2. Search in user's history records (HistoryService)
+    // 2. Search in user's saved scan history records (HistoryService)
     if (matchedProduct == null) {
       final historyService = HistoryService();
       final historyItems = historyService.getItems(
@@ -869,63 +891,24 @@ class VoiceCommandRouter {
           if (pId != null && pId.isNotEmpty) {
             try {
               matchedProduct = await BackendLocator.productRepository.getProductById(pId);
-              if (matchedProduct != null) break;
+              break;
             } catch (e) {
-              debugPrint('Voice search: failed to fetch product by id: $e');
+              debugPrint('Voice search: failed to fetch scanned product by id: $e');
             }
           }
         }
-      }
-    }
-
-    // 3. Fallback: Search all products in catalog by name and token matching
-    if (matchedProduct == null) {
-      try {
-        final allProducts = await BackendLocator.productRepository.getAllProducts();
-        
-        // Direct substring check
-        final matches = allProducts.where((p) {
-          final pName = p.name.toLowerCase();
-          final pBrand = p.brand.toLowerCase();
-          return pName.contains(normalizedQuery) ||
-              normalizedQuery.contains(pName) ||
-              '$pBrand $pName'.toLowerCase().contains(normalizedQuery);
-        }).toList();
-
-        if (matches.isNotEmpty) {
-          matchedProduct = matches.first;
-        } else if (queryTokens.isNotEmpty) {
-          // Token score overlap
-          Product? bestProduct;
-          int bestScore = 0;
-          for (final p in allProducts) {
-            final text = '${p.brand} ${p.name} ${p.category}'.toLowerCase();
-            int score = 0;
-            for (final token in queryTokens) {
-              if (text.contains(token)) score++;
-            }
-            if (score > bestScore) {
-              bestScore = score;
-              bestProduct = p;
-            }
-          }
-          if (bestScore > 0) {
-            matchedProduct = bestProduct;
-          }
-        }
-      } catch (e) {
-        debugPrint('Voice search: failed to search all products: $e');
       }
     }
 
     if (!context.mounted) return true;
 
     if (matchedProduct != null) {
-      VoiceAssistantService.setLatestScanProduct(matchedProduct);
+      final targetProduct = matchedProduct;
+      VoiceAssistantService.setLatestScanProduct(targetProduct);
 
       final reply = isTagalog
-          ? 'Nahanap ko ang ${matchedProduct.name} sa iyong history. Binubuksan ang mga detalye ng produkto.'
-          : 'Found ${matchedProduct.name} from your history. Opening product details.';
+          ? 'Nahanap ang ${targetProduct.name} mula sa iyong mga na-scan na produkto. Binubuksan ang mga detalye.'
+          : 'Found ${targetProduct.name} from your scan records. Opening product details.';
 
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).popUntil((route) => route.isFirst);
@@ -938,7 +921,7 @@ class VoiceCommandRouter {
         context,
         MaterialPageRoute(
           builder: (_) => ProductDetailScreen(
-            product: matchedProduct!,
+            product: targetProduct,
           ),
         ),
       );
@@ -946,8 +929,8 @@ class VoiceCommandRouter {
       return true;
     } else {
       final notFoundReply = isTagalog
-          ? 'Hindi ko mahanap ang "$query" sa iyong history.'
-          : 'I could not find "$query" in your history.';
+          ? 'Wala ka pang na-i-scan na produktong tulad niyan. Mangyaring i-scan muna ang aytem upang makita ang mga detalye nito.'
+          : 'You haven\'t scanned a product matching that yet. Please scan the item first to view its details.';
       await VoiceAssistantService.instance.speak(notFoundReply);
       return true;
     }

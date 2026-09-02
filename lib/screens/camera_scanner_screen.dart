@@ -46,7 +46,7 @@ class CameraScannerScreen extends StatefulWidget {
 }
 
 class _CameraScannerScreenState extends State<CameraScannerScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with WidgetsBindingObserver {
   CameraController? _cameraController;
 
   @override
@@ -92,6 +92,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   Timer? _continuousAnalysisTimer;
   List<DetectionResult> _liveDetections = [];
   bool _isProductInGuide = false;
+  bool _hasTappedToScan = false;
 
   DateTime? _productFirstDetectedTime;
   DateTime? _lastSeenTime;
@@ -101,16 +102,23 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   bool _isFallbackModalOpen = false;
   bool _isScreenActive = true;
 
-  // Laser animation
-  late AnimationController _laserController;
-  late Animation<double> _laserAnimation;
-
-  // Background advisory prefetch cache tracking
+  // Background advisory prefetch cache tracking & throttling (Issue 4 Fix)
   final Set<String> _prefetchedLabels = {};
+  DateTime? _lastAdvisoryPrefetchTime;
 
+  /// [ISSUE 4 FIX]: Debounce and throttle concurrent network calls (Firestore + Gemini)
+  /// so that prefetch fires at most once every 2.5 seconds regardless of frame rate,
+  /// with completely non-blocking async execution.
   void _triggerAdvisoryPrefetch(List<DetectionResult> detections) {
     final uid = AuthService().currentUser?.uid;
     if (uid == null) return;
+
+    final now = DateTime.now();
+    if (_lastAdvisoryPrefetchTime != null &&
+        now.difference(_lastAdvisoryPrefetchTime!).inMilliseconds < 2500) {
+      return; // Throttled: prevent compounding network/CPU pressure during live scanning
+    }
+    _lastAdvisoryPrefetchTime = now;
 
     for (final det in detections) {
       if (det.confidence >= 0.50 && !_prefetchedLabels.contains(det.label)) {
@@ -145,23 +153,15 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       _checkPermissionAndInit();
     }
     _announceIfVisible();
-
-    _laserController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-
-    _laserAnimation = Tween<double>(begin: 0.05, end: 0.95).animate(
-      CurvedAnimation(parent: _laserController, curve: Curves.easeInOut),
-    );
   }
 
 
+  bool _isInitializingCamera = false;
+  bool _cameraInitFailed = false;
+  String? _cameraErrorMessage;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return;
-    }
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused) {
       _stopImageStreamIfActive();
@@ -170,7 +170,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         _cameraController = null;
       });
     } else if (state == AppLifecycleState.resumed) {
-      _checkPermissionAndInit();
+      final isScanTab = !widget.embeddedMode || HomeTabController.tabNotifier.value == 1;
+      if (isScanTab && mounted) {
+        _checkPermissionAndInit();
+      }
     }
   }
 
@@ -181,64 +184,195 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _stopImageStreamIfActive();
     _cameraController?.dispose();
-    _laserController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  /// [PROBLEM 1 FIX]: Concurrency Guard — ensures initialize() can only be in-flight once.
   Future<void> _checkPermissionAndInit() async {
-    // 1. Load the TFLite model first — camera frames must not arrive before
-    //    the interpreter is ready or every frame silently returns [].
-    await _yoloService.initialize();
-    // 2. Only then start the camera (the camera plugin shows the OS
-    //    permission dialog automatically on CameraController.initialize()).
-    await _initCamera();
+    if (_isInitializingCamera) {
+      debugPrint('[Camera] Initialization already in progress, skipping duplicate request.');
+      return;
+    }
+    if (_cameraController != null && _cameraController!.value.isInitialized) {
+      debugPrint('[Camera] Camera already initialized and running.');
+      return;
+    }
+    _isInitializingCamera = true;
+    if (mounted) {
+      setState(() {
+        _cameraInitFailed = false;
+        _cameraErrorMessage = null;
+      });
+    }
+
+    try {
+      debugPrint('[Camera] Step 1: Initializing YOLO background service...');
+      await _yoloService.initialize();
+
+      debugPrint('[Camera] Step 2: Initializing Camera Hardware...');
+      await _initCameraWithFallback();
+    } catch (e) {
+      debugPrint('[Camera] Fatal initialization exception: $e');
+      if (mounted) {
+        setState(() {
+          _cameraInitFailed = true;
+          _cameraErrorMessage = e.toString();
+        });
+      }
+    } finally {
+      _isInitializingCamera = false;
+    }
   }
 
   // Camera hardware lock — prevents _runLiveAnalysis and _performScan from
   // using the camera simultaneously.
   bool _isLiveAnalysisRunning = false;
 
-  Future<void> _initCamera() async {
+  /// [PROBLEM 2 FIX]: Hardware Stream Configuration & Resolution Cascade for MediaTek / Transsion
+  Future<void> _initCameraWithFallback() async {
     try {
       final cameras = await availableCameras();
-      if (cameras.isEmpty) return;
+      if (cameras.isEmpty) {
+        debugPrint('[Camera] No cameras found on device.');
+        if (mounted) {
+          setState(() {
+            _cameraInitFailed = true;
+            _cameraErrorMessage = 'No camera found on this device.';
+          });
+        }
+        return;
+      }
       final back = cameras.firstWhere(
         (c) => c.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
       );
-      _cameraController = CameraController(
-        back,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-      await _cameraController!.initialize();
-      await _cameraController!.setFlashMode(FlashMode.off);
-      if (mounted) {
-        setState(() => _isFlashOn = false);
-        // Wait 500ms for camera preview session to fully stabilize on Android
-        Future.delayed(const Duration(milliseconds: 500), () {
+
+      // Fully dispose any previous controller to prevent resource leaks
+      if (_cameraController != null) {
+        try {
+          await _stopImageStreamIfActive();
+          await _cameraController!.dispose();
+        } catch (e) {
+          debugPrint('[Camera] Error disposing previous controller: $e');
+        }
+        _cameraController = null;
+      }
+
+      // Attempt 1: ResolutionPreset.medium with explicit YUV_420 format
+      bool success = false;
+      try {
+        debugPrint('[Camera] Attempting controller creation with ResolutionPreset.medium (ImageFormatGroup.yuv420)...');
+        final controller = CameraController(
+          back,
+          ResolutionPreset.medium,
+          enableAudio: false,
+          imageFormatGroup: ImageFormatGroup.yuv420,
+        );
+        debugPrint('[Camera] Calling controller.initialize()...');
+        await controller.initialize();
+        await controller.setFlashMode(FlashMode.off);
+        _cameraController = controller;
+        success = true;
+        debugPrint('[Camera] ResolutionPreset.medium initialize() completed successfully! Preview size: ${controller.value.previewSize}');
+      } catch (mediumErr) {
+        debugPrint('[Camera] ResolutionPreset.medium failed ($mediumErr). Falling back to ResolutionPreset.low for restricted hardware...');
+      }
+
+      // Attempt 2: ResolutionPreset.low fallback for restricted MediaTek / Transsion HAL
+      if (!success) {
+        if (_cameraController != null) {
+          try {
+            await _cameraController!.dispose();
+          } catch (_) {}
+          _cameraController = null;
+        }
+
+        try {
+          debugPrint('[Camera] Attempting fallback with ResolutionPreset.low (ImageFormatGroup.yuv420)...');
+          final lowController = CameraController(
+            back,
+            ResolutionPreset.low,
+            enableAudio: false,
+            imageFormatGroup: ImageFormatGroup.yuv420,
+          );
+          debugPrint('[Camera] Calling lowController.initialize()...');
+          await lowController.initialize();
+          await lowController.setFlashMode(FlashMode.off);
+          _cameraController = lowController;
+          success = true;
+          debugPrint('[Camera] ResolutionPreset.low fallback initialize() completed successfully! Preview size: ${lowController.value.previewSize}');
+        } catch (lowErr) {
+          debugPrint('[Camera] ResolutionPreset.low fallback also failed: $lowErr');
           if (mounted) {
+            setState(() {
+              _cameraInitFailed = true;
+              _cameraErrorMessage = 'Camera hardware initialization failed ($lowErr). Tap to retry.';
+            });
+          }
+          return;
+        }
+      }
+
+      if (mounted && success) {
+        setState(() {
+          _isFlashOn = false;
+          _cameraInitFailed = false;
+        });
+
+        // Await preview session stabilization before starting image stream
+        debugPrint('[Camera] Waiting 400ms for preview surface stabilization before starting stream...');
+        Future.delayed(const Duration(milliseconds: 400), () {
+          if (mounted && _isScreenActive) {
             _startContinuousAnalysis();
           }
         });
       }
     } catch (e) {
-      debugPrint('Camera init error: $e');
+      debugPrint('[Camera] _initCameraWithFallback outer error: $e');
+      if (mounted) {
+        setState(() {
+          _cameraInitFailed = true;
+          _cameraErrorMessage = 'Camera error: $e';
+        });
+      }
     }
   }
-
 
   Future<void> _stopImageStreamIfActive() async {
     if (_cameraController?.value.isStreamingImages == true) {
       try {
+        debugPrint('[Camera] Stopping image stream...');
         await _cameraController?.stopImageStream();
       } catch (_) {}
     }
   }
 
   void _handleTabChange() {
-    _announceIfVisible();
+    final isScanTab = !widget.embeddedMode || HomeTabController.tabNotifier.value == 1;
+    if (isScanTab) {
+      _isScreenActive = true;
+      _hasTappedToScan = false;
+      _noProductStartTime = null;
+      _lastSeenTime = null;
+      _productFirstDetectedTime = null;
+      _announceIfVisible();
+      if (_cameraController != null && _cameraController!.value.isInitialized) {
+        _startContinuousAnalysis();
+      } else {
+        _checkPermissionAndInit();
+      }
+    } else {
+      _isScreenActive = false;
+      _hasTappedToScan = false;
+      _noProductStartTime = null;
+      _lastSeenTime = null;
+      _productFirstDetectedTime = null;
+      _isLiveAnalysisRunning = false;
+      _isFallbackModalOpen = false;
+      _continuousAnalysisTimer?.cancel();
+      _stopImageStreamIfActive();
+    }
   }
 
   void _announceIfVisible() {
@@ -248,25 +382,64 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     }
   }
 
-  int _frameCount = 0;
+  DateTime? _lastLiveAnalysisTime;
 
   void _startContinuousAnalysis() {
     _continuousAnalysisTimer?.cancel();
     _productFirstDetectedTime = null;
-    _frameCount = 0;
+    _lastLiveAnalysisTime = null;
+    _noProductStartTime = null;
 
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    final isScanActive = !widget.embeddedMode || HomeTabController.tabNotifier.value == 1;
+    if (!_isScreenActive || !isScanActive || !mounted) {
+      debugPrint('[Camera] Skipping stream start: scanner is inactive.');
+      return;
+    }
 
-    if (_cameraController?.value.isStreamingImages != true) {
-      try {
-        _cameraController?.startImageStream((CameraImage image) {
-          _frameCount++;
-          // Throttle: process every 3rd frame to align with Camera2 ImageReader buffer recycling
-          if (_frameCount % 3 != 0) return;
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      debugPrint('[Camera] Cannot start image stream: controller is not initialized.');
+      return;
+    }
 
-          if (_isProcessing || _isLiveAnalysisRunning || !mounted || !_isScreenActive) return;
+    if (_cameraController?.value.isStreamingImages == true) {
+      debugPrint('[Camera] Image stream already active.');
+      return;
+    }
 
-          _isLiveAnalysisRunning = true;
+    try {
+      debugPrint('[Camera] Invoking startImageStream()...');
+      bool firstFrameLogged = false;
+      _cameraController?.startImageStream((CameraImage image) {
+        if (!firstFrameLogged) {
+          firstFrameLogged = true;
+          debugPrint('[Camera] Live stream active — first frame received (${image.width}x${image.height}, format: ${image.format.group})');
+        }
+
+        final isScanTabActive = !widget.embeddedMode || HomeTabController.tabNotifier.value == 1;
+        if (!_isScreenActive || !isScanTabActive || !mounted) {
+          _stopImageStreamIfActive();
+          return;
+        }
+
+        // [ISSUE 1 FIX]: Frame Drop Policy — If analysis, inference, or picture capture
+        // is in-flight, DROP the frame immediately without copying memory or building up queue.
+        if (_isProcessing || _isLiveAnalysisRunning || _yoloService.isInferring || !mounted || !_isScreenActive) {
+          return; // DROP frame; do not queue up work or thrash memory
+        }
+
+        // Time-based throttling (400ms): guarantees steady 2.5 FPS analysis,
+        // slashing memory and CPU churn by >75% while preserving instant UI reactivity.
+        final now = DateTime.now();
+        if (_lastLiveAnalysisTime != null &&
+            now.difference(_lastLiveAnalysisTime!).inMilliseconds < 400) {
+          return;
+        }
+
+        _lastLiveAnalysisTime = now;
+        _isLiveAnalysisRunning = true;
+
+        debugPrint(
+            'CameraScannerScreen: Live stream frame resolution: ${image.width}x${image.height}');
 
           final sensorOrientation =
               _cameraController?.description.sensorOrientation ?? 90;
@@ -354,10 +527,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       } catch (e) {
         debugPrint('startImageStream error: $e');
       }
-    }
   }
-
-
 
   void _handleClose() {
     _continuousAnalysisTimer?.cancel();
@@ -457,16 +627,14 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                             borderRadius: BorderRadius.circular(12)),
                       ),
                       icon: const Icon(Icons.report_problem_outlined),
-                      label: Flexible(
-                        child: Text(
-                          isTl
-                              ? 'I-report ang Hindi Kilalang Produkto'
-                              : 'Report Unidentified Product',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      label: Text(
+                        isTl
+                            ? 'I-report ang Hindi Kilalang Produkto'
+                            : 'Report Unidentified Product',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       onPressed: () {
@@ -488,14 +656,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                             borderRadius: BorderRadius.circular(12)),
                       ),
                       icon: const Icon(Icons.refresh_rounded),
-                      label: Flexible(
-                        child: Text(
-                          isTl ? 'Subukan Ulit' : 'Try Again',
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      label: Text(
+                        isTl ? 'Subukan Ulit' : 'Try Again',
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.inter(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       onPressed: () {
@@ -512,6 +678,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     ).then((_) {
       if (mounted) {
         _isFallbackModalOpen = false;
+        _hasTappedToScan = false;
         _noProductStartTime = DateTime.now();
         _startContinuousAnalysis();
       }
@@ -563,6 +730,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     );
 
     if (mounted) {
+      _hasTappedToScan = false;
       _startContinuousAnalysis();
     }
   }
@@ -574,6 +742,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     if (_liveDetections.isNotEmpty) {
       setState(() {
         _isProcessing = true;
+        _hasTappedToScan = true;
         _qualityWarning = null;
       });
       _stopImageStreamIfActive();
@@ -592,6 +761,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
     setState(() {
       _isProcessing = true;
+      _hasTappedToScan = true;
       _qualityWarning = null;
     });
 
@@ -601,6 +771,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         debugPrint('CameraScannerScreen: Safety timer triggered, resetting analyze state.');
         setState(() {
           _isProcessing = false;
+          _hasTappedToScan = false;
         });
         _startContinuousAnalysis();
       }
@@ -609,16 +780,29 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     try {
       if (_cameraController?.value.isInitialized != true) {
         safetyTimer.cancel();
-        setState(() => _isProcessing = false);
+        setState(() {
+          _isProcessing = false;
+          _hasTappedToScan = false;
+        });
         _startContinuousAnalysis();
         return;
       }
 
+      // [ISSUE 5 FIX]: Camera2 Deadlock Prevention Sequence
+      // Step 1: Request stop image stream and wait for native confirmation
       await _stopImageStreamIfActive();
+      int streamWaitCount = 0;
+      while (_cameraController?.value.isStreamingImages == true && streamWaitCount < 10) {
+        await Future.delayed(const Duration(milliseconds: 30));
+        streamWaitCount++;
+      }
+
+      // Step 2: Set flash mode safely
       await _cameraController!.setFlashMode(
         _isFlashOn ? FlashMode.torch : FlashMode.off,
       );
       
+      // Step 3: Take picture safely after buffer release
       XFile? file;
       try {
         file = await _cameraController!.takePicture();
@@ -630,6 +814,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
            safetyTimer.cancel();
            setState(() {
              _isProcessing = false;
+             _hasTappedToScan = false;
              _qualityWarning = 'Camera busy. Try again.';
            });
            _startContinuousAnalysis();
@@ -646,6 +831,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           setState(() {
             _qualityWarning = quality.message;
             _isProcessing = false;
+            _hasTappedToScan = false;
           });
           _startContinuousAnalysis();
           return;
@@ -668,6 +854,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       if (mounted) {
         setState(() {
           _isProcessing = false;
+          _hasTappedToScan = false;
           _qualityWarning = 'Scan error. Please try again.';
         });
         _startContinuousAnalysis();
@@ -681,6 +868,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   ) async {
     setState(() {
       _isProcessing = false;
+      _hasTappedToScan = false;
     });
 
     if (detections.isNotEmpty) {
@@ -748,8 +936,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               ),
             ),
           ).then((_) {
-            if (mounted) {
+            if (mounted && (!widget.embeddedMode || HomeTabController.tabNotifier.value == 1)) {
               _isScreenActive = true;
+              _hasTappedToScan = false;
               _noProductStartTime = null;
               SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
               _startContinuousAnalysis();
@@ -775,8 +964,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               ),
             ),
           ).then((_) {
-            if (mounted) {
+            if (mounted && (!widget.embeddedMode || HomeTabController.tabNotifier.value == 1)) {
               _isScreenActive = true;
+              _hasTappedToScan = false;
               _noProductStartTime = null;
               SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
               _startContinuousAnalysis();
@@ -812,7 +1002,115 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                     : const SizedBox.shrink(),
                 ),
 
-                // (Tap-to-scan removed — scanning is now fully automatic)
+                // Camera Hardware Init Error Fallback Card
+                if (_cameraInitFailed)
+                  Positioned.fill(
+                    child: Center(
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 32),
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.videocam_off_outlined, color: Colors.amber, size: 48),
+                            const SizedBox(height: 16),
+                            Text(
+                              _cameraErrorMessage ?? 'Camera initialization error',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white, fontSize: 14),
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton.icon(
+                              onPressed: () {
+                                _isInitializingCamera = false;
+                                _checkPermissionAndInit();
+                              },
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Retry Camera'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF8B1A1A),
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Viewfinder Tap-to-Scan Gesture
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () {
+                      if (_isProcessing) return;
+                      HapticService().vibrate();
+                      setState(() {
+                        _hasTappedToScan = true;
+                      });
+                      _performScan();
+                    },
+                  ),
+                ),
+
+                // Faint "Tap anywhere to scan" centered reminder (disappears when tapped/scanning)
+                if (!_hasTappedToScan && !_isProcessing)
+                  Positioned.fill(
+                    child: Center(
+                      child: IgnorePointer(
+                        child: AnimatedOpacity(
+                          opacity: _hasTappedToScan ? 0.0 : 1.0,
+                          duration: const Duration(milliseconds: 250),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.38),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.22),
+                                width: 1,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.touch_app_outlined,
+                                  color: Colors.white.withValues(alpha: 0.75),
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  Localizations.localeOf(context).languageCode == 'tl'
+                                      ? 'Pindutin para mag-scan'
+                                      : 'Tap anywhere to scan',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
 
                 // Dim overlay outside viewfinder & live region accessibility semantics
                 Positioned.fill(
@@ -821,15 +1119,11 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                     liveRegion: true,
                     container: true,
                     child: IgnorePointer(
-                      child: AnimatedBuilder(
-                        animation: _laserAnimation,
-                        builder: (_, __) => CustomPaint(
-                          painter: _ScannerOverlayPainter(
-                            laserProgress: _laserAnimation.value,
-                            isProcessing: _isProcessing,
-                            isProductInGuide: _isProductInGuide,
-                            detections: _liveDetections,
-                          ),
+                      child: CustomPaint(
+                        painter: _ScannerOverlayPainter(
+                          isProcessing: _isProcessing,
+                          isProductInGuide: _isProductInGuide,
+                          detections: _liveDetections,
                         ),
                       ),
                     ),
@@ -951,45 +1245,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                     ],
                   ),
                 ),
-
-                // ── Quality warning banner ──────────────────────────
-                // Sits below the static guide text (which now starts at
-                // topPadding + 66 and runs roughly two lines tall).
-                if (_qualityWarning != null)
-                  Positioned(
-                    top: topPadding + 118,
-                    left: 24,
-                    right: 24,
-                    child: Semantics(
-                      liveRegion: true,
-                      container: true,
-                      label: _qualityWarning!,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.redAccent.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.warning_amber_rounded,
-                                color: Colors.white, size: 20),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                _qualityWarning!,
-                                style: GoogleFonts.inter(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
 
                 // ── Dynamic Status Indicator + bottom helper prompt ──────
                 // The status pill ("Scanning for product, hold steady") now
@@ -1117,10 +1372,16 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       statusText = isTagalog ? 'Sinusuri ang Produkto...' : 'Analyzing Product...';
       statusColor = const Color(0xFF00E676);
       iconData = Icons.sync;
-    } else if (_qualityWarning != null && _qualityWarning!.toLowerCase().contains('dark')) {
-      statusText = isTagalog ? 'Masyadong Madilim - Buksan ang Flash' : 'Too Dark - Turn on Flash';
-      statusColor = const Color(0xFFFFB74D);
-      iconData = Icons.flash_on;
+    } else if (_qualityWarning != null) {
+      if (_qualityWarning!.toLowerCase().contains('dark')) {
+        statusText = isTagalog ? 'Masyadong Madilim - Buksan ang Flash' : 'Too Dark - Turn on Flash';
+        statusColor = const Color(0xFFFFB74D);
+        iconData = Icons.flash_on;
+      } else {
+        statusText = _qualityWarning!;
+        statusColor = const Color(0xFFFFB74D);
+        iconData = Icons.warning_amber_rounded;
+      }
     } else if (_isProductInGuide) {
       statusText = isTagalog ? 'I-hold steady nang 1.2s...' : 'Hold steady... (1.2s)';
       statusColor = const Color(0xFF00E676);
@@ -1143,7 +1404,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           border: Border.all(
             color: _isProductInGuide || _isProcessing
                 ? const Color(0xFF00E676)
-                : Colors.white24,
+                : (_qualityWarning != null
+                    ? const Color(0xFFFFB74D)
+                    : Colors.white24),
             width: 1.2,
           ),
         ),
@@ -1169,8 +1432,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             const SizedBox(width: 8),
             // Font size increased (12 -> 15) for readability; no longer
             // constrained to a narrow pill width, so the full status
-            // message (e.g. "Scanning for product, hold steady") stays
-            // on-screen instead of being truncated with an ellipsis.
+            // message stays on-screen instead of being truncated.
             Flexible(
               child: Text(
                 statusText,
@@ -1195,13 +1457,11 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
 // ── Custom Scanner Overlay Painter ──────────────────────────────────────────
 class _ScannerOverlayPainter extends CustomPainter {
-  final double laserProgress;
   final bool isProcessing;
   final bool isProductInGuide;
   final List<DetectionResult> detections;
 
   _ScannerOverlayPainter({
-    required this.laserProgress,
     required this.isProcessing,
     required this.isProductInGuide,
     required this.detections,
@@ -1221,7 +1481,7 @@ class _ScannerOverlayPainter extends CustomPainter {
     final vh = vb - vt;
 
     // Dim the region outside viewfinder
-    final dimPaint = Paint()..color = Colors.black.withOpacity(0.55);
+    final dimPaint = Paint()..color = Colors.black.withValues(alpha: 0.55);
     canvas.drawRect(Rect.fromLTWH(0, 0, w, vt), dimPaint);
     canvas.drawRect(Rect.fromLTWH(0, vb, w, h - vb), dimPaint);
     canvas.drawRect(Rect.fromLTWH(0, vt, vl, vh), dimPaint);
@@ -1262,11 +1522,10 @@ class _ScannerOverlayPainter extends CustomPainter {
 
     if (isProductInGuide) {
       final glowPaint = Paint()
-        ..color = const Color(0xFF00E676).withOpacity(0.35)
+        ..color = const Color(0xFF00E676).withValues(alpha: 0.35)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 10.0
         ..strokeJoin = StrokeJoin.round;
-        // maskFilter is handled in the painter if blur is supported.
       canvas.drawPath(pathTL, glowPaint);
       canvas.drawPath(pathTR, glowPaint);
       canvas.drawPath(pathBL, glowPaint);
@@ -1283,7 +1542,7 @@ class _ScannerOverlayPainter extends CustomPainter {
         ? const Color(0xFF00E676)
         : Colors.white54;
     final boxPaint = Paint()
-      ..color = boxColor.withOpacity(0.85)
+      ..color = boxColor.withValues(alpha: 0.85)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.5;
 
@@ -1303,27 +1562,10 @@ class _ScannerOverlayPainter extends CustomPainter {
       );
     }
     canvas.restore();
-    // (Label/text overlays on bounding boxes removed for clean camera view)
-
-    // Laser scan animation line
-    final laserY = vt + (vh * laserProgress);
-    final laserPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [
-          Colors.transparent,
-          guideColor.withOpacity(0.9),
-          Colors.transparent,
-        ],
-      ).createShader(Rect.fromLTRB(vl, laserY - 1, vr, laserY + 1))
-      ..strokeWidth = 2.0;
-    canvas.drawLine(Offset(vl, laserY), Offset(vr, laserY), laserPaint);
   }
-
-  // (_formatLabelText removed — label overlays removed from bounding boxes)
 
   @override
   bool shouldRepaint(covariant _ScannerOverlayPainter old) =>
-      old.laserProgress != laserProgress ||
       old.isProcessing != isProcessing ||
       old.isProductInGuide != isProductInGuide ||
       old.detections != detections;

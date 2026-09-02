@@ -107,15 +107,15 @@ void main() {
         }
 
         // MFA ON / OFF
-        if (RegExp(r'\b(turn off (?:mfa|multi factor|two factor|2fa)|mfa off|2fa off|disable (?:mfa|multi factor|two factor|2fa)|i\s*off ang mfa|patayin ang mfa)\b')
+        if (RegExp(r'\b(turn off (?:mfa|multi factor|two factor|2fa)|disable (?:mfa|multi factor|two factor|2fa)|deactivate (?:mfa|multi factor|two factor|2fa)|switch off (?:mfa|2fa)|mfa off|2fa off|i\s*off ang (?:mfa|multi factor|two factor|2fa)|patayin ang (?:mfa|multi factor|two factor|2fa)|isara ang (?:mfa|multi factor|two factor|2fa)|i\s*disable ang (?:mfa|2fa)|i\s*deactivate ang (?:mfa|2fa))\b')
             .hasMatch(normalized)) {
           return 'mfa_off';
         }
-        if (RegExp(r'\b(turn on (?:mfa|multi factor|two factor|2fa)|mfa on|2fa on|enable (?:mfa|multi factor|two factor|2fa)|i\s*on ang mfa|buhayin ang mfa)\b')
+        if (RegExp(r'\b(turn on (?:mfa|multi factor|two factor|2fa)|enable (?:mfa|multi factor|two factor|2fa)|activate (?:mfa|multi factor|two factor|2fa)|switch on (?:mfa|2fa)|mfa on|2fa on|i\s*on ang (?:mfa|multi factor|two factor|2fa)|buhayin ang (?:mfa|multi factor|two factor|2fa)|buksan ang (?:mfa|multi factor|two factor|2fa)|i\s*enable ang (?:mfa|2fa)|i\s*activate ang (?:mfa|2fa))\b')
             .hasMatch(normalized)) {
           return 'mfa_on';
         }
-        if (RegExp(r'\b(multi factor authentication|two factor authentication|multi factor|two factor|mfa|2fa|dalawang yugtong pagpapatunay)\b')
+        if (RegExp(r'\b(multi factor authentication|two factor authentication|multi factor|two factor|mfa|2fa|dalawang yugtong pagpapatunay|mfa settings|2fa settings)\b')
             .hasMatch(normalized)) {
           return 'mfa';
         }
@@ -173,7 +173,7 @@ void main() {
             .hasMatch(normalized)) {
           return 'review_history';
         }
-        if (RegExp(r'\b(change password|reset password|palitan ang password|baguhin ang password|update password|password)\b')
+        if (RegExp(r'\b(change password|reset password|palitan ang password|baguhin ang password|update password|password|security settings)\b')
             .hasMatch(normalized)) {
           return 'change_password';
         }
@@ -192,6 +192,10 @@ void main() {
         if (RegExp(r'\b(user guide|app guide|manual|gabay sa paggamit|gabay ng gumagamit|gabay|how to use|nutrition guide)\b')
             .hasMatch(normalized)) {
           return 'user_guide';
+        }
+        if (RegExp(r'\b(log out|logout|sign out|signout|mag log out|maglog out|mag sign out|magsign out|lumabas sa account|i\s*log out)\b')
+            .hasMatch(normalized)) {
+          return 'logout';
         }
 
         return null;
@@ -233,9 +237,28 @@ void main() {
       expect(targetFromTranscript('multi factor authentication'), equals('mfa'));
       expect(targetFromTranscript('two factor authentication'), equals('mfa'));
       expect(targetFromTranscript('turn on mfa'), equals('mfa_on'));
+      expect(targetFromTranscript('enable two factor authentication'), equals('mfa_on'));
+      expect(targetFromTranscript('i-on ang mfa'), equals('mfa_on'));
       expect(targetFromTranscript('mfa on'), equals('mfa_on'));
       expect(targetFromTranscript('turn off mfa'), equals('mfa_off'));
+      expect(targetFromTranscript('disable 2fa'), equals('mfa_off'));
+      expect(targetFromTranscript('i-off ang multi factor authentication'), equals('mfa_off'));
       expect(targetFromTranscript('mfa off'), equals('mfa_off'));
+      expect(targetFromTranscript('turn off voice assistant'), equals('voice_assistant_off'));
+      expect(targetFromTranscript('voice assistant off'), equals('voice_assistant_off'));
+      expect(targetFromTranscript('turn on voice assistant'), equals('voice_assistant_on'));
+      expect(targetFromTranscript('voice assistant on'), equals('voice_assistant_on'));
+      expect(targetFromTranscript('change language to tagalog'), equals('language_tagalog'));
+      expect(targetFromTranscript('change language to english'), equals('language_english'));
+      expect(targetFromTranscript('language settings'), equals('language'));
+      expect(targetFromTranscript('app reviews'), equals('review_history'));
+      expect(targetFromTranscript('privacy policy'), equals('privacy_policy'));
+      expect(targetFromTranscript('terms and conditions'), equals('terms_conditions'));
+      expect(targetFromTranscript('user guide'), equals('user_guide'));
+      expect(targetFromTranscript('log out'), equals('logout'));
+      expect(targetFromTranscript('sign out'), equals('logout'));
+      expect(targetFromTranscript('mag log out'), equals('logout'));
+      expect(targetFromTranscript('mag sign out'), equals('logout'));
       expect(targetFromTranscript('turn off voice assistant'), equals('voice_assistant_off'));
       expect(targetFromTranscript('voice assistant off'), equals('voice_assistant_off'));
       expect(targetFromTranscript('turn on voice assistant'), equals('voice_assistant_on'));
