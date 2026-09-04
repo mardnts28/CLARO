@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase/firebase";
 import DashboardLayout from "../components/DashboardLayout";
 import { getDashboardStats, getRecentReports } from "../services/reportService";
 import { getReviewStats } from "../services/reviewService";
@@ -22,6 +25,22 @@ export default function Dashboard() {
   const [recentReports, setRecentReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [username, setUsername] = useState("");
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+
+      const adminRef = doc(db, "admins", user.uid);
+      const adminSnap = await getDoc(adminRef);
+
+      if (adminSnap.exists()) {
+        setUsername(adminSnap.data().name || "");
+      }
+    });
+
+    return unsub;
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -64,7 +83,7 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <h1 className="page-title">Dashboard</h1>
-      <p className="page-subtitle">Welcome back, Admin!</p>
+      <p className="page-subtitle">Welcome back, {username || "Admin"}!</p>
 
       {error && <p className="table-empty error">{error}</p>}
 

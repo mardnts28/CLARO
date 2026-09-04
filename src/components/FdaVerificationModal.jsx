@@ -36,6 +36,18 @@ export default function FdaVerificationModal({ onConfirm, onClose, loading }) {
 
         <h3 className="modal-title">FDA Verification</h3>
 
+        <p className="fda-verification-note">
+          Verify the product is FDA registered through the{" "}
+          <a
+            href="https://verification.fda.gov.ph/"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            FDA Philippine Verification Portal
+          </a>
+          .
+        </p>
+
         <div className="fda-field-group">
           <label className="field-label">CPR Number</label>
           <input

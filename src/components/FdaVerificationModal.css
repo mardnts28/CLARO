@@ -36,3 +36,14 @@
   font-size: 12px;
   margin-top: 4px;
 }
+.fda-verification-note {
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.fda-verification-note a {
+  color: #1a73e8;
+  text-decoration: underline;
+}
