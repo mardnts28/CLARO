@@ -74,10 +74,10 @@ export default function Sidebar({ collapsed }) {
             "sidebar-link" + (isActive ? " active" : "")
           }
         >
-          <FiSettings className="icon" />
+          <FiFileText className="icon" />
           {!collapsed && (
             <>
-              <span className="link-text">Settings</span>
+              <span className="link-text">Activity Log</span>
               <FiChevronRight className="chevron" />
             </>
           )}
