@@ -17,6 +17,13 @@ export default function ProtectedRoute({ children }) {
       }
 
       try {
+        if (sessionStorage.getItem(`claro:otp-verified:${user.uid}`) !== "true") {
+          await signOut(auth);
+          setIsAuthed(false);
+          setChecking(false);
+          return;
+        }
+
         const adminRef = doc(db, "admins", user.uid);
         let adminSnap = await getDoc(adminRef);
 

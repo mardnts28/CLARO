@@ -87,9 +87,11 @@ export default function OTPVerification() {
 
     try {
       await verifyOTP(state.uid, code);
+      sessionStorage.setItem(`claro:otp-verified:${state.uid}`, "true");
 
       const adminSnap = await getDoc(doc(db, "admins", state.uid));
-      const mustChangePassword = adminSnap.exists() && adminSnap.data().mustChangePassword === true;
+      const mustChangePassword = state.mustChangePassword === true ||
+        (adminSnap.exists() && adminSnap.data().mustChangePassword === true);
 
       if (mustChangePassword) {
         navigate("/change-password", { replace: true, state: { firstTime: true } });

@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/images/logoll.png";
 import { loginAdmin, resetPassword, firebaseErrorMessages } from "../services/authService";
+import { generateAndSendOTP } from "../services/otpService";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase/firebase";
 import "./Login.css";
 
 export default function Login() {
@@ -46,15 +49,23 @@ export default function Login() {
     try {
       const admin = await loginAdmin(email.trim(), password);
 
-      // MFA/OTP step temporarily disabled (EmailJS free tier limits).
-      // Re-enable later by restoring generateAndSendOTP + navigate("/verify-otp").
-      // Mandatory password change for first-time logins is still enforced
-      // via the existing `mustChangePassword` field on the admin doc.
-      if (admin.mustChangePassword) {
-        navigate("/change-password", { replace: true, state: { firstTime: true } });
-      } else {
-        navigate("/dashboard", { replace: true });
+      sessionStorage.removeItem(`claro:otp-verified:${admin.uid}`);
+      let expiresAt;
+      try {
+        ({ expiresAt } = await generateAndSendOTP(admin.uid, email.trim()));
+      } catch (err) {
+        await signOut(auth);
+        throw err;
       }
+      navigate("/verify-otp", {
+        replace: true,
+        state: {
+          uid: admin.uid,
+          email: email.trim(),
+          otpExpiresAt: expiresAt.getTime(),
+          mustChangePassword: admin.mustChangePassword === true,
+        },
+      });
     } catch (err) {
       if (err.code === "not-admin") {
         setErrors({ form: "You are not authorized to access this dashboard." });

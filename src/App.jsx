@@ -17,7 +17,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Login />} />
         <Route path="/verify-otp" element={<OTPVerification />} />
-        <Route path="/change-password" element={<ChangePasswordFirstTime />} />
+        <Route path="/change-password" element={<ProtectedRoute><ChangePasswordFirstTime /></ProtectedRoute>} />
 
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
