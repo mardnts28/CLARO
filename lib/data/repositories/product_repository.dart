@@ -300,6 +300,7 @@ class FirestoreProductRepository implements ProductRepository {
       availableSizes: const [100],
       sizeOptions: const [],
       nutritionalFacts: NutritionalFacts(),
+      isOfflineFallback: true,
     );
   }
 

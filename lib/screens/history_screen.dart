@@ -88,11 +88,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _handleSubTabChange() {
-    if (mounted) {
-      setState(() {
-        _activeTab = HomeTabController.historySubTabNotifier.value;
-      });
-    }
+    if (!mounted) return;
+    final newTab = HomeTabController.historySubTabNotifier.value;
+    setState(() {
+      _activeTab = newTab;
+    });
+    // Do NOT call announcePage here — voice commands that trigger
+    // switchToHistorySubTab() already speak their own reply via the
+    // voice command router. Announcing again would cause overlap.
   }
 
   void _onLocaleChanged() {
@@ -108,8 +111,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void _announceIfVisible() {
     if (HomeTabController.tabNotifier.value == 2 &&
         _authService.currentUser != null &&
-        VoiceAssistantService.instance.isEnabled) {
-      VoiceAssistantService.instance.announcePage('history');
+        VoiceAssistantService.instance.isEnabled &&
+        // Only announce if on the All tab — sub-tabs handle their own
+        // announcements via onTap. Also skip if voice is already speaking
+        // (e.g. voice command router already said "Opening history").
+        _activeTab == 'Lahat' &&
+        !VoiceAssistantService.isSpeakingNotifier.value) {
+      final isTagalog =
+          LocaleService.localeNotifier.value.languageCode == 'tl';
+      final preamble = isTagalog
+          ? 'Binubuksan ang kasaysayan ng pag-scan.'
+          : 'Opening scan history.';
+      // 350 ms delay lets stopAudio() from the navigator observer finish
+      // before the announcement begins.
+      Future.delayed(const Duration(milliseconds: 350), () {
+        if (mounted) {
+          VoiceAssistantService.instance
+              .announcePageWithPreamble(preamble, 'history');
+        }
+      });
     }
   }
 
@@ -190,10 +210,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final productId = item.productId;
     if (uid == null || productId == null) return;
 
+    final wasFavorite = _favoriteProducts.any((p) => p.id == productId);
+
     try {
       await BackendLocator.favoritesService.toggleFavorite(
         userId: uid,
         productId: productId,
+        isCurrentlyFavorite: wasFavorite,
       );
       // No manual refresh needed -- _favoritesSubscription above picks this
       // up automatically, the same way it picks up every other navigation
@@ -290,6 +313,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+    final isFavoritesTab = _activeTab == 'Paborito';
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -299,7 +324,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
             style: GoogleFonts.outfit(
                 fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
         content: Text(
-          loc.clearAllConfirm,
+          isFavoritesTab
+              ? loc.clearAllFavoritesConfirm
+              : loc.clearAllConfirm,
           style: GoogleFonts.inter(
               fontSize: 14, color: colorScheme.onSurfaceVariant),
         ),
@@ -311,8 +338,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
           TextButton(
             onPressed: () {
-              _historyService.clearAllHistory();
               Navigator.pop(ctx);
+              if (isFavoritesTab) {
+                _clearAllFavorites();
+              } else {
+                _historyService.clearAllHistory();
+              }
             },
             child: Text(loc.clear,
                 style: GoogleFonts.inter(
@@ -321,6 +352,23 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ],
       ),
     );
+  }
+
+  /// Removes every currently-favorited product for this user.
+  Future<void> _clearAllFavorites() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid == null) return;
+    final ids = List<Product>.from(_favoriteProducts);
+    for (final product in ids) {
+      try {
+        await BackendLocator.favoritesService.removeFavorite(
+          userId: uid,
+          productId: product.id,
+        );
+      } catch (e) {
+        debugPrint('HistoryScreen._clearAllFavorites: failed for ${product.id}: $e');
+      }
+    }
   }
 
   // ── Build a single scan-type card ─────────────────────────────────────────
@@ -872,16 +920,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             color: colorScheme.onSurface),
                       ),
                     ),
-                    GestureDetector(
-                      onTap: _showClearAllDialog,
-                      child: Text(
-                        loc.clearAll,
-                        style: GoogleFonts.inter(
-                            fontSize: 12,
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w500),
+                    if (_activeTab != 'Mga Ulat')
+                      GestureDetector(
+                        onTap: _showClearAllDialog,
+                        child: Text(
+                          loc.clearAll,
+                          style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w500),
+                        ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -943,8 +992,46 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                       return Expanded(
                         child: GestureDetector(
-                          onTap: () =>
-                              setState(() => _activeTab = tab),
+                          onTap: () {
+                              setState(() => _activeTab = tab);
+                              if (VoiceAssistantService.instance.isEnabled) {
+                                final String? pageKey = switch (tab) {
+                                  'Paborito' => 'favorites',
+                                  'Kumpara'  => 'compare',
+                                  'Mga Ulat' => 'reports',
+                                  _          => null,
+                                };
+                                if (pageKey != null) {
+                                  final isTagalog = LocaleService
+                                      .localeNotifier.value.languageCode == 'tl';
+                                  final String preamble = switch (tab) {
+                                    'Paborito' => isTagalog
+                                        ? 'Binubuksan ang mga paboritong produkto.'
+                                        : 'Opening your favorites.',
+                                    'Kumpara' => isTagalog
+                                        ? 'Binubuksan ang kasaysayan ng paghahambing.'
+                                        : 'Opening your comparison history.',
+                                    'Mga Ulat' => isTagalog
+                                        ? 'Binubuksan ang iyong mga ulat.'
+                                        : 'Opening your submitted reports.',
+                                    _ => '',
+                                  };
+                                  // Stop the history-tab announcement if it is
+                                  // still playing, then speak preamble + page description.
+                                  VoiceAssistantService.instance.stopAudio();
+                                  Future.delayed(
+                                    const Duration(milliseconds: 350),
+                                    () {
+                                      if (mounted) {
+                                        VoiceAssistantService.instance
+                                            .announcePageWithPreamble(
+                                                preamble, pageKey);
+                                      }
+                                    },
+                                  );
+                                }
+                              }
+                            },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(vertical: 8),

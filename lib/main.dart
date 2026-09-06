@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_options.dart';
 import 'generated/l10n/app_localizations.dart';
 import 'services/theme_service.dart';
@@ -39,6 +40,12 @@ void main() async {
   ]);
   preInitStopwatch.stop();
   debugPrint('TIMING [Startup]: Core parallel I/O (dotenv, Firebase, SharedPreferences, PackageInfo) took ${preInitStopwatch.elapsedMilliseconds}ms');
+
+  // Enable Firestore offline persistence for automatic sync of favorites & writes
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
 
   final prefs = results[2] as SharedPreferences;
   final packageInfo = results[3] as PackageInfo;
@@ -83,6 +90,9 @@ void main() async {
         if (repo is FirestoreProductRepository) {
           await repo.preloadOfflineCatalog();
         }
+
+        // Auto-flush any pending offline product reports if internet is available
+        unawaited(BackendLocator.pendingReportsService.flushPendingReports());
       } catch (e) {
         debugPrint('TIMING [Startup]: Deferred background service init warning: $e');
       }

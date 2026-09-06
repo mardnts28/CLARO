@@ -756,6 +756,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'All scan history will be deleted. This cannot be undone.';
 
   @override
+  String get clearAllFavoritesConfirm =>
+      'All saved favorites will be removed. This cannot be undone.';
+
+  @override
   String get clear => 'Clear';
 
   @override
@@ -1290,4 +1294,45 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get selectAtLeastOneProduct => 'Select at least one product to add';
+
+  @override
+  String get noInternetTitle => 'No Internet Connection';
+
+  @override
+  String get noInternetNutritionMessage =>
+      'Connect to mobile data or Wi-Fi to load full nutritional details.';
+
+  @override
+  String get noInternetActionMessage =>
+      'Please connect to mobile data or Wi-Fi to perform this action.';
+
+  @override
+  String get noInternetReportMessage =>
+      'Please connect to mobile data or Wi-Fi to submit this report.';
+
+  @override
+  String get gotIt => 'Got it';
+
+  @override
+  String get offlineBasicRecognitionBanner =>
+      'Offline mode: Basic recognition only. Reconnect for complete nutrition.';
+
+  @override
+  String get noInternetHealthProfileMessage =>
+      'Please connect to mobile data or Wi-Fi to update your health conditions and allergens.';
+
+  @override
+  String get noInternetReviewMessage =>
+      'Please connect to mobile data or Wi-Fi to submit your review.';
+
+  @override
+  String get reportQueuedTitle => 'Report Saved Offline';
+
+  @override
+  String get reportQueuedMessage =>
+      'Your report has been saved offline and will be submitted automatically when you reconnect to the internet.';
+
+  @override
+  String get noInternetVoiceMessage =>
+      'Please connect to mobile data or Wi-Fi to use the Voice Assistant.';
 }

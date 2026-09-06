@@ -4,7 +4,6 @@ import '../services/auth_service.dart';
 import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
-import '../services/voice_assistant_service.dart';
 import '../widgets/date_of_birth_picker.dart';
 import 'home_screen.dart';
 

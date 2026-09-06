@@ -191,6 +191,49 @@ class _UnknownProductSubmissionScreenState
     }
     setState(() => _nameError = null);
 
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      final user = _authService.currentUser;
+      final uid = user?.uid ?? 'anonymous';
+      final email = user?.email ?? '';
+      String name = email.isNotEmpty ? email.split('@').first : 'Anonymous';
+      try {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .get();
+        final fetchedName = userDoc.data()?['name'] as String?;
+        if (fetchedName != null && fetchedName.trim().isNotEmpty) {
+          name = fetchedName.trim();
+        }
+      } catch (_) {}
+
+      await BackendLocator.pendingReportsService.queueReport(
+        productName: _nameController.text.trim(),
+        category: _selectedCategory,
+        reportedBy: uid,
+        userEmail: email,
+        userName: name,
+        frontImagePath: _frontImagePath,
+        backImagePath: _backImagePath!,
+        additionalBackImagePaths: _additionalBackImagePaths,
+      );
+
+      if (mounted) {
+        final loc = AppLocalizations.of(context)!;
+        await SuccessFeedbackUtils.showQueuedNoticeDialog(
+          context,
+          title: loc.reportQueuedTitle,
+          message: loc.reportQueuedMessage,
+          buttonText: loc.gotIt,
+          onDismiss: () {
+            Navigator.of(context).popUntil((route) => route.isFirst);
+          },
+        );
+      }
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -307,13 +350,57 @@ class _UnknownProductSubmissionScreenState
     } catch (e) {
       debugPrint('Report submission error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.redAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final loc = AppLocalizations.of(context)!;
+        final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+            e.toString().toLowerCase().contains('network') ||
+            e.toString().toLowerCase().contains('socket');
+        if (!mounted) return;
+        if (isNet) {
+          final user = _authService.currentUser;
+          final uid = user?.uid ?? 'anonymous';
+          final email = user?.email ?? '';
+          String name = email.isNotEmpty ? email.split('@').first : 'Anonymous';
+          try {
+            final userDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .get();
+            final fetchedName = userDoc.data()?['name'] as String?;
+            if (fetchedName != null && fetchedName.trim().isNotEmpty) {
+              name = fetchedName.trim();
+            }
+          } catch (_) {}
+
+          await BackendLocator.pendingReportsService.queueReport(
+            productName: _nameController.text.trim(),
+            category: _selectedCategory,
+            reportedBy: uid,
+            userEmail: email,
+            userName: name,
+            frontImagePath: _frontImagePath,
+            backImagePath: _backImagePath!,
+            additionalBackImagePaths: _additionalBackImagePaths,
+          );
+
+          if (!mounted) return;
+          await SuccessFeedbackUtils.showQueuedNoticeDialog(
+            context,
+            title: loc.reportQueuedTitle,
+            message: loc.reportQueuedMessage,
+            buttonText: loc.gotIt,
+            onDismiss: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $e'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

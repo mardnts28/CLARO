@@ -10,7 +10,6 @@ import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
-import '../widgets/voice_assistant_fab.dart';
 import '../data/services/backend_locator.dart';
 import 'change_password_screen.dart';
 
@@ -262,6 +261,19 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   Future<void> _saveUserName(String newName) async {
     final loc = AppLocalizations.of(context)!;
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (mounted) {
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     try {
       final uid = _authService.currentUser?.uid;
       if (uid == null) return;
@@ -276,7 +288,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         await _loadUserData();
         if (mounted) SuccessFeedbackUtils.showSuccessSnackBar(context, loc.profileUpdateSuccess);
       } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
+        if (mounted) {
+          final isNet = !(await SuccessFeedbackUtils.hasInternetConnection());
+          if (!mounted) return;
+          if (isNet) {
+            await SuccessFeedbackUtils.showOfflineNoticeDialog(
+              context,
+              title: loc.noInternetTitle,
+              message: loc.noInternetActionMessage,
+              buttonText: loc.gotIt,
+            );
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error saving user name: $e');
@@ -336,7 +361,24 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     );
   }
 
-  Future<void> _updateConditions() async {
+  Future<void> _updateConditions({String? toggledKey, bool? previousValue}) async {
+    final loc = AppLocalizations.of(context)!;
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (toggledKey != null && previousValue != null) {
+        setState(() => _conditions[toggledKey] = previousValue);
+      }
+      if (mounted) {
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetHealthProfileMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
@@ -348,14 +390,46 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         if (ok) {
           BackendLocator.userRepository.invalidateCache(uid);
           await _loadUserData();
+        } else {
+          if (toggledKey != null && previousValue != null) {
+            setState(() => _conditions[toggledKey] = previousValue);
+          }
+          if (mounted) {
+            await SuccessFeedbackUtils.showOfflineNoticeDialog(
+              context,
+              title: loc.noInternetTitle,
+              message: loc.noInternetHealthProfileMessage,
+              buttonText: loc.gotIt,
+            );
+          }
         }
       }
     } catch (e) {
       debugPrint('Error updating conditions: $e');
+      if (toggledKey != null && previousValue != null) {
+        setState(() => _conditions[toggledKey] = previousValue);
+      }
     }
   }
 
-  Future<void> _updateAllergens() async {
+  Future<void> _updateAllergens({String? toggledKey, bool? previousValue}) async {
+    final loc = AppLocalizations.of(context)!;
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (toggledKey != null && previousValue != null) {
+        setState(() => _allergens[toggledKey] = previousValue);
+      }
+      if (mounted) {
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetHealthProfileMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
@@ -366,10 +440,25 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         if (ok) {
           BackendLocator.userRepository.invalidateCache(uid);
           await _loadUserData();
+        } else {
+          if (toggledKey != null && previousValue != null) {
+            setState(() => _allergens[toggledKey] = previousValue);
+          }
+          if (mounted) {
+            await SuccessFeedbackUtils.showOfflineNoticeDialog(
+              context,
+              title: loc.noInternetTitle,
+              message: loc.noInternetHealthProfileMessage,
+              buttonText: loc.gotIt,
+            );
+          }
         }
       }
     } catch (e) {
       debugPrint('Error updating allergens: $e');
+      if (toggledKey != null && previousValue != null) {
+        setState(() => _allergens[toggledKey] = previousValue);
+      }
     }
   }
 
@@ -438,13 +527,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 _buildAllergensSection(theme),
                 const SizedBox(height: 20),
                 _buildAccountSettings(theme),
-                const SizedBox(height: 90),
+                const SizedBox(height: 24),
               ],
             ),
           ),
         ),
       ),
-      floatingActionButton: const VoiceAssistantFab(),
     );
   }
 
@@ -544,8 +632,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                     value: entry.value,
                     onChanged: (value) {
                       HapticService().vibrate();
+                      final prev = entry.value;
                       setState(() => _conditions[entry.key] = value);
-                      _updateConditions();
+                      _updateConditions(toggledKey: entry.key, previousValue: prev);
                     },
                     activeThumbColor: colorScheme.primary,
                     activeTrackColor: colorScheme.primary.withAlpha(120),
@@ -614,7 +703,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                       onTap: () {
                         HapticService().vibrate();
                         setState(() => _allergens[allergen] = false);
-                        _updateAllergens();
+                        _updateAllergens(toggledKey: allergen, previousValue: true);
                       },
                       child: Icon(Icons.close, size: 16, color: colorScheme.primary),
                     ),
@@ -709,8 +798,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   return GestureDetector(
                     onTap: () {
                       HapticService().vibrate();
-                      setState(() => _allergens[entry.key] = !entry.value);
-                      _updateAllergens();
+                      final prev = entry.value;
+                      setState(() => _allergens[entry.key] = !prev);
+                      _updateAllergens(toggledKey: entry.key, previousValue: prev);
                       Navigator.pop(context);
                     },
                     child: Container(

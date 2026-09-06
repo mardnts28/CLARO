@@ -269,6 +269,7 @@
 
   "clearAllTitle": "Burahin ang Lahat?",
   "clearAllConfirm": "Mabubura ang lahat ng kasaysayan ng iyong mga scan. Hindi ito maibabalik.",
+  "clearAllFavoritesConfirm": "Aalisin ang lahat ng naka-save na paborito. Hindi ito maibabalik.",
   "clear": "Burahin",
   "clearAll": "Burahin Lahat",
   "searchHint": "Maghanap",
@@ -487,5 +488,16 @@
       }
     }
   },
-  "selectAtLeastOneProduct": "Pumili ng kahit isang produkto para idagdag"
+  "selectAtLeastOneProduct": "Pumili ng kahit isang produkto para idagdag",
+  "noInternetTitle": "Walang Koneksyon sa Internet",
+  "noInternetNutritionMessage": "Kumonekta sa mobile data o Wi-Fi para sa buong datos ng nutrisyon.",
+  "noInternetActionMessage": "Mangyaring kumonekta sa mobile data o Wi-Fi para isagawa ang aksyong ito.",
+  "noInternetReportMessage": "Mangyaring kumonekta sa mobile data o Wi-Fi para maipadala ang report na ito.",
+  "gotIt": "Naintindihan",
+  "offlineBasicRecognitionBanner": "Offline mode: Pangunahing pagkilala lamang. Kumonekta muli para sa buong nutrisyon.",
+  "noInternetHealthProfileMessage": "Mangyaring kumonekta sa mobile data o Wi-Fi para i-update ang iyong health conditions at allergens.",
+  "noInternetReviewMessage": "Mangyaring kumonekta sa mobile data o Wi-Fi para maipadala ang iyong review.",
+  "reportQueuedTitle": "Na-save ang Report Offline",
+  "reportQueuedMessage": "Ang iyong report ay na-save offline at awtomatikong maipapadala kapag nakakonekta ka na muli sa internet.",
+  "noInternetVoiceMessage": "Mangyaring kumonekta sa mobile data o Wi-Fi para gamitin ang Voice Assistant."
 }

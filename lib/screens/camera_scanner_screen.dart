@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:camera/camera.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../services/yolo_recognition_service.dart';
@@ -18,6 +17,7 @@ import 'product_detail_screen.dart';
 import 'multi_scan_results_screen.dart';
 import 'unknown_product_submission_screen.dart';
 import '../models/product_model.dart';
+import '../core/utils/success_feedback_utils.dart';
 import '../generated/l10n/app_localizations.dart';
 
 class CameraScannerScreen extends StatefulWidget {
@@ -94,7 +94,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   bool _isProductInGuide = false;
   bool _hasTappedToScan = false;
 
-  DateTime? _productFirstDetectedTime;
   DateTime? _lastSeenTime;
 
   // 5-8s fallback timeout tracking
@@ -355,7 +354,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       _hasTappedToScan = false;
       _noProductStartTime = null;
       _lastSeenTime = null;
-      _productFirstDetectedTime = null;
       _announceIfVisible();
       if (_cameraController != null && _cameraController!.value.isInitialized) {
         _startContinuousAnalysis();
@@ -367,7 +365,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       _hasTappedToScan = false;
       _noProductStartTime = null;
       _lastSeenTime = null;
-      _productFirstDetectedTime = null;
       _isLiveAnalysisRunning = false;
       _isFallbackModalOpen = false;
       _continuousAnalysisTimer?.cancel();
@@ -386,7 +383,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
   void _startContinuousAnalysis() {
     _continuousAnalysisTimer?.cancel();
-    _productFirstDetectedTime = null;
     _lastLiveAnalysisTime = null;
     _noProductStartTime = null;
 
@@ -488,21 +484,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
             if (productInGuide && !_isProcessing) {
               _noProductStartTime = null;
-              _productFirstDetectedTime ??= DateTime.now();
               _lastSeenTime = DateTime.now();
               _triggerAdvisoryPrefetch(detections);
-              
-              final holdDurationMs = DateTime.now().difference(_productFirstDetectedTime!).inMilliseconds;
-              if (holdDurationMs >= 600) {
-                _productFirstDetectedTime = null;
-                _lastSeenTime = null;
-                _performScan();
-              }
             } else if (!_isProcessing) {
               if (_lastSeenTime != null) {
                 final missedDuration = DateTime.now().difference(_lastSeenTime!).inMilliseconds;
                 if (missedDuration > 1500) {
-                  _productFirstDetectedTime = null;
                   _lastSeenTime = null;
                 }
               }
@@ -892,20 +879,21 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           productCounts[prod.id] = (productCounts[prod.id] ?? 0) + count;
         } catch (e) {
           debugPrint('CameraScannerScreen: product lookup failed for $label: $e');
-          unawaited(() async {
-            try {
-              for (int i = 0; i < count; i++) {
-                await FirebaseFirestore.instance.collection('unmatched_yolo_scans').add({
-                  'label': label,
-                  'timestamp': FieldValue.serverTimestamp(),
-                });
-              }
-            } catch (_) {}
-          }());
         }
       }
 
       final distinctProducts = resolvedProducts.toSet().toList();
+
+      if (distinctProducts.any((p) => p.isOfflineFallback) && mounted) {
+        final loc = AppLocalizations.of(context)!;
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetNutritionMessage,
+          buttonText: loc.gotIt,
+        );
+        if (!mounted) return;
+      }
 
       if (distinctProducts.isNotEmpty && widget.returnResultsOnDetect) {
         if (mounted) {

@@ -18,6 +18,7 @@ import 'product_comparison_service.dart';
 import 'product_extraction_service.dart';
 import 'product_ranking_service.dart';
 import 'cloudinary_upload_service.dart';
+import '../../services/pending_reports_service.dart';
 
 class BackendLocator {
   BackendLocator._();
@@ -92,4 +93,7 @@ class BackendLocator {
     productRepository: productRepository,
     productRankingService: productRankingService,
   );
+
+  static final PendingReportsService pendingReportsService =
+      PendingReportsService();
 }

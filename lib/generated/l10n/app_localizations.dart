@@ -1520,6 +1520,12 @@ abstract class AppLocalizations {
   /// **'All scan history will be deleted. This cannot be undone.'**
   String get clearAllConfirm;
 
+  /// No description provided for @clearAllFavoritesConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'All saved favorites will be removed. This cannot be undone.'**
+  String get clearAllFavoritesConfirm;
+
   /// No description provided for @clear.
   ///
   /// In en, this message translates to:
@@ -2521,6 +2527,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select at least one product to add'**
   String get selectAtLeastOneProduct;
+
+  /// No description provided for @noInternetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No Internet Connection'**
+  String get noInternetTitle;
+
+  /// No description provided for @noInternetNutritionMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to mobile data or Wi-Fi to load full nutritional details.'**
+  String get noInternetNutritionMessage;
+
+  /// No description provided for @noInternetActionMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please connect to mobile data or Wi-Fi to perform this action.'**
+  String get noInternetActionMessage;
+
+  /// No description provided for @noInternetReportMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please connect to mobile data or Wi-Fi to submit this report.'**
+  String get noInternetReportMessage;
+
+  /// No description provided for @gotIt.
+  ///
+  /// In en, this message translates to:
+  /// **'Got it'**
+  String get gotIt;
+
+  /// No description provided for @offlineBasicRecognitionBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline mode: Basic recognition only. Reconnect for complete nutrition.'**
+  String get offlineBasicRecognitionBanner;
+
+  /// No description provided for @noInternetHealthProfileMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please connect to mobile data or Wi-Fi to update your health conditions and allergens.'**
+  String get noInternetHealthProfileMessage;
+
+  /// No description provided for @noInternetReviewMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please connect to mobile data or Wi-Fi to submit your review.'**
+  String get noInternetReviewMessage;
+
+  /// No description provided for @reportQueuedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report Saved Offline'**
+  String get reportQueuedTitle;
+
+  /// No description provided for @reportQueuedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Your report has been saved offline and will be submitted automatically when you reconnect to the internet.'**
+  String get reportQueuedMessage;
+
+  /// No description provided for @noInternetVoiceMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Please connect to mobile data or Wi-Fi to use the Voice Assistant.'**
+  String get noInternetVoiceMessage;
 }
 
 class _AppLocalizationsDelegate

@@ -4,6 +4,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 
+import 'voice_assistant_service.dart';
+
 class LocaleService {
   LocaleService._();
 
@@ -29,6 +31,26 @@ class LocaleService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_prefKey, languageCode);
     await prefs.setBool(_languageSelectedPrefKey, true);
+
+    // Keep voice assistant language in sync with app locale
+    final targetVoiceLang = languageCode == 'tl' ? VoiceLang.tagalog : VoiceLang.english;
+    if (VoiceAssistantService.languageNotifier.value != targetVoiceLang) {
+      await VoiceAssistantService.instance.updateLanguage(targetVoiceLang);
+    }
+
+    // Persist to user doc in Firestore so Profile & reload keep it in sync
+    final aSvc = AuthService();
+    final uid = aSvc.currentUser?.uid;
+    if (uid != null) {
+      try {
+        await aSvc.updateUserData({
+          'language': languageCode,
+          'voiceLanguage': targetVoiceLang.storageValue,
+        });
+      } catch (e) {
+        debugPrint('Failed to save language to Firestore: $e');
+      }
+    }
   }
 
   static Future<void> initializeLocale({AuthService? authService}) async {

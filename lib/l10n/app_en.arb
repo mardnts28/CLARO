@@ -269,6 +269,7 @@
 
   "clearAllTitle": "Clear All?",
   "clearAllConfirm": "All scan history will be deleted. This cannot be undone.",
+  "clearAllFavoritesConfirm": "All saved favorites will be removed. This cannot be undone.",
   "clear": "Clear",
   "clearAll": "Clear All",
   "searchHint": "Search",
@@ -487,5 +488,16 @@
       }
     }
   },
-  "selectAtLeastOneProduct": "Select at least one product to add"
+  "selectAtLeastOneProduct": "Select at least one product to add",
+  "noInternetTitle": "No Internet Connection",
+  "noInternetNutritionMessage": "Connect to mobile data or Wi-Fi to load full nutritional details.",
+  "noInternetActionMessage": "Please connect to mobile data or Wi-Fi to perform this action.",
+  "noInternetReportMessage": "Please connect to mobile data or Wi-Fi to submit this report.",
+  "gotIt": "Got it",
+  "offlineBasicRecognitionBanner": "Offline mode: Basic recognition only. Reconnect for complete nutrition.",
+  "noInternetHealthProfileMessage": "Please connect to mobile data or Wi-Fi to update your health conditions and allergens.",
+  "noInternetReviewMessage": "Please connect to mobile data or Wi-Fi to submit your review.",
+  "reportQueuedTitle": "Report Saved Offline",
+  "reportQueuedMessage": "Your report has been saved offline and will be submitted automatically when you reconnect to the internet.",
+  "noInternetVoiceMessage": "Please connect to mobile data or Wi-Fi to use the Voice Assistant."
 }

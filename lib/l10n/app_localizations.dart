@@ -1403,6 +1403,12 @@ abstract class AppLocalizations {
   /// **'All scan history will be deleted. This cannot be undone.'**
   String get clearAllConfirm;
 
+  /// No description provided for @clearAllFavoritesConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'All saved favorites will be removed. This cannot be undone.'**
+  String get clearAllFavoritesConfirm;
+
   /// No description provided for @clear.
   ///
   /// In en, this message translates to:

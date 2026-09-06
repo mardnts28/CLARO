@@ -602,6 +602,49 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
             ),
           ),
 
+          if (widget.detectedProducts.any((p) => p.isOfflineFallback))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: theme.brightness == Brightness.dark
+                      ? const Color(0xFFE65100).withValues(alpha: 0.15)
+                      : const Color(0xFFFFF3E0),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: theme.brightness == Brightness.dark
+                        ? const Color(0xFFFFB74D).withValues(alpha: 0.4)
+                        : const Color(0xFFFFB74D).withValues(alpha: 0.8),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.wifi_off_rounded,
+                      size: 18,
+                      color: theme.brightness == Brightness.dark
+                          ? const Color(0xFFFFB74D)
+                          : const Color(0xFFE65100),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        loc.offlineBasicRecognitionBanner,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                          color: theme.brightness == Brightness.dark
+                              ? const Color(0xFFFFB74D)
+                              : const Color(0xFFE65100),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // ── Product list ──────────────────────────────────────────
           Expanded(
             child: _loading

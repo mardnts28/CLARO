@@ -700,6 +700,10 @@ class AppLocalizationsTl extends AppLocalizations {
       'Mabubura ang lahat ng kasaysayan ng iyong mga scan. Hindi ito maibabalik.';
 
   @override
+  String get clearAllFavoritesConfirm =>
+      'Aalisin ang lahat ng naka-save na paborito. Hindi ito maibabalik.';
+
+  @override
   String get clear => 'Burahin';
 
   @override

@@ -18,7 +18,11 @@ abstract class FavoritesRepository {
   // Convenience for the heart-button tap handler -- flips the state and
   // returns the NEW state, so the UI can update the icon in one call
   // without a separate isFavorite() check first.
-  Future<bool> toggleFavorite({required String userId, required String productId});
+  Future<bool> toggleFavorite({
+    required String userId,
+    required String productId,
+    bool? isCurrentlyFavorite,
+  });
 
   /// Real-time stream of a user's favorited productIds. Any screen that
   /// shows favorite status should subscribe to this rather than doing a
@@ -68,11 +72,23 @@ class MockFavoritesRepository implements FavoritesRepository {
   }
 
   @override
-  Future<bool> toggleFavorite({required String userId, required String productId}) async {
+  Future<bool> toggleFavorite({
+    required String userId,
+    required String productId,
+    bool? isCurrentlyFavorite,
+  }) async {
     await Future.delayed(_simulatedDelay);
     final favorites = _favoritesByUser.putIfAbsent(userId, () => <String>{});
     final bool result;
-    if (favorites.contains(productId)) {
+    if (isCurrentlyFavorite != null) {
+      if (isCurrentlyFavorite) {
+        favorites.remove(productId);
+        result = false;
+      } else {
+        favorites.add(productId);
+        result = true;
+      }
+    } else if (favorites.contains(productId)) {
       favorites.remove(productId);
       result = false; // now NOT a favorite
     } else {
@@ -106,14 +122,42 @@ class FirebaseFavoritesRepository implements FavoritesRepository {
 
   @override
   Future<List<String>> getFavoriteProductIds(String userId) async {
-    final snapshot = await _favoritesCollection(userId).get();
-    return snapshot.docs.map((doc) => doc.id).toList();
+    try {
+      final snapshot = await _favoritesCollection(userId)
+          .get(const GetOptions(source: Source.cache));
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.map((doc) => doc.id).toList();
+      }
+    } catch (_) {}
+
+    try {
+      final snapshot = await _favoritesCollection(userId)
+          .get()
+          .timeout(const Duration(milliseconds: 2000));
+      return snapshot.docs.map((doc) => doc.id).toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   @override
   Future<bool> isFavorite({required String userId, required String productId}) async {
-    final doc = await _favoritesCollection(userId).doc(productId).get();
-    return doc.exists;
+    try {
+      final doc = await _favoritesCollection(userId)
+          .doc(productId)
+          .get(const GetOptions(source: Source.cache));
+      return doc.exists;
+    } catch (_) {
+      try {
+        final doc = await _favoritesCollection(userId)
+            .doc(productId)
+            .get()
+            .timeout(const Duration(milliseconds: 1500));
+        return doc.exists;
+      } catch (_) {
+        return false;
+      }
+    }
   }
 
   @override
@@ -130,10 +174,31 @@ class FirebaseFavoritesRepository implements FavoritesRepository {
   }
 
   @override
-  Future<bool> toggleFavorite({required String userId, required String productId}) async {
+  Future<bool> toggleFavorite({
+    required String userId,
+    required String productId,
+    bool? isCurrentlyFavorite,
+  }) async {
     final docRef = _favoritesCollection(userId).doc(productId);
-    final doc = await docRef.get();
-    if (doc.exists) {
+    bool wasFavorite = false;
+
+    if (isCurrentlyFavorite != null) {
+      wasFavorite = isCurrentlyFavorite;
+    } else {
+      try {
+        final doc = await docRef.get(const GetOptions(source: Source.cache));
+        wasFavorite = doc.exists;
+      } catch (_) {
+        try {
+          final doc = await docRef.get().timeout(const Duration(milliseconds: 1500));
+          wasFavorite = doc.exists;
+        } catch (_) {
+          wasFavorite = false;
+        }
+      }
+    }
+
+    if (wasFavorite) {
       await docRef.delete();
       return false; // now NOT a favorite
     } else {

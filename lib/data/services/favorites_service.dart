@@ -6,6 +6,7 @@
 // and use its return value to update the icon immediately, rather than
 // re-fetching favorite status separately.
 
+import 'package:flutter/foundation.dart';
 import '../../models/product_model.dart';
 import '../repositories/favorites_repository.dart';
 import '../repositories/product_repository.dart';
@@ -20,23 +21,40 @@ class FavoritesService {
   final FavoritesRepository _favoritesRepository;
   final ProductRepository _productRepository;
 
+  /// Broadcasts favorite changes so active product screens can immediately
+  /// synchronize their heart button state when favorited/unfavorited by voice or UI.
+  static final ValueNotifier<Map<String, bool>> favoriteActionNotifier =
+      ValueNotifier<Map<String, bool>>({});
+
   Future<bool> isFavorite({required String userId, required String productId}) {
     return _favoritesRepository.isFavorite(userId: userId, productId: productId);
   }
 
-  Future<void> addFavorite({required String userId, required String productId}) {
-    return _favoritesRepository.addFavorite(userId: userId, productId: productId);
+  Future<void> addFavorite({required String userId, required String productId}) async {
+    await _favoritesRepository.addFavorite(userId: userId, productId: productId);
+    favoriteActionNotifier.value = {productId: true};
   }
 
-  Future<void> removeFavorite({required String userId, required String productId}) {
-    return _favoritesRepository.removeFavorite(userId: userId, productId: productId);
+  Future<void> removeFavorite({required String userId, required String productId}) async {
+    await _favoritesRepository.removeFavorite(userId: userId, productId: productId);
+    favoriteActionNotifier.value = {productId: false};
   }
 
   /// Toggles the heart-button state for a product. Returns the NEW state
   /// (true = now favorited, false = now un-favorited) so the UI can update
   /// the icon immediately without a second round-trip.
-  Future<bool> toggleFavorite({required String userId, required String productId}) {
-    return _favoritesRepository.toggleFavorite(userId: userId, productId: productId);
+  Future<bool> toggleFavorite({
+    required String userId,
+    required String productId,
+    bool? isCurrentlyFavorite,
+  }) async {
+    final newState = await _favoritesRepository.toggleFavorite(
+      userId: userId,
+      productId: productId,
+      isCurrentlyFavorite: isCurrentlyFavorite,
+    );
+    favoriteActionNotifier.value = {productId: newState};
+    return newState;
   }
 
   /// Full Product objects for the user's "Saved Products" list screen.

@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
+import '../services/locale_service.dart';
 import '../services/text_size_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/voice_mic_overlay.dart';
@@ -28,6 +29,19 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
       VoiceAssistantService.instance.announcePage('preference');
     }
     _loadPrefs();
+    LocaleService.localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    LocaleService.localeNotifier.removeListener(_onLocaleChanged);
+    super.dispose();
   }
 
   Future<void> _loadPrefs() async {
@@ -162,6 +176,14 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                                     if (selectedLanguage == language) return;
                                     HapticService().vibrate();
                                     await VoiceAssistantService.instance.updateLanguage(selectedLanguage);
+
+                                    // Mirror the app locale 1:1 with the selected voice language
+                                    final targetLocaleCode = selectedLanguage == VoiceLang.tagalog ? 'tl' : 'en';
+                                    if (LocaleService.localeNotifier.value.languageCode != targetLocaleCode) {
+                                      await LocaleService.setAppLocale(targetLocaleCode);
+                                      await _authService.updateUserData({'language': targetLocaleCode});
+                                    }
+
                                     final actualLanguage = VoiceAssistantService.languageNotifier.value;
                                     await VoiceAssistantService.instance.speak(
                                       actualLanguage == VoiceLang.tagalog

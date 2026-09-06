@@ -694,6 +694,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'All scan history will be deleted. This cannot be undone.';
 
   @override
+  String get clearAllFavoritesConfirm =>
+      'All saved favorites will be removed. This cannot be undone.';
+
+  @override
   String get clear => 'Clear';
 
   @override

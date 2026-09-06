@@ -41,9 +41,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUserName();
 
     // Speak a first-time welcome message.
+    // 700 ms gives the TTS engine time to fully initialize on cold app start
+    // before firing the first announcement.
     if (VoiceAssistantService.instance.isEnabled) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        VoiceAssistantService.instance.announcePage('home');
+      Future.delayed(const Duration(milliseconds: 700), () {
+        if (mounted) {
+          VoiceAssistantService.instance.announcePage('home');
+        }
       });
     }
 

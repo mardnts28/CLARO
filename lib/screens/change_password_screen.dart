@@ -69,6 +69,19 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       return;
     }
 
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (mounted) {
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -110,6 +123,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _isLoading = false);
+      if (e.code == 'network-request-failed' || (e.message ?? '').toLowerCase().contains('network')) {
+        if (mounted) {
+          await SuccessFeedbackUtils.showOfflineNoticeDialog(
+            context,
+            title: loc.noInternetTitle,
+            message: loc.noInternetActionMessage,
+            buttonText: loc.gotIt,
+          );
+        }
+        return;
+      }
       final msg = (e.code == 'wrong-password' ||
               e.code == 'invalid-credential' ||
               (e.message ?? '').toLowerCase().contains('credential'))

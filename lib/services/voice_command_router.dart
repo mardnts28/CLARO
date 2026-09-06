@@ -22,6 +22,8 @@ import 'history_service.dart';
 import '../data/services/backend_locator.dart';
 import '../models/product_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../core/utils/success_feedback_utils.dart';
+import '../generated/l10n/app_localizations.dart';
 import 'theme_service.dart';
 
 const String claroWebsiteUrl = 'https://claro-52ia.onrender.com/';
@@ -46,6 +48,20 @@ class VoiceCommandRouter {
   };
 
   Future<void> handleMicTap(BuildContext context) async {
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (context.mounted) {
+        final loc = AppLocalizations.of(context)!;
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetVoiceMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     await VoiceAssistantService.instance.stopAudio();
 
     final transcript =
@@ -108,7 +124,30 @@ class VoiceCommandRouter {
     }
 
     // ============================================================
-    // 3. FAST LOCAL NAVIGATION
+    // 3. PRODUCT SEARCH
+    // ============================================================
+    final productSearchQuery =
+        _extractProductSearchQuery(transcript);
+
+    if (productSearchQuery != null &&
+        productSearchQuery.isNotEmpty) {
+      debugPrint(
+        'Voice command intent: product search for '
+        '"$productSearchQuery"',
+      );
+
+      final handled =
+          await _handleProductSearch(
+        context,
+        productSearchQuery,
+        language,
+      );
+
+      if (handled) return;
+    }
+
+    // ============================================================
+    // 4. FAST LOCAL NAVIGATION
     // ============================================================
     final localTarget =
         _targetFromTranscript(transcript);
@@ -132,29 +171,6 @@ class VoiceCommandRouter {
       );
 
       return;
-    }
-
-    // ============================================================
-    // 4. PRODUCT SEARCH
-    // ============================================================
-    final productSearchQuery =
-        _extractProductSearchQuery(transcript);
-
-    if (productSearchQuery != null &&
-        productSearchQuery.isNotEmpty) {
-      debugPrint(
-        'Voice command intent: product search for '
-        '"$productSearchQuery"',
-      );
-
-      final handled =
-          await _handleProductSearch(
-        context,
-        productSearchQuery,
-        language,
-      );
-
-      if (handled) return;
     }
 
     // ============================================================
@@ -506,6 +522,14 @@ class VoiceCommandRouter {
       await VoiceAssistantService.instance
           .updateEnabled(false);
 
+      try {
+        await AuthService().updateUserData({
+          'voiceAssistant': false,
+        });
+      } catch (error) {
+        debugPrint('Voice assistant preference save failed: $error');
+      }
+
       return;
     }
 
@@ -515,6 +539,14 @@ class VoiceCommandRouter {
     if (target == 'voice_assistant_on') {
       await VoiceAssistantService.instance
           .updateEnabled(true);
+
+      try {
+        await AuthService().updateUserData({
+          'voiceAssistant': true,
+        });
+      } catch (error) {
+        debugPrint('Voice assistant preference save failed: $error');
+      }
 
       await VoiceAssistantService.instance.speak(
         localeKey == 'fil'
@@ -530,27 +562,25 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'mfa_on') {
       try {
+        HomeTabController.switchToTab(3);
         await AuthService().setMfaEnabled(
           enabled: true,
         );
 
-        await VoiceAssistantService.instance
-            .speak(
-          localeKey == 'fil'
-              ? 'Matagumpay na na-on ang multi-factor authentication para sa iyong account.'
-              : 'Multi-factor authentication has been successfully enabled for your account.',
-        );
+        unawaited(() async {
+          await Future.delayed(const Duration(milliseconds: 350));
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Naka-on na ang multi-factor authentication para sa iyong account.'
+                : 'Multi-factor authentication has been turned on for your account.',
+          );
+        }());
       } catch (error, stackTrace) {
-        debugPrint(
-          'MFA enable failed: $error',
-        );
-        debugPrint('$stackTrace');
-
-        await VoiceAssistantService.instance
-            .speak(
+        debugPrint('MFA enable failed: $error\n$stackTrace');
+        await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
-              ? 'Narinig ko ang iyong utos, pero hindi ko ma-on ang multi-factor authentication dahil nagkaroon ng problema sa pag-update ng account.'
-              : 'I heard your command, but I could not enable multi-factor authentication because the account update failed.',
+              ? 'Narinig ko ang iyong utos, pero hindi ko ma-on ang multi-factor authentication.'
+              : 'I heard your command, but I could not enable multi-factor authentication.',
         );
       }
 
@@ -562,27 +592,25 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'mfa_off') {
       try {
+        HomeTabController.switchToTab(3);
         await AuthService().setMfaEnabled(
           enabled: false,
         );
 
-        await VoiceAssistantService.instance
-            .speak(
-          localeKey == 'fil'
-              ? 'Matagumpay na na-off ang multi-factor authentication.'
-              : 'Multi-factor authentication has been successfully disabled.',
-        );
+        unawaited(() async {
+          await Future.delayed(const Duration(milliseconds: 350));
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Naka-off na ang multi-factor authentication.'
+                : 'Multi-factor authentication has been turned off.',
+          );
+        }());
       } catch (error, stackTrace) {
-        debugPrint(
-          'MFA disable failed: $error',
-        );
-        debugPrint('$stackTrace');
-
-        await VoiceAssistantService.instance
-            .speak(
+        debugPrint('MFA disable failed: $error\n$stackTrace');
+        await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
-              ? 'Narinig ko ang iyong utos, pero hindi ko ma-off ang multi-factor authentication dahil nagkaroon ng problema sa pag-update ng account.'
-              : 'I heard your command, but I could not disable multi-factor authentication because the account update failed.',
+              ? 'Narinig ko ang iyong utos, pero hindi ko ma-off ang multi-factor authentication.'
+              : 'I heard your command, but I could not disable multi-factor authentication.',
         );
       }
 
@@ -590,18 +618,35 @@ class VoiceCommandRouter {
     }
 
     // ============================================================
-    // MFA SETTINGS
+    // MFA (TOGGLE / TURN ON)
     // ============================================================
     if (target == 'mfa') {
-      HomeTabController.switchToTab(3);
+      try {
+        HomeTabController.switchToTab(3);
+        final currentMfa = AuthService.mfaNotifier.value;
+        final newMfa = !currentMfa;
+        await AuthService().setMfaEnabled(enabled: newMfa);
 
-      final msg = localeKey == 'fil'
-          ? 'Binubuksan ang mga setting ng multi-factor authentication sa iyong profile.'
-          : 'Opening multi-factor authentication settings in your profile.';
+        final msg = newMfa
+            ? (localeKey == 'fil'
+                ? 'Naka-on na ang multi-factor authentication para sa iyong account.'
+                : 'Multi-factor authentication has been turned on for your account.')
+            : (localeKey == 'fil'
+                ? 'Naka-off na ang multi-factor authentication.'
+                : 'Multi-factor authentication has been turned off.');
 
-      unawaited(
-        VoiceAssistantService.instance.speak(msg),
-      );
+        unawaited(() async {
+          await Future.delayed(const Duration(milliseconds: 350));
+          await VoiceAssistantService.instance.speak(msg);
+        }());
+      } catch (error, stackTrace) {
+        debugPrint('MFA toggle failed: $error\n$stackTrace');
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Narinig ko ang iyong utos, pero nagkaroon ng problema sa multi-factor authentication.'
+              : 'I heard your command, but there was a problem with multi-factor authentication.',
+        );
+      }
 
       return;
     }
@@ -640,16 +685,18 @@ class VoiceCommandRouter {
     if (target == 'language_tagalog') {
       try {
         await LocaleService.setAppLocale('tl');
-
         await VoiceAssistantService.instance
             .updateLanguage(
           VoiceLang.tagalog,
         );
 
-        await VoiceAssistantService.instance
-            .speak(
-          'Pinalitan ang wika sa Tagalog.',
-        );
+        unawaited(() async {
+          await Future.delayed(const Duration(milliseconds: 350));
+          await VoiceAssistantService.instance
+              .speak(
+            'Pinalitan ang wika sa Tagalog.',
+          );
+        }());
       } catch (error, stackTrace) {
         debugPrint(
           'Tagalog language change failed: $error',
@@ -673,9 +720,12 @@ class VoiceCommandRouter {
           VoiceLang.english,
         );
 
-        await VoiceAssistantService.instance.speak(
-          'Language changed to English.',
-        );
+        unawaited(() async {
+          await Future.delayed(const Duration(milliseconds: 350));
+          await VoiceAssistantService.instance.speak(
+            'Language changed to English.',
+          );
+        }());
       } catch (error, stackTrace) {
         debugPrint(
           'English language change failed: $error',
@@ -691,15 +741,32 @@ class VoiceCommandRouter {
     }
 
     if (target == 'language') {
-      HomeTabController.switchToTab(3);
+      final currentLang = LocaleService.localeNotifier.value.languageCode;
+      final newLangCode = currentLang == 'tl' ? 'en' : 'tl';
+      final newVoiceLang = newLangCode == 'tl' ? VoiceLang.tagalog : VoiceLang.english;
 
-      final msg = localeKey == 'fil'
-          ? 'Maaari mong palitan ang wika sa profile settings.'
-          : 'You can change the language in your profile settings.';
+      try {
+        await LocaleService.setAppLocale(newLangCode);
+        await VoiceAssistantService.instance.updateLanguage(newVoiceLang);
 
-      unawaited(
-        VoiceAssistantService.instance.speak(msg),
-      );
+        final msg = newLangCode == 'tl'
+            ? 'Pinalitan ang wika sa Tagalog.'
+            : 'Language changed to English.';
+
+        unawaited(() async {
+          await Future.delayed(const Duration(milliseconds: 350));
+          await VoiceAssistantService.instance.speak(msg);
+        }());
+      } catch (error, stackTrace) {
+        debugPrint('Toggle language failed: $error');
+        debugPrint('$stackTrace');
+
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Narinig ko ang iyong utos, pero nagkaroon ng problema sa pagpalit ng wika.'
+              : 'I heard your command, but there was a problem changing the language.',
+        );
+      }
 
       return;
     }
@@ -825,6 +892,64 @@ class VoiceCommandRouter {
     }
 
     // ============================================================
+    // CLEAR HISTORY
+    // ============================================================
+    if (target == 'clear_history') {
+      HomeTabController.switchToHistorySubTab(
+        'Lahat',
+      );
+
+      final msg = localeKey == 'fil'
+          ? 'Para burahin ang iyong kasaysayan ng scan, i-tap ang trash icon sa itaas ng History screen.'
+          : 'To clear your scan history, please tap the trash icon at the top of the History screen.';
+
+      unawaited(() async {
+        await Future.delayed(const Duration(milliseconds: 350));
+        await VoiceAssistantService.instance.speak(msg);
+      }());
+
+      return;
+    }
+
+    // ============================================================
+    // CLEAR FAVORITES
+    // ============================================================
+    if (target == 'clear_favorites') {
+      HomeTabController.switchToHistorySubTab(
+        'Paborito',
+      );
+
+      final msg = localeKey == 'fil'
+          ? 'Para burahin ang iyong mga paborito, i-tap ang trash icon sa itaas ng screen.'
+          : 'To clear your favorites, please tap the trash icon at the top of the screen.';
+
+      unawaited(() async {
+        await Future.delayed(const Duration(milliseconds: 350));
+        await VoiceAssistantService.instance.speak(msg);
+      }());
+
+      return;
+    }
+
+    // ============================================================
+    // DELETE ACCOUNT
+    // ============================================================
+    if (target == 'delete_account') {
+      HomeTabController.switchToTab(3);
+
+      final msg = localeKey == 'fil'
+          ? 'Para burahin ang iyong account, mag-scroll sa ibaba ng Profile screen at i-tap ang Delete Account.'
+          : 'To delete your account, please scroll to the bottom of the Profile screen and tap Delete Account.';
+
+      unawaited(() async {
+        await Future.delayed(const Duration(milliseconds: 350));
+        await VoiceAssistantService.instance.speak(msg);
+      }());
+
+      return;
+    }
+
+    // ============================================================
     // HISTORY FAVORITES
     // ============================================================
     if (target == 'history_favorites') {
@@ -833,10 +958,11 @@ class VoiceCommandRouter {
       );
 
       unawaited(
-        VoiceAssistantService.instance.speak(
+        VoiceAssistantService.instance.announcePageWithPreamble(
           localeKey == 'fil'
               ? 'Binubuksan ang mga paboritong produkto.'
               : 'Opening your favorites.',
+          'favorites',
         ),
       );
 
@@ -852,10 +978,11 @@ class VoiceCommandRouter {
       );
 
       unawaited(
-        VoiceAssistantService.instance.speak(
+        VoiceAssistantService.instance.announcePageWithPreamble(
           localeKey == 'fil'
               ? 'Binubuksan ang kasaysayan ng paghahambing.'
               : 'Opening your comparison history.',
+          'compare',
         ),
       );
 
@@ -871,10 +998,11 @@ class VoiceCommandRouter {
       );
 
       unawaited(
-        VoiceAssistantService.instance.speak(
+        VoiceAssistantService.instance.announcePageWithPreamble(
           localeKey == 'fil'
               ? 'Binubuksan ang iyong mga ulat.'
               : 'Opening your submitted reports.',
+          'reports',
         ),
       );
 
@@ -903,9 +1031,20 @@ class VoiceCommandRouter {
                   localeKey,
                 );
 
-      unawaited(
-        VoiceAssistantService.instance.speak(reply),
-      );
+      // For history, chain the short reply with the full page description.
+      // For all other tabs the short reply is sufficient.
+      if (target == 'history') {
+        unawaited(
+          VoiceAssistantService.instance.announcePageWithPreamble(
+            reply,
+            'history',
+          ),
+        );
+      } else {
+        unawaited(
+          VoiceAssistantService.instance.speak(reply),
+        );
+      }
 
       return;
     }
@@ -1092,6 +1231,12 @@ class VoiceCommandRouter {
     }
   }
 
+  @visibleForTesting
+  String? testTargetFromTranscript(String transcript) => _targetFromTranscript(transcript);
+
+  @visibleForTesting
+  String? testExtractProductSearchQuery(String transcript) => _extractProductSearchQuery(transcript);
+
   String? _targetFromTranscript(
     String transcript,
   ) {
@@ -1105,7 +1250,7 @@ class VoiceCommandRouter {
     // UNFAVORITE
     // ============================================================
     if (RegExp(
-      r'\b(unfavorite this|unfavorite this product|unfavorite it|remove from favorites|unlike this product|unlike this|remove favorite|alisin sa paborito|tanggalin sa paborito|i\s*unfavorite ito|i\s*unfavorite)\b',
+      r'\b(unfavorite(?: this(?: product)?)?|unfavorite it|remove from favorites|unlike(?: this(?: product)?)?|remove favorite|alisin sa (?:mga )?paborito|tanggalin sa (?:mga )?paborito|i\s*unfavorite(?: ito)?|wag nang paborito|di na paborito|alisin sa saved|tanggalin sa saved)\b',
     ).hasMatch(normalized)) {
       return 'unfavorite_product';
     }
@@ -1114,7 +1259,7 @@ class VoiceCommandRouter {
     // FAVORITE
     // ============================================================
     if (RegExp(
-      r'\b(favorite this|favorite this product|favorite it|add to favorites|save to favorites|like this product|like this|i\s*favorite|i\s*paborito|paborito ito|gusto ko ito|i\s*save ito|isave ito|idagdag sa paborito|isama sa paborito)\b',
+      r'\b(favorite(?: this(?: product)?)?|favorite it|add to favorites|save to favorites|save this(?: product)?|save product|like(?: this(?: product)?)?|i\s*favorite(?: ito)?|i\s*paborito(?: ito)?|paborito ito|gusto ko ito|i\s*save(?: ito)?|isave(?: ito)?|idagdag sa (?:mga )?paborito|isama sa (?:mga )?paborito|gawing paborito|ilagay sa (?:mga )?paborito)\b',
     ).hasMatch(normalized)) {
       return 'favorite_product';
     }
@@ -1123,7 +1268,7 @@ class VoiceCommandRouter {
     // REPORT
     // ============================================================
     if (RegExp(
-      r'\b(report this product|report product|report issue|report error|i\s*report ito|ireport ito|i\s*report|ireport|i\s*ulat ito|iulat ito|i\s*ulat|iulat|mali ang impormasyon|maling produkto)\b',
+      r'\b(report(?: this(?: product)?)?|report product|report issue|report error|i\s*report(?: ito)?|ireport(?: ito)?|i\s*ulat(?: ito)?|iulat(?: ito)?|mali ang impormasyon|maling produkto|mag\s*ulat|mag\s*report|i\s*report ang produkto|i\s*ulat ang produkto)\b',
     ).hasMatch(normalized)) {
       return 'report_product';
     }
@@ -1132,7 +1277,7 @@ class VoiceCommandRouter {
     // MORE DETAILS
     // ============================================================
     if (RegExp(
-      r'\b(more details|for more details|show more details|open more details|see more details|view more details|product details|ingredients|storage instructions|storage|karagdagang detalye|karagdagang impormasyon|mga sangkap|sangkap|paraan ng pag\s*imbak|imbak|detalye ng produkto|detalye)\b',
+      r'\b(more details|for more details|show more details|open more details|see more details|view more details|product details|ingredients|storage instructions|storage|karagdagang detalye|karagdagang impormasyon|mga sangkap|sangkap|paraan ng pag\s*imbak|imbak|detalye ng produkto|detalye|buksan ang (?:mga )?detalye|tingnan ang (?:mga )?detalye|ipakita ang (?:mga )?detalye|alamin ang sangkap)\b',
     ).hasMatch(normalized)) {
       return 'more_details';
     }
@@ -1141,9 +1286,30 @@ class VoiceCommandRouter {
     // COMPARE
     // ============================================================
     if (RegExp(
-      r'\b(compare this product|compare this|compare product|compare scanned product|compare with alternatives|compare with others|ihambing ang produktong ito|paghambingin ito|pagkumparahin ito|ikumpera ito|ikumpra ito|ihambing ito)\b',
+      r'\b(compare(?: this(?: product)?)?|compare product|compare scanned product|compare with alternatives|compare with others|ihambing(?: ang produktong ito)?|paghambingin(?: ito)?|pagkumparahin(?: ito)?|ikumpera(?: ito)?|ikumpra(?: ito)?|ihambing ito|ihambing ang produkto|paghambingin ang (?:mga )?produkto|ikumpera sa iba|ihambing sa iba)\b',
     ).hasMatch(normalized)) {
       return 'compare_products';
+    }
+
+    // ============================================================
+    // CLEAR HISTORY & FAVORITES (GUIDED ACTIONS)
+    // ============================================================
+    if (RegExp(
+      r'\b(clear\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|delete\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|erase\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|wipe\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|remove\s+all\s+history|burahin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|tanggalin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|alisin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|linisin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|i\s*clear\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|i\s*delete\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan))\b',
+    ).hasMatch(normalized)) {
+      return 'clear_history';
+    }
+
+    if (RegExp(
+      r'\b(clear\s+(?:all\s+)?(?:my\s+)?favorites|delete\s+(?:all\s+)?(?:my\s+)?favorites|erase\s+(?:all\s+)?(?:my\s+)?favorites|burahin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:mga\s+)?paborito|tanggalin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:mga\s+)?paborito|alisin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:mga\s+)?paborito|linisin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:mga\s+)?paborito|i\s*clear\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:mga\s+)?paborito|i\s*delete\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:mga\s+)?paborito)\b',
+    ).hasMatch(normalized)) {
+      return 'clear_favorites';
+    }
+
+    if (RegExp(
+      r'\b(delete\s+(?:my\s+)?account|remove\s+(?:my\s+)?account|close\s+(?:my\s+)?account|erase\s+(?:my\s+)?account|burahin\s+(?:ang\s+)?(?:aking\s+)?account|tanggalin\s+(?:ang\s+)?(?:aking\s+)?account|alisin\s+(?:ang\s+)?(?:aking\s+)?account|isara\s+(?:ang\s+)?(?:aking\s+)?account|i\s*delete\s+(?:ang\s+)?(?:aking\s+)?account)\b',
+    ).hasMatch(normalized)) {
+      return 'delete_account';
     }
 
     // ============================================================
@@ -1156,7 +1322,7 @@ class VoiceCommandRouter {
     }
 
     if (RegExp(
-      r'\b(compare history|comparison history|comparison records|history compare|kasaysayan ng paghahambing|mga pinaghambing|mga kinumpara|past comparisons)\b',
+      r'\b(compare history|comparison history|comparison records|history compare|kasaysayan ng paghahambing|mga pinaghambing|mga kinumpara|past comparisons|nakaraang paghahambing)\b',
     ).hasMatch(normalized)) {
       return 'history_compare';
     }
@@ -1175,7 +1341,7 @@ class VoiceCommandRouter {
     }
 
     if (RegExp(
-      r'\b(reports|my reports|submitted reports|mga ulat|ulat|aking mga ulat|report history|view reports|show reports|kasaysayan ng ulat)\b',
+      r'\b(reports|my reports|submitted reports|mga ulat|ulat|aking mga ulat|report history|view reports|show reports|kasaysayan ng ulat|mga na\s*report|mga naulat)\b',
     ).hasMatch(normalized)) {
       return 'history_reports';
     }
@@ -1184,34 +1350,28 @@ class VoiceCommandRouter {
     // MAIN TABS
     // ============================================================
     if (RegExp(
-      r'\b(home|main|dashboard|simula|home page|home screen|main page|main screen|tahanan|unang pahina|balik sa home|punta sa home)\b',
+      r'\b(home|main|dashboard|simula|home page|home screen|main page|main screen|tahanan|unang pahina|balik sa home|punta sa home|pangunahing screen)\b',
     ).hasMatch(normalized)) {
       return 'home';
     }
 
     if (RegExp(
-      r'\b(scan|scanner|camera|mag\s*scan|magscan|mag scan|camera screen|scan screen|take a scan|scan a product|kumuha ng scan|buksan ang camera|buksan ang scanner)\b',
+      r'\b(scan|scanner|camera|mag\s*scan|magscan|mag scan|camera screen|scan screen|take a scan|scan a product|kumuha ng scan|buksan ang camera|buksan ang scanner|mag\s*picture|i\s*scan)\b',
     ).hasMatch(normalized)) {
       return 'scan';
     }
 
     if (RegExp(
-      r'\b(history|records|previous scans|mga na\s*scan|mga nascan|mga nakaraang scan|kasaysayan|scan history|all scans)\b',
+      r'\b(history|records|previous scans|mga na\s*scan|mga nascan|mga nakaraang scan|kasaysayan|scan history|all scans|lahat ng scan)\b',
     ).hasMatch(normalized)) {
       return 'history';
-    }
-
-    if (RegExp(
-      r'\b(profile|my profile|account|my account|profile page|profile screen|settings|setting|account settings|user profile|aking profile|impormasyon ng account|mga setting)\b',
-    ).hasMatch(normalized)) {
-      return 'profile';
     }
 
     // ============================================================
     // PERSONAL INFORMATION
     // ============================================================
     if (RegExp(
-      r'\b(personal information|personal info|my info|my information|account information|personal na impormasyon|personal details|profile details|user info|user details|my name|my email|edit profile|aking impormasyon|aking detalye|aking pangalan|aking email)\b',
+      r'\b(personal information|personal info|my info|my information|account information|personal na impormasyon|personal details|profile details|user info|user details|my name|my email|edit profile|aking impormasyon|aking detalye|aking pangalan|aking email|baguhin ang profile)\b',
     ).hasMatch(normalized)) {
       return 'personal_info';
     }
@@ -1220,13 +1380,13 @@ class VoiceCommandRouter {
     // VOICE ASSISTANT
     // ============================================================
     if (RegExp(
-      r'\b(voice assistant off|voice off|turn off voice assistant|turn off voice|disable voice assistant|disable voice|i\s*off ang voice assistant|patayin ang boses|patayin ang voice assistant)\b',
+      r'\b(voice assistant off|voice off|turn off voice assistant|turn off voice|disable voice assistant|disable voice|mute voice assistant|mute voice|i\s*off ang voice assistant|patayin ang boses|patayin ang voice assistant|i\s*off ang boses|isara ang voice assistant|i\s*mute ang boses|i\s*mute ang voice assistant)\b',
     ).hasMatch(normalized)) {
       return 'voice_assistant_off';
     }
 
     if (RegExp(
-      r'\b(voice assistant on|voice on|turn on voice assistant|turn on voice|enable voice assistant|enable voice|i\s*on ang voice assistant|buhayin ang boses|buhayin ang voice assistant)\b',
+      r'\b(voice assistant on|voice on|turn on voice assistant|turn on voice|enable voice assistant|enable voice|unmute voice assistant|unmute voice|i\s*on ang voice assistant|buhayin ang boses|buhayin ang voice assistant|i\s*on ang boses|buksan ang voice assistant|buksan ang boses|paganahin ang voice assistant)\b',
     ).hasMatch(normalized)) {
       return 'voice_assistant_on';
     }
@@ -1235,13 +1395,13 @@ class VoiceCommandRouter {
     // MFA
     // ============================================================
     if (RegExp(
-      r'\b(turn off (?:mfa|multi factor|two factor|2fa)|disable (?:mfa|multi factor|two factor|2fa)|deactivate (?:mfa|multi factor|two factor|2fa)|switch off (?:mfa|2fa)|mfa off|2fa off|i\s*off ang (?:mfa|multi factor|two factor|2fa)|patayin ang (?:mfa|multi factor|two factor|2fa)|isara ang (?:mfa|multi factor|two factor|2fa)|i\s*disable ang (?:mfa|2fa)|i\s*deactivate ang (?:mfa|2fa))\b',
+      r'\b(turn off (?:mfa|multi factor|two factor|2fa)|disable (?:mfa|multi factor|two factor|2fa)|deactivate (?:mfa|multi factor|two factor|2fa)|switch off (?:mfa|2fa)|mfa off|2fa off|i\s*off ang (?:mfa|multi factor|two factor|2fa)|patayin ang (?:mfa|multi factor|two factor|2fa)|isara ang (?:mfa|multi factor|two factor|2fa)|i\s*disable ang (?:mfa|2fa)|i\s*deactivate ang (?:mfa|2fa)|isara ang dalawang yugtong pagpapatunay)\b',
     ).hasMatch(normalized)) {
       return 'mfa_off';
     }
 
     if (RegExp(
-      r'\b(turn on (?:mfa|multi factor|two factor|2fa)|enable (?:mfa|multi factor|two factor|2fa)|activate (?:mfa|multi factor|two factor|2fa)|switch on (?:mfa|2fa)|mfa on|2fa on|i\s*on ang (?:mfa|multi factor|two factor|2fa)|buhayin ang (?:mfa|multi factor|two factor|2fa)|buksan ang (?:mfa|multi factor|two factor|2fa)|i\s*enable ang (?:mfa|2fa)|i\s*activate ang (?:mfa|2fa))\b',
+      r'\b(turn on (?:mfa|multi factor|two factor|2fa)|enable (?:mfa|multi factor|two factor|2fa)|activate (?:mfa|multi factor|two factor|2fa)|switch on (?:mfa|2fa)|mfa on|2fa on|i\s*on ang (?:mfa|multi factor|two factor|2fa)|buhayin ang (?:mfa|multi factor|two factor|2fa)|buksan ang (?:mfa|multi factor|two factor|2fa)|paganahin ang (?:mfa|multi factor|two factor|2fa)|i\s*enable ang (?:mfa|2fa)|i\s*activate ang (?:mfa|2fa)|buksan ang dalawang yugtong pagpapatunay)\b',
     ).hasMatch(normalized)) {
       return 'mfa_on';
     }
@@ -1268,13 +1428,13 @@ class VoiceCommandRouter {
     }
 
     if (RegExp(
-      r'\b(turn on dark mode|turn on darkmode|enable dark mode|enable darkmode|switch to dark mode|dark mode on|darkmode on|diliman ang tema|dark theme|i\s*dark mode|madilim na tema|diliman|darkmode|dark mode)\b',
+      r'\b(turn on dark mode|turn on darkmode|enable dark mode|enable darkmode|switch to dark mode|dark mode on|darkmode on|diliman ang tema|dark theme|i\s*dark mode|madilim na tema|diliman|darkmode|dark mode|gawing madilim ang tema|buksan ang dark mode|i\s*on ang dark mode)\b',
     ).hasMatch(normalized)) {
       return 'dark_mode';
     }
 
     if (RegExp(
-      r'\b(turn on light mode|turn on lightmode|enable light mode|enable lightmode|switch to light mode|light mode on|lightmode on|liwanagan ang tema|light theme|default theme|i\s*light mode|maliwanag na tema|liwanagan|lightmode|light mode)\b',
+      r'\b(turn on light mode|turn on lightmode|enable light mode|enable lightmode|switch to light mode|light mode on|lightmode on|liwanagan ang tema|light theme|default theme|i\s*light mode|maliwanag na tema|liwanagan|lightmode|light mode|gawing maliwanag ang tema|buksan ang light mode|i\s*on ang light mode|orihinal na tema)\b',
     ).hasMatch(normalized)) {
       return 'light_mode';
     }
@@ -1283,19 +1443,19 @@ class VoiceCommandRouter {
     // LANGUAGE
     // ============================================================
     if (RegExp(
-      r'\b((?:change|switch|set) (?:language|voice) to (?:tagalog|filipino)|magtagalog|tagalog voice|wika tagalog|palitan sa tagalog|gawing tagalog)\b',
+      r'\b((?:change|switch|set|convert) (?:the\s+)?(?:language|voice|wika)?\s*(?:to|into|sa)?\s*(?:tagalog|filipino)|(?:palitan|magpalit|baguhin|gawin|ilipat|lumipat)\s*(?:ang\s+|ng\s+|nang\s+)?(?:wika|boses)?\s*(?:sa|ng|na|para sa)?\s*(?:tagalog|filipino)|mag\s*tagalog|magsalita\s+(?:ng|sa)\s+(?:tagalog|filipino)|gamitin\s+ang\s+(?:tagalog|filipino)|tagalog\s+(?:po|please|voice|wika|lang)|i\s*tagalog|speak\s+(?:in\s+)?(?:tagalog|filipino)|boses\s+sa\s+tagalog|^tagalog$|^filipino$)\b',
     ).hasMatch(normalized)) {
       return 'language_tagalog';
     }
 
     if (RegExp(
-      r'\b((?:change|switch|set) (?:language|voice) to english|mag\s*english|english voice|wika ingles|palitan sa english|gawing english)\b',
+      r'\b((?:change|switch|set|convert) (?:the\s+)?(?:language|voice|wika)?\s*(?:to|into|sa)?\s*(?:english|ingles)|(?:palitan|magpalit|baguhin|gawin|ilipat|lumipat)\s*(?:ang\s+|ng\s+|nang\s+)?(?:wika|boses)?\s*(?:sa|ng|na)?\s*(?:english|ingles)|mag\s*english|magsalita\s+(?:ng|sa)\s+english|gamitin\s+ang\s+(?:english|ingles)|english\s+(?:po|please|voice|wika|lang)|i\s*english|speak\s+(?:in\s+)?english|boses\s+sa\s+english|^english$|^ingles$)\b',
     ).hasMatch(normalized)) {
       return 'language_english';
     }
 
     if (RegExp(
-      r'\b(language change|change language|switch language|language settings|language setting|wika|palitan ang wika|magpalit ng wika)\b',
+      r'\b(language change|change language|switch language|language settings|language setting|wika|palitan ang wika|magpalit ng wika|baguhin ang wika|mga setting ng wika)\b',
     ).hasMatch(normalized)) {
       return 'language';
     }
@@ -1304,13 +1464,13 @@ class VoiceCommandRouter {
     // OTHER SETTINGS
     // ============================================================
     if (RegExp(
-      r'\b(theme screen|theme settings|theme setting|open theme|mga setting ng tema|mga tema|tema|tema ng app|appearance)\b',
+      r'\b(theme screen|theme settings|theme setting|open theme|mga setting ng tema|mga tema|tema|tema ng app|appearance|buksan ang tema|tingnan ang tema)\b',
     ).hasMatch(normalized)) {
       return 'theme';
     }
 
     if (RegExp(
-      r'\b(preference|preferences|health preference|health preferences|dietary preference|dietary preferences|kagustuhan|mga kagustuhan|health conditions|health condition|medical conditions|medical condition|allergies|allergy|mga allergy|kondisyon sa kalusugan|pangkalusugan|my health|my preferences)\b',
+      r'\b(preference|preferences|health preference|health preferences|dietary preference|dietary preferences|kagustuhan|mga kagustuhan|health conditions|health condition|medical conditions|medical condition|allergies|allergy|mga allergy|kondisyon sa kalusugan|pangkalusugan|my health|my preferences|aking kalusugan)\b',
     ).hasMatch(normalized)) {
       return 'preference';
     }
@@ -1355,6 +1515,15 @@ class VoiceCommandRouter {
       r'\b(change password|reset password|palitan ang password|baguhin ang password|update password|i-reset ang password|password|security settings)\b',
     ).hasMatch(normalized)) {
       return 'change_password';
+    }
+
+    // ============================================================
+    // PROFILE & GENERAL SETTINGS
+    // ============================================================
+    if (RegExp(
+      r'\b(profile|my profile|account|my account|profile page|profile screen|settings|setting|account settings|user profile|aking profile|impormasyon ng account|mga setting|setting ng account)\b',
+    ).hasMatch(normalized)) {
+      return 'profile';
     }
 
     // ============================================================
@@ -1446,6 +1615,33 @@ class VoiceCommandRouter {
       'two_factor_authentication': 'mfa',
       'multi_factor_authentication': 'mfa',
       'two_factor': 'mfa',
+      'mfa_settings': 'mfa',
+      'enable_mfa': 'mfa_on',
+      'turn_on_mfa': 'mfa_on',
+      'mfa_on': 'mfa_on',
+      'disable_mfa': 'mfa_off',
+      'turn_off_mfa': 'mfa_off',
+      'mfa_off': 'mfa_off',
+      'enable_voice': 'voice_assistant_on',
+      'turn_on_voice': 'voice_assistant_on',
+      'voice_assistant_on': 'voice_assistant_on',
+      'disable_voice': 'voice_assistant_off',
+      'turn_off_voice': 'voice_assistant_off',
+      'voice_assistant_off': 'voice_assistant_off',
+      'tagalog': 'language_tagalog',
+      'filipino': 'language_tagalog',
+      'language_tagalog': 'language_tagalog',
+      'english': 'language_english',
+      'ingles': 'language_english',
+      'language_english': 'language_english',
+      'change_language': 'language',
+      'switch_language': 'language',
+      'language_settings': 'language',
+      'favorite_product': 'favorite_product',
+      'add_favorite': 'favorite_product',
+      'save_product': 'favorite_product',
+      'unfavorite_product': 'unfavorite_product',
+      'remove_favorite': 'unfavorite_product',
       'app_reviews': 'review_history',
       'app_review': 'review_history',
       'terms_and_conditions': 'terms_conditions',
@@ -1455,6 +1651,16 @@ class VoiceCommandRouter {
       'comparison': 'compare_products',
       'compare_product': 'compare_products',
       'product_comparison': 'compare_products',
+      'clear_history': 'clear_history',
+      'clear_all_history': 'clear_history',
+      'delete_history': 'clear_history',
+      'delete_all_history': 'clear_history',
+      'clear_favorites': 'clear_favorites',
+      'delete_favorites': 'clear_favorites',
+      'delete_account': 'delete_account',
+      'delete_my_account': 'delete_account',
+      'close_account': 'delete_account',
+      'remove_account': 'delete_account',
     };
 
     return aliases[normalized] ?? normalized;
@@ -1484,6 +1690,21 @@ class VoiceCommandRouter {
         localeKey == 'fil'
             ? 'kasaysayan ng pag-scan'
             : 'scan history',
+
+      'clear_history' =>
+        localeKey == 'fil'
+            ? 'kasaysayan ng pag-scan'
+            : 'scan history',
+
+      'clear_favorites' =>
+        localeKey == 'fil'
+            ? 'mga paborito'
+            : 'favorites',
+
+      'delete_account' =>
+        localeKey == 'fil'
+            ? 'profile at mga setting ng account'
+            : 'profile and account settings',
 
       'profile' =>
         localeKey == 'fil'
@@ -1555,10 +1776,6 @@ class VoiceCommandRouter {
   ) {
     final t =
         transcript.trim().toLowerCase();
-
-    if (_targetFromTranscript(transcript) != null) {
-      return null;
-    }
 
     const excludedPages = {
       'home',
@@ -1653,7 +1870,7 @@ class VoiceCommandRouter {
         caseSensitive: false,
       ),
       RegExp(
-        r'^(?:paki-?)?(?:hanapin|hanap|pahanap|buksan|tingnan|ipakita|pumunta\s+sa|punta\s+sa)\s+(?:po\s+)?(?:ang|yung|ng)?\s*(.+?)(?:\s+sa\s+(?:aking\s+)?history|\s+sa\s+mga\s+na-?scan)?$',
+        r'^(?:paki-?)?(?:maghanap(?:\s+ng|\s+sa)?|hanapin|hanap|pahanap|buksan|tingnan|ipakita|pumunta\s+sa|punta\s+sa)\s+(?:po\s+)?(?:ang|yung|ng)?\s*(.+?)(?:\s+sa\s+(?:aking\s+)?history|\s+sa\s+mga\s+na-?scan)?$',
         caseSensitive: false,
       ),
     ];

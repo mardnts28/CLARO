@@ -49,6 +49,7 @@ class Product {
   // (nutrition scaling, etc.) keeps working unchanged.
   final List<ProductSizeOption> sizeOptions;
   final NutritionalFacts nutritionalFacts;
+  final bool isOfflineFallback;
 
   Product({
     required this.id,
@@ -68,6 +69,7 @@ class Product {
     this.availableSizes = const [],
     this.sizeOptions = const [],
     required this.nutritionalFacts,
+    this.isOfflineFallback = false,
   });
 
   /// Image to show for [sizeGrams], falling back to [imageUrl] (the
@@ -103,6 +105,7 @@ class Product {
     List<double>? availableSizes,
     List<ProductSizeOption>? sizeOptions,
     NutritionalFacts? nutritionalFacts,
+    bool? isOfflineFallback,
   }) {
     return Product(
       id: id ?? this.id,
@@ -122,6 +125,7 @@ class Product {
       availableSizes: availableSizes ?? this.availableSizes,
       sizeOptions: sizeOptions ?? this.sizeOptions,
       nutritionalFacts: nutritionalFacts ?? this.nutritionalFacts,
+      isOfflineFallback: isOfflineFallback ?? this.isOfflineFallback,
     );
   }
 
@@ -143,6 +147,7 @@ class Product {
     'availableSizes': availableSizes,
     'sizeOptions': sizeOptions.map((s) => s.toJson()).toList(),
     'nutritionalFacts': nutritionalFacts.toJson(),
+    'isOfflineFallback': isOfflineFallback,
   };
 
   factory Product.fromJson(Map<String, dynamic> json) => Product(
@@ -173,6 +178,7 @@ class Product {
         ? NutritionalFacts.fromJson(
             json['nutritionalFacts'] as Map<String, dynamic>)
         : NutritionalFacts(),
+    isOfflineFallback: json['isOfflineFallback'] as bool? ?? false,
   );
 
   @override

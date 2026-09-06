@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 
 import 'auth_service.dart';
+import 'locale_service.dart';
 import '../models/product_model.dart';
 
 enum VoiceLang { english, tagalog }
@@ -62,72 +63,84 @@ class VoiceAssistantService {
       'fil': 'Kumusta! Ako ang CLARO, ang iyong voice assistant. I-tap ang mic button anumang oras kung kailangan mo ng tulong.',
     },
     'scan': {
-      'en': 'This is the scanning screen. Hold the product inside the guide until CLARO detects it and reads the nutrition result.',
-      'fil': 'Ito ang scanning screen. Hawakan ang produkto sa loob ng gabay hanggang ma-detect ng CLARO at mabasa ang nutrition result.',
+      'en': 'Hold the product in the frame — CLARO will detect it and read the nutrition result.',
+      'fil': 'Ilagay ang produkto sa loob ng frame — ide-detect ito ng CLARO at babasahin ang nutrition result.',
     },
     'history': {
-      'en': 'This is your history screen. Tap a product to reopen a previous scan or a report to hear its status.',
-      'fil': 'Ito ang history screen mo. I-tap ang produkto para buksan muli ang nakaraang scan o ulat para marinig ang status nito.',
+      'en': 'Your past scans are listed here — tap any item to review it.',
+      'fil': 'Ang iyong mga nakaraang scan ay nakalista dito — i-tap ang alinman para suriin.',
     },
     'profile': {
-      'en': 'This is your profile screen. Use the buttons here to edit personal info, preferences, or send feedback.',
-      'fil': 'Ito ang profile screen mo. Gamitin ang mga button dito para i-edit ang personal na impormasyon, mga preference, o magpadala ng feedback.',
+      'en': 'Your profile is here — edit personal info, preferences, or send feedback.',
+      'fil': 'Nandito ang iyong profile — i-edit ang impormasyon, mga preference, o magpadala ng feedback.',
     },
     'personal_info': {
-      'en': 'This screen lets you update your name, age, health conditions, and allergens. Save changes so CLARO can give better advice.',
-      'fil': 'Sa screen na ito, maaari mong i-update ang pangalan, edad, kondisyon sa kalusugan, at allergens. I-save ang mga pagbabago para mas mabuting makapagbigay ng payo ang CLARO.',
+      'en': 'Update your name, age, health conditions, and allergens here — save so CLARO gives better advice.',
+      'fil': 'I-update ang pangalan, edad, kondisyon sa kalusugan, at allergens dito — i-save para mas mapabuti ang payo ng CLARO.',
     },
     'preference': {
-      'en': 'This is the preferences screen. Change language, speech rate, vibration, notifications, and text size here.',
-      'fil': 'Ito ang preference screen. Baguhin ang wika, bilis ng pananalita, vibration, notification, at laki ng teksto dito.',
+      'en': 'Adjust language, speech rate, vibration, notifications, and text size here.',
+      'fil': 'Baguhin ang wika, bilis ng pananalita, vibration, notification, at laki ng teksto dito.',
     },
     'product_detail': {
-      'en': 'This is the product detail screen. Listen for health advice, ingredient warnings, and compare this product with alternatives.',
-      'fil': 'Ito ang product detail screen. Makinig sa health advice, ingredient warnings, at ikumpara ang produktong ito sa ibang mga pilihan.',
+      'en': 'Health advice and ingredient warnings are listed — tap Compare to see alternatives.',
+      'fil': 'Nakalista ang health advice at ingredient warnings — i-tap ang Compare para makita ang mga alternatibo.',
     },
     'compare_products': {
-      'en': 'This is the product comparison screen. Browse ranked alternatives and tap one to see its detailed nutrition advice.',
-      'fil': 'Ito ang product comparison screen. Tingnan ang mga alternatibong naka-rank at i-tap ang isa para makita ang detalye ng nutrition nito.',
+      'en': 'Ranked alternatives are listed here — tap one to see its nutrition details.',
+      'fil': 'Ang mga alternatibong naka-rank ay nakalista dito — i-tap ang isa para makita ang nutrition details.',
     },
     'multi_scan_results': {
-      'en': 'This is the multi-scan results screen. Review the ranked products found in your scan and choose one to learn more.',
-      'fil': 'Ito ang multi-scan results screen. Suriin ang mga naka-rank na produkto mula sa iyong scan at piliin ang isa para malaman pa.',
+      'en': 'Ranked products from your scan are here — tap one to learn more.',
+      'fil': 'Ang mga naka-rank na produkto mula sa iyong scan ay nandito — i-tap ang isa para malaman pa.',
     },
     'product_not_found': {
-      'en': 'This screen says the product could not be identified. You can scan again or report the product for review.',
-      'fil': 'Sinasabi ng screen na ito na hindi natukoy ang produkto. Puwede kang mag-scan muli o i-report ang produkto para suriin.',
+      'en': 'Product could not be identified — scan again or report it for review.',
+      'fil': 'Hindi natukoy ang produkto — mag-scan muli o i-report para suriin.',
     },
     'unknown_product_submission': {
-      'en': 'This report screen lets you submit the unknown product with a front and back photo so CLARO can learn it later.',
-      'fil': 'Sa screen na ito, isumite ang hindi kilalang produkto kasama ang front at back photo para matutuhan ito ng CLARO.',
+      'en': 'Submit the unknown product with front and back photos so CLARO can learn it.',
+      'fil': 'Isumite ang hindi kilalang produkto kasama ang front at back photo para matutuhan ito ng CLARO.',
     },
     'suggestion': {
-      'en': 'This is the feedback screen. Rate your experience and write a suggestion to help improve CLARO.',
-      'fil': 'Ito ang feedback screen. I-rate ang iyong karanasan at magsulat ng suhestiyon para mapabuti ang CLARO.',
+      'en': 'Rate your experience and write a suggestion to help improve CLARO.',
+      'fil': 'I-rate ang iyong karanasan at magsulat ng suhestiyon para mapabuti ang CLARO.',
     },
     'review_history': {
-      'en': 'This is your review history screen. Check the status of feedback you submitted and read replies from the team.',
-      'fil': 'Ito ang review history screen mo. Suriin ang status ng feedback na isinubmit mo at basahin ang mga reply mula sa team.',
+      'en': 'Your submitted feedback is here — check status and read replies from the team.',
+      'fil': 'Ang iyong mga isinubmit na feedback ay nandito — suriin ang status at basahin ang mga reply.',
     },
     'about_claro': {
-      'en': 'This is the About CLARO screen. Hear what CLARO does and who built the app.',
-      'fil': 'Ito ang About CLARO screen. Alamin kung ano ang ginagawa ng CLARO at sino ang gumawa ng app.',
+      'en': 'Learn what CLARO does and who built the app.',
+      'fil': 'Alamin kung ano ang ginagawa ng CLARO at sino ang gumawa ng app.',
     },
     'change_password': {
-      'en': 'This is the change password screen. Enter your current password and a new password to update your account security.',
-      'fil': 'Ito ang change password screen. Ilagay ang kasalukuyang password at bagong password para i-update ang seguridad ng account.',
+      'en': 'Enter your current and new password to update your account security.',
+      'fil': 'Ilagay ang kasalukuyang at bagong password para i-update ang seguridad ng account.',
     },
     'theme': {
-      'en': 'This is the theme screen. Choose between default or dark mode to change the app look.',
-      'fil': 'Ito ang theme screen. Pumili ng default o dark mode para baguhin ang itsura ng app.',
+      'en': 'Choose default or dark mode to change the app look.',
+      'fil': 'Pumili ng default o dark mode para baguhin ang itsura ng app.',
     },
     'report_detail': {
-      'en': 'This is the report detail screen. Hear the submitted product report status and review the product images.',
-      'fil': 'Ito ang report detail screen. Marinig ang status ng isinubmit na product report at suriin ang mga larawan ng produkto.',
+      'en': 'Your submitted report is here — check its status and review the product images.',
+      'fil': 'Ang iyong isinubmit na report ay nandito — suriin ang status at ang mga larawan ng produkto.',
     },
     'more_details': {
-      'en': 'This is the more details screen. Review ingredients, allergen warnings, and storage tips for the product.',
-      'fil': 'Ito ang more details screen. Suriin ang ingredients, allergen warnings, at storage tips para sa produkto.',
+      'en': 'Ingredients, allergen warnings, and storage tips are listed here.',
+      'fil': 'Nakalista dito ang ingredients, allergen warnings, at storage tips.',
+    },
+    'favorites': {
+      'en': 'Your saved products are here — tap one to view its details.',
+      'fil': 'Ang iyong mga na-save na produkto ay nandito — i-tap ang isa para makita ang detalye.',
+    },
+    'compare': {
+      'en': 'Products you queued for comparison are listed here — tap one to compare.',
+      'fil': 'Ang mga produktong naka-pila para sa paghahambing ay nakalista dito — i-tap ang isa para ikumpara.',
+    },
+    'reports': {
+      'en': 'Your submitted reports are here — check their review status.',
+      'fil': 'Ang iyong mga isinubmit na ulat ay nandito — suriin ang kanilang review status.',
     },
   };
 
@@ -148,23 +161,30 @@ class VoiceAssistantService {
           .doc(user.uid)
           .get();
 
+      final appDefaultLang = LocaleService.localeNotifier.value.languageCode == 'tl'
+          ? VoiceLang.tagalog
+          : VoiceLang.english;
+
       if (doc.exists && doc.data() != null) {
         final data = doc.data() as Map<String, dynamic>;
         isEnabledNotifier.value = data['voiceAssistant'] ?? false;
         languageNotifier.value = VoiceLang.values.firstWhere(
           (lang) => lang.name == (data['voiceLanguage'] as String? ?? ''),
-          orElse: () => VoiceLang.english,
+          orElse: () => appDefaultLang,
         );
         speechRateNotifier.value = (data['voiceRate'] as num?)?.toDouble() ?? 0.5;
       } else {
         isEnabledNotifier.value = false;
-        languageNotifier.value = VoiceLang.english;
+        languageNotifier.value = appDefaultLang;
         speechRateNotifier.value = 0.5;
       }
     } catch (e) {
       debugPrint('Error initializing voice assistant: $e');
+      final fallbackLang = LocaleService.localeNotifier.value.languageCode == 'tl'
+          ? VoiceLang.tagalog
+          : VoiceLang.english;
       isEnabledNotifier.value = false;
-      languageNotifier.value = VoiceLang.english;
+      languageNotifier.value = fallbackLang;
       speechRateNotifier.value = 0.5;
     }
 
@@ -220,19 +240,31 @@ class VoiceAssistantService {
   }
 
   Future<VoiceLang> _configureLanguage(VoiceLang requestedLanguage) async {
-    if (requestedLanguage == VoiceLang.tagalog) {
-      final availability = await _flutterTts.isLanguageAvailable(
-        requestedLanguage.ttsLanguageCode,
-      );
-      if (availability != true && availability != 1) {
-        debugPrint('Tagalog TTS is unavailable; falling back to English.');
-        await _flutterTts.setLanguage(VoiceLang.english.ttsLanguageCode);
-        return VoiceLang.english;
+    try {
+      if (requestedLanguage == VoiceLang.tagalog) {
+        // On Android, 0 = LANG_AVAILABLE, 1 = LANG_COUNTRY_AVAILABLE, 2 = LANG_COUNTRY_VAR_AVAILABLE.
+        // On iOS/macOS, isLanguageAvailable returns a bool.
+        final dynamic avail = await _flutterTts.isLanguageAvailable('fil-PH');
+        final bool isAvailable = avail == true || (avail is int && avail >= 0);
+        if (isAvailable) {
+          await _flutterTts.setLanguage('fil-PH');
+        } else {
+          final dynamic availFil = await _flutterTts.isLanguageAvailable('fil');
+          if (availFil == true || (availFil is int && availFil >= 0)) {
+            await _flutterTts.setLanguage('fil');
+          } else {
+            await _flutterTts.setLanguage('fil-PH');
+          }
+        }
+        return VoiceLang.tagalog;
+      } else {
+        await _flutterTts.setLanguage(requestedLanguage.ttsLanguageCode);
+        return requestedLanguage;
       }
+    } catch (e) {
+      debugPrint('Error configuring TTS language: $e');
+      return requestedLanguage;
     }
-
-    await _flutterTts.setLanguage(requestedLanguage.ttsLanguageCode);
-    return requestedLanguage;
   }
 
   Future<void> updateSpeechRate(double rate) async {
@@ -365,7 +397,31 @@ class VoiceAssistantService {
     final pageMap = _pageAnnouncements[pageKey];
     if (pageMap == null) return;
     final text = pageMap[languageNotifier.value == VoiceLang.tagalog ? 'fil' : 'en'] ?? '';
+    if (text.isEmpty) return;
+
+    // Small delay ensures route push animation and observer didPush() stopAudio()
+    // calls complete before the announcement begins speaking.
+    await Future.delayed(const Duration(milliseconds: 350));
     await speak(text);
+  }
+
+  /// Speaks [preamble] (e.g. "Opening history.") immediately followed by the
+  /// full page description for [pageKey] as a single uninterrupted utterance.
+  /// Because [speak] calls _flutterTts.stop() internally, concatenating both
+  /// into one call is the only way to guarantee they don't cut each other off.
+  Future<void> announcePageWithPreamble(
+    String preamble,
+    String pageKey,
+  ) async {
+    final pageMap = _pageAnnouncements[pageKey];
+    if (pageMap == null) return;
+    final lang = languageNotifier.value == VoiceLang.tagalog ? 'fil' : 'en';
+    final pageText = pageMap[lang] ?? '';
+    if (pageText.isEmpty) return;
+
+    await Future.delayed(const Duration(milliseconds: 350));
+    final fullText = preamble.isNotEmpty ? '$preamble $pageText' : pageText;
+    await speak(fullText);
   }
 
   bool get isEnabled => isEnabledNotifier.value;

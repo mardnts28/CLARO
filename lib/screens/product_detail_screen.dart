@@ -25,6 +25,7 @@ import '../core/utils/nutrition_availability.dart';
 import '../core/utils/nutri_score_calculator.dart';
 import '../core/utils/nova_score_calculator.dart';
 import '../data/services/backend_locator.dart';
+import '../data/services/favorites_service.dart';
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -116,6 +117,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
     _loadFdaVerification();
     _loadFavoriteStatus();
+    FavoritesService.favoriteActionNotifier.addListener(_handleFavoriteActionChanged);
+  }
+
+  void _handleFavoriteActionChanged() {
+    if (!mounted) return;
+    final map = FavoritesService.favoriteActionNotifier.value;
+    if (map.containsKey(_currentProduct.id)) {
+      final isFav = map[_currentProduct.id]!;
+      if (_isFavorite != isFav) {
+        setState(() => _isFavorite = isFav);
+      }
+    }
   }
 
   void _onLocaleChanged() {
@@ -242,6 +255,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       VoiceAssistantService.activeResultProductNotifier.value = null;
     }
     _reportToastTimer?.cancel();
+    FavoritesService.favoriteActionNotifier.removeListener(_handleFavoriteActionChanged);
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
@@ -309,18 +323,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Future<void> _loadFavoriteStatus() async {
     final uid = _authService.currentUser?.uid;
-    if (uid == null) return;
+    if (uid == null) {
+      if (mounted) setState(() => _favoriteBusy = false);
+      return;
+    }
 
-    final isFav = await BackendLocator.favoritesService.isFavorite(
-      userId: uid,
-      productId: _currentProduct.id,
-    );
+    try {
+      final isFav = await BackendLocator.favoritesService.isFavorite(
+        userId: uid,
+        productId: _currentProduct.id,
+      );
 
-    if (mounted) {
-      setState(() {
-        _isFavorite = isFav;
-        _favoriteBusy = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isFavorite = isFav;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading favorite status: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _favoriteBusy = false;
+        });
+      }
     }
   }
 
@@ -331,8 +357,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // Optimistic update -- flip the icon immediately so the tap feels
     // responsive, then reconcile with what the repository actually did.
     final previous = _isFavorite;
+    final target = !previous;
     setState(() {
-      _isFavorite = !previous;
+      _isFavorite = target;
       _favoriteBusy = true;
     });
 
@@ -340,6 +367,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final newState = await BackendLocator.favoritesService.toggleFavorite(
         userId: uid,
         productId: _currentProduct.id,
+        isCurrentlyFavorite: previous,
       );
       if (mounted) {
         setState(() {
@@ -349,10 +377,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       }
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
-      // Revert the optimistic flip since the write didn't actually happen.
+      // In offline mode, the write is queued in local Firestore cache.
+      // Keep the toggled state so the heart stays filled!
       if (mounted) {
         setState(() {
-          _isFavorite = previous;
+          _isFavorite = target;
           _favoriteBusy = false;
         });
       }
@@ -542,6 +571,50 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 12),
+
+                  if (p.isOfflineFallback)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: theme.brightness == Brightness.dark
+                              ? const Color(0xFFE65100).withValues(alpha: 0.15)
+                              : const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: theme.brightness == Brightness.dark
+                                ? const Color(0xFFFFB74D).withValues(alpha: 0.4)
+                                : const Color(0xFFFFB74D).withValues(alpha: 0.8),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.wifi_off_rounded,
+                              size: 18,
+                              color: theme.brightness == Brightness.dark
+                                  ? const Color(0xFFFFB74D)
+                                  : const Color(0xFFE65100),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                loc.offlineBasicRecognitionBanner,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w500,
+                                  color: theme.brightness == Brightness.dark
+                                      ? const Color(0xFFFFB74D)
+                                      : const Color(0xFFE65100),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
 
                   // ── 1. Main Product Info Card ──────────────────────
                   _buildCard(

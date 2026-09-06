@@ -74,6 +74,20 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
       return;
     }
 
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      setState(() => _submitting = false);
+      if (mounted) {
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetReviewMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     try {
       final uid = _authService.currentUser?.uid;
       if (uid == null) {
@@ -111,7 +125,22 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
     } catch (e) {
       debugPrint('Error submitting feedback: $e');
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.submitError)));
+      if (mounted) {
+        final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+            e.toString().toLowerCase().contains('network') ||
+            e.toString().toLowerCase().contains('socket');
+        if (!mounted) return;
+        if (isNet) {
+          await SuccessFeedbackUtils.showOfflineNoticeDialog(
+            context,
+            title: loc.noInternetTitle,
+            message: loc.noInternetReviewMessage,
+            buttonText: loc.gotIt,
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.submitError)));
+        }
+      }
     }
   }
 

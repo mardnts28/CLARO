@@ -12,6 +12,7 @@ import '../generated/l10n/app_localizations.dart';
 import 'personal_info_screen.dart';
 import 'preference_screen.dart';
 import 'suggestion_screen.dart';
+import '../core/utils/success_feedback_utils.dart';
 
 const String claroWebsiteUrl = 'https://claro-52ia.onrender.com/';
 const String privacyPolicyUrl = 'https://claro-52ia.onrender.com/privacy-policy';
@@ -51,6 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     themeModeNotifier.addListener(_handleThemeChanged);
     AuthService.mfaNotifier.addListener(_handleMfaChanged);
     VoiceAssistantService.isEnabledNotifier.addListener(_handleVoiceAssistantChanged);
+    LocaleService.localeNotifier.addListener(_onLocaleChanged);
   }
 
   void _handleTabChange() {
@@ -60,9 +62,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _announceIfVisible() {
     if (HomeTabController.tabNotifier.value == 3 &&
         _authService.currentUser != null &&
-        VoiceAssistantService.instance.isEnabled) {
+        VoiceAssistantService.instance.isEnabled &&
+        !VoiceAssistantService.isSpeakingNotifier.value) {
       VoiceAssistantService.instance.announcePage('profile');
     }
+  }
+
+  void _onLocaleChanged() {
+    if (!mounted) return;
+    setState(() {
+      _selectedLanguageCode = LocaleService.localeNotifier.value.languageCode;
+    });
   }
 
   @override
@@ -72,6 +82,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     themeModeNotifier.removeListener(_handleThemeChanged);
     AuthService.mfaNotifier.removeListener(_handleMfaChanged);
     VoiceAssistantService.isEnabledNotifier.removeListener(_handleVoiceAssistantChanged);
+    LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     super.dispose();
   }
 
@@ -356,9 +367,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _buildMenuItemWithArrow(
             icon: Icons.language,
             label: loc.language,
-            trailing: Text(
-              _selectedLanguageCode == 'tl' ? loc.tagalog : loc.english,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            trailing: ValueListenableBuilder<Locale>(
+              valueListenable: LocaleService.localeNotifier,
+              builder: (context, locale, _) {
+                final isTl = locale.languageCode == 'tl';
+                return Text(
+                  isTl ? loc.tagalog : loc.english,
+                  style: TextStyle(color: colorScheme.onSurfaceVariant),
+                );
+              },
             ),
             onTap: () {
               HapticService().vibrate();
@@ -732,16 +749,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Switch(
-            value: _darkModeEnabled,
-            onChanged: (value) async {
-              HapticService().vibrate();
-              final theme = value ? 'Dark Mode' : 'Default';
-              setState(() => _darkModeEnabled = value);
-              await setAppThemeMode(parseThemeMode(theme));
-              await _authService.updateUserData({'theme': theme});
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeModeNotifier,
+            builder: (context, mode, _) {
+              final isDark = mode == ThemeMode.dark;
+              return Switch(
+                value: isDark,
+                onChanged: (value) async {
+                  HapticService().vibrate();
+                  final theme = value ? 'Dark Mode' : 'Default';
+                  setState(() => _darkModeEnabled = value);
+                  await setAppThemeMode(parseThemeMode(theme));
+                  await _authService.updateUserData({'theme': theme});
+                },
+                activeColor: primaryColor,
+              );
             },
-            activeColor: primaryColor,
           ),
         ],
       ),
@@ -774,22 +797,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Switch(
-            value: _mfaEnabled,
-            onChanged: (value) async {
-              HapticService().vibrate();
-              final previous = _mfaEnabled;
-              setState(() => _mfaEnabled = value);
-              try {
-                await _authService.setMfaEnabled(enabled: value);
-              } catch (_) {
-                setState(() => _mfaEnabled = previous);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.mfaSaveError)));
-                }
-              }
+          ValueListenableBuilder<bool>(
+            valueListenable: AuthService.mfaNotifier,
+            builder: (context, mfaEnabled, _) {
+              return Switch(
+                value: mfaEnabled,
+                onChanged: (value) async {
+                  HapticService().vibrate();
+                  final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+                  if (!hasInternet) {
+                    if (mounted) {
+                      await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                        context,
+                        title: loc.noInternetTitle,
+                        message: loc.noInternetActionMessage,
+                        buttonText: loc.gotIt,
+                      );
+                    }
+                    return;
+                  }
+                  setState(() => _mfaEnabled = value);
+                  try {
+                    await _authService.setMfaEnabled(enabled: value);
+                  } catch (_) {
+                    setState(() => _mfaEnabled = !value);
+                    if (mounted) {
+                      await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                        context,
+                        title: loc.noInternetTitle,
+                        message: loc.noInternetActionMessage,
+                        buttonText: loc.gotIt,
+                      );
+                    }
+                  }
+                },
+                activeColor: primaryColor,
+              );
             },
-            activeColor: primaryColor,
           ),
         ],
       ),
@@ -820,24 +864,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          Switch(
-            value: _voiceAssistantEnabled,
-            onChanged: (value) async {
-              HapticService().vibrate();
-              final previous = _voiceAssistantEnabled;
-              setState(() => _voiceAssistantEnabled = value);
-              await VoiceAssistantService.instance.updateEnabled(value);
-              final ok = await _updateUserPreference('voiceAssistant', value);
-              if (!ok) {
-                // revert and inform
-                setState(() => _voiceAssistantEnabled = previous);
-                await VoiceAssistantService.instance.updateEnabled(previous);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
-                }
-              }
+          ValueListenableBuilder<bool>(
+            valueListenable: VoiceAssistantService.isEnabledNotifier,
+            builder: (context, isVoiceEnabled, _) {
+              return Switch(
+                value: isVoiceEnabled,
+                onChanged: (value) async {
+                  HapticService().vibrate();
+                  final previous = isVoiceEnabled;
+                  setState(() => _voiceAssistantEnabled = value);
+                  await VoiceAssistantService.instance.updateEnabled(value);
+                  final ok = await _updateUserPreference('voiceAssistant', value);
+                  if (!ok) {
+                    // revert and inform
+                    setState(() => _voiceAssistantEnabled = previous);
+                    await VoiceAssistantService.instance.updateEnabled(previous);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
+                    }
+                  }
+                },
+                activeColor: primaryColor,
+              );
             },
-            activeColor: primaryColor,
           ),
         ],
       ),

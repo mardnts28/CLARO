@@ -766,6 +766,10 @@ class AppLocalizationsTl extends AppLocalizations {
       'Mabubura ang lahat ng kasaysayan ng iyong mga scan. Hindi ito maibabalik.';
 
   @override
+  String get clearAllFavoritesConfirm =>
+      'Aalisin ang lahat ng naka-save na paborito. Hindi ito maibabalik.';
+
+  @override
   String get clear => 'Burahin';
 
   @override
@@ -1312,4 +1316,45 @@ class AppLocalizationsTl extends AppLocalizations {
   @override
   String get selectAtLeastOneProduct =>
       'Pumili ng kahit isang produkto para idagdag';
+
+  @override
+  String get noInternetTitle => 'Walang Koneksyon sa Internet';
+
+  @override
+  String get noInternetNutritionMessage =>
+      'Kumonekta sa mobile data o Wi-Fi para sa buong datos ng nutrisyon.';
+
+  @override
+  String get noInternetActionMessage =>
+      'Mangyaring kumonekta sa mobile data o Wi-Fi para isagawa ang aksyong ito.';
+
+  @override
+  String get noInternetReportMessage =>
+      'Mangyaring kumonekta sa mobile data o Wi-Fi para maipadala ang report na ito.';
+
+  @override
+  String get gotIt => 'Naintindihan';
+
+  @override
+  String get offlineBasicRecognitionBanner =>
+      'Offline mode: Pangunahing pagkilala lamang. Kumonekta muli para sa buong nutrisyon.';
+
+  @override
+  String get noInternetHealthProfileMessage =>
+      'Mangyaring kumonekta sa mobile data o Wi-Fi para i-update ang iyong health conditions at allergens.';
+
+  @override
+  String get noInternetReviewMessage =>
+      'Mangyaring kumonekta sa mobile data o Wi-Fi para maipadala ang iyong review.';
+
+  @override
+  String get reportQueuedTitle => 'Na-save ang Report Offline';
+
+  @override
+  String get reportQueuedMessage =>
+      'Ang iyong report ay na-save offline at awtomatikong maipapadala kapag nakakonekta ka na muli sa internet.';
+
+  @override
+  String get noInternetVoiceMessage =>
+      'Mangyaring kumonekta sa mobile data o Wi-Fi para gamitin ang Voice Assistant.';
 }

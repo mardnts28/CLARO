@@ -1,0 +1,180 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helpers ────────────────────────────────────────────────
+    function isAdmin() {
+      return request.auth != null
+             && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // ─── User Profile Data ───────────────────────────────────────
+  match /users/{userId} {
+    allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+
+    allow create: if request.auth != null && request.auth.uid == userId
+                  && !('conditions' in request.resource.data)
+                  && !('allergens' in request.resource.data);
+
+    allow update: if request.auth != null && request.auth.uid == userId
+                  && !request.resource.data.diff(resource.data).affectedKeys()
+                       .hasAny(['conditions', 'allergens']);
+
+    allow delete: if request.auth != null && request.auth.uid == userId;
+  }
+
+    // ─── Scan History ────────────────────────────────────────────
+    // Scan history is stored as a sub-collection under each user.
+    match /users/{userId}/scan_history/{scanId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ─── History (scans + comparisons, used by HistoryService) ────
+    match /users/{userId}/history/{itemId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ─── Favorites ──────────────────────────────────────────────
+    match /users/{userId}/favorites/{productId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ─── Products (global, read-only for authenticated users) ───
+    match /products/{productId} {
+      allow read: if request.auth != null;
+      allow write: if false; // admin-only via console or Cloud Functions
+    }
+
+    // ─── FDA Products (global) ─────────────────────────────────────
+    // This is the actual live collection FirestoreProductRepository reads
+    // from (see data/repositories/product_repository.dart) -- separate
+    // from /products above, which appears to be an older/different
+    // collection name.
+    //
+    // Write is gated by isAdmin(), not `if false` -- the admin dashboard's
+    // reportService.js promotes approved reports into this collection
+    // using the regular client SDK (setDoc/updateDoc), not the Admin SDK,
+    // so it's a real, rule-checked write path, not just console/script
+    // access. tools/bulk-import/import.js uses a Firebase service account
+    // (Admin SDK), which bypasses these rules entirely regardless of what
+    // this says -- this rule only affects client-SDK writes (admin
+    // dashboard, and the Flutter app if it ever writes here directly,
+    // which it currently doesn't).
+    match /fda_products/{productId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ─── Product Nutrition Data (global) ───────────────────────────
+    // Nutrition/ingredients/allergens, populated by the OCR + Gemini
+    // extraction pipeline -- either tools/bulk-import (Admin SDK, bypasses
+    // these rules) or admin-approved user reports (client SDK, subject to
+    // this rule). Read policy matches fda_products since NutritionService
+    // (Flutter app) reads both together to build one enriched Product.
+    match /product_nutrition_data/{productId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // ─── User-submitted unknown products ─────────────────────────
+    match /submitted_products/{submissionId} {
+      allow create: if request.auth != null
+                    && request.resource.data.submittedBy == request.auth.uid;
+      allow read: if request.auth != null
+                  && resource.data.submittedBy == request.auth.uid;
+      allow update, delete: if false; // admin review only
+    }
+
+    // ─── Login OTP Challenges ─────────────────────────────────────
+    // OTP challenges are stored keyed by user UID. Read is intentionally
+    // public because verifyOtp() runs while the user is signed out — see
+    // the earlier note about this being a soft spot if a uid ever leaks.
+    match /login_otps/{userId} {
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if true;
+    }
+
+    // ─── App Suggestions/Reviews ("suhestiyon") ───────────────────
+    // Auto-ID documents — a user can submit multiple reviews over time.
+    // Each doc is tagged with the submitter's uid. Only the owner or an
+    // admin can read a given review; only an admin can change status or
+    // write a reply.
+    match /suhestiyon/{reviewId} {
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid;
+      allow read: if request.auth != null
+                  && (resource.data.uid == request.auth.uid || isAdmin());
+      allow update: if isAdmin(); // status changes + adminReply, admin-only
+      allow delete: if isAdmin();
+    }
+
+    // ─── Admins ─────────────────────────────────────────────────
+    // isAdmin() (defined above) gates writes on fda_products,
+    // product_nutrition_data, and suhestiyon -- so this collection's rules
+    // matter more than "just a profile doc".
+    //
+    // No `create` from the client at all: this codebase has no admin
+    // signup flow (authService.js only ever reads this doc to check
+    // membership) -- admin accounts must be provisioned manually, out of
+    // band, via the Firebase Console or a trusted Admin-SDK script, with
+    // the Auth user and this Firestore doc created together. Previously
+    // `allow write: if request.auth != null && request.auth.uid == uid`
+    // let ANY signed-in user create their own /admins/{their-uid} doc and
+    // instantly pass isAdmin() -- and since this project's Auth is shared
+    // with the CLARO mobile app, "any signed-in user" meant any ordinary
+    // app user too, not just people testing this dashboard.
+    //
+    // `update` is scoped to exactly the two fields the app's own code
+    // touches (see services/profileService.js: updateUsername() writes
+    // `name`, changePasswordFirstTime() writes `mustChangePassword`) --
+    // notably NOT `active`, so a disabled admin can't reactivate their own
+    // account this way, and nothing else can be smuggled into the same
+    // write.
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if false;
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['name', 'mustChangePassword']);
+      allow delete: if false;
+    }
+
+    match /otps/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ─── Unknown Product Reports ──────────────────────────────────
+    // Users can create their own reports (enforced by `reportedBy` field
+    // matching their uid). Offline-persistence write queuing relies on
+    // this exact `create` rule — queued writes are replayed with the
+    // same auth token when connectivity is restored, so the
+    // `reportedBy == request.auth.uid` check naturally passes.
+    // Update and delete are admin-only: users cannot retract or modify a
+    // report once submitted, and admins approve/reject via the dashboard.
+    match /reports/{reportId} {
+      allow create: if request.auth != null
+                    && request.resource.data.reportedBy == request.auth.uid;
+      allow read:   if request.auth != null
+                    && (resource.data.reportedBy == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /approved_unknown_product_reports/{reportId} {
+      allow read, write: if request.auth != null;
+    }
+
+    match /activity_logs/{logId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ─── Deny everything else by default ─────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
