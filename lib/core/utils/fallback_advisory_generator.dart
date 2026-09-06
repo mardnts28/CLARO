@@ -114,26 +114,53 @@ class FallbackAdvisoryGenerator {
     final severityWord =
         worst.level == AdvisoryLevel.caution ? (isTagalog ? 'Mataas' : 'High') : (isTagalog ? 'Katamtaman' : 'Moderate');
 
-    // Calculate safe serving
+    // Calculate suggested serving amount
     final safeServing = ServingSizeCalculator.calculate(
-      condition: worst.condition,
       nutrientKey: worst.nutrientKey,
       valuePer100g: worst.valuePer100g,
       servingSizeG: servingSizeG,
     );
 
-    // Build concise advisory following the new format
+    // Sentence 1: nutrient amount + % of WHO daily reference amount.
+    // Sugars gets its own exact wording -- the app only records TOTAL
+    // sugars (no free/added sugars breakdown), but the WHO 50g/day
+    // reference it's compared against is specifically for free sugars.
+    // This sentence must be explicit about that so we never imply the
+    // app measured free/added sugars directly.
+    final isSugars = worst.nutrientKey == 'sugarsG';
+    final amountSentence = isSugars
+        ? (isTagalog
+            ? 'Naglalaman ang serving na ito ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng total sugars, na humigit-kumulang ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng WHO reference para sa free sugars.'
+            : 'This serving contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of total sugars, which is about ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the WHO reference for free sugars.')
+        : (isTagalog
+            ? 'Naglalaman ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng '
+                '$nutrientName bawat serving (${servingSizeG.toStringAsFixed(0)}g), '
+                'na katumbas ng ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng daily reference amount.'
+            : 'Contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
+                '$nutrientName per serving (${servingSizeG.toStringAsFixed(0)}g), '
+                'which is ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the daily reference amount.');
+
+    // Build concise advisory following the new format, in exactly 3
+    // sentences (mirrors the Gemini prompt's structure -- see
+    // AdvisoryPromptBuilder):
+    // 1. Nutrient amount per serving + % of WHO daily reference amount.
+    // 2. What that means for the user's condition, without implying this
+    //    product causes/worsens/triggers it.
+    // 3. The suggested per-meal amount, combined with the 3-meals-a-day /
+    //    100% WHO framing into one sentence.
+    final perMealSentence = safeServing != null
+        ? (isTagalog
+            ? '$safeServing — sapat ito para sa hanggang 3 beses na pagkain sa isang araw, nang hindi lalampas sa 100% ng WHO daily reference amount mula sa produktong ito lang.'
+            : '$safeServing — enough for up to 3 meals a day without going over 100% of the WHO daily reference amount from this product alone.')
+        : '';
+
     final explanation = isTagalog
-        ? 'Naglalaman ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng '
-          '$nutrientName bawat serving (${servingSizeG.toStringAsFixed(0)}g), '
-          'na katumbas ng ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng inirerekomendang limitasyon sa isang araw. '
-          'Maaari itong makaapekto sa iyong ${_conditionLabel(worst.condition, isTagalog)}. '
-          '${safeServing != null ? 'Isaalang-alang ang paglimita sa $safeServing.' : ''}'
-        : 'Contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
-          '$nutrientName per serving (${servingSizeG.toStringAsFixed(0)}g), '
-          'which is ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the recommended healthy daily limit. '
-          'This may affect your ${_conditionLabel(worst.condition, isTagalog)}. '
-          '${safeServing != null ? 'Consider limiting to $safeServing.' : ''}';
+        ? '$amountSentence '
+          'Mahalagang bantayan ito kung mayroon kang ${_conditionLabel(worst.condition, isTagalog)}. '
+          '$perMealSentence'
+        : '$amountSentence '
+          'This is worth watching if you have ${_conditionLabel(worst.condition, isTagalog)}. '
+          '$perMealSentence';
 
     return HealthAdvisory(
       overallLevel: overallLevel,
@@ -161,7 +188,7 @@ class FallbackAdvisoryGenerator {
       case 'sodiumMg':
         return isTagalog ? 'sodium' : 'sodium'; // generally untranslated
       case 'sugarsG':
-        return isTagalog ? 'asukal' : 'sugar';
+        return isTagalog ? 'total sugars' : 'total sugars';
       case 'saturatedFatG':
         return isTagalog ? 'saturated fat' : 'saturated fat';
       default:

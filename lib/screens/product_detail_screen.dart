@@ -1342,7 +1342,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
               TextSpan(
-                text: '${e.percentage.toStringAsFixed(0)}% ${loc.ofWhoLimit}',
+                text: '${e.percentage.toStringAsFixed(0)}% ${e.nutrientKey == 'sugarsG' ? loc.ofWhoFreeSugarReference : loc.ofWhoLimit}',
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: isRelated ? highlightAccentColor : colorScheme.onSurfaceVariant,
@@ -1421,11 +1421,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // ── Helper method to build advisory subtitle with emphasized last sentence ──────
+  //
+  // The last sentence of the advisory text is where both the fallback
+  // generator (fallback_advisory_generator.dart) and the AI prompt
+  // (advisory_prompt_builder.dart, instruction #4) are told to place the
+  // "safe serving" recommendation, so bolding/italicizing it is how the
+  // recommended intake amount gets visual emphasis without touching the
+  // underlying text or calculation.
+  //
+  // Text.rich/Text always soft-wrap within whatever width their parent
+  // (an Expanded Column here) gives them, so long translated sentences or
+  // long words wrap onto new lines instead of overflowing -- no fixed
+  // width/height is applied here, intentionally, so this keeps working
+  // regardless of text length or screen size.
   Widget _buildAdvisorySubtitle(String subtitle, ColorScheme colorScheme, AdvisoryLevel level) {
+    final trimmedSubtitle = subtitle.trim();
+
     // Don't apply emphasis when suitability level is Suitable
     if (level == AdvisoryLevel.suitable) {
       return Text(
-        subtitle,
+        trimmedSubtitle,
+        softWrap: true,
         style: GoogleFonts.inter(
           fontSize: 13,
           color: colorScheme.onSurface,
@@ -1433,18 +1449,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       );
     }
-    
-    // Split the text into sentences
-    final sentences = subtitle.split(RegExp(r'(?<=[.!?])\s+'));
-    
+
+    // Split the text into sentences, dropping any empty/whitespace-only
+    // fragments -- e.g. the fallback generator can leave a trailing space
+    // with nothing after it when there's no safe-serving recommendation
+    // to append, which previously produced a bogus empty "last sentence"
+    // instead of correctly emphasizing the real final sentence.
+    final sentences = trimmedSubtitle
+        .split(RegExp(r'(?<=[.!?])\s+'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+
     if (sentences.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     // If there's only one sentence, emphasize it
     if (sentences.length == 1) {
       return Text(
-        subtitle,
+        sentences.first,
+        softWrap: true,
         style: GoogleFonts.inter(
           fontSize: 13,
           color: colorScheme.onSurface,
@@ -1454,10 +1479,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       );
     }
-    
+
     // Build text spans with emphasis on the last sentence
     final textSpans = <TextSpan>[];
-    
+
     // Add all sentences except the last one normally
     for (int i = 0; i < sentences.length - 1; i++) {
       textSpans.add(TextSpan(
@@ -1469,8 +1494,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       ));
     }
-    
-    // Add the last sentence with emphasis (bold and italic, no underline)
+
+    // Add the last sentence -- the recommended serving/intake amount --
+    // with emphasis (bold and italic, no underline).
     textSpans.add(TextSpan(
       text: sentences.last,
       style: GoogleFonts.inter(
@@ -1481,9 +1507,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         fontStyle: FontStyle.italic,
       ),
     ));
-    
+
     return Text.rich(
       TextSpan(children: textSpans),
+      softWrap: true,
     );
   }
 
@@ -1565,7 +1592,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final effectiveAdvisory = _effectiveAdvisory(context);
     final advisoryTitle = effectiveAdvisory?.warningText ??
         (level == AdvisoryLevel.suitable ? loc.safeToConsume : loc.reminderLabel);
-    final title = '$levelLabel - $advisoryTitle';
+    
+    // Remove decision word from advisoryTitle if it's duplicated at the start
+    // This handles cases where AI might include "Caution" in warningText despite instructions
+    String cleanAdvisoryTitle = advisoryTitle;
+    if (advisoryTitle.toLowerCase().startsWith('$levelLabel'.toLowerCase()) ||
+        advisoryTitle.toLowerCase().startsWith('${levelLabel.toLowerCase()}:')) {
+      cleanAdvisoryTitle = advisoryTitle.substring(levelLabel.length).trim();
+      if (cleanAdvisoryTitle.startsWith(':') || cleanAdvisoryTitle.startsWith('-')) {
+        cleanAdvisoryTitle = cleanAdvisoryTitle.substring(1).trim();
+      }
+    }
+    
+    final title = '$levelLabel - $cleanAdvisoryTitle';
     final subtitle = effectiveAdvisory?.explanation ?? loc.safeToConsumeSubtitle;
 
     return Container(

@@ -1059,7 +1059,7 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String analysisBasisSubtitle(String servingSize) {
-    return 'Batay sa WHO daily limit, bawat 1 serving ($servingSize)';
+    return 'Batay sa sanggunian ng WHO, bawat 1 serving ($servingSize)';
   }
 
   @override
@@ -1081,10 +1081,13 @@ class AppLocalizationsTl extends AppLocalizations {
   String get heartSatFatShortLabel => 'Saturated fats';
 
   @override
-  String get dailySuffix => 'araw-araw';
+  String get dailySuffix => 'sanggunian';
 
   @override
-  String get ofWhoLimit => 'ng WHO limit';
+  String get ofWhoLimit => 'ng sanggunian ng WHO';
+
+  @override
+  String get ofWhoFreeSugarReference => 'ng sanggunian ng WHO para sa asukal';
 
   @override
   String get allergenDetectedBadge => 'Allergen Detected';
@@ -1106,14 +1109,13 @@ class AppLocalizationsTl extends AppLocalizations {
   String get howToUnderstandTitle => 'Paano unawain:';
 
   @override
-  String get legendSuitableDesc => 'Mababang epekto sa panganib sa kalusugan.';
+  String get legendSuitableDesc => 'Maliit na bahagi ng sanggunian.';
 
   @override
-  String get legendModerateDesc => 'Kainin nang katamtaman.';
+  String get legendModerateDesc => 'Kapansin-pansing bahagi ng sanggunian.';
 
   @override
-  String get legendCautionDesc =>
-      'Mataas na epekto sa panganib sa kalusugan. Limitahan ang pagkonsumo.';
+  String get legendCautionDesc => 'Malaking bahagi ng sanggunian.';
 
   @override
   String get forMoreDetails => 'Higit pang detalye';
