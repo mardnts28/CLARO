@@ -387,7 +387,7 @@
   "bestLabelShort": "Best",
   "worstLabelShort": "Worst",
   "analysisBasisTitle": "Pagsusuri sa Kalusugan",
-  "analysisBasisSubtitle": "Batay sa WHO daily limit, bawat 1 serving ({servingSize})",
+  "analysisBasisSubtitle": "Batay sa sanggunian ng WHO, bawat 1 serving ({servingSize})",
   "@analysisBasisSubtitle": {
     "placeholders": {
       "servingSize": {
@@ -401,17 +401,18 @@
   "bpSodiumShortLabel": "Sodium",
   "diabetesSugarsShortLabel": "Total sugars",
   "heartSatFatShortLabel": "Saturated fats",
-  "dailySuffix": "araw-araw",
-  "ofWhoLimit": "ng WHO limit",
+  "dailySuffix": "sanggunian",
+  "ofWhoLimit": "ng sanggunian ng WHO",
+  "ofWhoFreeSugarReference": "ng sanggunian ng WHO para sa asukal",
   "allergenDetectedBadge": "Allergen Detected",
   "allergenWarningNote": "Awtomatikong nagdudulot ng babala kung saved allergen mo ito.",
   "suitableLegend": "Suitable ≤5%",
   "moderateLegend": "Moderate 6-20%",
   "cautionLegend": "Caution >20%",
   "howToUnderstandTitle": "Paano unawain:",
-  "legendSuitableDesc": "Mababang epekto sa panganib sa kalusugan.",
-  "legendModerateDesc": "Kainin nang katamtaman.",
-  "legendCautionDesc": "Mataas na epekto sa panganib sa kalusugan. Limitahan ang pagkonsumo.",
+  "legendSuitableDesc": "Maliit na bahagi ng sanggunian.",
+  "legendModerateDesc": "Kapansin-pansing bahagi ng sanggunian.",
+  "legendCautionDesc": "Malaking bahagi ng sanggunian.",
 
   "forMoreDetails": "Higit pang detalye",
   "moreDetailsScreenTitle": "Higit pang Detalye",

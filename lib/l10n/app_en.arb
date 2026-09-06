@@ -387,7 +387,7 @@
   "bestLabelShort": "Best",
   "worstLabelShort": "Worst",
   "analysisBasisTitle": "Health Analysis",
-  "analysisBasisSubtitle": "Based on WHO daily limit, per 1 serving ({servingSize})",
+  "analysisBasisSubtitle": "Based on WHO reference, per 1 serving ({servingSize})",
   "@analysisBasisSubtitle": {
     "placeholders": {
       "servingSize": {
@@ -401,17 +401,18 @@
   "bpSodiumShortLabel": "Sodium",
   "diabetesSugarsShortLabel": "Total sugars",
   "heartSatFatShortLabel": "Saturated fats",
-  "dailySuffix": "daily",
-  "ofWhoLimit": "of WHO limit",
+  "dailySuffix": "reference",
+  "ofWhoLimit": "of WHO reference",
+  "ofWhoFreeSugarReference": "of WHO free-sugar reference",
   "allergenDetectedBadge": "Allergen Detected",
   "allergenWarningNote": "Automatically alerts if this is your saved allergen.",
   "suitableLegend": "Suitable ≤5%",
   "moderateLegend": "Moderate 6-20%",
   "cautionLegend": "Caution >20%",
   "howToUnderstandTitle": "How to understand:",
-  "legendSuitableDesc": "Low impact on health risk.",
-  "legendModerateDesc": "Consume in moderation.",
-  "legendCautionDesc": "High impact on health risk. Limit intake.",
+  "legendSuitableDesc": "Small part of the reference.",
+  "legendModerateDesc": "Noticeable part of the reference.",
+  "legendCautionDesc": "Large part of the reference.",
 
   "forMoreDetails": "For more details",
   "moreDetailsScreenTitle": "More Details",

@@ -1,40 +1,44 @@
 // lib/core/utils/serving_size_calculator.dart
 //
-// Computes a safe serving size deterministically, using the SAME
-// Caution threshold already established in Table 3.14 / who_fda_thresholds.dart
-// -- not a separate assumption. "Safe" here means: how much of this product
-// can be consumed before its contribution to this nutrient crosses the
-// Caution line for the user's condition.
+// Computes the suggested serving amount deterministically, based on the
+// WHO daily reference limit for the flagged nutrient (see WhoDailyLimits in
+// who_fda_thresholds.dart), split evenly across 3 meals per day. This is a
+// per-meal guideline, not a threshold derived from ConditionThresholds --
+// those Suitable/Moderate/Caution bands are used only for classification
+// elsewhere (see who_calculator.dart) and are intentionally not used here.
 
-import '../../data/models/health_profile.dart';
-import '../constants/who_fda_thresholds.dart';
+import 'who_calculator.dart';
 
 class ServingSizeCalculator {
+  static const int mealsPerDay = 3;
+
   static String? calculate({
-    required HealthCondition condition,
     required String nutrientKey,
     required double valuePer100g,
     required double servingSizeG,
   }) {
-    final band = ConditionThresholds.thresholds[condition]?[nutrientKey];
-    if (band == null || valuePer100g <= 0) return null;
+    if (valuePer100g <= 0) return null;
 
-    final cautionThreshold = band.cautionMinInclusive; // e.g. 400mg sodium, 9.5g sugars (Table 3.14)
+    final dailyLimit = WhoCalculator.getWhoDailyLimit(nutrientKey);
 
-    // Grams of THIS product that would bring its contribution up to the
-    // Caution boundary -- i.e. the max amount before this product alone
-    // pushes the nutrient into Caution territory.
-    final maxGramsBeforeCaution = (cautionThreshold / valuePer100g) * 100;
+    // Per-meal share of the WHO daily reference limit.
+    final perMealLimit = dailyLimit / mealsPerDay;
 
-    final ratio = maxGramsBeforeCaution / servingSizeG;
+    // Grams of THIS product that would deliver exactly the per-meal limit
+    // of the nutrient.
+    final gramsForPerMealLimit = (perMealLimit / valuePer100g) * 100;
+
+    // Never suggest more than the product's normal serving size.
+    final suggestedGrams = gramsForPerMealLimit.clamp(0, servingSizeG);
+
+    final ratio = suggestedGrams / servingSizeG;
 
     if (ratio >= 1.0) {
-      return 'Up to 1 full serving (${servingSizeG.toStringAsFixed(0)}g) stays within the suggested limit';
+      return 'Up to 1 full serving (${servingSizeG.toStringAsFixed(0)}g) is the suggested amount per meal';
     } else if (ratio >= 0.5) {
-      return 'About half a serving (${(servingSizeG * ratio).toStringAsFixed(0)}g) stays within the suggested limit';
+      return 'About half a serving (${suggestedGrams.toStringAsFixed(0)}g) is the suggested amount per meal';
     } else {
-      final safeGrams = (servingSizeG * ratio).clamp(0, servingSizeG);
-      return 'No more than ${safeGrams.toStringAsFixed(0)}g stays within the suggested limit';
+      return 'No more than ${suggestedGrams.toStringAsFixed(0)}g is the suggested amount per meal';
     }
   }
 }

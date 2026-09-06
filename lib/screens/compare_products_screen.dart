@@ -247,9 +247,26 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   }
 
   /// True if [product] matches the currently-selected Product Type /
-  /// Flavor filters. Type tags are OR'd together, flavor tags are OR'd
-  /// together, and (when both groups have a selection) the two groups
-  /// combine with AND -- standard faceted-filter behavior.
+  /// Flavor filters.
+  ///
+  /// Product Type tags are OR'd together (Chicken or Beef).
+  ///
+  /// Flavor is actually TWO separate facets that must each be satisfied
+  /// independently (AND'd with each other):
+  ///   1. Spicy/Non-Spicy toggle (mutually exclusive by construction in
+  ///      the filter sheet, but handled as its own facet here regardless).
+  ///   2. Flavor keyword chips (Tomato, BBQ, etc.) -- OR'd among
+  ///      themselves, e.g. selecting Tomato + BBQ shows either.
+  ///
+  /// Previously these two facets were merged into a single OR group,
+  /// which meant a Spicy Tomato product could pass a "Non-Spicy + Tomato"
+  /// filter just by matching the Tomato keyword, ignoring the Non-Spicy
+  /// requirement entirely. Splitting them into separate facets fixes
+  /// that: a product must now satisfy the spice-level constraint AND the
+  /// flavor-keyword constraint when both are selected.
+  ///
+  /// Finally, Product Type and Flavor (as a whole) combine with AND --
+  /// standard faceted-filter behavior.
   bool _matchesTagFilters(Product product) {
     if (_selectedTypeTags.isNotEmpty) {
       final productTypeTags = ProductCharacteristics.typeTags(product);
@@ -261,12 +278,28 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     if (_selectedFlavorTags.isNotEmpty) {
       final productFlavorTags = ProductCharacteristics.flavorTags(product);
       final isSpicy = ProductCharacteristics.isSpicy(product);
-      final matchesAnySelectedFlavor = _selectedFlavorTags.any((tag) {
-        if (tag == _spicyTag) return isSpicy;
-        if (tag == _nonSpicyTag) return !isSpicy;
-        return productFlavorTags.contains(tag);
-      });
-      if (!matchesAnySelectedFlavor) return false;
+
+      final spicySelection =
+          _selectedFlavorTags.intersection({_spicyTag, _nonSpicyTag});
+      final keywordSelection =
+          _selectedFlavorTags.difference({_spicyTag, _nonSpicyTag});
+
+      // Facet 1: Spicy/Non-Spicy -- must match if selected.
+      if (spicySelection.isNotEmpty) {
+        final matchesSpicy = spicySelection.any((tag) {
+          if (tag == _spicyTag) return isSpicy;
+          return !isSpicy; // _nonSpicyTag
+        });
+        if (!matchesSpicy) return false;
+      }
+
+      // Facet 2: flavor keyword tags -- OR'd among themselves, but this
+      // facet must also pass (independently of facet 1) if selected.
+      if (keywordSelection.isNotEmpty) {
+        if (!keywordSelection.any(productFlavorTags.contains)) {
+          return false;
+        }
+      }
     }
 
     return true;

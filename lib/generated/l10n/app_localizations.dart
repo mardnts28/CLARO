@@ -2069,7 +2069,7 @@ abstract class AppLocalizations {
   /// No description provided for @analysisBasisSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Based on WHO daily limit, per 1 serving ({servingSize})'**
+  /// **'Based on WHO reference, per 1 serving ({servingSize})'**
   String analysisBasisSubtitle(String servingSize);
 
   /// No description provided for @bpSodiumLabel.
@@ -2111,14 +2111,20 @@ abstract class AppLocalizations {
   /// No description provided for @dailySuffix.
   ///
   /// In en, this message translates to:
-  /// **'daily'**
+  /// **'reference'**
   String get dailySuffix;
 
   /// No description provided for @ofWhoLimit.
   ///
   /// In en, this message translates to:
-  /// **'of WHO limit'**
+  /// **'of WHO reference'**
   String get ofWhoLimit;
+
+  /// No description provided for @ofWhoFreeSugarReference.
+  ///
+  /// In en, this message translates to:
+  /// **'of WHO free-sugar reference'**
+  String get ofWhoFreeSugarReference;
 
   /// No description provided for @allergenDetectedBadge.
   ///
@@ -2159,19 +2165,19 @@ abstract class AppLocalizations {
   /// No description provided for @legendSuitableDesc.
   ///
   /// In en, this message translates to:
-  /// **'Low impact on health risk.'**
+  /// **'Small part of the reference.'**
   String get legendSuitableDesc;
 
   /// No description provided for @legendModerateDesc.
   ///
   /// In en, this message translates to:
-  /// **'Consume in moderation.'**
+  /// **'Noticeable part of the reference.'**
   String get legendModerateDesc;
 
   /// No description provided for @legendCautionDesc.
   ///
   /// In en, this message translates to:
-  /// **'High impact on health risk. Limit intake.'**
+  /// **'Large part of the reference.'**
   String get legendCautionDesc;
 
   /// No description provided for @forMoreDetails.

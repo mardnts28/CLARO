@@ -33,7 +33,6 @@ class AdvisoryPromptBuilder {
     final safeServing = worst == null
         ? null
         : ServingSizeCalculator.calculate(
-            condition: worst.condition,
             nutrientKey: worst.nutrientKey,
             valuePer100g: worst.valuePer100g,
             servingSizeG: product.servingSizeG,
@@ -73,12 +72,20 @@ class AdvisoryPromptBuilder {
       factsBlock =
           'All evaluated nutrients are within the suitable range for this user\'s condition(s).';
     } else {
+      final sugarsNote = worst.nutrientKey == 'sugarsG'
+          ? '\nData limitation: This app only records TOTAL sugars -- it cannot distinguish free/added sugars from naturally occurring sugars. '
+              'The WHO daily reference used here (50g/day) is the WHO reference for free sugars, but the percentage above was calculated using total sugars as a stand-in. '
+              'Never call this value "free sugars" or "added sugars" -- always call it "total sugars", and phrase the amount/percentage sentence using the wording given in the instructions below.'
+          : '';
       factsBlock =
-          'Exact nutrient value to cite: ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
-          '${_nutrientLabel(worst.nutrientKey)} per serving (${product.servingSizeG}g). '
-          'One serving is about ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the daily limit. '
-          'Relevant condition: ${_conditionLabel(worst.condition)}. '
-          '${safeServing != null ? 'Pre-calculated safe serving (use this EXACT text, do not calculate your own number): "$safeServing".' : ''}';
+          'Nutrient of concern: ${_nutrientLabel(worst.nutrientKey)}.\n'
+          'Exact amount per serving: ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)}.\n'
+          'Serving size: ${product.servingSizeG.toStringAsFixed(0)}g.\n'
+          'Supplied percentage of the daily reference amount from one serving: ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}%.\n'
+          'Classification level for this nutrient: ${_levelLabel(worst.level)}.\n'
+          'Relevant health condition: ${_conditionLabel(worst.condition)}.\n'
+          '${safeServing != null ? 'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".' : 'No suggested serving amount was supplied for this nutrient.'}'
+          '$sugarsNote';
     }
 
     String comparisonBlock = '';
@@ -123,19 +130,55 @@ Also write a "comparisonExplanation" field: ONE short sentence explaining why th
    - If it names a derived ingredient, say it's derived, not a direct match (e.g. "Detected ingredient: Whey (dairy-derived)")
 3. End with a short recommendation to consume with caution or avoid this product
 
+IMPORTANT: For the "warningText" field, do NOT include the decision word ("Caution") at the beginning. The UI already displays the decision separately. The warningText should only describe the allergen, e.g. "Fish allergen detected" not "Caution: Fish allergen detected".
+
 Do NOT mention: calculations, algorithms, risk scores, WHO, "recommended maximum daily intake"'''
-        : '''Write a concise health advisory (30-60 words, short sentences) following this exact format:
+        : '''IMPORTANT:
+- The application has already calculated all nutrient amounts, percentages, classification levels, and suitable/recommended serving amounts.
+- You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
+- Every number in the advisory must come directly from the supplied facts above.
+- Do not calculate daily limits, remaining amounts, maximum servings, nutrient amounts, percentages, or serving sizes.
+- If a suggested serving amount is supplied above, communicate that exact value without modifying it.
+- Never describe any amount as "safe." Use non-medical, non-diagnostic, and non-prescriptive language.
 
-1. State the nutrient amount per serving using the exact values provided
-2. Convert the percentage into natural language (e.g., "about 13% of your daily sodium limit")
-3. Explain health effects simply using everyday language (e.g., "Too much sodium may raise blood pressure")
-4. If a safe serving recommendation is available, end with one practical suggestion (e.g., "Enjoy up to 1 serving at a time")
-5. Sound like a grocery shopping assistant giving quick advice
+The advisory should, when the information is available:
+1. State the nutrient of concern and its exact amount per serving.
+2. State the serving size in grams.
+3. State the supplied percentage of the daily reference amount/limit.
+4. Briefly explain why the nutrient matters for the user's specific health condition, without implying this product directly causes, worsens, or triggers it.
+5. Give one simple, practical, non-medical recommendation.
+6. If the classification level is "Caution", "Moderate", or a similar higher-intake level AND a suggested serving amount is supplied above, include that exact amount in the recommendation.
+7. If the serving is already within the supplied suitable range, you may mention the supplied recommended amount instead.
+8. If no suggested serving amount is supplied above, give a general recommendation instead. Do not create one.
+9. If a "Data limitation" note about sugars appears in the facts above, use this exact wording for the amount/percentage sentence instead of the general format in rules 1-3: "This serving contains [supplied amount] of total sugars, which is about [supplied percentage]% of the WHO reference for free sugars." Fill in [supplied amount] and [supplied percentage] with the exact supplied values only. Never call this value "free sugars" or "added sugars" on its own.
 
-Do NOT mention: calculations, algorithms, risk scores, WHO, "represents", "contributes", "recommended maximum daily intake", "moderation", "excessive intake", "dietary guideline", "consume", "contributes to hypertension"''';
+WORDING:
+- Use simple language suitable for an ordinary grocery shopper.
+- Prefer "daily reference amount" or "suggested daily amount" over "daily limit."
+- Do not imply that one serving directly causes, worsens, or triggers a medical condition.
+- Do not diagnose or prescribe treatment.
+- Use cautious wording since the classification level is Moderate or Caution.
+- Avoid unnecessary disclaimers, repetition, or introductory phrases.
+- For sugars specifically: always say "total sugars", never "free sugars" or "added sugars" as a standalone label -- the app only has total sugars data, not a free/added sugars breakdown.
+- If a suggested serving amount is supplied above, make clear that it is a suggested amount PER MEAL, intended for up to 3 meals in a day without exceeding 100% of the supplied WHO daily reference limit for that nutrient from this product alone.
+- Do not calculate or restate the 3-meal math yourself -- just state that it applies.
+
+OUTPUT:
+Write a concise advisory of approximately 30-50 words, in this logical order:
+1. Nutrient amount + serving size
+2. Daily percentage, if supplied
+3. Health relevance
+4. Practical recommendation, including the exact supplied suggested serving amount when applicable
+5. End with one sentence stating that the suggested serving amount is intended for 3 meals a day without exceeding 100% of the supplied WHO daily reference limit for that nutrient from this product alone.
+Do not force every sentence if required information is unavailable, but do not omit supplied facts that are required above.''';
+
+    final introBlock = allergen.hasDirectAllergen
+        ? 'You are a friendly grocery assistant inside a Filipino grocery app called CLARO, writing a quick health tip for a scanned product.'
+        : 'You are a wording assistant for the non-allergen Health Advisory card in a Filipino grocery app called CLARO. '
+            'Generate a short, clear, cautious, user-friendly health advisory using ONLY the nutrient and health facts supplied below.';
 
     return '''
-You are a friendly grocery assistant inside a Filipino grocery app called CLARO, writing a quick health tip for a scanned product.
+$introBlock
 
 Decision: $decisionWord
 Facts: $factsBlock
@@ -192,7 +235,7 @@ $jsonFields
       case 'sodiumMg':
         return 'sodium';
       case 'sugarsG':
-        return 'added sugars';
+        return 'total sugars';
       case 'saturatedFatG':
         return 'saturated fat';
       default:

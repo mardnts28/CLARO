@@ -1049,7 +1049,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String analysisBasisSubtitle(String servingSize) {
-    return 'Based on WHO daily limit, per 1 serving ($servingSize)';
+    return 'Based on WHO reference, per 1 serving ($servingSize)';
   }
 
   @override
@@ -1071,10 +1071,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get heartSatFatShortLabel => 'Saturated fats';
 
   @override
-  String get dailySuffix => 'daily';
+  String get dailySuffix => 'reference';
 
   @override
-  String get ofWhoLimit => 'of WHO limit';
+  String get ofWhoLimit => 'of WHO reference';
+
+  @override
+  String get ofWhoFreeSugarReference => 'of WHO free-sugar reference';
 
   @override
   String get allergenDetectedBadge => 'Allergen Detected';
@@ -1096,13 +1099,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get howToUnderstandTitle => 'How to understand:';
 
   @override
-  String get legendSuitableDesc => 'Low impact on health risk.';
+  String get legendSuitableDesc => 'Small part of the reference.';
 
   @override
-  String get legendModerateDesc => 'Consume in moderation.';
+  String get legendModerateDesc => 'Noticeable part of the reference.';
 
   @override
-  String get legendCautionDesc => 'High impact on health risk. Limit intake.';
+  String get legendCautionDesc => 'Large part of the reference.';
 
   @override
   String get forMoreDetails => 'For more details';
