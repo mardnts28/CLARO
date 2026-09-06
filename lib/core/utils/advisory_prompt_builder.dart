@@ -111,13 +111,13 @@ Also write a "comparisonExplanation" field: ONE short sentence explaining why th
     final jsonFields = comparisonFact != null
         ? '''{
   "warningText": "short headline, max 8 words",
-  "explanation": "the single sentence following the decision-first format",
+  "explanation": "the advisory text following the instructions above",
   "safeServingSize": ${safeServing != null ? '"$safeServing"' : 'null'},
   "comparisonExplanation": "the single comparison sentence described above"
 }'''
         : '''{
   "warningText": "short headline, max 8 words",
-  "explanation": "the single sentence following the decision-first format",
+  "explanation": "the advisory text following the instructions above",
   "safeServingSize": ${safeServing != null ? '"$safeServing"' : 'null'}
 }''';
 
@@ -141,36 +141,36 @@ Do NOT mention: calculations, algorithms, risk scores, WHO, "recommended maximum
 - If a suggested serving amount is supplied above, communicate that exact value without modifying it.
 - Never describe any amount as "safe." Use non-medical, non-diagnostic, and non-prescriptive language.
 
-The advisory should, when the information is available:
-1. State the nutrient of concern and its exact amount per serving.
-2. State the serving size in grams.
-3. State the supplied percentage of the daily reference amount/limit.
-4. Briefly explain why the nutrient matters for the user's specific health condition, without implying this product directly causes, worsens, or triggers it.
-5. Give one simple, practical, non-medical recommendation.
-6. If the classification level is "Caution", "Moderate", or a similar higher-intake level AND a suggested serving amount is supplied above, include that exact amount in the recommendation.
-7. If the serving is already within the supplied suitable range, you may mention the supplied recommended amount instead.
-8. If no suggested serving amount is supplied above, give a general recommendation instead. Do not create one.
-9. If a "Data limitation" note about sugars appears in the facts above, use this exact wording for the amount/percentage sentence instead of the general format in rules 1-3: "This serving contains [supplied amount] of total sugars, which is about [supplied percentage]% of the WHO reference for free sugars." Fill in [supplied amount] and [supplied percentage] with the exact supplied values only. Never call this value "free sugars" or "added sugars" on its own.
+WARNINGTEXT field:
+- Maximum 8 words.
+- Do NOT repeat the decision level ("Caution", "Moderate", "Suitable") -- the UI already displays that separately.
+- Use a short descriptive phrase instead. Example: "High in Sodium", NOT "Sodium Caution for Hypertension".
+
+EXPLANATION field -- write EXACTLY 3 short sentences, preferably 30-45 words total:
+
+Sentence 1:
+- Start with "This product" and state the exact supplied nutrient amount. Do NOT mention serving size in this sentence. Put the supplied WHO percentage in parentheses at the end.
+  Example: "This product contains 727.3mg of sodium (36.4% of the WHO daily reference amount)."
+- EXCEPTION: if a "Data limitation" note about sugars appears in the facts above, use this exact wording instead of the format above: "This serving contains [supplied amount] of total sugars, which is about [supplied percentage]% of the WHO reference for free sugars." Fill in only the exact supplied values. Never call this value "free sugars" or "added sugars" on its own.
+
+Sentence 2:
+- Simply explain what that amount means for the user's specific health condition.
+- Be cautious and non-medical. Do not imply the product causes, worsens, or triggers the condition.
+
+Sentence 3:
+- Give the supplied suggested serving amount as a practical suggestion, exactly as supplied -- do not calculate, modify, convert, or estimate it.
+  Example: "Consider a smaller 50g serving (for 3 meals a day)."
+- Keep the 3-meal context in parentheses. Do NOT explain the 100% calculation or repeat the full mathematical reasoning behind it.
+- If no suggested serving amount is supplied above, give a short general recommendation instead. Do not invent a serving amount.
 
 WORDING:
 - Use simple language suitable for an ordinary grocery shopper.
-- Prefer "daily reference amount" or "suggested daily amount" over "daily limit."
-- Do not imply that one serving directly causes, worsens, or triggers a medical condition.
-- Do not diagnose or prescribe treatment.
-- Use cautious wording since the classification level is Moderate or Caution.
-- Avoid unnecessary disclaimers, repetition, or introductory phrases.
-- For sugars specifically: always say "total sugars", never "free sugars" or "added sugars" as a standalone label -- the app only has total sugars data, not a free/added sugars breakdown.
-- If a suggested serving amount is supplied above, make clear that it is a suggested amount PER MEAL, intended for up to 3 meals in a day without exceeding 100% of the supplied WHO daily reference limit for that nutrient from this product alone.
-- Do not calculate or restate the 3-meal math yourself -- just state that it applies.
-
-OUTPUT:
-Write a concise advisory of approximately 30-50 words, in this logical order:
-1. Nutrient amount + serving size
-2. Daily percentage, if supplied
-3. Health relevance
-4. Practical recommendation, including the exact supplied suggested serving amount when applicable
-5. End with one sentence stating that the suggested serving amount is intended for 3 meals a day without exceeding 100% of the supplied WHO daily reference limit for that nutrient from this product alone.
-Do not force every sentence if required information is unavailable, but do not omit supplied facts that are required above.''';
+- Prefer "daily reference amount" over "daily limit."
+- Never describe any amount as "safe."
+- Never invent or calculate numbers -- use only the supplied facts.
+- Avoid repetition and unnecessary disclaimers.
+- For sugars specifically: always say "total sugars", never "free sugars" or "added sugars" as a standalone label.
+- Keep the advisory concise.''';
 
     final introBlock = allergen.hasDirectAllergen
         ? 'You are a friendly grocery assistant inside a Filipino grocery app called CLARO, writing a quick health tip for a scanned product.'

@@ -2180,6 +2180,78 @@ abstract class AppLocalizations {
   /// **'Large part of the reference.'**
   String get legendCautionDesc;
 
+  /// No description provided for @howClaroCalculatesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How CLARO Calculates Your Health Guide'**
+  String get howClaroCalculatesTitle;
+
+  /// No description provided for @howClaroCalculatesIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'WHO sets a healthy daily reference amount for each nutrient. CLARO compares this product\'s amount per serving to that reference and turns it into a percentage. CLARO then uses that percentage — not WHO — to label the product Suitable, Moderate, or Caution.'**
+  String get howClaroCalculatesIntro;
+
+  /// No description provided for @howClaroReferencePrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'We reference '**
+  String get howClaroReferencePrefix;
+
+  /// No description provided for @howClaroReferenceLinkLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Healthy Diet by World Health Organization'**
+  String get howClaroReferenceLinkLabel;
+
+  /// No description provided for @calculationFormulaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'The formula'**
+  String get calculationFormulaLabel;
+
+  /// No description provided for @calculationFormula.
+  ///
+  /// In en, this message translates to:
+  /// **'Product amount per serving ÷ WHO reference × 100 = % of WHO reference'**
+  String get calculationFormula;
+
+  /// No description provided for @howClaroExampleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Example from this product'**
+  String get howClaroExampleTitle;
+
+  /// No description provided for @howClaroExampleUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Nutrition facts aren\'t available for this product, so we can\'t show a live example here.'**
+  String get howClaroExampleUnavailable;
+
+  /// No description provided for @productAmountPerServingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Product amount'**
+  String get productAmountPerServingLabel;
+
+  /// No description provided for @whoReferenceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'WHO reference'**
+  String get whoReferenceLabel;
+
+  /// No description provided for @whoFreeSugarReferenceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'WHO free-sugar reference'**
+  String get whoFreeSugarReferenceLabel;
+
+  /// No description provided for @howClaroClassificationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How CLARO classifies it'**
+  String get howClaroClassificationTitle;
+
   /// No description provided for @forMoreDetails.
   ///
   /// In en, this message translates to:

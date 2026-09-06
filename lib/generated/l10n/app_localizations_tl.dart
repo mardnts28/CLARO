@@ -1122,6 +1122,47 @@ class AppLocalizationsTl extends AppLocalizations {
   String get legendCautionDesc => 'Malaking bahagi ng sanggunian.';
 
   @override
+  String get howClaroCalculatesTitle =>
+      'Paano Kinakalkula ng CLARO ang Iyong Health Guide';
+
+  @override
+  String get howClaroCalculatesIntro =>
+      'Nagtatakda ang WHO ng malusog na sanggunian kada araw para sa bawat nutrient. Inikukumpara ng CLARO ang halaga ng produktong ito bawat serving sa sanggunian na iyon at ginagawang porsyento. Ginagamit ng CLARO ang porsyentong iyon — hindi ang WHO — para markahan ang produkto bilang Suitable, Moderate, o Caution.';
+
+  @override
+  String get howClaroReferencePrefix => 'Sumasangguni kami sa ';
+
+  @override
+  String get howClaroReferenceLinkLabel =>
+      'Healthy Diet ng World Health Organization';
+
+  @override
+  String get calculationFormulaLabel => 'Ang formula';
+
+  @override
+  String get calculationFormula =>
+      'Halaga ng produkto kada serving ÷ WHO reference × 100 = % ng WHO reference';
+
+  @override
+  String get howClaroExampleTitle => 'Halimbawa mula sa produktong ito';
+
+  @override
+  String get howClaroExampleUnavailable =>
+      'Walang available na nutrition facts para sa produktong ito, kaya hindi namin ito maipapakita bilang halimbawa.';
+
+  @override
+  String get productAmountPerServingLabel => 'Halaga ng produkto';
+
+  @override
+  String get whoReferenceLabel => 'WHO reference';
+
+  @override
+  String get whoFreeSugarReferenceLabel => 'WHO reference para sa free sugars';
+
+  @override
+  String get howClaroClassificationTitle => 'Paano ito ini-klasipika ng CLARO';
+
+  @override
   String get forMoreDetails => 'Higit pang detalye';
 
   @override

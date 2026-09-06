@@ -1017,6 +1017,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             builder: (context) => MoreDetailsScreen(
                               product: p,
                               matchedAllergens: _evaluation?.allergenAssessment.matchedContains ?? const [],
+                              // Same conditions WhoCalculator.evaluateProduct() iterated
+                              // over for this user (i.e. the ones on their saved health
+                              // profile) -- lets the "How CLARO Calculates" guide only
+                              // badge a nutrient card with a condition the user actually
+                              // has.
+                              userConditions: _evaluation
+                                      ?.nutrientEvaluations
+                                      .map((e) => e.condition)
+                                      .toSet()
+                                      .toList() ??
+                                  const [],
                             ),
                           ),
                         );

@@ -1108,6 +1108,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get legendCautionDesc => 'Large part of the reference.';
 
   @override
+  String get howClaroCalculatesTitle =>
+      'How CLARO Calculates Your Health Guide';
+
+  @override
+  String get howClaroCalculatesIntro =>
+      'WHO sets a healthy daily reference amount for each nutrient. CLARO compares this product\'s amount per serving to that reference and turns it into a percentage. CLARO then uses that percentage — not WHO — to label the product Suitable, Moderate, or Caution.';
+
+  @override
+  String get howClaroReferencePrefix => 'We reference ';
+
+  @override
+  String get howClaroReferenceLinkLabel =>
+      'Healthy Diet by World Health Organization';
+
+  @override
+  String get calculationFormulaLabel => 'The formula';
+
+  @override
+  String get calculationFormula =>
+      'Product amount per serving ÷ WHO reference × 100 = % of WHO reference';
+
+  @override
+  String get howClaroExampleTitle => 'Example from this product';
+
+  @override
+  String get howClaroExampleUnavailable =>
+      'Nutrition facts aren\'t available for this product, so we can\'t show a live example here.';
+
+  @override
+  String get productAmountPerServingLabel => 'Product amount';
+
+  @override
+  String get whoReferenceLabel => 'WHO reference';
+
+  @override
+  String get whoFreeSugarReferenceLabel => 'WHO free-sugar reference';
+
+  @override
+  String get howClaroClassificationTitle => 'How CLARO classifies it';
+
+  @override
   String get forMoreDetails => 'For more details';
 
   @override
