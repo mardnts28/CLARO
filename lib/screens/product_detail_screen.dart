@@ -2339,11 +2339,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final labelServingSizeG = evaluation.product.servingSizeG;
     if (_selectedSizeG == labelServingSizeG) return _advisory;
 
+    // Use combined nutrient calculation for users without health conditions
+    final useCombinedNutrients = _userHealthProfile?.conditions.isEmpty ?? false;
+    final hasNoConditionsAndNoAllergens = (_userHealthProfile?.conditions.isEmpty ?? false) && !evaluation.allergenAssessment.hasDirectAllergen;
+
     return FallbackAdvisoryGenerator.generate(
       evaluation,
       reason: FallbackReason.notNeeded,
       languageCode: Localizations.localeOf(context).languageCode,
       servingSizeGOverride: _selectedSizeG,
+      useCombinedNutrients: useCombinedNutrients,
+      hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
     );
   }
 

@@ -30,13 +30,21 @@ class AdvisoryPromptBuilder {
       );
     }
 
-    final safeServing = worst == null
-        ? null
-        : ServingSizeCalculator.calculate(
-            nutrientKey: worst.nutrientKey,
-            valuePer100g: worst.valuePer100g,
+    // For users with no health conditions and no allergens, use combined nutrient calculation
+    final hasNoConditionsAndNoAllergens = user.conditions.isEmpty && !allergen.hasDirectAllergen;
+    
+    final safeServing = hasNoConditionsAndNoAllergens
+        ? ServingSizeCalculator.calculateCombinedNutrients(
+            nutritionPer100g: product.nutritionPer100g,
             servingSizeG: product.servingSizeG,
-          );
+          )
+        : (worst == null
+            ? null
+            : ServingSizeCalculator.calculate(
+                nutrientKey: worst.nutrientKey,
+                valuePer100g: worst.valuePer100g,
+                servingSizeG: product.servingSizeG,
+              ));
 
     final decisionWord = allergen.hasDirectAllergen
         ? 'Caution'
@@ -68,6 +76,10 @@ class AdvisoryPromptBuilder {
       factsBlock =
           'This product CONTAINS an allergen the user is allergic to: $allergenLabels.\n'
           'Ingredient attribution (use exactly this, do not add, guess, or invent beyond it):\n$sourceLines';
+    } else if (hasNoConditionsAndNoAllergens) {
+      factsBlock =
+          'User has no health conditions and no allergens.\n'
+          'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".';
     } else if (worst == null) {
       factsBlock =
           'All evaluated nutrients are within the suitable range for this user\'s condition(s).';
@@ -133,7 +145,27 @@ Also write a "comparisonExplanation" field: ONE short sentence explaining why th
 IMPORTANT: For the "warningText" field, do NOT include the decision word ("Caution") at the beginning. The UI already displays the decision separately. The warningText should only describe the allergen, e.g. "Fish allergen detected" not "Caution: Fish allergen detected".
 
 Do NOT mention: calculations, algorithms, risk scores, WHO, "recommended maximum daily intake"'''
-        : '''IMPORTANT:
+        : (hasNoConditionsAndNoAllergens
+            ? '''IMPORTANT:
+- The application has already calculated the suggested serving amount.
+- You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
+- The suggested serving amount is for up to 3 meals per day.
+- Never describe any amount as "safe" or medically recommended.
+
+WARNINGTEXT field:
+- Maximum 8 words.
+- Must clearly state "Suitable".
+- May include a short descriptive phrase after it if needed.
+- Do not make the header unnecessarily long.
+
+EXPLANATION field -- write EXACTLY ONE short sentence:
+- Tell the user the suggested amount PER MEAL.
+- Use the exact suggested serving amount supplied above.
+- Preferred format: "Consider a [amount] serving per meal (for 3 meals a day)."
+- Do not explain the mathematical calculation.
+- Do not repeat nutrient amounts or WHO percentages.
+- Keep it very short and user-friendly.'''
+            : '''IMPORTANT:
 - The application has already calculated all nutrient amounts, percentages, classification levels, and suitable/recommended serving amounts.
 - You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
 - Every number in the advisory must come directly from the supplied facts above.
@@ -170,7 +202,7 @@ WORDING:
 - Never invent or calculate numbers -- use only the supplied facts.
 - Avoid repetition and unnecessary disclaimers.
 - For sugars specifically: always say "total sugars", never "free sugars" or "added sugars" as a standalone label.
-- Keep the advisory concise.''';
+- Keep the advisory concise.''');
 
     final introBlock = allergen.hasDirectAllergen
         ? 'You are a friendly grocery assistant inside a Filipino grocery app called CLARO, writing a quick health tip for a scanned product.'

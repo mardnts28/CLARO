@@ -564,7 +564,9 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            'WHO reference: ${NumberFormatUtils.formatValue(row.whoDailyLimit)}${row.unit}/day',
+            row.nutrientKey == 'sugarsG'
+                ? '${loc.whoFreeSugarReferenceLabel}: ${NumberFormatUtils.formatValue(row.whoDailyLimit)}${row.unit}/day'
+                : '${loc.whoReferenceLabel}: ${NumberFormatUtils.formatValue(row.whoDailyLimit)}${row.unit}/day',
             softWrap: true,
             style: GoogleFonts.inter(fontSize: 11.5, color: colorScheme.onSurfaceVariant),
           ),

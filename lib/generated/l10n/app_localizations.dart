@@ -2243,7 +2243,7 @@ abstract class AppLocalizations {
   /// No description provided for @whoFreeSugarReferenceLabel.
   ///
   /// In en, this message translates to:
-  /// **'WHO free-sugar reference'**
+  /// **'WHO Free sugar reference'**
   String get whoFreeSugarReferenceLabel;
 
   /// No description provided for @howClaroClassificationTitle.

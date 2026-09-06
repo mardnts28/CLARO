@@ -32,9 +32,54 @@ class FallbackAdvisoryGenerator {
     // WhoCalculator functions the backend used to build `evaluation` in
     // the first place, so it can't silently drift out of sync).
     double? servingSizeGOverride,
+    // When true, uses combined nutrient calculation (sodium + sugars + saturated fat)
+    // instead of single worst nutrient. Intended for users without health conditions.
+    bool useCombinedNutrients = false,
+    // When true, user has no health conditions and no allergens - use simplified advisory
+    bool hasNoConditionsAndNoAllergens = false,
   }) {
     final allergen = evaluation.allergenAssessment;
     final isTagalog = languageCode == 'tl';
+
+    // Handle users with no health conditions and no allergens
+    if (hasNoConditionsAndNoAllergens) {
+      final servingSizeG = servingSizeGOverride ?? evaluation.product.servingSizeG;
+      
+      // Use combined nutrient calculation
+      final safeServing = ServingSizeCalculator.calculateCombinedNutrients(
+        nutritionPer100g: evaluation.product.nutritionPer100g,
+        servingSizeG: servingSizeG,
+      );
+
+      // Extract the numeric amount from the safeServing string for formatting
+      String? servingAmount;
+      if (safeServing != null) {
+        // Parse the amount from strings like "Up to 1 full serving (100g) is the suggested amount per meal"
+        // or "About half a serving (50g) is the suggested amount per meal"
+        // or "No more than 83g is the suggested amount per meal"
+        final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*g').firstMatch(safeServing);
+        if (amountMatch != null) {
+          servingAmount = '${amountMatch.group(1)}g';
+        }
+      }
+
+      final explanation = servingAmount != null
+          ? (isTagalog
+              ? 'Isipin ang $servingAmount serving per meal (para sa 3 beses na pagkain sa isang araw).'
+              : 'Consider a $servingAmount serving per meal (for 3 meals a day).')
+          : (isTagalog
+              ? 'Mainit ito nang maayos bilang bahagi ng balanced na pagkain.'
+              : 'Enjoy this in moderation as part of a balanced diet.');
+
+      return HealthAdvisory(
+        overallLevel: AdvisoryLevel.suitable,
+        warningText: isTagalog ? 'Angkop' : 'Suitable',
+        explanation: explanation,
+        safeServingSize: safeServing,
+        source: AdvisorySource.fallbackRuleBased,
+        generatedAt: DateTime.now(),
+      );
+    }
 
     if (allergen.hasDirectAllergen) {
       final allergenLabels = allergen.matchedContains.map(_allergenLabel).join(', ');
@@ -122,11 +167,17 @@ class FallbackAdvisoryGenerator {
         : (isTagalog ? 'Medyo Mataas' : 'Elevated');
 
     // Calculate suggested serving amount
-    final safeServing = ServingSizeCalculator.calculate(
-      nutrientKey: worst.nutrientKey,
-      valuePer100g: worst.valuePer100g,
-      servingSizeG: servingSizeG,
-    );
+    // Use combined nutrient calculation when flag is set, otherwise use single worst nutrient
+    final safeServing = useCombinedNutrients
+        ? ServingSizeCalculator.calculateCombinedNutrients(
+            nutritionPer100g: evaluation.product.nutritionPer100g,
+            servingSizeG: servingSizeG,
+          )
+        : ServingSizeCalculator.calculate(
+            nutrientKey: worst.nutrientKey,
+            valuePer100g: worst.valuePer100g,
+            servingSizeG: servingSizeG,
+          );
 
     // Sentence 1: "This product contains [amount] ([% of WHO daily
     // reference amount])." -- no serving size mentioned here. Sugars

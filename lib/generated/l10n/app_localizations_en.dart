@@ -1143,7 +1143,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get whoReferenceLabel => 'WHO reference';
 
   @override
-  String get whoFreeSugarReferenceLabel => 'WHO free-sugar reference';
+  String get whoFreeSugarReferenceLabel => 'WHO Free sugar reference';
 
   @override
   String get howClaroClassificationTitle => 'How CLARO classifies it';
