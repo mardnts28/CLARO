@@ -446,7 +446,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     final loc = AppLocalizations.of(context)!;
 
     return GestureDetector(
-      onTap: _openAddProductFlow,
+      onTap: () {
+        HapticService().vibrate();
+        _openAddProductFlow();
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 14),
         alignment: Alignment.center,
@@ -515,7 +518,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: GestureDetector(
-                    onTap: () => Navigator.pop(context),
+                    onTap: () {
+                      HapticService().vibrate();
+                      Navigator.pop(context);
+                    },
                     child: Icon(Icons.arrow_back,
                         color: colorScheme.primary, size: 24),
                   ),
@@ -525,7 +531,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: GestureDetector(
-                      onTap: _showFilterSheet,
+                      onTap: () {
+                        HapticService().vibrate();
+                        _showFilterSheet();
+                      },
                       child: Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -569,7 +578,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                 if (_selectedCondition != null) ...[
                   const SizedBox(width: 8),
                   GestureDetector(
-                    onTap: () => _selectConditionFilter(null),
+                    onTap: () {
+                      HapticService().vibrate();
+                      _selectConditionFilter(null);
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),

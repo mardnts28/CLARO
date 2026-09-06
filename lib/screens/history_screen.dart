@@ -332,12 +332,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
+            onPressed: () {
+              HapticService().vibrate();
+              Navigator.pop(ctx);
+            },
             child: Text(loc.cancel,
                 style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant)),
           ),
           TextButton(
             onPressed: () {
+              HapticService().vibrate();
               Navigator.pop(ctx);
               if (isFavoritesTab) {
                 _clearAllFavorites();
@@ -415,6 +419,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () async {
+              HapticService().vibrate();
               if (product != null) {
                 await Navigator.push(
                   context,
@@ -515,7 +520,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
                   // Favorite heart toggle
                   GestureDetector(
-                    onTap: () => _toggleFavoriteForItem(item),
+                    onTap: () {
+                      HapticService().vibrate();
+                      _toggleFavoriteForItem(item);
+                    },
                     child: Icon(
                       isFavorite ? Icons.favorite : Icons.favorite_border,
                       color: isFavorite
@@ -692,6 +700,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return GestureDetector(
       onTap: () {
+        HapticService().vibrate();
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -922,7 +931,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
                     if (_activeTab != 'Mga Ulat')
                       GestureDetector(
-                        onTap: _showClearAllDialog,
+                        onTap: () {
+                          HapticService().vibrate();
+                          _showClearAllDialog();
+                        },
                         child: Text(
                           loc.clearAll,
                           style: GoogleFonts.inter(
@@ -965,7 +977,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                       if (_searchQuery.isNotEmpty)
                         GestureDetector(
-                          onTap: () => _searchController.clear(),
+                          onTap: () {
+                            HapticService().vibrate();
+                            _searchController.clear();
+                          },
                           child: Icon(Icons.close,
                               color: colorScheme.onSurfaceVariant, size: 18),
                         ),
@@ -993,6 +1008,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       return Expanded(
                         child: GestureDetector(
                           onTap: () {
+                              HapticService().vibrate();
                               setState(() => _activeTab = tab);
                               if (VoiceAssistantService.instance.isEnabled) {
                                 final String? pageKey = switch (tab) {

@@ -6,6 +6,7 @@ import '../models/product_model.dart';
 import '../services/fda_verification_service.dart';
 import '../services/auth_service.dart';
 import '../services/voice_assistant_service.dart';
+import '../services/haptic_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/locale_service.dart';
 import '../widgets/voice_assistant_fab.dart';
@@ -217,7 +218,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: _navigateToReport,
+                        onTap: () {
+                          HapticService().vibrate();
+                          _navigateToReport();
+                        },
                         child: Text(
                           message,
                           style: GoogleFonts.inter(
@@ -232,7 +236,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     const SizedBox(width: 4),
                     GestureDetector(
-                      onTap: _dismissReportTooltip,
+                      onTap: () {
+                        HapticService().vibrate();
+                        _dismissReportTooltip();
+                      },
                       child: const Icon(
                         Icons.close,
                         size: 15,
@@ -514,6 +521,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       alignment: Alignment.centerLeft,
                       child: GestureDetector(
                         onTap: () {
+                          HapticService().vibrate();
                           _dismissReportTooltip();
                           Navigator.pop(context);
                         },
@@ -532,7 +540,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         button: true,
                         label: loc.reportProductButton,
                         child: GestureDetector(
-                          onTap: _navigateToReport,
+                          onTap: () {
+                            HapticService().vibrate();
+                            _navigateToReport();
+                          },
                           child: Icon(
                             Icons.report_problem_outlined,
                             color: colorScheme.onSurfaceVariant,
@@ -546,7 +557,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         button: true,
                         label: _isFavorite ? 'Remove from favorites' : 'Add to favorites',
                         child: GestureDetector(
-                          onTap: _toggleFavorite,
+                          onTap: () {
+                            HapticService().vibrate();
+                            _toggleFavorite();
+                          },
                           child: Icon(
                             _isFavorite ? Icons.favorite : Icons.favorite_border,
                             color: _isFavorite ? const Color(0xFFD32F2F) : colorScheme.onSurfaceVariant,

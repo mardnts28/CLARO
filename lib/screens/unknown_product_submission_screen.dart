@@ -510,7 +510,10 @@ class _UnknownProductSubmissionScreenState
             const SizedBox(width: 16),
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: onPick,
+                onPressed: () {
+                  HapticService().vibrate();
+                  onPick();
+                },
                 icon: Icon(Icons.camera_alt_outlined, size: 18, color: primaryColor),
                 label: Text(
                   buttonLabel,
@@ -558,7 +561,10 @@ class _UnknownProductSubmissionScreenState
                 child: IconButton(
                   icon: Icon(Icons.arrow_back,
                       color: primaryColor, size: 26),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    HapticService().vibrate();
+                    Navigator.pop(context);
+                  },
                 ),
               ),
             ),
@@ -667,7 +673,10 @@ class _UnknownProductSubmissionScreenState
                                 top: 4,
                                 right: 4,
                                 child: GestureDetector(
-                                  onTap: () => _removeAdditionalBackPhoto(index),
+                                  onTap: () {
+                                    HapticService().vibrate();
+                                    _removeAdditionalBackPhoto(index);
+                                  },
                                   child: Container(
                                     decoration: BoxDecoration(
                                       color: Colors.red.withValues(alpha: 0.9),
@@ -691,7 +700,10 @@ class _UnknownProductSubmissionScreenState
 
                     // Add additional photo button
                     OutlinedButton.icon(
-                      onPressed: _pickAdditionalBackPhoto,
+                      onPressed: () {
+                        HapticService().vibrate();
+                        _pickAdditionalBackPhoto();
+                      },
                       icon: Icon(Icons.add_photo_alternate_outlined, size: 18, color: colorScheme.primary),
                       label: Text(
                         loc.reportAddAnotherBackPhoto,
@@ -765,6 +777,7 @@ class _UnknownProductSubmissionScreenState
                           groupValue: _selectedCategory,
                           onChanged: (value) {
                             if (value != null) {
+                              HapticService().vibrate();
                               setState(() => _selectedCategory = value);
                             }
                           },
@@ -822,7 +835,10 @@ class _UnknownProductSubmissionScreenState
                       width: double.infinity,
                       height: 54,
                       child: ElevatedButton(
-                        onPressed: canSubmit ? _handleSubmit : null,
+                        onPressed: canSubmit ? () {
+                          HapticService().vibrate();
+                          _handleSubmit();
+                        } : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: primaryColor,
                           foregroundColor: colorScheme.onPrimary,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../generated/l10n/app_localizations.dart';
+import '../services/haptic_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 
@@ -32,7 +33,10 @@ class _AboutClaroScreenState extends State<AboutClaroScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: colorScheme.primary),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            HapticService().vibrate();
+            Navigator.of(context).pop();
+          },
         ),
         title: Text(
           loc.aboutClaro,

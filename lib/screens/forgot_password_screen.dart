@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
+import '../services/haptic_service.dart';
 import '../services/validation_service.dart';
 import '../core/utils/success_feedback_utils.dart';
 
@@ -93,7 +94,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             GestureDetector(
-                              onTap: () => Navigator.pop(context),
+                              onTap: () {
+                                HapticService().vibrate();
+                                Navigator.pop(context);
+                              },
                               child: Icon(
                                 Icons.arrow_back,
                                 color: colorScheme.primary,

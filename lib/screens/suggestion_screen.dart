@@ -180,6 +180,13 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
         backgroundColor: colorScheme.surface,
         elevation: 0,
         iconTheme: IconThemeData(color: colorScheme.primary),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: colorScheme.primary),
+          onPressed: () {
+            HapticService().vibrate();
+            Navigator.of(context).pop();
+          },
+        ),
         title: Text(loc.suggestion, style: TextStyle(color: colorScheme.primary)),
         actions: [
           IconButton(

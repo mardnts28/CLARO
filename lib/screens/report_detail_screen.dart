@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/report_model.dart';
+import '../services/haptic_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
 
@@ -57,7 +58,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                 padding: const EdgeInsets.only(left: 8, top: 8),
                 child: IconButton(
                   icon: Icon(Icons.arrow_back, color: colorScheme.primary, size: 26),
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    HapticService().vibrate();
+                    Navigator.pop(context);
+                  },
                 ),
               ),
             ),

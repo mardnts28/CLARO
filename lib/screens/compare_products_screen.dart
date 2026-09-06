@@ -499,7 +499,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
               return FilterChip(
                 label: Text(label),
                 selected: selected,
-                onSelected: (_) => onTap(),
+                onSelected: (_) {
+                  HapticService().vibrate();
+                  onTap();
+                },
                 selectedColor: colorScheme.primary.withOpacity(0.15),
                 checkmarkColor: colorScheme.primary,
                 labelStyle: GoogleFonts.inter(
@@ -531,13 +534,16 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                         value: tempConditions.contains(condition),
                         activeColor: colorScheme.primary,
                         title: Text(_conditionLabel(condition)),
-                        onChanged: (checked) => setSheetState(() {
-                          if (checked == true) {
-                            tempConditions.add(condition);
-                          } else {
-                            tempConditions.remove(condition);
-                          }
-                        }),
+                        onChanged: (checked) {
+                          HapticService().vibrate();
+                          setSheetState(() {
+                            if (checked == true) {
+                              tempConditions.add(condition);
+                            } else {
+                              tempConditions.remove(condition);
+                            }
+                          });
+                        },
                       ),
 
                     // ── Product Type (only shown if this comparison set
@@ -728,7 +734,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                 const Spacer(),
                 if (_profile != null)
                   GestureDetector(
-                    onTap: _showFilterSheet,
+                    onTap: () {
+                      HapticService().vibrate();
+                      _showFilterSheet();
+                    },
                     child: Stack(
                       clipBehavior: Clip.none,
                       children: [

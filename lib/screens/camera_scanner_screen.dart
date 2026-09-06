@@ -625,6 +625,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                         ),
                       ),
                       onPressed: () {
+                        HapticService().vibrate();
                         Navigator.pop(ctx);
                         _navigateToReportDirectly(capturedImagePath: capturedImagePath);
                       },
@@ -652,6 +653,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                         ),
                       ),
                       onPressed: () {
+                        HapticService().vibrate();
                         Navigator.pop(ctx);
                       },
                     ),
@@ -690,11 +692,11 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     if (_isProcessing) return;
 
     _continuousAnalysisTimer?.cancel();
+    _stopImageStreamIfActive();
 
     String? path = capturedImagePath;
     if ((path == null || path.isEmpty) && _cameraController?.value.isInitialized == true) {
       try {
-        await _stopImageStreamIfActive();
         await _cameraController!.setFlashMode(
           _isFlashOn ? FlashMode.torch : FlashMode.off,
         );
@@ -1015,6 +1017,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                             const SizedBox(height: 20),
                             ElevatedButton.icon(
                               onPressed: () {
+                                HapticService().vibrate();
                                 _isInitializingCamera = false;
                                 _checkPermissionAndInit();
                               },
@@ -1157,7 +1160,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                         ? 'Isara ang scanner'
                         : 'Close scanner',
                     child: GestureDetector(
-                      onTap: _handleClose,
+                      onTap: () {
+                        HapticService().vibrate();
+                        _handleClose();
+                      },
                       child: Container(
                         width: 40,
                         height: 40,
@@ -1184,7 +1190,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                         button: true,
                         label: AppLocalizations.of(context)!.reportProductButton,
                         child: GestureDetector(
-                          onTap: _navigateToReportDirectly,
+                          onTap: () {
+                            HapticService().vibrate();
+                            _navigateToReportDirectly();
+                          },
                           child: Container(
                             width: 40,
                             height: 40,
@@ -1212,7 +1221,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                                 ? 'Buksan ang flash'
                                 : 'Turn on flash'),
                         child: GestureDetector(
-                          onTap: _toggleFlash,
+                          onTap: () {
+                            HapticService().vibrate();
+                            _toggleFlash();
+                          },
                           child: Container(
                             width: 40,
                             height: 40,
@@ -1259,7 +1271,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                             ? 'Hindi mahanap ang produkto? I-report'
                             : 'Can’t scan your product? Report here',
                         child: GestureDetector(
-                          onTap: _navigateToReportDirectly,
+                          onTap: () {
+                            HapticService().vibrate();
+                            _navigateToReportDirectly();
+                          },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 14, vertical: 8),
