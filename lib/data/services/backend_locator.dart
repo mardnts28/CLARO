@@ -25,9 +25,16 @@ class BackendLocator {
 
   // Read from .env (loaded once in main.dart via dotenv.load()) --
   // pubspec.yaml already lists .env as an asset and flutter_dotenv as a
-  // dependency. Update the key name below if your .env uses a different
-  // variable name than GEMINI_API_KEY.
-  static String get _geminiApiKey => dotenv.env['GEMINI_API_KEY'] ?? '';
+  // dependency.
+  //
+  // GEMINI_API_KEY is intentionally NOT read here anymore -- the real key
+  // now lives only as a Cloudflare Worker secret (claro-gemini-proxy), never
+  // inside the app/APK. The app instead holds GEMINI_PROXY_URL (the
+  // Worker's public URL) and APP_SHARED_SECRET (a low-stakes app-to-Worker
+  // auth token, rotatable any time, unlike a real API key with paid quota
+  // behind it). See gemini_advisory_service.dart's header comment.
+  static String get _geminiProxyUrl => dotenv.env['GEMINI_PROXY_URL'] ?? '';
+  static String get _appSharedSecret => dotenv.env['APP_SHARED_SECRET'] ?? '';
   static String get _geminiModel =>
       dotenv.env['GEMINI_MODEL'] ?? 'gemini-3.5-flash';
 
@@ -68,14 +75,22 @@ class BackendLocator {
   static final HistoryRepository historyRepository = FirebaseHistoryRepository();
 
   static final GeminiAdvisoryService geminiAdvisoryService =
-      GeminiAdvisoryService(apiKey: _geminiApiKey, model: _geminiModel);
+      GeminiAdvisoryService(
+    proxyUrl: _geminiProxyUrl,
+    appSecret: _appSharedSecret,
+    model: _geminiModel,
+  );
 
   // Gemini's 3rd role in this system (see product_extraction_service.dart) --
   // reads front+back product photos and returns structured brand/nutrition/
   // ingredient/allergen data. Used by the unknown-product report flow
   // (Phase 3) to populate a submission before it reaches admin review.
   static final ProductExtractionService productExtractionService =
-      ProductExtractionService(apiKey: _geminiApiKey, model: _geminiModel);
+      ProductExtractionService(
+    proxyUrl: _geminiProxyUrl,
+    appSecret: _appSharedSecret,
+    model: _geminiModel,
+  );
 
   // Used by the unknown-product report flow to upload front/back label
   // photos before submitting a report -- see cloudinary_upload_service.dart.

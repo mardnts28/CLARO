@@ -1,9 +1,15 @@
 // lib/data/services/gemini_advisory_service.dart
+//
+// Calls Gemini through the claro-gemini-proxy Cloudflare Worker instead of
+// calling Google's API directly. The real Gemini API key lives only as a
+// Cloudflare Worker secret -- it never ships inside the APK. The app
+// authenticates to the Worker with APP_SHARED_SECRET (see backend_locator.dart
+// and claro-gemini-proxy/src/index.ts).
 
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/health_advisory.dart';
@@ -17,22 +23,69 @@ import '../../core/utils/fallback_advisory_generator.dart';
 
 class GeminiAdvisoryService {
   GeminiAdvisoryService({
-    required String apiKey,
+    required String proxyUrl,
+    required String appSecret,
     String model = 'gemini-3.5-flash',
-  }) : _model = GenerativeModel(
-          model: model,
-          apiKey: apiKey,
-          generationConfig: GenerationConfig(
-            responseMimeType: 'application/json',
-            temperature: 0.4,
-            maxOutputTokens: 2048,
-          ),
-        );
+  })  : _proxyUrl = proxyUrl,
+        _appSecret = appSecret,
+        _model = model;
 
-  final GenerativeModel _model;
+  final String _proxyUrl;
+  final String _appSecret;
+  final String _model;
   static const _timeout = Duration(seconds: 10);
 
   final Map<String, HealthAdvisory> _cache = {};
+
+  /// Posts [prompt] to the Cloudflare Worker and returns Gemini's raw text
+  /// response (same shape the old GenerativeModel.generateContent().text
+  /// used to give us), so the rest of this file's parsing logic is
+  /// unchanged.
+  Future<String?> _callGemini(
+    String prompt, {
+    required Duration timeout,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse(_proxyUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-App-Secret': _appSecret,
+          },
+          body: jsonEncode({
+            'model': _model,
+            'contents': [
+              {
+                'parts': [
+                  {'text': prompt},
+                ],
+              },
+            ],
+            'generationConfig': {
+              'responseMimeType': 'application/json',
+              'temperature': 0.4,
+              'maxOutputTokens': 2048,
+            },
+          }),
+        )
+        .timeout(timeout);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Gemini proxy returned ${response.statusCode}: ${response.body}',
+      );
+    }
+
+    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    final candidates = decoded['candidates'] as List?;
+    if (candidates == null || candidates.isEmpty) return null;
+
+    final content = candidates.first['content'] as Map<String, dynamic>?;
+    final parts = content?['parts'] as List?;
+    if (parts == null || parts.isEmpty) return null;
+
+    return parts.first['text'] as String?;
+  }
 
   String _persistentCacheKey({
     required String fingerprint,
@@ -111,11 +164,9 @@ class GeminiAdvisoryService {
     final useCombinedNutrients = user.conditions.isEmpty;
     final hasNoConditionsAndNoAllergens = user.conditions.isEmpty && !evaluation.allergenAssessment.hasDirectAllergen;
     try {
-      final response = await _model
-          .generateContent([Content.text(prompt)])
-          .timeout(_timeout);
+      final text = await _callGemini(prompt, timeout: _timeout);
 
-      advisory = _parseResponse(response.text, evaluation, languageCode, useCombinedNutrients, hasNoConditionsAndNoAllergens);
+      advisory = _parseResponse(text, evaluation, languageCode, useCombinedNutrients, hasNoConditionsAndNoAllergens);
     } on TimeoutException catch (e) {
       print('GEMINI TIMEOUT: $e');
       advisory = FallbackAdvisoryGenerator.generate(
@@ -238,11 +289,9 @@ class GeminiAdvisoryService {
     );
 
     try {
-      final response = await _model
-          .generateContent([Content.text(prompt)])
-          .timeout(_timeout);
+      final text = await _callGemini(prompt, timeout: _timeout);
 
-      final explanation = _parseRankingExplanation(response.text);
+      final explanation = _parseRankingExplanation(text);
       return {'explanation': explanation, 'source': 'Gemini'};
     } on TimeoutException catch (_) {
       final explanation = FallbackAdvisoryGenerator.generateRankingExplanation(

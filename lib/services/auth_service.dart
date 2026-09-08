@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'haptic_service.dart';
 import 'home_tab_controller.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 // Base URL for the Cloudflare Worker that performs server-side encryption
 // and decryption of health conditions/allergens. The key never lives on
@@ -122,20 +123,7 @@ class AuthService {
       }
       
       await _updateSessionId(uid);
-      
-      // TEMPORARY: Print Firebase ID token for API testing
-      try {
-        final user = _firebaseAuth.currentUser;
-        if (user != null) {
-          final idToken = await user.getIdToken(true);
-          debugPrint('=== FIREBASE ID TOKEN FOR API TESTING ===');
-          debugPrint(idToken);
-          debugPrint('=== END TOKEN ===');
-        }
-      } catch (e) {
-        debugPrint('Error getting ID token: $e');
-      }
-      
+
       return null;
     } on FirebaseAuthException catch (e) {
       debugPrint('Firebase Auth signup failed: ${e.code} - ${e.message}');
@@ -195,20 +183,7 @@ class AuthService {
       }
 
       await _updateSessionId(uid);
-      
-      // TEMPORARY: Print Firebase ID token for API testing
-      try {
-        final user = _firebaseAuth.currentUser;
-        if (user != null) {
-          final idToken = await user.getIdToken(true);
-          debugPrint('=== FIREBASE ID TOKEN FOR API TESTING ===');
-          debugPrint(idToken);
-          debugPrint('=== END TOKEN ===');
-        }
-      } catch (e) {
-        debugPrint('Error getting ID token: $e');
-      }
-      
+
       isAuthenticating.value = false;
       return null;
     } on FirebaseAuthException catch (e) {
@@ -268,20 +243,8 @@ class AuthService {
   Future<void> finishMfaLogin() async {
     final uid = _firebaseAuth.currentUser?.uid;
     if (uid != null) await _updateSessionId(uid);
-    
-    // TEMPORARY: Print Firebase ID token for API testing
-    try {
-      final user = _firebaseAuth.currentUser;
-      if (user != null) {
-        final idToken = await user.getIdToken(true);
-        debugPrint('=== FIREBASE ID TOKEN FOR API TESTING ===');
-        debugPrint(idToken);
-        debugPrint('=== END TOKEN ===');
-      }
-    } catch (e) {
-      debugPrint('Error getting ID token: $e');
-    }
-    
+
+
     pendingMfaChallenge.value = null;
     isAuthenticating.value = false;
   }
@@ -417,39 +380,22 @@ class AuthService {
     mfaNotifier.value = enabled;
   }
 
-  /// EmailJS Public Key (a.k.a. "user_id"). Safe to keep in client code —
-  /// this is designed to be public and only identifies your account.
-  static const String _emailJsPublicKey = 'wJyfTyTAuJIC6XQvn';
+  /// Base URL of the claro-gemini-proxy Cloudflare Worker (the same one
+  /// used for Gemini calls -- see backend_locator.dart / GEMINI_PROXY_URL).
+  /// The /email route lives on this same Worker; only its shared-secret
+  /// gate and the recipient/OTP/time fields cross the wire from the app.
+  /// EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, the public key, and (if you
+  /// have one) the private key all live server-side as Worker secrets now
+  /// -- none of them are read from dotenv here anymore.
+  static String get _proxyBaseUrl => dotenv.env['GEMINI_PROXY_URL'] ?? '';
+  static String get _appSharedSecret => dotenv.env['APP_SHARED_SECRET'] ?? '';
 
-  /// Optional EmailJS Private Key (a.k.a. "accessToken"). Leave this as
-  /// an empty string unless you've specifically enabled and generated a
-  /// Private Key from EmailJS dashboard -> Account -> Security. If you
-  /// have one, paste it here and it will be sent along with each
-  /// request, which authenticates the call directly.
-  ///
-  /// If you DON'T have a Private Key, that's fine — you can still fix
-  /// OTP delivery by instead turning on:
-  ///   Account -> Security -> "Allow EmailJS API calls from
-  ///   non-browser applications"
-  /// That toggle alone removes the browser-origin requirement and does
-  /// not need any key. Leave _emailJsPrivateKey empty in that case; the
-  /// request below only attaches accessToken when this is non-empty.
-  static const String _emailJsPrivateKey = 'TPESYD0VrS0MpTSbsQE7y';
-
-  /// Sends the OTP code to the user's email using EmailJS.
-  ///
-  /// IMPORTANT: EmailJS's REST endpoint rejects calls that don't look like
-  /// they came from a browser unless either (a) "Allow EmailJS API calls
-  /// from non-browser applications" is enabled in the EmailJS dashboard
-  /// under Account -> Security, or (b) the request includes a valid
-  /// Private Key as `accessToken` (see _emailJsPrivateKey above). Without
-  /// one of those, this call returns a non-200 response (commonly 403)
-  /// and no email is ever delivered, even though the OTP code is still
-  /// generated and stored in Firestore.
-  ///
-  /// This method logs the full response and rethrows on failure so the
-  /// caller (_prepareAndSendOtp) can record emailSent=false AND you can
-  /// see exactly why in the console instead of it failing silently.
+  /// Sends the OTP code to the user's email via the Worker's /email route,
+  /// which forwards to EmailJS with the real service/template/keys attached
+  /// server-side. This method logs the full response and rethrows on
+  /// failure so the caller (_prepareAndSendOtp) can record emailSent=false
+  /// AND you can see exactly why in the console instead of it failing
+  /// silently.
   Future<void> _sendOtpEmail(
       String email,
       String code,
@@ -460,12 +406,7 @@ class AuthService {
     // Format as 12-hour time (e.g. 7:18 PM)
     final formattedTime = DateFormat('h:mm a').format(expiry);
 
-    final templateParams = {
-      'service_id': 'service_5y6zi4d',
-      'template_id': 'template_te10bxg',
-      'user_id': _emailJsPublicKey,
-      if (_emailJsPrivateKey.isNotEmpty)
-        'accessToken': _emailJsPrivateKey,
+    final payload = {
       'template_params': {
         'to_email': email,
         'passcode': code,
@@ -477,12 +418,12 @@ class AuthService {
 
     try {
       response = await http.post(
-        Uri.parse('https://api.emailjs.com/api/v1.0/email/send'),
+        Uri.parse('$_proxyBaseUrl/email'),
         headers: {
-          'origin': 'http://localhost',
           'Content-Type': 'application/json',
+          'X-App-Secret': _appSharedSecret,
         },
-        body: jsonEncode(templateParams),
+        body: jsonEncode(payload),
       );
     } catch (e) {
       debugPrint('OTP email network error: $e');
@@ -683,20 +624,7 @@ class AuthService {
       }
 
       await _updateSessionId(uid);
-      
-      // TEMPORARY: Print Firebase ID token for API testing
-      try {
-        final user = _firebaseAuth.currentUser;
-        if (user != null) {
-          final idToken = await user.getIdToken(true);
-          debugPrint('=== FIREBASE ID TOKEN FOR API TESTING ===');
-          debugPrint(idToken);
-          debugPrint('=== END TOKEN ===');
-        }
-      } catch (e) {
-        debugPrint('Error getting ID token: $e');
-      }
-      
+
       isAuthenticating.value = false;
       return null;
     } catch (e) {

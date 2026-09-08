@@ -5,6 +5,11 @@
 // product's front + back label photos directly (multimodal -- no separate
 // OCR engine) and returning structured product data.
 //
+// Calls Gemini through the claro-gemini-proxy Cloudflare Worker instead of
+// calling Google's API directly, so the real Gemini API key never ships
+// inside the APK -- see gemini_advisory_service.dart's header comment for
+// the same rationale.
+//
 // This service is deliberately narrow -- image(s) in, ProductExtractionResult
 // out. It does NOT touch Firestore, does NOT know about the `reports`
 // collection or the admin approval flow. Callers decide what to do with the
@@ -19,32 +24,23 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/constants/canonical_allergens.dart';
 import '../models/product_extraction_result.dart';
 
 class ProductExtractionService {
   ProductExtractionService({
-    required String apiKey,
+    required String proxyUrl,
+    required String appSecret,
     String model = 'gemini-3.5-flash',
-  }) : _model = GenerativeModel(
-          model: model,
-          apiKey: apiKey,
-          generationConfig: GenerationConfig(
-            responseMimeType: 'application/json',
-            // Low temperature -- this call wants faithful transcription of
-            // what's on the label, not creative variation. Contrast with
-            // GeminiAdvisoryService's 0.4, which is generating explanatory
-            // text rather than extracting fixed facts.
-            temperature: 0.1,
-            // 8192 allows long ingredient lists and full nutrition objects
-            // without risk of truncation while only charging for actual tokens.
-            maxOutputTokens: 8192,
-          ),
-        );
+  })  : _proxyUrl = proxyUrl,
+        _appSecret = appSecret,
+        _model = model;
 
-  final GenerativeModel _model;
+  final String _proxyUrl;
+  final String _appSecret;
+  final String _model;
   static const _timeout = Duration(seconds: 45);
 
   /// Reads [frontImageBytes] + [backImageBytes] (JPEG/PNG bytes -- the
@@ -61,26 +57,81 @@ class ProductExtractionService {
     String backMimeType = 'image/jpeg',
   }) async {
     try {
-      final parts = <Part>[
-        TextPart(_buildPrompt()),
+      final parts = <Map<String, dynamic>>[
+        {'text': _buildPrompt()},
       ];
       if (frontImageBytes.isNotEmpty) {
-        parts.add(DataPart(frontMimeType, frontImageBytes));
+        parts.add({
+          'inline_data': {
+            'mime_type': frontMimeType,
+            'data': base64Encode(frontImageBytes),
+          },
+        });
       }
       if (backImageBytes.isNotEmpty) {
-        parts.add(DataPart(backMimeType, backImageBytes));
+        parts.add({
+          'inline_data': {
+            'mime_type': backMimeType,
+            'data': base64Encode(backImageBytes),
+          },
+        });
       }
       for (final extraBytes in additionalBackImageBytes) {
         if (extraBytes.isNotEmpty) {
-          parts.add(DataPart(backMimeType, extraBytes));
+          parts.add({
+            'inline_data': {
+              'mime_type': backMimeType,
+              'data': base64Encode(extraBytes),
+            },
+          });
         }
       }
 
-      final response = await _model.generateContent([
-        Content.multi(parts),
-      ]).timeout(_timeout);
+      final response = await http
+          .post(
+            Uri.parse(_proxyUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-App-Secret': _appSecret,
+            },
+            body: jsonEncode({
+              'model': _model,
+              'contents': [
+                {'parts': parts},
+              ],
+              'generationConfig': {
+                'responseMimeType': 'application/json',
+                // Low temperature -- this call wants faithful transcription
+                // of what's on the label, not creative variation. Contrast
+                // with GeminiAdvisoryService's 0.4, which is generating
+                // explanatory text rather than extracting fixed facts.
+                'temperature': 0.1,
+                // 8192 allows long ingredient lists and full nutrition
+                // objects without risk of truncation while only charging
+                // for actual tokens.
+                'maxOutputTokens': 8192,
+              },
+            }),
+          )
+          .timeout(_timeout);
 
-      return _parseResponse(response.text);
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Gemini proxy returned ${response.statusCode}: ${response.body}',
+        );
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final candidates = decoded['candidates'] as List?;
+      final content = candidates?.isNotEmpty == true
+          ? candidates!.first['content'] as Map<String, dynamic>?
+          : null;
+      final resultParts = content?['parts'] as List?;
+      final text = resultParts?.isNotEmpty == true
+          ? resultParts!.first['text'] as String?
+          : null;
+
+      return _parseResponse(text);
     } on TimeoutException catch (e) {
       print('GEMINI EXTRACTION TIMEOUT: $e');
       return ProductExtractionResult.empty(
