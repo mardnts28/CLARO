@@ -184,6 +184,26 @@ a {
   outline-offset: 2px;
 }
 
+.btn-primary:disabled {
+  background-color: var(--text-secondary, #9ca3af);
+  color: #ffffff !important;
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+.btn-primary:disabled:hover {
+  background-color: var(--text-secondary, #9ca3af);
+  transform: none;
+  box-shadow: none;
+}
+
+.hero-download-note {
+  margin-top: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
 .btn-secondary {
   display: inline-flex;
   align-items: center;
