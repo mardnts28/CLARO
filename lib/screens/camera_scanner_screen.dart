@@ -478,7 +478,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   Future<void> _navigateToReportDirectly({String? capturedImagePath}) async {
     if (_isProcessing) return;
 
-    _continuousAnalysisTimer?.cancel();
     _stopImageStreamIfActive();
 
     String? path = capturedImagePath;
