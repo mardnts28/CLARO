@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:claro/core/utils/fallback_advisory_generator.dart';
-import 'package:claro/core/utils/who_calculator.dart';
 import 'package:claro/core/constants/who_fda_thresholds.dart';
 import 'package:claro/data/models/health_advisory.dart';
 import 'package:claro/data/models/health_profile.dart';
