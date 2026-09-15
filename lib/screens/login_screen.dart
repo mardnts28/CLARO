@@ -154,6 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
           uid: challenge['uid'].toString(),
           otpCode: challenge['code']?.toString(),
           emailSent: challenge['emailSent'] == true,
+          expiresAt: challenge['expiresAt'] as DateTime?,
         ),
       ),
           (route) => false,

@@ -283,6 +283,7 @@ class AuthGate extends StatelessWidget {
                       uid: challenge['uid'].toString(),
                       otpCode: challenge['code']?.toString(),
                       emailSent: challenge['emailSent'] == true,
+                      expiresAt: challenge['expiresAt'] as DateTime?,
                     );
                   }
                   return const Scaffold(
@@ -292,7 +293,7 @@ class AuthGate extends StatelessWidget {
               );
             }
 
-            // Verify session validity
+            // Verify session validity and MFA completion
             return FutureBuilder<bool>(
               future: AuthService().isSessionValid(user.uid),
               builder: (context, sessionSnap) {

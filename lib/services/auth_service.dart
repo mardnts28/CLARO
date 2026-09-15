@@ -182,6 +182,8 @@ class AuthService {
         }
       }
 
+      // Only update session ID if MFA is not required (user completes normal login)
+      // For MFA users, session ID is updated in finishMfaLogin() after OTP verification
       await _updateSessionId(uid);
 
       isAuthenticating.value = false;
@@ -253,7 +255,7 @@ class AuthService {
   Future<Map<String, dynamic>> _prepareAndSendOtp(String uid, String email) async {
     final code = (100000 + DateTime.now().microsecondsSinceEpoch % 900000).toString().padLeft(6, '0');
     final now = Timestamp.now();
-    final expiresAt = Timestamp.fromDate(now.toDate().add(const Duration(minutes: 5)));
+    final expiresAt = Timestamp.fromDate(now.toDate().add(const Duration(minutes: 1)));
 
     await _firebaseDb.collection('login_otps').doc(uid).set({
       'uid': uid,
@@ -279,6 +281,7 @@ class AuthService {
       'uid': uid,
       'code': code,
       'emailSent': emailSent,
+      'expiresAt': expiresAt.toDate(),
     };
   }
 
@@ -318,6 +321,14 @@ class AuthService {
 
         final data = userDoc.data();
         final remoteSessionId = data?['currentSessionId'] as String?;
+        final mfaEnabled = data?['mfaEnabled'] == true;
+
+        // For MFA-enabled users, require a valid session ID to prevent bypass
+        if (mfaEnabled && remoteSessionId == null) {
+          return false;
+        }
+
+        // If no session ID and MFA is not enabled, allow access (backward compatibility)
         if (remoteSessionId == null) return true;
 
         final prefs = await SharedPreferences.getInstance();
@@ -468,7 +479,6 @@ class AuthService {
       await _firebaseAuth.signOut();
       return {
         ...challenge,
-        'expiresAt': Timestamp.fromDate(DateTime.now().add(const Duration(minutes: 5))),
         'recipientEmail': email,
       };
     } catch (e) {
@@ -623,6 +633,8 @@ class AuthService {
         return {'status': 'MFA_REQUIRED', ...challenge};
       }
 
+      // Only update session ID if MFA is not required (user completes normal Google sign-in)
+      // For MFA users, session ID is updated in finishMfaLogin() after OTP verification
       await _updateSessionId(uid);
 
       isAuthenticating.value = false;

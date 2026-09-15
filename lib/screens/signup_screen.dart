@@ -325,6 +325,7 @@ class _SignupScreenState extends State<SignupScreen> {
           uid: challenge['uid'].toString(),
           otpCode: challenge['code']?.toString(),
           emailSent: challenge['emailSent'] == true,
+          expiresAt: challenge['expiresAt'] as DateTime?,
         ),
       ),
           (route) => false,

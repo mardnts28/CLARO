@@ -14,6 +14,7 @@ class OtpVerificationScreen extends StatefulWidget {
     required this.uid,
     this.otpCode,
     this.emailSent = true,
+    this.expiresAt,
   });
 
   final String email;
@@ -28,6 +29,7 @@ class OtpVerificationScreen extends StatefulWidget {
   final String uid;
   final String? otpCode;
   final bool emailSent;
+  final DateTime? expiresAt;
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
@@ -38,13 +40,15 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final _otpController = TextEditingController();
   bool _isVerifying = false;
   bool _isResending = false;
-  int _remainingSeconds = 30;
+  int _remainingSeconds = 60;
   int _attempts = 0;
   Timer? _timer;
+  DateTime? _currentExpiresAt;
 
   @override
   void initState() {
     super.initState();
+    _currentExpiresAt = widget.expiresAt;
     if (widget.emailSent) {
       _startTimer();
     }
@@ -58,9 +62,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   }
 
   void _startTimer() {
-    _remainingSeconds = 30;
-
     _timer?.cancel();
+
+    // Calculate remaining seconds from expiry time
+    if (_currentExpiresAt != null) {
+      final now = DateTime.now();
+      final difference = _currentExpiresAt!.difference(now);
+      _remainingSeconds = difference.inSeconds;
+    } else {
+      _remainingSeconds = 60;
+    }
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
@@ -73,6 +84,12 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         }
       });
     });
+  }
+
+  String _formatTime(int seconds) {
+    final minutes = seconds ~/ 60;
+    final remainingSeconds = seconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
   Future<void> _verifyOtp() async {
@@ -143,6 +160,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       }
       final resendEmailSent = otpData['emailSent'] == true;
       if (resendEmailSent) {
+        // Update expiry time if provided
+        if (otpData['expiresAt'] != null) {
+          _currentExpiresAt = (otpData['expiresAt'] as DateTime);
+        }
         _startTimer();
         SuccessFeedbackUtils.showSuccessSnackBar(context, 'A new verification code has been sent.');
       } else {
@@ -207,97 +228,181 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                   },
                 ),
               ),
-              body: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Verify your email',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      widget.emailSent
-                          ? 'A verification code has been sent to your email.'
-                          : 'We couldn\'t send the code to your email right now. Please tap "Resend Code" below to try again.',
-                      style: TextStyle(fontSize: 15, color: colorScheme.onSurfaceVariant),
-                    ),
-                    // NOTE: the OTP code is intentionally never rendered on
-                    // screen, even as a fallback when email delivery fails.
-                    // Displaying it here would defeat the purpose of MFA —
-                    // anyone with access to the device (or a screenshot)
-                    // could complete the login without ever touching the
-                    // user's inbox. If email delivery is unreliable, fix
-                    // the delivery path (see AuthService._sendOtpEmail)
-                    // rather than exposing the code in the UI.
-                    const SizedBox(height: 24),
-                    TextField(
-                      controller: _otpController,
-                      style: TextStyle(color: colorScheme.onSurface),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(6),
-                      ],
-                      keyboardType: TextInputType.number,
-                      textAlign: TextAlign.center,
-                      decoration: InputDecoration(
-                        hintText: AppLocalizations.of(context)!.enterDigitCode,
-                        hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
-                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
-                        border: const OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: colorScheme.onPrimary,
+              body: SafeArea(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Verify your email',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
                         ),
-                        onPressed: _isVerifying ? null : _verifyOtp,
-                        child: _isVerifying
-                            ? SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: colorScheme.onPrimary,
-                          ),
-                        )
-                            : const Text('Verify'),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        TextButton(
+                      const SizedBox(height: 12),
+                      Text(
+                        widget.emailSent
+                            ? 'A verification code has been sent to your email.'
+                            : 'We couldn\'t send the code to your email right now. Please tap "Resend Code" below to try again.',
+                        style: TextStyle(fontSize: 15, color: colorScheme.onSurfaceVariant),
+                      ),
+                      // NOTE: the OTP code is intentionally never rendered on
+                      // screen, even as a fallback when email delivery fails.
+                      // Displaying it here would defeat the purpose of MFA —
+                      // anyone with access to the device (or a screenshot)
+                      // could complete the login without ever touching the
+                      // user's inbox. If email delivery is unreliable, fix
+                      // the delivery path (see AuthService._sendOtpEmail)
+                      // rather than exposing the code in the UI.
+                      const SizedBox(height: 24),
+                      // OTP Expiry Countdown Timer
+                      if (_remainingSeconds > 0)
+                        Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: _remainingSeconds <= 10
+                              ? Colors.red.withOpacity(0.1)
+                              : colorScheme.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: _remainingSeconds <= 10
+                                ? Colors.red
+                                : colorScheme.primary.withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.timer_outlined,
+                              size: 18,
+                              color: _remainingSeconds <= 10
+                                  ? Colors.red
+                                  : colorScheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Code expires in ${_formatTime(_remainingSeconds)}',
+                              style: TextStyle(
+                                color: _remainingSeconds <= 10
+                                    ? Colors.red
+                                    : colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_remainingSeconds == 0)
+                        Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.red,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.timer_off_outlined,
+                              size: 18,
+                              color: Colors.red,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Code has expired',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      TextField(
+                        controller: _otpController,
+                        style: TextStyle(color: colorScheme.onSurface),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(6),
+                        ],
+                        keyboardType: TextInputType.number,
+                        textAlign: TextAlign.center,
+                        decoration: InputDecoration(
+                          hintText: AppLocalizations.of(context)!.enterDigitCode,
+                          hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                          enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
+                          focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
+                          ),
+                          onPressed: _isVerifying ? null : _verifyOtp,
+                          child: _isVerifying
+                              ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: colorScheme.onPrimary,
+                            ),
+                          )
+                              : const Text('Verify'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _remainingSeconds > 0
+                                ? Colors.grey.shade400
+                                : Colors.red,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.grey.shade400,
+                          ),
                           onPressed: _isResending || _remainingSeconds > 0
                               ? null
                               : _resendCode,
-                          child: Text('Resend Code', style: TextStyle(color: colorScheme.primary)),
+                          child: _isResending
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : Text(
+                                  _remainingSeconds > 0
+                                      ? 'Resend Code'
+                                      : 'Resend Code',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _remainingSeconds > 0
-                              ? 'Resend in ${(_remainingSeconds ~/ 60).toString().padLeft(2, '0')}:${(_remainingSeconds % 60).toString().padLeft(2, '0')}'
-                              : 'You can resend now',
-                          style: TextStyle(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text('Attempts used: $_attempts/5', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
-                  ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text('Attempts used: $_attempts/5', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
+                    ],
+                  ),
                 ),
               ),
             ),
