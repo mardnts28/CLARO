@@ -71,7 +71,7 @@
   gap: 0.4rem;
 }
 
-/* Hero Visual Card Mockup */
+/* Hero Visual */
 .hero-visual {
   position: relative;
   display: flex;
@@ -79,63 +79,12 @@
   align-items: center;
 }
 
-.hero-mockup-card {
+.app-preview-image {
   width: 100%;
   max-width: 440px;
-  background-color: var(--card-bg);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-lg);
-  padding: 2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  position: relative;
-  overflow: hidden;
-}
-
-.hero-mockup-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 6px;
-  background-color: var(--primary-red);
-}
-
-.mockup-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.mockup-logo-img {
-  height: 2.5rem;
-  width: auto;
+  height: auto;
   object-fit: contain;
 }
-
-.mockup-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.mockup-content-placeholder {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.skeleton-box {
-  background-color: var(--card-bg-alt);
-  border-radius: var(--radius-sm);
-}
-
-.skeleton-box.h-40 { height: 40px; }
-.skeleton-box.h-20 { height: 20px; }
-.skeleton-box.h-120 { height: 120px; }
 
 /* Grid Sections (Features / Guides) */
 .section-header {
