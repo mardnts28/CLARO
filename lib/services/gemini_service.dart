@@ -1,10 +1,14 @@
-import 'package:cloud_functions/cloud_functions.dart';
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import 'voice_assistant_service.dart';
 import 'scan_history_service.dart';
+import '../data/services/backend_locator.dart';
 import '../models/product_model.dart';
 
 enum VoiceIntentType {
@@ -86,6 +90,8 @@ class GeminiService {
   static const _processingErrorReplyFil =
       'Narinig ko ang iyong utos, pero hindi ko ito maiproseso ngayon. Pakisubukan muli.';
 
+  static const _timeout = Duration(seconds: 10);
+
   Future<VoiceIntent> classifyIntent({
     required String transcript,
     required VoiceLang language,
@@ -96,29 +102,67 @@ class GeminiService {
             : 'en';
 
     try {
-      final callable =
-          FirebaseFunctions.instance
-              .httpsCallable(
-        'voiceIntent',
-      );
+      final prompt = '''
+Classify this voice command for the CLARO app.
+Language: $langValue
+Transcript: <transcript>$transcript</transcript>
 
-      final result =
-          await callable.call(
-        <String, dynamic>{
-          'transcript': transcript,
-          'language': langValue,
-        },
-      );
+Return only valid JSON with exactly this shape:
+{
+  "type": "navigate" | "summarize_scan" | "out_of_scope" | "unclear" | "processing_error",
+  "target_page": string | null,
+  "spoken_reply": string
+}
+Use null for target_page unless type is navigate. Do not wrap the JSON in markdown.
+''';
 
-      final data = result.data;
+      final response = await http
+          .post(
+            Uri.parse(BackendLocator.geminiProxyUrl),
+            headers: {
+              'Content-Type': 'application/json',
+              'X-App-Secret': BackendLocator.appSharedSecret,
+            },
+            body: jsonEncode({
+              'model': BackendLocator.geminiModel,
+              'contents': [
+                {
+                  'parts': [
+                    {'text': prompt},
+                  ],
+                },
+              ],
+              'generationConfig': {
+                'responseMimeType': 'application/json',
+                'temperature': 0.2,
+                'maxOutputTokens': 256,
+              },
+            }),
+          )
+          .timeout(_timeout);
 
-      if (data is Map) {
-        final intent =
-            VoiceIntent.fromMap(
-          Map<String, dynamic>.from(
-            data,
-          ),
+      if (response.statusCode != 200) {
+        throw Exception(
+          'Gemini proxy returned ${response.statusCode}: ${response.body}',
         );
+      }
+
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final candidates = decoded['candidates'] as List?;
+      final content = candidates?.firstOrNull as Map<String, dynamic>?;
+      final parts = content?['content'] is Map<String, dynamic>
+          ? (content!['content'] as Map<String, dynamic>)['parts'] as List?
+          : null;
+      final text = parts?.firstOrNull is Map<String, dynamic>
+          ? (parts!.first as Map<String, dynamic>)['text'] as String?
+          : null;
+
+      if (text == null || text.trim().isEmpty) {
+        throw const FormatException('Gemini returned no intent JSON');
+      }
+
+      final data = jsonDecode(text) as Map<String, dynamic>;
+      final intent = _parseStrictIntent(data);
 
         // If the backend returned an unclear
         // intent without a useful response,
@@ -139,28 +183,9 @@ class GeminiService {
         }
 
         return intent;
-      }
-
-      debugPrint(
-        'Voice intent error: callable returned unexpected data: $data',
-      );
-
-      // IMPORTANT:
-      // The transcript existed, therefore this
-      // is NOT a "did not hear the user" error.
-      return VoiceIntent(
-        type:
-            VoiceIntentType.processingError,
-        targetPage: null,
-        spokenReply:
-            language ==
-                    VoiceLang.tagalog
-                ? _processingErrorReplyFil
-                : _processingErrorReplyEn,
-      );
     } catch (error, stackTrace) {
       debugPrint(
-        'Voice intent callable failed: $error',
+        'Voice intent proxy failed: $error',
       );
       debugPrint('$stackTrace');
 
@@ -180,6 +205,33 @@ class GeminiService {
                 : _processingErrorReplyEn,
       );
     }
+  }
+
+  static VoiceIntent _parseStrictIntent(Map<String, dynamic> data) {
+    const allowedTypes = {
+      'navigate',
+      'summarize_scan',
+      'out_of_scope',
+      'unclear',
+      'processing_error',
+    };
+
+    final type = data['type'];
+    final targetPage = data['target_page'];
+    final spokenReply = data['spoken_reply'];
+
+    if (data.length != 3 ||
+      !data.containsKey('type') ||
+      !data.containsKey('target_page') ||
+      !data.containsKey('spoken_reply') ||
+      type is! String ||
+        !allowedTypes.contains(type) ||
+        (targetPage != null && targetPage is! String) ||
+        spokenReply is! String) {
+      throw const FormatException('Invalid voice intent schema');
+    }
+
+    return VoiceIntent.fromMap(data);
   }
 
   Future<String> summarizeScan({

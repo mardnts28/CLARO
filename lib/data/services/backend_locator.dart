@@ -38,6 +38,10 @@ class BackendLocator {
   static String get _geminiModel =>
       dotenv.env['GEMINI_MODEL'] ?? 'gemini-3.5-flash';
 
+  static String get geminiProxyUrl => _geminiProxyUrl;
+  static String get appSharedSecret => _appSharedSecret;
+  static String get geminiModel => _geminiModel;
+
   // Update these key names if your .env uses different variable names --
   // see cloudinary_upload_service.dart's header comment for one-time
   // Cloudinary console setup steps.
