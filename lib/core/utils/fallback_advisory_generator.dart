@@ -32,9 +32,54 @@ class FallbackAdvisoryGenerator {
     // WhoCalculator functions the backend used to build `evaluation` in
     // the first place, so it can't silently drift out of sync).
     double? servingSizeGOverride,
+    // When true, uses combined nutrient calculation (sodium + sugars + saturated fat)
+    // instead of single worst nutrient. Intended for users without health conditions.
+    bool useCombinedNutrients = false,
+    // When true, user has no health conditions and no allergens - use simplified advisory
+    bool hasNoConditionsAndNoAllergens = false,
   }) {
     final allergen = evaluation.allergenAssessment;
     final isTagalog = languageCode == 'tl';
+
+    // Handle users with no health conditions and no allergens
+    if (hasNoConditionsAndNoAllergens) {
+      final servingSizeG = servingSizeGOverride ?? evaluation.product.servingSizeG;
+      
+      // Use combined nutrient calculation
+      final safeServing = ServingSizeCalculator.calculateCombinedNutrients(
+        nutritionPer100g: evaluation.product.nutritionPer100g,
+        servingSizeG: servingSizeG,
+      );
+
+      // Extract the numeric amount from the safeServing string for formatting
+      String? servingAmount;
+      if (safeServing != null) {
+        // Parse the amount from strings like "Up to 1 full serving (100g) is the suggested amount per meal"
+        // or "About half a serving (50g) is the suggested amount per meal"
+        // or "No more than 83g is the suggested amount per meal"
+        final amountMatch = RegExp(r'(\d+(?:\.\d+)?)\s*g').firstMatch(safeServing);
+        if (amountMatch != null) {
+          servingAmount = '${amountMatch.group(1)}g';
+        }
+      }
+
+      final explanation = servingAmount != null
+          ? (isTagalog
+              ? 'Isipin ang $servingAmount serving per meal (para sa 3 beses na pagkain sa isang araw).'
+              : 'Consider a $servingAmount serving per meal (for 3 meals a day).')
+          : (isTagalog
+              ? 'Mainit ito nang maayos bilang bahagi ng balanced na pagkain.'
+              : 'Enjoy this in moderation as part of a balanced diet.');
+
+      return HealthAdvisory(
+        overallLevel: AdvisoryLevel.suitable,
+        warningText: isTagalog ? 'Angkop' : 'Suitable',
+        explanation: explanation,
+        safeServingSize: safeServing,
+        source: AdvisorySource.fallbackRuleBased,
+        generatedAt: DateTime.now(),
+      );
+    }
 
     if (allergen.hasDirectAllergen) {
       final allergenLabels = allergen.matchedContains.map(_allergenLabel).join(', ');
@@ -111,48 +156,64 @@ class FallbackAdvisoryGenerator {
         : AdvisoryLevel.moderate;
 
     final nutrientName = _nutrientLabel(worst.nutrientKey, isTagalog);
-    final severityWord =
-        worst.level == AdvisoryLevel.caution ? (isTagalog ? 'Mataas' : 'High') : (isTagalog ? 'Katamtaman' : 'Moderate');
+    // "severityWord" feeds the warningText headline only -- it must NOT
+    // repeat one of the three decision-level words ("Caution"/"Moderate"/
+    // "Suitable") the UI already shows separately as the badge, so
+    // "Moderate" specifically is replaced with a different descriptive
+    // word here ("Elevated"/"Medyo Mataas") even though the underlying
+    // classification level is still exactly `worst.level` -- unchanged.
+    final severityWord = worst.level == AdvisoryLevel.caution
+        ? (isTagalog ? 'Mataas' : 'High')
+        : (isTagalog ? 'Medyo Mataas' : 'Elevated');
 
     // Calculate suggested serving amount
-    final safeServing = ServingSizeCalculator.calculate(
-      nutrientKey: worst.nutrientKey,
-      valuePer100g: worst.valuePer100g,
-      servingSizeG: servingSizeG,
-    );
+    // Use combined nutrient calculation when flag is set, otherwise use single worst nutrient
+    final safeServing = useCombinedNutrients
+        ? ServingSizeCalculator.calculateCombinedNutrients(
+            nutritionPer100g: evaluation.product.nutritionPer100g,
+            servingSizeG: servingSizeG,
+          )
+        : ServingSizeCalculator.calculate(
+            nutrientKey: worst.nutrientKey,
+            valuePer100g: worst.valuePer100g,
+            servingSizeG: servingSizeG,
+          );
 
-    // Sentence 1: nutrient amount + % of WHO daily reference amount.
-    // Sugars gets its own exact wording -- the app only records TOTAL
-    // sugars (no free/added sugars breakdown), but the WHO 50g/day
-    // reference it's compared against is specifically for free sugars.
-    // This sentence must be explicit about that so we never imply the
-    // app measured free/added sugars directly.
+    // Sentence 1: "This product contains [amount] ([% of WHO daily
+    // reference amount])." -- no serving size mentioned here. Sugars
+    // keeps its own exact wording -- the app only records TOTAL sugars
+    // (no free/added sugars breakdown), but the WHO 50g/day reference
+    // it's compared against is specifically for free sugars. This
+    // sentence must be explicit about that so we never imply the app
+    // measured free/added sugars directly.
     final isSugars = worst.nutrientKey == 'sugarsG';
     final amountSentence = isSugars
         ? (isTagalog
             ? 'Naglalaman ang serving na ito ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng total sugars, na humigit-kumulang ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng WHO reference para sa free sugars.'
             : 'This serving contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of total sugars, which is about ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the WHO reference for free sugars.')
         : (isTagalog
-            ? 'Naglalaman ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng '
-                '$nutrientName bawat serving (${servingSizeG.toStringAsFixed(0)}g), '
-                'na katumbas ng ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng daily reference amount.'
-            : 'Contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of '
-                '$nutrientName per serving (${servingSizeG.toStringAsFixed(0)}g), '
-                'which is ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the daily reference amount.');
+            ? 'Naglalaman ang produktong ito ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} na $nutrientName '
+                '(${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng WHO daily reference amount).'
+            : 'This product contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of $nutrientName '
+                '(${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the WHO daily reference amount).');
 
-    // Build concise advisory following the new format, in exactly 3
-    // sentences (mirrors the Gemini prompt's structure -- see
-    // AdvisoryPromptBuilder):
-    // 1. Nutrient amount per serving + % of WHO daily reference amount.
+    // Build concise advisory in exactly 3 sentences (mirrors the Gemini
+    // prompt's structure -- see AdvisoryPromptBuilder):
+    // 1. Nutrient amount + % of WHO daily reference amount (no serving
+    //    size, no math explanation).
     // 2. What that means for the user's condition, without implying this
     //    product causes/worsens/triggers it.
-    // 3. The suggested per-meal amount, combined with the 3-meals-a-day /
-    //    100% WHO framing into one sentence.
+    // 3. The supplied suggested per-meal amount, exactly as supplied,
+    //    with the 3-meals-a-day context kept in parentheses and no
+    //    restatement of the underlying 100%/WHO math. Falls back to a
+    //    short general recommendation when no serving amount was supplied.
     final perMealSentence = safeServing != null
         ? (isTagalog
-            ? '$safeServing — sapat ito para sa hanggang 3 beses na pagkain sa isang araw, nang hindi lalampas sa 100% ng WHO daily reference amount mula sa produktong ito lang.'
-            : '$safeServing — enough for up to 3 meals a day without going over 100% of the WHO daily reference amount from this product alone.')
-        : '';
+            ? '$safeServing (para sa hanggang 3 beses na pagkain sa isang araw).'
+            : '$safeServing (for up to 3 meals a day).')
+        : (isTagalog
+            ? 'Kainin ito nang katamtaman bilang bahagi ng balanced na pagkain.'
+            : 'Enjoy this in moderation as part of a balanced diet.');
 
     final explanation = isTagalog
         ? '$amountSentence '

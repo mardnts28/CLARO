@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../services/auth_service.dart';
+import '../services/haptic_service.dart';
 import '../services/voice_assistant_service.dart';
 
 /// Strongly-typed view of a single review document, so the rest of the
@@ -89,6 +90,7 @@ class _ReviewHistoryScreenState extends State<ReviewHistoryScreen> {
   /// admin status/reply even if the stream was paused — e.g. the app
   /// was backgrounded — and hasn't reconnected yet.
   Future<void> _handleRefresh() async {
+    HapticService().vibrate();
     final uid = _authService.currentUser?.uid;
     if (uid == null) return;
     try {
@@ -151,6 +153,13 @@ class _ReviewHistoryScreenState extends State<ReviewHistoryScreen> {
         backgroundColor: colorScheme.surface,
         elevation: 0,
         iconTheme: IconThemeData(color: colorScheme.primary),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: colorScheme.primary),
+          onPressed: () {
+            HapticService().vibrate();
+            Navigator.pop(context);
+          },
+        ),
         // TODO(l10n): move to AppLocalizations, e.g. loc.reviewHistory
         title: Text('My Reviews', style: TextStyle(color: colorScheme.primary)),
       ),

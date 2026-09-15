@@ -1,11 +1,27 @@
+import { useState, useEffect } from 'react';
 import { Download, Scan, FileText, ShieldCheck, HeartPulse, GitCompare, Mic } from 'lucide-react';
 import logoImg from '../assets/images/logoII.png';
 import './Pages.css';
 
+// TODO: update this to wherever the APK is actually hosted (Firebase Hosting,
+// your own server, etc). Use the arm64-v8a build — it covers the vast
+// majority of modern Android phones.
+   const APK_DOWNLOAD_URL = '/downloads/claro-app-release.apk';
+
 export default function Home() {
+  const [isAndroid, setIsAndroid] = useState(false);
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent || navigator.vendor || '';
+    setIsAndroid(/android/i.test(userAgent));
+  }, []);
+
   const handleDownloadClick = (e) => {
-    e.preventDefault();
-    // Visual button only as specified by requirements
+    if (!isAndroid) {
+      e.preventDefault();
+      return;
+    }
+    window.location.href = APK_DOWNLOAD_URL;
   };
 
   return (
@@ -25,12 +41,18 @@ export default function Home() {
               <button
                 className="btn-primary"
                 onClick={handleDownloadClick}
-                title="Install CLARO App"
-                aria-label="Install CLARO App"
+                disabled={!isAndroid}
+                title={isAndroid ? 'Install CLARO App' : 'Available on Android devices only'}
+                aria-label={isAndroid ? 'Install CLARO App' : 'Available on Android devices only'}
               >
                 <Download size={18} />
-                <span>Install CLARO App</span>
+                <span>{isAndroid ? 'Install CLARO App' : 'Available on Android only'}</span>
               </button>
+              {!isAndroid && (
+                <p className="hero-download-note">
+                  Open this page on an Android phone to download the app.
+                </p>
+              )}
             </div>
           </div>
 

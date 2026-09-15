@@ -702,7 +702,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: GestureDetector(
-        onTap: onTap,
+        onTap: () {
+          HapticService().vibrate();
+          onTap();
+        },
         behavior: HitTestBehavior.opaque,
         child: Row(
           children: [

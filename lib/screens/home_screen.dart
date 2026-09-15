@@ -685,7 +685,10 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: onTap,
+            onTap: () {
+              HapticService().vibrate();
+              onTap();
+            },
 
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1420,7 +1423,10 @@ class _HomeScreenState extends State<HomeScreen> {
         : theme.colorScheme.primary;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticService().vibrate();
+        onTap();
+      },
 
       child: Container(
         decoration: BoxDecoration(

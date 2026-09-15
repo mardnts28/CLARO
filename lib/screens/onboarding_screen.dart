@@ -525,7 +525,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         final selected = _conditions[key]!;
         final isWala = key == 'Wala';
         return GestureDetector(
-          onTap: () => _toggleCondition(key),
+          onTap: () {
+            HapticService().vibrate();
+            _toggleCondition(key);
+          },
           child: _buildToggleItem(
             label: display[key] ?? key,
             selected: selected,
@@ -551,7 +554,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       children: keys.map((key) {
         final selected = _allergens[key]!;
         return GestureDetector(
-          onTap: () => _toggleAllergen(key),
+          onTap: () {
+            HapticService().vibrate();
+            _toggleAllergen(key);
+          },
           child: _buildToggleItem(
             label: display[key] ?? key,
             selected: selected,

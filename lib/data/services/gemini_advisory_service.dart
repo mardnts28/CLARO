@@ -83,10 +83,15 @@ class GeminiAdvisoryService {
     if (evaluation.overallLevel == AdvisoryLevel.suitable &&
         !evaluation.allergenAssessment.hasDirectAllergen &&
         !isComparison) {
+      // Use combined nutrient calculation for users without health conditions
+      final useCombinedNutrients = user.conditions.isEmpty;
+      final hasNoConditionsAndNoAllergens = user.conditions.isEmpty;
       final advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.notNeeded,
         languageCode: languageCode,
+        useCombinedNutrients: useCombinedNutrients,
+        hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
       );
       _cache[pKey] = advisory;
       _persistAdvisory(pKey, advisory);
@@ -102,18 +107,23 @@ class GeminiAdvisoryService {
     );
 
     HealthAdvisory advisory;
+    // Use combined nutrient calculation for users without health conditions
+    final useCombinedNutrients = user.conditions.isEmpty;
+    final hasNoConditionsAndNoAllergens = user.conditions.isEmpty && !evaluation.allergenAssessment.hasDirectAllergen;
     try {
       final response = await _model
           .generateContent([Content.text(prompt)])
           .timeout(_timeout);
 
-      advisory = _parseResponse(response.text, evaluation, languageCode);
+      advisory = _parseResponse(response.text, evaluation, languageCode, useCombinedNutrients, hasNoConditionsAndNoAllergens);
     } on TimeoutException catch (e) {
       print('GEMINI TIMEOUT: $e');
       advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.timeout,
         languageCode: languageCode,
+        useCombinedNutrients: useCombinedNutrients,
+        hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
       );
     } catch (e, stack) {
       print('GEMINI ERROR: $e');
@@ -122,6 +132,8 @@ class GeminiAdvisoryService {
         evaluation,
         reason: FallbackReason.apiError,
         languageCode: languageCode,
+        useCombinedNutrients: useCombinedNutrients,
+        hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
       );
     }
 
@@ -138,13 +150,15 @@ class GeminiAdvisoryService {
     });
   }
 
-  HealthAdvisory _parseResponse(String? text, ProductEvaluation evaluation, String languageCode) {
+  HealthAdvisory _parseResponse(String? text, ProductEvaluation evaluation, String languageCode, bool useCombinedNutrients, bool hasNoConditionsAndNoAllergens) {
     if (text == null || text.trim().isEmpty) {
       print('EMPTY RESPONSE from Gemini');
       return FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.emptyResponse,
         languageCode: languageCode,
+        useCombinedNutrients: useCombinedNutrients,
+        hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
       );
     }
     try {
@@ -185,6 +199,8 @@ class GeminiAdvisoryService {
         evaluation,
         reason: FallbackReason.parseError,
         languageCode: languageCode,
+        useCombinedNutrients: useCombinedNutrients,
+        hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
       );
     }
   }

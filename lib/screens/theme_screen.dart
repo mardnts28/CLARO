@@ -3,6 +3,7 @@ import '../core/utils/success_feedback_utils.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
+import '../services/haptic_service.dart';
 import '../services/theme_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/voice_assistant_fab.dart';
@@ -142,7 +143,10 @@ class _ThemeScreenState extends State<ThemeScreen> {
     final bodyMedium = theme.textTheme.bodyMedium;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticService().vibrate();
+        onTap();
+      },
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(

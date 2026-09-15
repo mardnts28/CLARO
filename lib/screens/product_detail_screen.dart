@@ -6,6 +6,7 @@ import '../models/product_model.dart';
 import '../services/fda_verification_service.dart';
 import '../services/auth_service.dart';
 import '../services/voice_assistant_service.dart';
+import '../services/haptic_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/locale_service.dart';
 import '../widgets/voice_assistant_fab.dart';
@@ -217,7 +218,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: _navigateToReport,
+                        onTap: () {
+                          HapticService().vibrate();
+                          _navigateToReport();
+                        },
                         child: Text(
                           message,
                           style: GoogleFonts.inter(
@@ -232,7 +236,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                     const SizedBox(width: 4),
                     GestureDetector(
-                      onTap: _dismissReportTooltip,
+                      onTap: () {
+                        HapticService().vibrate();
+                        _dismissReportTooltip();
+                      },
                       child: const Icon(
                         Icons.close,
                         size: 15,
@@ -514,6 +521,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       alignment: Alignment.centerLeft,
                       child: GestureDetector(
                         onTap: () {
+                          HapticService().vibrate();
                           _dismissReportTooltip();
                           Navigator.pop(context);
                         },
@@ -532,7 +540,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         button: true,
                         label: loc.reportProductButton,
                         child: GestureDetector(
-                          onTap: _navigateToReport,
+                          onTap: () {
+                            HapticService().vibrate();
+                            _navigateToReport();
+                          },
                           child: Icon(
                             Icons.report_problem_outlined,
                             color: colorScheme.onSurfaceVariant,
@@ -546,7 +557,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         button: true,
                         label: _isFavorite ? 'Remove from favorites' : 'Add to favorites',
                         child: GestureDetector(
-                          onTap: _toggleFavorite,
+                          onTap: () {
+                            HapticService().vibrate();
+                            _toggleFavorite();
+                          },
                           child: Icon(
                             _isFavorite ? Icons.favorite : Icons.favorite_border,
                             color: _isFavorite ? const Color(0xFFD32F2F) : colorScheme.onSurfaceVariant,
@@ -1017,6 +1031,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             builder: (context) => MoreDetailsScreen(
                               product: p,
                               matchedAllergens: _evaluation?.allergenAssessment.matchedContains ?? const [],
+                              // Same conditions WhoCalculator.evaluateProduct() iterated
+                              // over for this user (i.e. the ones on their saved health
+                              // profile) -- lets the "How CLARO Calculates" guide only
+                              // badge a nutrient card with a condition the user actually
+                              // has.
+                              userConditions: _evaluation
+                                      ?.nutrientEvaluations
+                                      .map((e) => e.condition)
+                                      .toSet()
+                                      .toList() ??
+                                  const [],
                             ),
                           ),
                         );
@@ -2328,11 +2353,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final labelServingSizeG = evaluation.product.servingSizeG;
     if (_selectedSizeG == labelServingSizeG) return _advisory;
 
+    // Use combined nutrient calculation for users without health conditions
+    final useCombinedNutrients = _userHealthProfile?.conditions.isEmpty ?? false;
+    final hasNoConditionsAndNoAllergens = (_userHealthProfile?.conditions.isEmpty ?? false) && !evaluation.allergenAssessment.hasDirectAllergen;
+
     return FallbackAdvisoryGenerator.generate(
       evaluation,
       reason: FallbackReason.notNeeded,
       languageCode: Localizations.localeOf(context).languageCode,
       servingSizeGOverride: _selectedSizeG,
+      useCombinedNutrients: useCombinedNutrients,
+      hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
     );
   }
 
