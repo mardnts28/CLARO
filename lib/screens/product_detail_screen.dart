@@ -61,6 +61,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // Backend-derived health advisory state (WhoCalculator + GeminiAdvisoryService,
   // via ProductRankingService.getProductDetail -- see backend_locator.dart).
   bool _advisoryLoading = true;
+
+  // Ensures the full spoken analysis is only auto-announced once per
+  // product load -- not on every _refreshVoiceSummary() call (e.g. when
+  // the user changes the pack-size dropdown afterward).
+  bool _hasAutoAnnouncedSummary = false;
   bool _nutritionUnavailable = false;
   ProductEvaluation? _evaluation;
   HealthAdvisory? _advisory;
@@ -286,6 +291,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _fdaResult = null;
       _userHealthProfile = null;
       _isFavorite = false;
+      _hasAutoAnnouncedSummary = false;
       _favoriteBusy = true; // Prevent interaction while loading new product's favorite status
     });
     _loadFdaVerification();
@@ -474,6 +480,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           _advisoryLoading = false;
         });
         _refreshVoiceSummary();
+
+        // Auto-speak the full analysis the moment it's ready, so the user
+        // doesn't have to say "summarize" to hear it -- only once per
+        // product, and only if voice assistant is actually enabled.
+        if (!_hasAutoAnnouncedSummary &&
+            VoiceAssistantService.instance.isEnabled) {
+          _hasAutoAnnouncedSummary = true;
+          final summary =
+              VoiceAssistantService.latestScanSummaryNotifier.value;
+          if (summary != null && summary.trim().isNotEmpty) {
+            unawaited(VoiceAssistantService.instance.speak(summary));
+          }
+        }
       }
     } catch (e) {
       debugPrint('Error loading health advisory: $e');

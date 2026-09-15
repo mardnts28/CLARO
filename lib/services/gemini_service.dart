@@ -14,6 +14,11 @@ import '../models/product_model.dart';
 enum VoiceIntentType {
   navigate,
   summarizeScan,
+
+  // A real, grounded answer to an in-scope question --
+  // e.g. "why is this flagged?" while a product is open.
+  answerQuestion,
+
   outOfScope,
   unclear,
 
@@ -45,6 +50,9 @@ class VoiceIntent {
 
       'summarize_scan' =>
         VoiceIntentType.summarizeScan,
+
+      'answer_question' =>
+        VoiceIntentType.answerQuestion,
 
       'out_of_scope' =>
         VoiceIntentType.outOfScope,
@@ -92,9 +100,33 @@ class GeminiService {
 
   static const _timeout = Duration(seconds: 10);
 
+  // Every navigable target the app actually supports, kept in sync with
+  // the branches handled in VoiceCommandRouter (_handleNavigationIntent
+  // and _navigateToScreen). Gemini is only allowed to pick from this list
+  // for `navigate` -- anything else is rejected rather than silently
+  // failing later inside the app.
+  static const Set<String> _validTargets = {
+    'home', 'scan', 'history', 'profile',
+    'clear_favorites', 'clear_history', 'compare_products', 'dark_mode',
+    'delete_account', 'favorite_product', 'history_compare',
+    'history_favorites', 'history_reports', 'language', 'language_english',
+    'language_tagalog', 'light_mode', 'logout', 'mfa', 'mfa_off', 'mfa_on',
+    'more_details', 'report_product', 'unfavorite_product',
+    'voice_assistant_off', 'voice_assistant_on', 'about_claro',
+    'change_password', 'personal_info', 'preference', 'privacy_policy',
+    'review_history', 'suggestion', 'terms_conditions', 'theme',
+    'user_guide',
+  };
+
+  /// Classifies a voice command, optionally grounded in [screenContext] --
+  /// a short description of whatever is currently on screen (e.g. the
+  /// product/advisory summary already shown on ProductDetailScreen). Pass
+  /// null when there's nothing relevant on screen (home, history list,
+  /// settings, etc.) rather than sending empty/misleading context.
   Future<VoiceIntent> classifyIntent({
     required String transcript,
     required VoiceLang language,
+    String? screenContext,
   }) async {
     final langValue =
         language == VoiceLang.tagalog
@@ -102,18 +134,50 @@ class GeminiService {
             : 'en';
 
     try {
+      final contextBlock = (screenContext != null && screenContext.trim().isNotEmpty)
+          ? '''
+
+The user is currently looking at this screen. Use ONLY the facts below if you
+need to answer a question about it -- never use outside knowledge, and never
+invent or assume any health, safety, or nutrition fact that isn't stated here:
+<screen_context>
+${screenContext.trim()}
+</screen_context>
+'''
+          : '''
+
+There is no product or screen data currently available to the user. If their
+question depends on seeing a specific product's data, use type "unclear" and
+say you don't have that information yet -- do not guess.
+''';
+
       final prompt = '''
-Classify this voice command for the CLARO app.
+Classify this voice command for the CLARO app (a food-label scanning and
+health-advisory app).
 Language: $langValue
 Transcript: <transcript>$transcript</transcript>
-
+$contextBlock
 Return only valid JSON with exactly this shape:
 {
-  "type": "navigate" | "summarize_scan" | "out_of_scope" | "unclear" | "processing_error",
+  "type": "navigate" | "summarize_scan" | "answer_question" | "out_of_scope" | "unclear" | "processing_error",
   "target_page": string | null,
   "spoken_reply": string
 }
-Use null for target_page unless type is navigate. Do not wrap the JSON in markdown.
+
+Rules:
+- Use "navigate" only if the user wants to go to a specific screen, and
+  target_page must be EXACTLY one of: ${_validTargets.join(', ')}.
+  Never invent a target_page value outside this list.
+- Use "summarize_scan" if the user wants the current scan/product summarized.
+- Use "answer_question" only if you can answer using solely the
+  <screen_context> given above (if any). Put the full answer in spoken_reply.
+  Never state a health/safety/nutrition fact that is not present in
+  screen_context.
+- Use "unclear" if the request depends on context you were not given, and
+  say so in spoken_reply (e.g. "I don't have that information right now").
+- Use "out_of_scope" if the request has nothing to do with this app.
+- Use null for target_page unless type is navigate.
+- Do not wrap the JSON in markdown.
 ''';
 
       final response = await http
@@ -182,6 +246,23 @@ Use null for target_page unless type is navigate. Do not wrap the JSON in markdo
           );
         }
 
+        // Safety net: never let an "answer_question" through without any
+        // screen context to ground it in, and never with an empty answer.
+        // Guessing at health/safety facts is worse than saying nothing.
+        if (intent.type == VoiceIntentType.answerQuestion &&
+            (screenContext == null ||
+                screenContext.trim().isEmpty ||
+                intent.spokenReply.trim().isEmpty)) {
+          return VoiceIntent(
+            type: VoiceIntentType.unclear,
+            targetPage: null,
+            spokenReply:
+                language == VoiceLang.tagalog
+                    ? _unclearReplyFil
+                    : _unclearReplyEn,
+          );
+        }
+
         return intent;
     } catch (error, stackTrace) {
       debugPrint(
@@ -211,6 +292,7 @@ Use null for target_page unless type is navigate. Do not wrap the JSON in markdo
     const allowedTypes = {
       'navigate',
       'summarize_scan',
+      'answer_question',
       'out_of_scope',
       'unclear',
       'processing_error',
@@ -229,6 +311,15 @@ Use null for target_page unless type is navigate. Do not wrap the JSON in markdo
         (targetPage != null && targetPage is! String) ||
         spokenReply is! String) {
       throw const FormatException('Invalid voice intent schema');
+    }
+
+    // Reject hallucinated screens instead of letting navigation silently
+    // fail later with "I couldn't find that page".
+    if (type == 'navigate' &&
+        (targetPage == null || !_validTargets.contains(targetPage))) {
+      throw FormatException(
+        'Gemini returned an unrecognized target_page: $targetPage',
+      );
     }
 
     return VoiceIntent.fromMap(data);

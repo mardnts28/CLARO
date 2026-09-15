@@ -174,12 +174,45 @@ class VoiceCommandRouter {
     }
 
     // ============================================================
-    // 5. GEMINI INTENT CLASSIFICATION
+    // 5. STILL LOADING? (product detail screen, advisory not ready yet)
     // ============================================================
+    // A product is open but its evaluation/advisory hasn't finished
+    // loading, so there's nothing grounded to answer with yet. Say so
+    // instead of silently sending Gemini stale/empty context.
+    final hasActiveProduct =
+        VoiceAssistantService.activeResultProductNotifier.value != null;
+    final hasLoadedSummary =
+        (VoiceAssistantService.latestScanSummaryNotifier.value ?? '')
+            .trim()
+            .isNotEmpty;
+
+    if (hasActiveProduct && !hasLoadedSummary) {
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Sandali lang, sinusuri pa ang produktong ito.'
+            : 'Still analyzing this product, one moment.',
+      );
+      return;
+    }
+
+    // ============================================================
+    // 6. GEMINI INTENT CLASSIFICATION
+    // ============================================================
+    // Only attach context when the user is CURRENTLY on the product
+    // screen with a finished advisory -- notjust because a summary from
+    // an earlier visit happens to still be cached, which could otherwise
+    // ground an unrelated question (asked elsewhere in the app) in a
+    // stale product's data.
+    final screenContext =
+        (hasActiveProduct && hasLoadedSummary)
+            ? VoiceAssistantService.latestScanSummaryNotifier.value
+            : null;
+
     final intent =
         await GeminiService.instance.classifyIntent(
       transcript: transcript,
       language: language,
+      screenContext: screenContext,
     );
 
     if (!context.mounted) return;
@@ -191,6 +224,7 @@ class VoiceCommandRouter {
     final resolvedIntent =
         target != null &&
                 intent.type != VoiceIntentType.summarizeScan &&
+                intent.type != VoiceIntentType.answerQuestion &&
                 intent.type != VoiceIntentType.processingError
             ? VoiceIntent(
                 type: VoiceIntentType.navigate,
@@ -210,7 +244,7 @@ class VoiceCommandRouter {
     );
 
     // ============================================================
-    // 6. HANDLE INTENT
+    // 7. HANDLE INTENT
     // ============================================================
     switch (resolvedIntent.type) {
       case VoiceIntentType.navigate:
@@ -236,6 +270,16 @@ class VoiceCommandRouter {
                 : 'I heard your request, but there was a problem retrieving the results. Please try again.',
           );
         }
+        break;
+
+      case VoiceIntentType.answerQuestion:
+        await VoiceAssistantService.instance.speak(
+          resolvedIntent.spokenReply.isNotEmpty
+              ? resolvedIntent.spokenReply
+              : localeKey == 'fil'
+                  ? 'Narinig ko ang tanong mo, pero wala akong sapat na impormasyon para sagutin ito.'
+                  : 'I heard your question, but I don\'t have enough information to answer it.',
+        );
         break;
 
       case VoiceIntentType.outOfScope:
