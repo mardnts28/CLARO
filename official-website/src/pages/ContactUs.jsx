@@ -1,11 +1,18 @@
-import { User } from 'lucide-react';
+import { useRef, useState } from 'react';
+import emailjs from '@emailjs/browser';
+import { User, Send, Mail } from 'lucide-react';
 import ImageCarousel from '../components/ImageCarousel';
+import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, CONTACT_RECIPIENT_EMAIL } from '../config/emailConfig';
 import './Pages.css';
 
-export default function AboutDevelopers() {
+export default function ContactUs() {
+  const formRef = useRef(null);
+  const [status, setStatus] = useState('idle'); // idle | sending | success | error
+
   const developers = [
     {
       name: 'Mary Faith Ardientes',
+      email: 'maryfaithardientes13@gmail.com',
       role: 'Project Manager & Machine Learning Engineer',
       image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1786704181/ardientes_wrfpjz.jpg',
       icon: <User size={36} />,
@@ -19,6 +26,7 @@ export default function AboutDevelopers() {
     },
     {
       name: 'Jay Bhie Bite',
+      email: 'bitejb6@gmail.com',
       role: 'UI/UX Designer & Developer',
       image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1786704181/bite_vbnfzg.jpg',
       bio: 'UI/UX Designer focusing on user research, wireframing, interface design, and a consistent mobile/web experience. Also responsible for accessibility features for low-vision users, including light/dark themes, adjustable text size and speech volume, and English and Tagalog language support',
@@ -31,6 +39,7 @@ export default function AboutDevelopers() {
     },
     {
       name: 'Rochelle Ann C. Salucop',
+      email: 'poculas.nna@gmail.com',
       role: 'Backend Developer & Quality Tester',
       image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1786704183/salucop_mvd2zk.jpg',
       bio: 'Backend Developer responsible for developing and maintaining the application\'s backend services, database operations, nutrition data integration, server-side processing, and conducting quality testing to identify and resolve system issues',
@@ -43,14 +52,102 @@ export default function AboutDevelopers() {
     }
   ];
 
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formRef.current) return;
+
+    setStatus('sending');
+
+    emailjs
+      .sendForm(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, formRef.current, {
+        publicKey: EMAILJS_PUBLIC_KEY,
+      })
+      .then(() => {
+        setStatus('success');
+        formRef.current.reset();
+      })
+      .catch((error) => {
+        console.error('EmailJS send error:', error);
+        setStatus('error');
+      });
+  };
+
   return (
-    <div className="about-developers-page page-section" style={{ paddingTop: 0 }}>
+    <div className="contact-us-page page-section" style={{ paddingTop: 0 }}>
       <div className="container">
-        {/* Page Header */}
+        {/* Contact Us Section */}
         <div className="page-header">
-          <h1 className="page-title">About the Developers</h1>
+          <h1 className="page-title">Contact Us</h1>
           <p className="page-subtitle">
-            Meet the students who developed the CLARO project.
+            Have a question, feedback, or concern about CLARO? Send us a message below.
+          </p>
+        </div>
+
+        <div className="card contact-form-card">
+          <form className="contact-form" ref={formRef} onSubmit={handleSubmit}>
+            {/* Hidden field so the existing EmailJS template can route the message */}
+            <input type="hidden" name="to_email" value={CONTACT_RECIPIENT_EMAIL} />
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="contact-name">Name</label>
+              <input
+                id="contact-name"
+                name="from_name"
+                type="text"
+                className="form-input"
+                placeholder="Your full name"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="contact-email">Email Address</label>
+              <input
+                id="contact-email"
+                name="from_email"
+                type="email"
+                className="form-input"
+                placeholder="you@example.com"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="contact-message">Message</label>
+              <textarea
+                id="contact-message"
+                name="message"
+                className="form-textarea"
+                placeholder="Write your message here..."
+                required
+              />
+            </div>
+
+            <div className="contact-form-actions">
+              <button type="submit" className="btn-primary" disabled={status === 'sending'}>
+                <Send size={18} />
+                {status === 'sending' ? 'Sending...' : 'Send Message'}
+              </button>
+
+              {status === 'success' && (
+                <span className="contact-form-status success">
+                  Your message has been sent. Thank you!
+                </span>
+              )}
+              {status === 'error' && (
+                <span className="contact-form-status error">
+                  Something went wrong. Please try again later.
+                </span>
+              )}
+            </div>
+          </form>
+        </div>
+
+        {/* About the Developers Section */}
+        <div className="page-header" style={{ marginTop: '5rem' }}>
+          <h2 className="section-title">About the Developers</h2>
+          <p className="page-subtitle">
+            We are 4th year Bachelor of Science in Information Technology (BSIT) students from Technological Institute of the Philippines (TIP) - Manila Campus, whom developed CLARO for our Capstone Project
           </p>
         </div>
 
@@ -71,6 +168,10 @@ export default function AboutDevelopers() {
                 </div>
               )}
               <h3 className="developer-name">{dev.name}</h3>
+              <p className="developer-email">
+                <Mail size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                {dev.email}
+              </p>
               <p className="developer-role">{dev.role}</p>
               <p className="developer-bio">{dev.bio}</p>
 

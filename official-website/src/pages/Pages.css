@@ -591,6 +591,15 @@
   margin-bottom: 0.25rem;
 }
 
+.developer-email {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+}
+
 .developer-role {
   font-size: 0.9rem;
   font-weight: 500;
@@ -602,6 +611,81 @@
   font-size: 0.9rem;
   color: var(--text-secondary);
   line-height: 1.55;
+}
+
+/* Contact Us Form */
+.contact-form-card {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2.5rem;
+}
+
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  font-family: var(--font-family);
+  font-size: 1rem;
+  color: var(--text-primary);
+  background-color: var(--card-bg-alt);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  transition: all var(--transition-fast);
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 140px;
+  font-family: var(--font-family);
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--primary-red);
+  box-shadow: 0 0 0 3px var(--primary-red-glow);
+}
+
+.contact-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.contact-form-status {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.contact-form-status.success {
+  color: #2e7d32;
+}
+
+[data-theme="dark"] .contact-form-status.success {
+  color: #66bb6a;
+}
+
+.contact-form-status.error {
+  color: var(--primary-red);
 }
 
 /* Responsive Media Queries */
@@ -630,6 +714,9 @@
     grid-template-columns: 1fr;
   }
   .doc-card {
+    padding: 2rem 1.25rem;
+  }
+  .contact-form-card {
     padding: 2rem 1.25rem;
   }
   .cta-banner {

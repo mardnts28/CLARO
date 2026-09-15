@@ -43,7 +43,7 @@ export default function Footer() {
                 <Link to="/user-guide" className="footer-link">User Guide</Link>
               </li>
               <li>
-                <Link to="/about-developers" className="footer-link">About the Developers</Link>
+                <Link to="/contact-us" className="footer-link">Contact Us</Link>
               </li>
             </ul>
           </div>

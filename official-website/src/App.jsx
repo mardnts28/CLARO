@@ -7,7 +7,7 @@ import Home from './pages/Home';
 import UserGuide from './pages/UserGuide';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsConditions from './pages/TermsConditions';
-import AboutDevelopers from './pages/AboutDevelopers';
+import ContactUs from './pages/ContactUs';
 
 export default function App() {
   return (
@@ -20,7 +20,9 @@ export default function App() {
           <Route path="/user-guide" element={<UserGuide />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-and-conditions" element={<TermsConditions />} />
-          <Route path="/about-developers" element={<AboutDevelopers />} />
+          <Route path="/contact-us" element={<ContactUs />} />
+          {/* Redirect the old URL so existing links/bookmarks still work */}
+          <Route path="/about-developers" element={<ContactUs />} />
           {/* Fallback to Home for unknown routes */}
           <Route path="*" element={<Home />} />
         </Routes>

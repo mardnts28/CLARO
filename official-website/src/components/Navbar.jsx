@@ -43,7 +43,7 @@ export default function Navbar() {
     { path: '/user-guide', label: 'User Guide' },
     { path: '/privacy-policy', label: 'Privacy Policy' },
     { path: '/terms-and-conditions', label: 'Terms & Conditions' },
-    { path: '/about-developers', label: 'About the Developers' },
+    { path: '/contact-us', label: 'Contact Us' },
   ];
 
   return (
