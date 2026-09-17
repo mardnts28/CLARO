@@ -40,7 +40,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final _otpController = TextEditingController();
   bool _isVerifying = false;
   bool _isResending = false;
-  int _remainingSeconds = 60;
+  int _remainingSeconds = 180;
   int _attempts = 0;
   Timer? _timer;
   DateTime? _currentExpiresAt;
@@ -70,7 +70,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       final difference = _currentExpiresAt!.difference(now);
       _remainingSeconds = difference.inSeconds;
     } else {
-      _remainingSeconds = 60;
+      _remainingSeconds = 180;
     }
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {

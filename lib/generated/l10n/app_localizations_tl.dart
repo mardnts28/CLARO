@@ -1101,13 +1101,22 @@ class AppLocalizationsTl extends AppLocalizations {
       'Awtomatikong nagdudulot ng babala kung saved allergen mo ito.';
 
   @override
-  String get suitableLegend => 'Suitable ≤5%';
+  String get suitableLegend => 'mababa ≤5%';
 
   @override
-  String get moderateLegend => 'Moderate 6-20%';
+  String get moderateLegend => 'katamtaman 6-20%';
 
   @override
-  String get cautionLegend => 'Caution >20%';
+  String get cautionLegend => 'mataas >20%';
+
+  @override
+  String get levelLow => 'mababa';
+
+  @override
+  String get levelMedium => 'katamtaman';
+
+  @override
+  String get levelHigh => 'mataas';
 
   @override
   String get howToUnderstandTitle => 'Paano unawain:';

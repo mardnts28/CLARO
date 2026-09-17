@@ -1087,13 +1087,22 @@ class AppLocalizationsEn extends AppLocalizations {
       'Automatically alerts if this is your saved allergen.';
 
   @override
-  String get suitableLegend => 'Suitable ≤5%';
+  String get suitableLegend => 'low ≤5%';
 
   @override
-  String get moderateLegend => 'Moderate 6-20%';
+  String get moderateLegend => 'medium 6-20%';
 
   @override
-  String get cautionLegend => 'Caution >20%';
+  String get cautionLegend => 'high >20%';
+
+  @override
+  String get levelLow => 'low';
+
+  @override
+  String get levelMedium => 'medium';
+
+  @override
+  String get levelHigh => 'high';
 
   @override
   String get howToUnderstandTitle => 'How to understand:';

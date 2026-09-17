@@ -1377,19 +1377,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         progressColor = const Color(0xFF2E7D32);
         badgeBgColor = isDark ? const Color(0xFF1B3320) : const Color(0xFFE8F5E9);
         badgeTextColor = isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32);
-        badgeLabel = 'Suitable';
+        badgeLabel = loc.levelLow;
         break;
       case AdvisoryLevel.moderate:
         progressColor = const Color(0xFFE65100);
         badgeBgColor = isDark ? const Color(0xFF3A2A12) : const Color(0xFFFFF3E0);
         badgeTextColor = isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100);
-        badgeLabel = 'Moderate';
+        badgeLabel = loc.levelMedium;
         break;
       case AdvisoryLevel.caution:
         progressColor = const Color(0xFFC62828);
         badgeBgColor = isDark ? const Color(0xFF3A1414) : const Color(0xFFFFEBEE);
         badgeTextColor = isDark ? const Color(0xFFEF9A9A) : const Color(0xFFC62828);
-        badgeLabel = 'Caution';
+        badgeLabel = loc.levelHigh;
         break;
     }
 
@@ -1705,7 +1705,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         break;
     }
 
-    final levelLabel = _levelLabel(level);
+    final levelLabel = _levelLabel(level, loc);
     final effectiveAdvisory = _effectiveAdvisory(context);
     final advisoryTitle = effectiveAdvisory?.warningText ??
         (level == AdvisoryLevel.suitable ? loc.safeToConsume : loc.reminderLabel);
@@ -1893,14 +1893,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
 
 
-  String _levelLabel(AdvisoryLevel level) {
+  String _levelLabel(AdvisoryLevel level, AppLocalizations loc) {
     switch (level) {
       case AdvisoryLevel.suitable:
-        return 'Suitable';
+        return loc.levelLow;
       case AdvisoryLevel.moderate:
-        return 'Moderate';
+        return loc.levelMedium;
       case AdvisoryLevel.caution:
-        return 'Caution';
+        return loc.levelHigh;
     }
   }
 
@@ -2212,15 +2212,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ProductEvaluation evaluation,
   ) {
     final languageCode = Localizations.localeOf(context).languageCode;
+    final loc = AppLocalizations.of(context)!;
     final allergenLabels = _matchedUserAllergenLabels(
       _currentProduct,
       languageCode,
     );
     final advisory = _effectiveAdvisory(context);
     final verdict = switch (_currentOverallLevel()) {
-      AdvisoryLevel.suitable => 'Suitable',
-      AdvisoryLevel.moderate => 'Moderate',
-      AdvisoryLevel.caution => 'Caution',
+      AdvisoryLevel.suitable => loc.levelLow,
+      AdvisoryLevel.moderate => loc.levelMedium,
+      AdvisoryLevel.caution => loc.levelHigh,
     };
     final flaggedNutrients = <String>[];
     for (final nutrient in evaluation.nutrientEvaluations) {
