@@ -22,10 +22,29 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.1033502181973-cuinan5338ih6snkf2rhef4houip7kaj</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>CLARO needs access to your camera to scan product labels and identify food items using our YOLOv8 recognition engine.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>CLARO needs microphone access for voice assistant commands and nutrition queries.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>CLARO needs access to your photos to let you pick food labels for scanning.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>CLARO needs speech recognition to understand your voice commands.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -66,7 +85,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSCameraUsageDescription</key>
-	<string>CLARO needs access to your camera to scan product labels and identify food items using our YOLOv8 recognition engine.</string>
 </dict>
 </plist>
