@@ -34,6 +34,9 @@ export default function FdaVerificationModal({
   const [cprNumber, setCprNumber] = useState("");
   const [validityDate, setValidityDate] = useState("");
 
+  const MAX_FILE_SIZE_MB = 10;
+  const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
   const fileInputRef = useRef(null);
 
   // ── File selection ──────────────────────────────────────────────────────
@@ -43,13 +46,24 @@ export default function FdaVerificationModal({
       setErrors({ screenshot: "Please upload a valid image file (PNG, JPG, WEBP)." });
       return;
     }
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      const sizeInMb = (file.size / (1024 * 1024)).toFixed(1);
+      setErrors({
+        screenshot: `Screenshot is ${sizeInMb} MB. Please upload an image under ${MAX_FILE_SIZE_MB} MB.`,
+      });
+      return;
+    }
     setErrors({});
     setScreenshotFile(file);
     setPreviewUrl(URL.createObjectURL(file));
   }
 
   function handleInputChange(e) {
-    handleFile(e.target.files[0]);
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFile(file);
+    }
+    e.target.value = "";
   }
 
   function handleDrop(e) {
@@ -135,6 +149,9 @@ export default function FdaVerificationModal({
     setAlignmentResult(null);
     setErrors({});
     setLowConfidence(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   }
 
   return (
@@ -210,7 +227,7 @@ export default function FdaVerificationModal({
                   <p className="fda-dropzone-text">
                     Drag &amp; drop or <span className="fda-dropzone-link">click to upload</span>
                   </p>
-                  <p className="fda-dropzone-sub">PNG, JPG, WEBP</p>
+                  <p className="fda-dropzone-sub">PNG, JPG, WEBP (Max 10 MB)</p>
                 </>
               )}
             </div>

@@ -11,22 +11,22 @@ import { logActivity } from "./logService";
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-let rawModel = import.meta.env.VITE_GEMINI_MODEL || "gemini-3.6-flash";
-if (
-  rawModel.includes("1.5") ||
-  rawModel.includes("2.5") ||
-  rawModel.includes("3.5") ||
-  !rawModel.startsWith("gemini-")
-) {
-  rawModel = "gemini-3.6-flash";
-}
-const GEMINI_MODEL = rawModel;
+const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-3.5-flash";
+
+export const MAX_FDA_SCREENSHOT_SIZE_MB = 10;
+const MAX_FDA_SCREENSHOT_BYTES = MAX_FDA_SCREENSHOT_SIZE_MB * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // Upload FDA screenshot to Cloudinary
 // Returns the secure public URL of the uploaded image.
 // ---------------------------------------------------------------------------
 export async function uploadFdaScreenshot(file) {
+  if (file && file.size > MAX_FDA_SCREENSHOT_BYTES) {
+    throw new Error(
+      `Screenshot exceeds the maximum allowed size of ${MAX_FDA_SCREENSHOT_SIZE_MB} MB.`
+    );
+  }
+
   const formData = new FormData();
   formData.append("file", file);
   formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
@@ -75,6 +75,12 @@ function fileToBase64(file) {
 // }
 // ---------------------------------------------------------------------------
 export async function extractFdaDataWithGemini(imageFile, targetProduct = null) {
+  if (imageFile && imageFile.size > MAX_FDA_SCREENSHOT_BYTES) {
+    throw new Error(
+      `Screenshot exceeds the maximum allowed size of ${MAX_FDA_SCREENSHOT_SIZE_MB} MB.`
+    );
+  }
+
   const base64 = await fileToBase64(imageFile);
 
   const productName =
