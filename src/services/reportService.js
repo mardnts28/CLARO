@@ -80,6 +80,7 @@ async function promoteToLiveCatalog(finalData) {
     registration_status: isFdaVerified,
     cpr_number: cprNumber,
     validity_date: validityTimestamp,
+    fda_screenshot_url: finalData.fdaScreenshotUrl || "",
     available_sizes: ed.size ? [ed.size] : [],
     imageURL: finalData.frontImageUrl || "",
     source: "admin_approved_report",
@@ -116,8 +117,8 @@ async function promoteToLiveCatalog(finalData) {
 /// AND into the live catalog (fda_products + product_nutrition_data) so it
 /// actually becomes visible/usable in the app -- see promoteToLiveCatalog().
 /// [correctedData] is whatever the admin edited on the review screen (see
-/// ReportDetails.jsx) -- typically `{ extractedData: {...} }` with the
-/// reviewer's corrections applied on top of Gemini's original extraction.
+/// ReportDetails.jsx) -- typically `{ extractedData: {...}, fdaScreenshotUrl }` with
+/// the reviewer's corrections applied on top of Gemini's original extraction.
 /// Fields not touched by the admin keep whatever extraction produced;
 /// fields the admin did edit override it. Also writes the correction back
 /// onto the `reports` doc itself, not just the approved copy, so the

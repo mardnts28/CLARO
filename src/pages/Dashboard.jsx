@@ -6,7 +6,11 @@ import { auth, db } from "../firebase/firebase";
 import DashboardLayout from "../components/DashboardLayout";
 import { getDashboardStats, getRecentReports } from "../services/reportService";
 import { getReviewStats } from "../services/reviewService";
-import { FiClipboard, FiStar } from "react-icons/fi";
+import {
+  getAllProducts,
+  getCprExpirationSummary,
+} from "../services/fdaRecordService";
+import { FiClipboard, FiStar, FiAlertTriangle } from "react-icons/fi";
 import "./Dashboard.css";
 
 function StatusBadge({ status }) {
@@ -23,6 +27,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ totalReports: 0, pendingReports: 0 });
   const [reviewStats, setReviewStats] = useState({ totalReviews: 0, newReviews: 0 });
   const [recentReports, setRecentReports] = useState([]);
+  const [fdaSummary, setFdaSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [username, setUsername] = useState("");
@@ -45,14 +50,17 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [statsData, recentData, reviewStatsData] = await Promise.all([
-          getDashboardStats(),
-          getRecentReports(5),
-          getReviewStats(),
-        ]);
+        const [statsData, recentData, reviewStatsData, productsData] =
+          await Promise.all([
+            getDashboardStats(),
+            getRecentReports(5),
+            getReviewStats(),
+            getAllProducts().catch(() => []),
+          ]);
         setStats(statsData);
         setRecentReports(recentData);
         setReviewStats(reviewStatsData);
+        setFdaSummary(getCprExpirationSummary(productsData, 60));
       } catch (err) {
         console.error("DASHBOARD LOAD ERROR:", err);
         setError("Failed to load dashboard data.");
@@ -84,6 +92,27 @@ export default function Dashboard() {
     <DashboardLayout>
       <h1 className="page-title">Dashboard</h1>
       <p className="page-subtitle">Welcome back, {username || "Admin"}!</p>
+
+      {/* CPR Expiration Alert Banner */}
+      {fdaSummary && fdaSummary.hasAttentionNeeded && (
+        <div className="dashboard-cpr-alert" role="alert">
+          <div className="dashboard-cpr-alert-icon">
+            <FiAlertTriangle />
+          </div>
+          <div className="dashboard-cpr-alert-content">
+            <strong>CPR Expiration Alert:</strong>{" "}
+            <span>
+              {fdaSummary.attentionCount} product{fdaSummary.attentionCount === 1 ? " has a" : "s have"} FDA registration nearing expiration or expired.
+            </span>
+          </div>
+          <button
+            className="dashboard-cpr-alert-btn"
+            onClick={() => navigate("/fda-records")}
+          >
+            Review FDA Records &rarr;
+          </button>
+        </div>
+      )}
 
       {error && <p className="table-empty error">{error}</p>}
 

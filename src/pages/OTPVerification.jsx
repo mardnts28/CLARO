@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { verifyOTP, generateAndSendOTP, otpErrorMessages, OTP_EXPIRY_MINUTES } from "../services/otpService";
+import { FiAlertCircle } from "react-icons/fi";
 import "./Login.css";
 import "./OTPVerification.css";
 
@@ -153,7 +154,12 @@ export default function OTPVerification() {
             ))}
           </div>
 
-          {error && <div className="form-error">{error}</div>}
+          {error && (
+            <div className="form-error" role="alert">
+              <FiAlertCircle className="form-error-icon" />
+              <span>{error}</span>
+            </div>
+          )}
 
           <button type="submit" className="login-btn" disabled={loading || isExpired}>
             {loading ? "Verifying..." : "Verify"}

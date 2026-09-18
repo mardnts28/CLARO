@@ -33,3 +33,13 @@ serviceAccountKey.json
 *.njsproj
 *.sln
 *.sw?
+
+# Mobile and desktop build folders
+.dart_tool/
+.flutter-plugins*
+android/
+ios/
+build/
+linux/
+macos/
+windows/

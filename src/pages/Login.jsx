@@ -5,6 +5,7 @@ import { loginAdmin, resetPassword, firebaseErrorMessages } from "../services/au
 import { generateAndSendOTP } from "../services/otpService";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase/firebase";
+import { FiAlertCircle } from "react-icons/fi";
 import "./Login.css";
 
 export default function Login() {
@@ -67,6 +68,7 @@ export default function Login() {
         },
       });
     } catch (err) {
+      console.error("LOGIN ERROR:", err);
       if (err.code === "not-admin") {
         setErrors({ form: "You are not authorized to access this dashboard." });
       } else {
@@ -132,7 +134,12 @@ export default function Login() {
               />
             </div>
 
-            {resetError && <div className="form-error">{resetError}</div>}
+            {resetError && (
+              <div className="form-error" role="alert">
+                <FiAlertCircle className="form-error-icon" />
+                <span>{resetError}</span>
+              </div>
+            )}
             {resetMessage && <p className="success-msg">{resetMessage}</p>}
 
             <button type="submit" className="login-btn" disabled={resetLoading}>
@@ -169,7 +176,11 @@ export default function Login() {
               type="email"
               placeholder="Email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (errors.email) setErrors((prev) => ({ ...prev, email: "" }));
+                if (errors.form) setErrors((prev) => ({ ...prev, form: "" }));
+              }}
               className={errors.email ? "input-error" : ""}
             />
             {errors.email && <span className="field-error">{errors.email}</span>}
@@ -180,7 +191,11 @@ export default function Login() {
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (errors.password) setErrors((prev) => ({ ...prev, password: "" }));
+                if (errors.form) setErrors((prev) => ({ ...prev, form: "" }));
+              }}
               className={errors.password ? "input-error" : ""}
             />
             <button
@@ -199,7 +214,12 @@ export default function Login() {
             </button>
           </div>
 
-          {errors.form && <div className="form-error">{errors.form}</div>}
+          {errors.form && (
+            <div className="form-error" role="alert">
+              <FiAlertCircle className="form-error-icon" />
+              <span>{errors.form}</span>
+            </div>
+          )}
 
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? "Logging in..." : "Login"}

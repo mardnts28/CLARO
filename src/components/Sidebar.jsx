@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase/firebase";
@@ -9,11 +10,30 @@ import {
   FiStar,
   FiLogOut,
   FiChevronRight,
+  FiShield,
 } from "react-icons/fi";
+import {
+  getAllProducts,
+  getCprExpirationSummary,
+} from "../services/fdaRecordService";
 import "./Sidebar.css";
 
 export default function Sidebar({ collapsed }) {
   const navigate = useNavigate();
+  const [fdaAttentionCount, setFdaAttentionCount] = useState(0);
+
+  useEffect(() => {
+    async function loadFdaSummary() {
+      try {
+        const prods = await getAllProducts();
+        const summary = getCprExpirationSummary(prods, 60);
+        setFdaAttentionCount(summary.attentionCount);
+      } catch (err) {
+        // fail silently in sidebar
+      }
+    }
+    loadFdaSummary();
+  }, []);
 
   async function handleLogout() {
     await signOut(auth);
@@ -63,6 +83,36 @@ export default function Sidebar({ collapsed }) {
           {!collapsed && (
             <>
               <span className="link-text">App Review</span>
+              <FiChevronRight className="chevron" />
+            </>
+          )}
+        </NavLink>
+
+        <NavLink
+          to="/fda-records"
+          className={({ isActive }) =>
+            "sidebar-link" + (isActive ? " active" : "")
+          }
+          style={{ position: "relative" }}
+        >
+          <FiShield className="icon" />
+          {collapsed && fdaAttentionCount > 0 && (
+            <span
+              className="sidebar-dot-badge"
+              title={`${fdaAttentionCount} product(s) need CPR renewal`}
+            />
+          )}
+          {!collapsed && (
+            <>
+              <span className="link-text">FDA Records</span>
+              {fdaAttentionCount > 0 && (
+                <span
+                  className="sidebar-pill-badge"
+                  title={`${fdaAttentionCount} product(s) need CPR renewal`}
+                >
+                  {fdaAttentionCount}
+                </span>
+              )}
               <FiChevronRight className="chevron" />
             </>
           )}

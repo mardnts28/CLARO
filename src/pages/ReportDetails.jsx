@@ -14,6 +14,8 @@ import {
   rejectReport,
 } from "../services/reportService";
 
+import { uploadFdaScreenshot } from "../services/fdaRecordService";
+
 import { CANONICAL_ALLERGENS } from "../constants/canonicalAllergens";
 
 import { FiArrowLeft } from "react-icons/fi";
@@ -246,16 +248,24 @@ export default function ReportDetails() {
   async function handleApproveConfirm({
     cprNumber,
     validityDate,
+    screenshotFile,
   }) {
     setActionLoading(true);
 
     try {
+      // Upload the FDA screenshot to Cloudinary first, then approve
+      let fdaScreenshotUrl = "";
+      if (screenshotFile) {
+        fdaScreenshotUrl = await uploadFdaScreenshot(screenshotFile);
+      }
+
       await approveReport(id, {
         extractedData: {
           ...buildExtractedDataPayload(),
           cprNumber,
           validityDate,
         },
+        fdaScreenshotUrl,
       });
 
       setReport((prev) => ({
@@ -265,7 +275,10 @@ export default function ReportDetails() {
 
       setModalType(null);
     } catch (err) {
-      setError("Something went wrong. Please try again.");
+      setError(
+        err.message || "Something went wrong. Please try again."
+      );
+      throw err;
     } finally {
       setActionLoading(false);
     }
@@ -959,6 +972,8 @@ export default function ReportDetails() {
       {/* APPROVE MODAL */}
       {modalType === "approve" && (
         <FdaVerificationModal
+          productName={form?.productName || report?.productName || ""}
+          brand={form?.brand || report?.brand || ""}
           onConfirm={handleApproveConfirm}
           onClose={() => setModalType(null)}
           loading={actionLoading}

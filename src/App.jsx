@@ -9,6 +9,7 @@ import ReportDetails from "./pages/ReportDetails";
 import ReviewDetails from "./pages/ReviewDetails"
 import Settings from "./pages/Settings";
 import AppReview from "./pages/AppReview";
+import FdaRecords from "./pages/FdaRecords";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -26,6 +27,7 @@ function App() {
         <Route path="/app-review" element={<ProtectedRoute><AppReview /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/app-review/:id" element={<ProtectedRoute><ReviewDetails /></ProtectedRoute>} />
+        <Route path="/fda-records" element={<ProtectedRoute><FdaRecords /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   );

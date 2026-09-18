@@ -4,6 +4,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase/firebase";
 import logo from "../assets/images/logoll.png";
 import { changePasswordFirstTime } from "../services/profileService";
+import { FiAlertCircle } from "react-icons/fi";
 import "./Login.css";
 
 export default function ChangePasswordFirstTime() {
@@ -91,7 +92,12 @@ export default function ChangePasswordFirstTime() {
             {errors.retypePassword && <span className="field-error">{errors.retypePassword}</span>}
           </div>
 
-          {errors.form && <div className="form-error">{errors.form}</div>}
+          {errors.form && (
+            <div className="form-error" role="alert">
+              <FiAlertCircle className="form-error-icon" />
+              <span>{errors.form}</span>
+            </div>
+          )}
 
           <button type="submit" className="login-btn" disabled={loading}>
             {loading ? "Saving..." : "Save New Password"}
