@@ -802,14 +802,81 @@ class AuthService {
     }
   }
 
-  Future<String?> sendPasswordResetEmail({
+  Future<Map<String, dynamic>> requestPasswordResetOtp({
     required String email,
   }) async {
     try {
-      await _firebaseAuth.sendPasswordResetEmail(email: email);
-      return null;
+      await _firebaseAuth.sendPasswordResetEmail(email: email.trim());
+      return {};
     } on FirebaseAuthException catch (e) {
-      return getFriendlyAuthErrorMessage(e);
+      debugPrint('requestPasswordResetOtp failed: ${e.code} - ${e.message}');
+      return {'error': getFriendlyAuthErrorMessage(e)};
+    } catch (e) {
+      debugPrint('requestPasswordResetOtp failed: $e');
+      return {'error': 'Unable to send the password reset email. Please try again.'};
+    }
+  }
+
+  Future<String?> verifyPasswordResetOtp({
+    required String challengeId,
+    required String code,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_proxyBaseUrl/password-reset/verify'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-App-Secret': _appSharedSecret,
+        },
+        body: jsonEncode({'challengeId': challengeId, 'code': code.trim()}),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return _passwordResetErrorMessage(data['error']?.toString());
+    } catch (e) {
+      debugPrint('verifyPasswordResetOtp failed: $e');
+      return 'Unable to verify the code. Please try again.';
+    }
+  }
+
+  Future<String?> completePasswordReset({
+    required String challengeId,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_proxyBaseUrl/password-reset/update'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-App-Secret': _appSharedSecret,
+        },
+        body: jsonEncode({'challengeId': challengeId, 'newPassword': newPassword}),
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) return null;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return _passwordResetErrorMessage(data['error']?.toString());
+    } catch (e) {
+      debugPrint('completePasswordReset failed: $e');
+      return 'Unable to change your password. Please try again.';
+    }
+  }
+
+  String _passwordResetErrorMessage(String? code) {
+    switch (code) {
+      case 'user-not-found':
+        return 'No account found with this email address.';
+      case 'invalid-code':
+        return 'Invalid verification code.';
+      case 'expired-code':
+        return 'This verification code has expired.';
+      case 'weak-password':
+        return 'The new password does not meet the password requirements.';
+      case 'verification-required':
+        return 'Please verify the code before changing your password.';
+      case 'email-send-failed':
+        return 'Unable to send the verification code. Please try again.';
+      default:
+        return 'Something went wrong. Please try again.';
     }
   }
 

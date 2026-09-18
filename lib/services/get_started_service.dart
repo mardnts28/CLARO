@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 
 /// Tracks whether the user has already been shown the one-time
 /// "Get Started" screen (see GetStartedScreen), so it's shown once per
-/// device -- right after Select Language and before Login/Sign Up --
+/// device -- before Select Language and Login/Sign Up --
 /// rather than every time the app is opened or the user logs out.
 class GetStartedService {
   GetStartedService._();

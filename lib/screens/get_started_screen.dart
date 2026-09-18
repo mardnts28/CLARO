@@ -1,42 +1,106 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/haptic_service.dart';
 import '../services/get_started_service.dart';
 
-/// Shown once, right after Select Language and before Login/Sign Up (see
-/// RootGate in main.dart). Previously this content lived as the second
-/// page of the post-login OnboardingScreen PageView, sandwiched between
-/// Basic Information and Health Profile -- it has been pulled out into
-/// its own screen and moved earlier in the flow.
+/// CLARO Get Started / Welcome Screen
 ///
-/// Because this screen is now reached straight from SelectLanguageScreen
-/// (which has no text fields) rather than from the Login screen (which
-/// does), it no longer inherits any leftover keyboard/field focus from a
-/// previous screen, which is what used to cause the
-/// "BOTTOM OVERFLOWED BY 71 PIXELS" error here.
+/// The main visual design is provided by:
+/// assets/images/startbg.png
+///
+/// The background image contains:
+/// - CLARO logo
+/// - Shopping cart illustration
+/// - Red curved/dome background
+/// - Tagline
+/// - Subtitle
+/// - Page indicator
+///
+/// Interactive elements placed above the background:
+/// - Get Started button
+/// - Learn More About CLARO
+///
+/// Existing functionality is preserved:
+/// - Haptic feedback
+/// - GetStartedService.markSeen()
+/// - External Learn More URL
+/// - Error handling if the URL cannot be opened
 class GetStartedScreen extends StatelessWidget {
   const GetStartedScreen({super.key});
 
-  static const _bg = Color(0xFFF5F0EE);
+  // ---------------------------------------------------------------------------
+  // COLORS
+  // ---------------------------------------------------------------------------
+
+  static const Color _red = Color(0xFF8B1A1A);
+
+  // ---------------------------------------------------------------------------
+  // BACKGROUND ASSET
+  // ---------------------------------------------------------------------------
+
+  static const String _backgroundAsset =
+      'assets/images/startbg.png';
+
+  // ---------------------------------------------------------------------------
+  // LEARN MORE URL
+  // ---------------------------------------------------------------------------
+
+  static final Uri _learnMoreUrl = Uri.parse(
+    'https://claro-52ia.onrender.com/?fbclid=IwY2xjawUXIttwZG9mA2V4dG4DYWVtAjExAHNydGMGYXBwX2lkATAAAR4YhO9Wsy20CCgjm8jxB2PI5wbOiV-pNHmZudjQn6MwtJvBLUNr-69vEw0aIA_aem_Y_mwxTMVzZKOGXKFa2OutQ',
+  );
+
+  // ---------------------------------------------------------------------------
+  // GET STARTED FUNCTION
+  // ---------------------------------------------------------------------------
 
   Future<void> _onGetStarted() async {
+    // Preserve haptic feedback.
     HapticService().vibrate();
-    // Flips GetStartedService.hasSeenGetStartedNotifier to true, which
-    // RootGate listens to -- it will swap this screen out for AuthGate
-    // (Login/Sign Up, or Home if already authenticated) automatically.
+
+    // Preserve the existing GetStartedService behavior.
+    //
+    // RootGate listens to this and moves the user to the
+    // authentication/home flow.
     await GetStartedService.markSeen();
   }
 
+  // ---------------------------------------------------------------------------
+  // LEARN MORE FUNCTION
+  // ---------------------------------------------------------------------------
+
+  Future<void> _onLearnMore(BuildContext context) async {
+    // Preserve haptic feedback.
+    HapticService().vibrate();
+
+    final bool ok = await launchUrl(
+      _learnMoreUrl,
+      mode: LaunchMode.externalApplication,
+    );
+
+    // Preserve the original error handling.
+    if (!ok && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not open the link.'),
+        ),
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // MAIN BUILD
+  // ---------------------------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    // Force Light Mode, matching the rest of the onboarding flow.
     return Theme(
       data: ThemeData(
         brightness: Brightness.light,
-        primaryColor: const Color(0xFF8B1A1A),
-        scaffoldBackgroundColor: _bg,
+        primaryColor: _red,
+        scaffoldBackgroundColor: Colors.white,
         colorScheme: const ColorScheme.light(
-          primary: Color(0xFF8B1A1A),
+          primary: _red,
           onPrimary: Colors.white,
           secondary: Color(0xFFD32F2F),
           onSecondary: Colors.white,
@@ -52,87 +116,67 @@ class GetStartedScreen extends StatelessWidget {
       ),
       child: Builder(
         builder: (context) {
-          final theme = Theme.of(context);
-          final colorScheme = theme.colorScheme;
-          final loc = AppLocalizations.of(context)!;
+          final AppLocalizations loc =
+              AppLocalizations.of(context)!;
 
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(
+              // Prevent system font-size settings from changing
+              // the proportions of this highly visual welcome screen.
               textScaler: TextScaler.noScaling,
             ),
             child: Scaffold(
-              backgroundColor: theme.scaffoldBackgroundColor,
-              // A screen with no text fields can never have a keyboard
-              // push it up, so `resizeToAvoidBottomInset: false` isn't
-              // needed here. SafeArea + SingleChildScrollView keep this
-              // responsive on smaller devices (so the grid + button don't
-              // overflow), which is why this can't just be a fixed
-              // Column with Spacer like the rest of onboarding -- but
-              // Spacer/Expanded need a bounded height, which a
-              // SingleChildScrollView's child doesn't have. Wrapping in
-              // IntrinsicHeight to get around that (as an earlier version
-              // of this screen did) breaks GridView specifically: a
-              // GridView is a viewport, and viewports can't report
-              // intrinsic dimensions ("RenderShrinkWrappingViewport does
-              // not support returning intrinsic dimensions") -- so this
-              // uses fixed spacing instead of Spacer, which needs neither.
-              body: SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-                  child: Column(
+              backgroundColor: Colors.white,
+
+              // Prevent the Scaffold from automatically moving the
+              // entire design when the keyboard/system UI appears.
+              resizeToAvoidBottomInset: false,
+
+              body: LayoutBuilder(
+                builder: (
+                  BuildContext context,
+                  BoxConstraints constraints,
+                ) {
+                  final double width = constraints.maxWidth;
+                  final double height = constraints.maxHeight;
+
+                  final EdgeInsets viewPadding =
+                      MediaQuery.of(context).viewPadding;
+
+                  final double bottomInset =
+                      MediaQuery.of(context).padding.bottom;
+
+                  final double topInset =
+                      MediaQuery.of(context).padding.top;
+
+                  return Stack(
+                    fit: StackFit.expand,
                     children: [
-                      _buildLogo(theme),
-                      const SizedBox(height: 20),
-                      Text(
-                        loc.getStartedTagline,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.primary,
-                        ),
+                      // ======================================================
+                      // FULL SCREEN BACKGROUND
+                      // ======================================================
+
+                      _buildBackground(
+                        width: width,
+                        height: height,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        loc.getStartedSubtitle,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, color: colorScheme.onSurface, height: 1.5),
-                      ),
-                      const SizedBox(height: 36),
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                        childAspectRatio: 1.4,
-                        children: [
-                          _buildFeatureCard('assets/images/scan.png', loc.featureScan, theme),
-                          _buildFeatureCard('assets/images/nutrisyon.png', loc.featureNutrition, theme),
-                          _buildFeatureCard('assets/images/gabay.png', loc.featureHealth, theme),
-                          _buildFeatureCard('assets/images/compare.png', loc.featureCompare, theme),
-                        ],
-                      ),
-                      const SizedBox(height: 36),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          ),
-                          onPressed: _onGetStarted,
-                          child: Text(
-                            loc.getStarted,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
+
+                      // ======================================================
+                      // INTERACTIVE CONTROLS
+                      // ======================================================
+
+                      _buildActionArea(
+                        context: context,
+                        loc: loc,
+                        width: width,
+                        height: height,
+                        topInset: topInset,
+                        bottomInset: bottomInset,
+                        viewPadding: viewPadding,
                       ),
                     ],
-                  ),
-                ),
+                  );
+                },
               ),
             ),
           );
@@ -141,51 +185,274 @@ class GetStartedScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildLogo(ThemeData theme) {
-    return Column(
-      children: [
-        Image.asset('assets/images/logo.png', height: 80),
-        const SizedBox(height: 6),
-        Text(
-          'CLARO',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
-            letterSpacing: 3,
-          ),
+  // ---------------------------------------------------------------------------
+  // BACKGROUND
+  // ---------------------------------------------------------------------------
+
+  Widget _buildBackground({
+    required double width,
+    required double height,
+  }) {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: Colors.white,
+        child: Image.asset(
+          _backgroundAsset,
+
+          // COVER ensures the image fills the entire screen.
+          //
+          // This means:
+          // - No white bars
+          // - No empty space
+          // - No stretching
+          //
+          // On devices with a significantly different aspect ratio,
+          // the edges may be cropped slightly, which is preferable
+          // for this full-screen visual design.
+          fit: BoxFit.cover,
+
+          // Keep the center of startbg aligned with the center
+          // of the device screen.
+          alignment: Alignment.center,
+
+          // Improve image quality when the image is scaled.
+          filterQuality: FilterQuality.high,
+
+          errorBuilder: (
+            BuildContext context,
+            Object error,
+            StackTrace? stackTrace,
+          ) {
+            return _buildBackgroundError();
+          },
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildFeatureCard(String imagePath, String label, ThemeData theme) {
+  // ---------------------------------------------------------------------------
+  // BACKGROUND ERROR FALLBACK
+  // ---------------------------------------------------------------------------
+
+  Widget _buildBackgroundError() {
     return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            imagePath,
-            height: 36,
-            width: 36,
-            errorBuilder: (_, __, ___) => const Icon(
-                Icons.image_not_supported,
-                size: 36,
-                color: Colors.grey),
+      color: Colors.white,
+      alignment: Alignment.center,
+      child: const Padding(
+        padding: EdgeInsets.all(24),
+        child: Text(
+          'Unable to load CLARO background.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: _red,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
           ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurface),
-          ),
-        ],
+        ),
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // ACTION AREA
+  // ---------------------------------------------------------------------------
+
+  Widget _buildActionArea({
+    required BuildContext context,
+    required AppLocalizations loc,
+    required double width,
+    required double height,
+    required double topInset,
+    required double bottomInset,
+    required EdgeInsets viewPadding,
+  }) {
+    // ---------------------------------------------------------
+    // RESPONSIVE BUTTON WIDTH
+    // ---------------------------------------------------------
+    //
+    // Typical phone:
+    // 390px * 0.34 = 132.6px
+    //
+    // This keeps the button close to the reference.
+    //
+    // On very narrow phones, it won't become too small.
+    // On tablets, it won't become unnecessarily huge.
+    final double buttonWidth = (width * 0.34).clamp(
+      125.0,
+      180.0,
+    );
+
+    // ---------------------------------------------------------
+    // RESPONSIVE BUTTON HEIGHT
+    // ---------------------------------------------------------
+
+    final double buttonHeight = (width / 390 * 42).clamp(
+      40.0,
+      48.0,
+    );
+
+    // ---------------------------------------------------------
+    // RESPONSIVE BOTTOM POSITION
+    // ---------------------------------------------------------
+    //
+    // Instead of using one fixed pixel value, calculate the
+    // position relative to the screen height.
+    //
+    // This keeps the button visually consistent on:
+    // 360x800
+    // 390x844
+    // 393x873
+    // 412x915
+    // etc.
+    //
+    // The clamp prevents the button from moving too far away
+    // from the bottom on unusually tall/short devices.
+    final double bottomSpacing = (height * 0.065).clamp(
+      42.0,
+      70.0,
+    );
+
+    // ---------------------------------------------------------
+    // SAFE AREA
+    // ---------------------------------------------------------
+    //
+    // Android navigation bars can have different heights.
+    // Add the actual bottom inset so the Learn More link
+    // does not get hidden behind the system navigation area.
+    final double safeBottom = bottomInset > 0
+        ? bottomInset
+        : viewPadding.bottom;
+
+    // ---------------------------------------------------------
+    // VERY SHORT DEVICE PROTECTION
+    // ---------------------------------------------------------
+
+    final bool isVeryShortScreen = height < 650;
+
+    final double adjustedBottomSpacing =
+        isVeryShortScreen
+            ? 30.0
+            : bottomSpacing;
+
+    return Positioned(
+      left: 0,
+      right: 0,
+
+      // Keep the controls inside the visible safe area.
+      bottom: adjustedBottomSpacing + safeBottom,
+
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ===============================================================
+            // GET STARTED BUTTON
+            // ===============================================================
+
+            SizedBox(
+              width: buttonWidth,
+              height: buttonHeight,
+              child: ElevatedButton(
+                onPressed: _onGetStarted,
+
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: _red,
+
+                  // The reference uses a flat white button.
+                  elevation: 0,
+                  shadowColor: Colors.transparent,
+
+                  padding: EdgeInsets.zero,
+
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+
+                child: Text(
+                  loc.getStarted,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+
+                  style: TextStyle(
+                    color: _red,
+                    fontSize: _responsiveFont(
+                      width,
+                      base: 13,
+                    ),
+                    fontWeight: FontWeight.w700,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+            ),
+
+            // ===============================================================
+            // GAP
+            // ===============================================================
+
+            const SizedBox(height: 9),
+
+            // ===============================================================
+            // LEARN MORE
+            // ===============================================================
+
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+
+              onTap: () {
+                _onLearnMore(context);
+              },
+
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 5,
+                ),
+
+                child: Text(
+                  'Learn More About CLARO',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: _responsiveFont(
+                      width,
+                      base: 10,
+                    ),
+                    fontWeight: FontWeight.w400,
+
+                    decoration: TextDecoration.underline,
+                    decorationColor: Colors.white,
+
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // RESPONSIVE FONT
+  // ---------------------------------------------------------------------------
+
+  double _responsiveFont(
+    double width, {
+    required double base,
+  }) {
+    final double factor = (width / 390).clamp(
+      0.88,
+      1.15,
+    );
+
+    return base * factor;
   }
 }

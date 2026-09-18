@@ -13,9 +13,9 @@ import 'home_screen.dart';
 ///
 /// NOTE ON FLOW: this screen used to be a 3-page PageView (Basic Info →
 /// Get Started → Health Profile) shown after login. "Get Started" has
-/// since moved to its own standalone screen (GetStartedScreen) earlier
-/// in the flow -- right after language selection and before Login/Sign
-/// Up -- so this is now a 2-page flow: Basic Info → Health Profile.
+/// since moved to its own standalone screen (GetStartedScreen) before
+/// language selection and Login/Sign Up -- so this is now a 2-page flow:
+/// Basic Info → Health Profile.
 ///
 /// IMPORTANT: the keys in _conditions / _allergens (e.g. 'Diabetes',
 /// 'Alta-presyon', 'Isda') are NOT just UI labels -- they are the exact

@@ -28,6 +28,33 @@ void main() async {
   final totalStartupStopwatch = Stopwatch()..start();
   WidgetsFlutterBinding.ensureInitialized();
 
+  await _initializeApp();
+  runApp(const ClaroApp());
+  totalStartupStopwatch.stop();
+  debugPrint('TIMING [Startup]: Total startup initialization took ${totalStartupStopwatch.elapsedMilliseconds}ms');
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    final firstFrameStopwatch = Stopwatch()..start();
+    unawaited(() async {
+      try {
+        await VoiceAssistantService.initialize();
+        firstFrameStopwatch.stop();
+        debugPrint('TIMING [Startup]: Deferred background services (VoiceAssistant, TTS) initialized in ${firstFrameStopwatch.elapsedMilliseconds}ms');
+
+        final repo = BackendLocator.productRepository;
+        if (repo is FirestoreProductRepository) {
+          await repo.preloadOfflineCatalog();
+        }
+
+        unawaited(BackendLocator.pendingReportsService.flushPendingReports());
+      } catch (e) {
+        debugPrint('TIMING [Startup]: Deferred background service init warning: $e');
+      }
+    }());
+  });
+}
+
+Future<void> _initializeApp() async {
   // 1. Concurrently load .env, Firebase, SharedPreferences, and PackageInfo
   final preInitStopwatch = Stopwatch()..start();
   final results = await Future.wait([
@@ -70,34 +97,6 @@ void main() async {
   prefsInitStopwatch.stop();
   debugPrint('TIMING [Startup]: Preferences initialization took ${prefsInitStopwatch.elapsedMilliseconds}ms');
 
-  // 3. Immediately render the first UI frame
-  runApp(const ClaroApp());
-  totalStartupStopwatch.stop();
-  debugPrint('TIMING [Startup]: Total main() execution until runApp() took ${totalStartupStopwatch.elapsedMilliseconds}ms');
-
-  // 4. Defer non-critical platform services after first frame to eliminate startup Davey jank
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    final firstFrameStopwatch = Stopwatch()..start();
-    debugPrint('TIMING [Startup]: First frame successfully rendered to display at ${totalStartupStopwatch.elapsedMilliseconds}ms post-boot');
-
-    unawaited(() async {
-      try {
-        await VoiceAssistantService.initialize();
-        firstFrameStopwatch.stop();
-        debugPrint('TIMING [Startup]: Deferred background services (VoiceAssistant, TTS) initialized in ${firstFrameStopwatch.elapsedMilliseconds}ms');
-
-        final repo = BackendLocator.productRepository;
-        if (repo is FirestoreProductRepository) {
-          await repo.preloadOfflineCatalog();
-        }
-
-        // Auto-flush any pending offline product reports if internet is available
-        unawaited(BackendLocator.pendingReportsService.flushPendingReports());
-      } catch (e) {
-        debugPrint('TIMING [Startup]: Deferred background service init warning: $e');
-      }
-    }());
-  });
 }
 
 class ClaroApp extends StatelessWidget {
@@ -217,8 +216,8 @@ class _VoiceInteractionStopperState extends State<_VoiceInteractionStopper> {
 }
 
 /// App entry point. Routes, in order:
-/// 1. Language not yet explicitly selected → SelectLanguageScreen
-/// 2. Get Started not yet seen → GetStartedScreen
+/// 1. Get Started not yet seen → GetStartedScreen
+/// 2. Language not yet explicitly selected → SelectLanguageScreen
 /// 3. Otherwise → AuthGate (Login/Sign Up → onboarding → Home, as below)
 class RootGate extends StatelessWidget {
   const RootGate({super.key});
@@ -226,16 +225,16 @@ class RootGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
-      valueListenable: LocaleService.hasSelectedLanguageNotifier,
-      builder: (context, hasSelectedLanguage, _) {
-        if (!hasSelectedLanguage) {
-          return const SelectLanguageScreen();
+      valueListenable: GetStartedService.hasSeenGetStartedNotifier,
+      builder: (context, hasSeenGetStarted, _) {
+        if (!hasSeenGetStarted) {
+          return const GetStartedScreen();
         }
         return ValueListenableBuilder<bool>(
-          valueListenable: GetStartedService.hasSeenGetStartedNotifier,
-          builder: (context, hasSeenGetStarted, _) {
-            if (!hasSeenGetStarted) {
-              return const GetStartedScreen();
+          valueListenable: LocaleService.hasSelectedLanguageNotifier,
+          builder: (context, hasSelectedLanguage, _) {
+            if (!hasSelectedLanguage) {
+              return const SelectLanguageScreen();
             }
             return const AuthGate();
           },

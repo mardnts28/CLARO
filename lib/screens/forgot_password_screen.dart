@@ -17,14 +17,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   final _authService = AuthService();
   bool _isLoading = false;
-  bool _emailSent = false;
   String? _emailError;
 
-  Future<void> _handlePasswordReset() async {
+  Future<void> _requestCode() async {
     final loc = AppLocalizations.of(context)!;
     final email = _emailController.text.trim();
 
-    // Validate email
     final emailError = ValidationService.validateEmail(email, loc);
     if (emailError != null) {
       setState(() => _emailError = emailError);
@@ -33,17 +31,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _emailError = null);
 
     setState(() => _isLoading = true);
-    final error = await _authService.sendPasswordResetEmail(email: email);
+    final result = await _authService.requestPasswordResetOtp(email: email);
+    if (!mounted) return;
     setState(() => _isLoading = false);
-
-    if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
-    } else {
-      setState(() => _emailSent = true);
-      SuccessFeedbackUtils.showSuccessSnackBar(context, loc.emailSent);
+    if (result['error'] != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['error'] as String)));
+      return;
     }
+
+    SuccessFeedbackUtils.showSuccessSnackBar(
+      context,
+      'A password reset email has been sent to your inbox. Please follow the link to create a new password.',
+    );
+    if (mounted) Navigator.pop(context);
   }
 
   @override
@@ -135,7 +135,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               ),
                             ),
                             Text(
-                              'Enter your email address and we will send you a link to reset your password.',
+                              'Enter your email address and we will send a password reset link to your inbox.',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: colorScheme.onSurfaceVariant,
@@ -148,7 +148,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               controller: _emailController,
                               hint: 'Email',
                               icon: Icons.email_outlined,
-                              enabled: !_emailSent,
+                              errorText: _emailError,
                             ),
                             const SizedBox(height: 20),
                             SizedBox(
@@ -161,9 +161,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
-                                onPressed: _isLoading || _emailSent
-                                    ? null
-                                    : _handlePasswordReset,
+                                onPressed: _isLoading ? null : _requestCode,
                                 child: _isLoading
                                     ? const SizedBox(
                                         height: 20,
@@ -173,11 +171,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : Text(
-                                        _emailSent
-                                            ? 'Email Sent'
-                                            : 'Send Reset Link',
-                                        style: const TextStyle(
+                                    : const Text(
+                                        'Send Reset Link',
+                                        style: TextStyle(
                                           fontSize: 16,
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
@@ -185,54 +181,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                       ),
                               ),
                             ),
-                            if (_emailSent) ...[
-                              const SizedBox(height: 20),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.green.shade300,
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green.shade700,
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Check your email',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.green.shade700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Follow the link in your email to reset your password.',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.green.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
                             const SizedBox(height: 20),
                             SizedBox(
                               width: double.infinity,
                               child: TextButton(
                                 onPressed: () => Navigator.pop(context),
                                 child: Text(
-                                  _emailSent
-                                      ? 'Back to Login'
-                                      : 'Remember your password? Back to Login',
+                                    'Remember your password? Back to Login',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 14,
@@ -262,6 +217,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     required String hint,
     required IconData icon,
     bool enabled = true,
+    String? errorText,
+    TextInputType? keyboardType,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return CustomTextField(
@@ -269,7 +226,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       hintText: hint,
       prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
       enabled: enabled,
-      errorText: _emailError,
+      errorText: errorText ?? _emailError,
+      keyboardType: keyboardType,
       onChanged: (val) {
         if (_emailError != null && val.trim().isNotEmpty) {
           setState(() => _emailError = null);
