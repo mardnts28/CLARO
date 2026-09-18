@@ -895,7 +895,7 @@ select.field-input:disabled {
    ERRORS
    ========================================================= */
 
-.form-error {
+.details-card .form-error {
   color: #d32f2f;
 
   font-size: 12px;

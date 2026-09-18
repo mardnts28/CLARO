@@ -402,7 +402,7 @@
   margin-bottom: 8px;
 }
 
-.form-error,
+.fda-modal-box .form-error,
 .fda-scan-error {
   display: flex;
   align-items: flex-start;
