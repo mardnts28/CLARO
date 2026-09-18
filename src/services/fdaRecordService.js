@@ -8,10 +8,23 @@ import {
 import { db } from "../firebase/firebase";
 import { logActivity } from "./logService";
 
-const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
-const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const GEMINI_MODEL = import.meta.env.VITE_GEMINI_MODEL || "gemini-3.5-flash";
+// Sanitize environment variables to prevent non-ASCII / ISO-8859-1 header errors in fetch
+function sanitizeEnvValue(val, fallback = "") {
+  if (!val) return fallback;
+  return (
+    String(val)
+      .replace(/[\u2018\u2019\u201A\u201B\u2032\u2035]/g, "") // curly single quotes
+      .replace(/[\u201C\u201D\u201E\u201F\u2033\u2036]/g, "") // curly double quotes
+      .replace(/[\u200B-\u200D\uFEFF]/g, "") // zero-width spaces / BOM
+      .replace(/[^\x20-\x7E]/g, "") // strip characters outside printable ASCII
+      .trim() || fallback
+  );
+}
+
+const CLOUDINARY_CLOUD_NAME = sanitizeEnvValue(import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
+const CLOUDINARY_UPLOAD_PRESET = sanitizeEnvValue(import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
+const GEMINI_API_KEY = sanitizeEnvValue(import.meta.env.VITE_GEMINI_API_KEY);
+const GEMINI_MODEL = sanitizeEnvValue(import.meta.env.VITE_GEMINI_MODEL, "gemini-3.5-flash");
 
 export const MAX_FDA_SCREENSHOT_SIZE_MB = 10;
 const MAX_FDA_SCREENSHOT_BYTES = MAX_FDA_SCREENSHOT_SIZE_MB * 1024 * 1024;
@@ -75,6 +88,12 @@ function fileToBase64(file) {
 // }
 // ---------------------------------------------------------------------------
 export async function extractFdaDataWithGemini(imageFile, targetProduct = null) {
+  if (!GEMINI_API_KEY) {
+    throw new Error(
+      "Gemini API key is not configured. Please set VITE_GEMINI_API_KEY in your environment variables, or enter CPR details manually."
+    );
+  }
+
   if (imageFile && imageFile.size > MAX_FDA_SCREENSHOT_BYTES) {
     throw new Error(
       `Screenshot exceeds the maximum allowed size of ${MAX_FDA_SCREENSHOT_SIZE_MB} MB.`
@@ -142,17 +161,19 @@ Return ONLY the JSON object. Do not include markdown code block backticks or exp
     ],
     generationConfig: {
       temperature: 0,
-      maxOutputTokens: 2048,
+      maxOutputTokens: 8192,
+      thinkingConfig: {
+        thinkingLevel: "MINIMAL",
+      },
     },
   };
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-goog-api-key": GEMINI_API_KEY,
       },
       body: JSON.stringify(body),
     }
@@ -168,12 +189,21 @@ Return ONLY the JSON object. Do not include markdown code block backticks or exp
       );
     }
 
+    if (res.status === 429 || res.status === 503) {
+      throw new Error(
+        `Gemini service is temporarily busy (${res.status}): ${errorMsg || "Please wait a moment and try again, or enter CPR details manually."}`
+      );
+    }
+
     throw new Error(errorMsg || "Gemini OCR request failed. Please try again or enter details manually.");
   }
 
   const data = await res.json();
-  const rawText =
-    data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const parts = data?.candidates?.[0]?.content?.parts || [];
+  // In Gemini 3.5 Flash, parts[0] may contain the internal reasoning ({ thought: true }).
+  // Extract the actual final output part.
+  const contentPart = parts.find((p) => !p.thought && p.text) || parts[parts.length - 1];
+  const rawText = contentPart?.text || "";
 
   const cleaned = rawText
     .replace(/```json/gi, "")
