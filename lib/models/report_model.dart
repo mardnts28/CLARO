@@ -16,6 +16,7 @@ class ReportModel {
   final String category;
   final String reportedBy;
   final String status;
+  final String rejectionReason;
   final String userEmail;
   final String userName;
   final String frontImageUrl;
@@ -37,6 +38,7 @@ class ReportModel {
     required this.category,
     required this.reportedBy,
     required this.status,
+    this.rejectionReason = '',
     required this.userEmail,
     required this.userName,
     this.frontImageUrl = '',
@@ -66,6 +68,7 @@ class ReportModel {
       category: data['category'] ?? 'others',
       reportedBy: data['reportedBy'] ?? '',
       status: data['status'] ?? 'Pending',
+      rejectionReason: data['rejectionReason'] ?? '',
       userEmail: data['userEmail'] ?? '',
       userName: data['userName'] ?? '',
       frontImageUrl: data['frontImageUrl'] ?? '',
@@ -83,6 +86,7 @@ class ReportModel {
       'category': category,
       'reportedBy': reportedBy,
       'status': status,
+      'rejectionReason': rejectionReason,
       'userEmail': userEmail,
       'userName': userName,
       'frontImageUrl': frontImageUrl,

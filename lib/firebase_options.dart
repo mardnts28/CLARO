@@ -26,7 +26,10 @@ class DefaultFirebaseOptions {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
-        return ios;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for ios - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.macOS:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for macos - '
@@ -55,14 +58,5 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1033502181973',
     projectId: 'claro-e90dd',
     storageBucket: 'claro-e90dd.firebasestorage.app',
-  );
-
-  static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDrrA5ZB6VO36dFHSJqkBNAlutkJPnVevg',
-    appId: '1:1033502181973:ios:876824dd2a270eccff22dc',
-    messagingSenderId: '1033502181973',
-    projectId: 'claro-e90dd',
-    storageBucket: 'claro-e90dd.firebasestorage.app',
-    iosBundleId: 'com.claro.claro',
   );
 }

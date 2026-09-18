@@ -102,6 +102,79 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                         ),
                       ),
                     ),
+
+                    // Highlighted Rejection Reason (Rejection only)
+                    if (status == 'rejected' &&
+                        widget.report.rejectionReason.trim().isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.brightness == Brightness.dark
+                              ? Colors.red.withOpacity(0.12)
+                              : const Color(0xFFFFF5F5),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: theme.brightness == Brightness.dark
+                                ? Colors.red.withOpacity(0.35)
+                                : const Color(0xFFFECACA),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withOpacity(0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.error_outline_rounded,
+                                    size: 16,
+                                    color: Colors.red[700],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Reason for Rejection',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: theme.brightness == Brightness.dark
+                                        ? Colors.red[300]
+                                        : const Color(0xFFB91C1C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.report.rejectionReason.trim(),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                height: 1.4,
+                                color: theme.brightness == Brightness.dark
+                                    ? Colors.white.withOpacity(0.9)
+                                    : const Color(0xFF991B1B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
 
                     // Product Name
