@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../widgets/custom_text_field.dart';
 import '../core/utils/sanitizing_text_input_formatter.dart';
 import '../core/utils/success_feedback_utils.dart';
+import '../core/utils/image_validation_utils.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
@@ -44,7 +45,7 @@ class _UnknownProductSubmissionScreenState
     extends State<UnknownProductSubmissionScreen> {
   String? _frontImagePath;
   String? _backImagePath;
-  final List<String> _additionalBackImagePaths = [];
+  String? _additionalBackImagePath; // Limited to 1 image
   bool _isSubmitting = false;
   String? _nameError;
   String _selectedCategory = 'others'; // Default to 'others'
@@ -100,6 +101,17 @@ class _UnknownProductSubmissionScreenState
         imageQuality: 85,
       );
       if (picked != null && mounted) {
+        // Validate the image file
+        final file = File(picked.path);
+        final validation = ImageValidationUtils.validateImageFile(file);
+        
+        if (!validation.isValid) {
+          if (mounted) {
+            ImageValidationUtils.showValidationError(context, validation.errorMessage!);
+          }
+          return;
+        }
+        
         setState(() => _frontImagePath = picked.path);
       }
     } catch (e) {
@@ -129,6 +141,17 @@ class _UnknownProductSubmissionScreenState
         imageQuality: 85,
       );
       if (picked != null && mounted) {
+        // Validate the image file
+        final file = File(picked.path);
+        final validation = ImageValidationUtils.validateImageFile(file);
+        
+        if (!validation.isValid) {
+          if (mounted) {
+            ImageValidationUtils.showValidationError(context, validation.errorMessage!);
+          }
+          return;
+        }
+        
         setState(() => _backImagePath = picked.path);
       }
     } catch (e) {
@@ -158,15 +181,26 @@ class _UnknownProductSubmissionScreenState
         imageQuality: 85,
       );
       if (picked != null && mounted) {
-        setState(() => _additionalBackImagePaths.add(picked.path));
+        // Validate the image file
+        final file = File(picked.path);
+        final validation = ImageValidationUtils.validateImageFile(file);
+        
+        if (!validation.isValid) {
+          if (mounted) {
+            ImageValidationUtils.showValidationError(context, validation.errorMessage!);
+          }
+          return;
+        }
+        
+        setState(() => _additionalBackImagePath = picked.path);
       }
     } catch (e) {
       debugPrint('Additional back image pick error: $e');
     }
   }
 
-  void _removeAdditionalBackPhoto(int index) {
-    setState(() => _additionalBackImagePaths.removeAt(index));
+  void _removeAdditionalBackPhoto() {
+    setState(() => _additionalBackImagePath = null);
   }
 
   // ── Submit report to Firestore ─────────────────────────────────────────
@@ -216,7 +250,7 @@ class _UnknownProductSubmissionScreenState
         userName: name,
         frontImagePath: _frontImagePath,
         backImagePath: _backImagePath!,
-        additionalBackImagePaths: _additionalBackImagePaths,
+        additionalBackImagePaths: _additionalBackImagePath != null ? [_additionalBackImagePath!] : [],
       );
 
       if (mounted) {
@@ -273,18 +307,18 @@ class _UnknownProductSubmissionScreenState
       }
       final backBytes = await File(_backImagePath!).readAsBytes();
 
-      // Upload additional back photos
+      // Upload additional back photo (single image)
       List<Uint8List> additionalBackBytesList = [];
       List<Future<String?>> additionalUploads = [];
-      for (int i = 0; i < _additionalBackImagePaths.length; i++) {
-        final additionalFile = File(_additionalBackImagePaths[i]);
+      if (_additionalBackImagePath != null) {
+        final additionalFile = File(_additionalBackImagePath!);
         if (await additionalFile.exists()) {
           final additionalBytes = await additionalFile.readAsBytes();
           additionalBackBytesList.add(additionalBytes);
           additionalUploads.add(
             BackendLocator.cloudinaryUploadService.upload(
               additionalBytes,
-              filename: '${uid}_back_additional_${i}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+              filename: '${uid}_back_additional_${DateTime.now().millisecondsSinceEpoch}.jpg',
             ),
           );
         }
@@ -379,7 +413,7 @@ class _UnknownProductSubmissionScreenState
             userName: name,
             frontImagePath: _frontImagePath,
             backImagePath: _backImagePath!,
-            additionalBackImagePaths: _additionalBackImagePaths,
+            additionalBackImagePaths: _additionalBackImagePath != null ? [_additionalBackImagePath!] : [],
           );
 
           if (!mounted) return;
@@ -629,9 +663,9 @@ class _UnknownProductSubmissionScreenState
 
                     const SizedBox(height: 28),
 
-                    // ── Additional Back Photos section (optional) ────
+                    // ── Additional Back Photo section (optional) ────
                     Text(
-                      loc.reportAdditionalBackPhotos,
+                      'Additional Back Photo (Optional)',
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -649,51 +683,45 @@ class _UnknownProductSubmissionScreenState
                     ),
                     const SizedBox(height: 12),
 
-                    // Display additional back photos
-                    if (_additionalBackImagePaths.isNotEmpty) ...[
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: List.generate(_additionalBackImagePaths.length, (index) {
-                          return Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  width: 100,
-                                  height: 100,
-                                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                                  child: Image.file(
-                                    File(_additionalBackImagePaths[index]),
-                                    fit: BoxFit.cover,
-                                  ),
+                    // Display additional back photo (single image)
+                    if (_additionalBackImagePath != null) ...[
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              width: 100,
+                              height: 100,
+                              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+                              child: Image.file(
+                                File(_additionalBackImagePath!),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 4,
+                            right: 4,
+                            child: GestureDetector(
+                              onTap: () {
+                                HapticService().vibrate();
+                                _removeAdditionalBackPhoto();
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.9),
+                                  shape: BoxShape.circle,
+                                ),
+                                padding: const EdgeInsets.all(4),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 16,
                                 ),
                               ),
-                              Positioned(
-                                top: 4,
-                                right: 4,
-                                child: GestureDetector(
-                                  onTap: () {
-                                    HapticService().vibrate();
-                                    _removeAdditionalBackPhoto(index);
-                                  },
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.withValues(alpha: 0.9),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    padding: const EdgeInsets.all(4),
-                                    child: const Icon(
-                                      Icons.close,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        }),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -704,9 +732,17 @@ class _UnknownProductSubmissionScreenState
                         HapticService().vibrate();
                         _pickAdditionalBackPhoto();
                       },
-                      icon: Icon(Icons.add_photo_alternate_outlined, size: 18, color: colorScheme.primary),
+                      icon: Icon(
+                        _additionalBackImagePath == null
+                            ? Icons.add_photo_alternate_outlined
+                            : Icons.camera_alt_outlined,
+                        size: 18,
+                        color: colorScheme.primary,
+                      ),
                       label: Text(
-                        loc.reportAddAnotherBackPhoto,
+                        _additionalBackImagePath == null
+                            ? loc.reportAddAnotherBackPhoto
+                            : loc.reportChangePhoto,
                         style: GoogleFonts.inter(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
