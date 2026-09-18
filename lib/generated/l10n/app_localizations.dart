@@ -2156,6 +2156,24 @@ abstract class AppLocalizations {
   /// **'Caution >20%'**
   String get cautionLegend;
 
+  /// No description provided for @levelLow.
+  ///
+  /// In en, this message translates to:
+  /// **'low'**
+  String get levelLow;
+
+  /// No description provided for @levelMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'medium'**
+  String get levelMedium;
+
+  /// No description provided for @levelHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'high'**
+  String get levelHigh;
+
   /// No description provided for @howToUnderstandTitle.
   ///
   /// In en, this message translates to:

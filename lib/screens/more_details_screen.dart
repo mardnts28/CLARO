@@ -645,7 +645,8 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = colorScheme.brightness == Brightness.dark;
-    final style = _levelStyleFor(level, isDark);
+    final loc = AppLocalizations.of(context)!;
+    final style = _levelStyleFor(level, isDark, loc);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -728,23 +729,23 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
     }
   }
 
-  _LevelStyle _levelStyleFor(AdvisoryLevel level, bool isDark) {
+  _LevelStyle _levelStyleFor(AdvisoryLevel level, bool isDark, AppLocalizations loc) {
     switch (level) {
       case AdvisoryLevel.suitable:
         return _LevelStyle(
-          label: 'Suitable',
+          label: loc.levelLow,
           badgeBg: isDark ? const Color(0xFF1B3320) : const Color(0xFFE8F5E9),
           textColor: isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32),
         );
       case AdvisoryLevel.moderate:
         return _LevelStyle(
-          label: 'Moderate',
+          label: loc.levelMedium,
           badgeBg: isDark ? const Color(0xFF3A2A12) : const Color(0xFFFFF3E0),
           textColor: isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100),
         );
       case AdvisoryLevel.caution:
         return _LevelStyle(
-          label: 'Caution',
+          label: loc.levelHigh,
           badgeBg: isDark ? const Color(0xFF3A1414) : const Color(0xFFFFEBEE),
           textColor: isDark ? const Color(0xFFEF9A9A) : const Color(0xFFC62828),
         );
