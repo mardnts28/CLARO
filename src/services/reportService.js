@@ -159,14 +159,26 @@ export async function approveReport(reportId, correctedData = {}) {
   return { promotedProductId };
 }
 
-export async function rejectReport(reportId) {
+export async function rejectReport(reportId, rejectionReason = "") {
   const reportRef = doc(db, "reports", reportId);
   const reportSnap = await getDoc(reportRef);
   const reportData = reportSnap.exists() ? reportSnap.data() : {};
 
-  await updateDoc(reportRef, { status: "Rejected" });
+  const cleanReason = String(rejectionReason || "").trim().slice(0, 50);
+  const updateData = { status: "Rejected" };
+  if (cleanReason) {
+    updateData.rejectionReason = cleanReason;
+  }
 
-  await logActivity("Rejected Report", reportId, "report", reportData.productName);
+  await updateDoc(reportRef, updateData);
+
+  const reasonSnippet = cleanReason ? ` (Reason: ${cleanReason})` : "";
+  await logActivity(
+    "Rejected Report",
+    reportId,
+    "report",
+    `${reportData.productName || "Report"}${reasonSnippet}`
+  );
 }
 
 

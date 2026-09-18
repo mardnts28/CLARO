@@ -11,9 +11,9 @@
 .modal-box {
   background: #fff;
   border-radius: 14px;
-  padding: 32px 36px;
+  padding: 32px 32px;
   width: 100%;
-  max-width: 340px;
+  max-width: 420px;
   text-align: center;
   position: relative;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
@@ -68,7 +68,93 @@
 .modal-desc {
   font-size: 13.5px;
   color: #7a7a7a;
-  margin: 0 0 22px;
+  margin: 0 0 18px;
+}
+
+.modal-reason-group {
+  margin: 0 0 20px 0;
+  text-align: left;
+}
+
+.modal-reason-select-wrapper {
+  margin-bottom: 12px;
+}
+
+.modal-reason-select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #1f2937;
+  background: #f9fafb;
+  box-sizing: border-box;
+  outline: none;
+  margin-top: 5px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.modal-reason-select:focus {
+  background: #fff;
+  border-color: #c23b3b;
+  box-shadow: 0 0 0 3px rgba(194, 59, 59, 0.15);
+}
+
+.modal-reason-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.modal-reason-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.modal-required-star {
+  color: #c23b3b;
+  margin-left: 2px;
+}
+
+.modal-char-counter {
+  font-size: 11.5px;
+  color: #6b7280;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.modal-char-counter.limit-reached {
+  color: #c23b3b;
+  font-weight: 600;
+}
+
+.modal-reason-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-family: inherit;
+  color: #1f2937;
+  background: #f9fafb;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.modal-reason-input:focus {
+  background: #fff;
+  border-color: #c23b3b;
+  box-shadow: 0 0 0 3px rgba(194, 59, 59, 0.15);
+}
+
+.modal-reason-input::placeholder {
+  color: #9ca3af;
+  font-size: 13px;
 }
 
 .modal-confirm-btn {

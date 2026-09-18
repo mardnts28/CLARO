@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase/firebase";
 import logo from "../assets/images/logoll.png";
 import {
   FiHome,
   FiFileText,
-  FiSettings,
   FiStar,
   FiLogOut,
   FiChevronRight,
@@ -42,10 +41,14 @@ export default function Sidebar({ collapsed }) {
 
   return (
     <aside className={`sidebar ${collapsed ? "sidebar-collapsed" : ""}`}>
-      <div className="sidebar-brand">
-          <img src={logo} alt="CLARO Logo" className="sidebar-logo" />
+      <Link
+        to="/dashboard"
+        className="sidebar-brand"
+        title="Go to Dashboard"
+      >
+        <img src={logo} alt="CLARO Logo" className="sidebar-logo" />
         {!collapsed && <span className="sidebar-brand-text">CLARO</span>}
-      </div>
+      </Link>
 
       <nav className="sidebar-nav">
         <NavLink

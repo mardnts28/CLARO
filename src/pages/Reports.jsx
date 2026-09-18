@@ -7,14 +7,21 @@ import "./Reports.css";
 import "./AppReview.css";
 import "./Dashboard.css";
 
-function StatusBadge({ status }) {
+function StatusBadge({ status, reason }) {
   const map = {
     Approve: "badge badge-approved",
     Pending: "badge badge-pending",
     Rejected: "badge badge-rejected",
   };
 
-  return <span className={map[status] || "badge"}>{status}</span>;
+  return (
+    <span
+      className={map[status] || "badge"}
+      title={status === "Rejected" && reason ? `Reason: ${reason}` : undefined}
+    >
+      {status}
+    </span>
+  );
 }
 
 // Lower number = higher priority (shown first)
@@ -256,7 +263,7 @@ export default function Reports() {
                     </td>
 
                     <td>
-                      <StatusBadge status={r.status} />
+                      <StatusBadge status={r.status} reason={r.rejectionReason} />
                     </td>
 
                     <td>

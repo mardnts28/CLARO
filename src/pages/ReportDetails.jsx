@@ -284,15 +284,16 @@ export default function ReportDetails() {
     }
   }
 
-  async function handleConfirm() {
+  async function handleConfirm(rejectionReason = "") {
     setActionLoading(true);
 
     try {
-      await rejectReport(id);
+      await rejectReport(id, rejectionReason);
 
       setReport((prev) => ({
         ...prev,
         status: "Rejected",
+        rejectionReason: rejectionReason?.trim() || "",
       }));
 
       setModalType(null);
@@ -385,6 +386,18 @@ export default function ReportDetails() {
 
               <StatusBadge status={report.status} />
             </div>
+
+            {report.status === "Rejected" && report.rejectionReason && (
+              <div className="details-meta-item details-meta-rejection">
+                <span className="details-label">
+                  Reason for Rejection
+                </span>
+
+                <span className="details-value rejection-reason-text">
+                  {report.rejectionReason}
+                </span>
+              </div>
+            )}
 
           </div>
         </div>
