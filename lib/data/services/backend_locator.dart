@@ -5,6 +5,11 @@
 // their own ProductRepository/UserRepository/GeminiAdvisoryService.
 // Follows the same singleton-via-static-instance pattern ProductDbService
 // already uses elsewhere in this app -- no new DI framework introduced.
+//
+// PHASE 2 CHANGE: added `groupRepository`, registered after
+// `userRepository` since it depends on it (see group_repository.dart --
+// linked members' health data is fetched through the existing
+// UserRepository, not duplicated).
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -12,6 +17,7 @@ import '../repositories/product_repository.dart';
 import '../repositories/user_repository.dart';
 import '../repositories/favorites_repository.dart';
 import '../repositories/history_repository.dart';
+import '../repositories/group_repository.dart'; // NEW (Phase 2)
 import 'favorites_service.dart';
 import 'gemini_advisory_service.dart';
 import 'product_comparison_service.dart';
@@ -53,6 +59,13 @@ class BackendLocator {
   static final ProductRepository productRepository = FirestoreProductRepository();
 
   static final UserRepository userRepository = FirebaseUserRepository();
+
+  // NEW (Phase 2) -- registered after userRepository so it can be handed
+  // in for resolving "linked" members' profiles in
+  // getGroupHealthProfiles(). See group_repository.dart.
+  static final GroupRepository groupRepository = FirebaseGroupRepository(
+    userRepository: userRepository,
+  );
 
   // Backed by Firestore (`users/{userId}/favorites`) -- favorites now
   // persist across app restarts and sync across a user's devices. The

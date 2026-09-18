@@ -12,6 +12,8 @@ import '../generated/l10n/app_localizations.dart';
 import 'personal_info_screen.dart';
 import 'preference_screen.dart';
 import 'suggestion_screen.dart';
+import 'group_screen.dart'; // Phase 3
+import 'join_group_screen.dart'; // Phase 4
 import '../core/utils/success_feedback_utils.dart';
 
 const String claroWebsiteUrl = 'https://claro-52ia.onrender.com/';
@@ -327,6 +329,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
               );
               if (mounted) await _loadUserData();
+            },
+          ),
+          Divider(height: 0, color: colorScheme.outlineVariant),
+          // NEW (Phase 3) -- entry point for the group feature.
+          _buildMenuItemWithArrow(
+            icon: Icons.group_outlined,
+            label: 'Health Group',
+            onTap: () {
+              HapticService().vibrate();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GroupScreen()),
+              );
+            },
+          ),
+          Divider(height: 0, color: colorScheme.outlineVariant),
+          // NEW (Phase 4) -- lets someone who received an invite code
+          // join a group they don't own. Kept separate from "Health
+          // Group" above, which assumes/creates an owned-or-joined
+          // group; this is specifically the "I have a code" entry point.
+          _buildMenuItemWithArrow(
+            icon: Icons.qr_code_scanner_outlined,
+            label: 'Join a Group',
+            onTap: () {
+              HapticService().vibrate();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const JoinGroupScreen()),
+              );
             },
           ),
         ],
