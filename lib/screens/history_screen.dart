@@ -798,6 +798,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       (icon: Icons.home_outlined, activeIcon: Icons.home, label: loc.home),
       (icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: loc.scan),
       (icon: Icons.history_outlined, activeIcon: Icons.history, label: loc.history),
+      (icon: Icons.group_outlined, activeIcon: Icons.group, label: loc.groupTab),
       (icon: Icons.person_outline, activeIcon: Icons.person, label: loc.profile),
     ];
 

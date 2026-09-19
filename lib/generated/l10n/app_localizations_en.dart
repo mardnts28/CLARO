@@ -1388,4 +1388,188 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get noInternetVoiceMessage =>
       'Please connect to mobile data or Wi-Fi to use the Voice Assistant.';
+
+  @override
+  String get groupTab => 'Group';
+
+  @override
+  String get noGroupYet => 'No group yet';
+
+  @override
+  String get groupEmptyStateTitle =>
+      'Evaluate products for your whole household';
+
+  @override
+  String get groupEmptyStateSubtitle =>
+      'Create a group to see a health evaluation for each family member, friend, or co-living partner every time you scan a product.';
+
+  @override
+  String get joinGroupButton => 'Join';
+
+  @override
+  String get createGroupButton => 'Create';
+
+  @override
+  String get nameYourGroup => 'Name your group';
+
+  @override
+  String get groupNameHint => 'e.g. My Family';
+
+  @override
+  String get defaultGroupName => 'My Health Group';
+
+  @override
+  String get groupOwnerLabel => 'You own this group';
+
+  @override
+  String get groupMemberLabel => 'You are a member';
+
+  @override
+  String get groupDetailsMembers => 'Members';
+
+  @override
+  String get groupDetailsNoMembers => 'No members yet.';
+
+  @override
+  String get memberStatusLinked => 'Linked';
+
+  @override
+  String get memberStatusManaged => 'Managed';
+
+  @override
+  String get removeFromGroupTooltip => 'Remove from group';
+
+  @override
+  String get deleteMemberTooltip => 'Delete member';
+
+  @override
+  String get removeFromGroupTitle => 'Remove from group?';
+
+  @override
+  String get deleteMemberTitle => 'Delete this member?';
+
+  @override
+  String get removeFromGroupMessage =>
+      'This removes them from the group. Their own health data is not affected.';
+
+  @override
+  String get deleteMemberMessage =>
+      'This permanently deletes this member\'s entry and their health data.';
+
+  @override
+  String get removeButton => 'Remove';
+
+  @override
+  String get addMemberButton => 'Add Member';
+
+  @override
+  String get addMemberChooserTitle => 'Add a member';
+
+  @override
+  String get inviteSomeoneTitle => 'Invite someone';
+
+  @override
+  String get inviteSomeoneSubtitle =>
+      'They install the app and manage their own profile';
+
+  @override
+  String get addManuallyTitle => 'Add manually';
+
+  @override
+  String get addManuallySubtitle => 'For someone without their own account';
+
+  @override
+  String get memberNameHint => 'Member\'s name';
+
+  @override
+  String get memberNameEmptyError => 'Enter this member\'s name';
+
+  @override
+  String memberAddedSuccess(Object name) {
+    return '$name added to your group';
+  }
+
+  @override
+  String memberAddedHealthDataFailed(Object name) {
+    return '$name was added, but health info failed to save. Edit them to retry.';
+  }
+
+  @override
+  String get viewOnlyHealthProfileNote =>
+      'You can view this member\'s health profile, but only they can edit it.';
+
+  @override
+  String get noHealthProfileYet => 'No health info added yet';
+
+  @override
+  String get editHealthProfile => 'Edit';
+
+  @override
+  String get deleteGroupButton => 'Delete Group';
+
+  @override
+  String get deleteGroupDisabledHint =>
+      'Remove all members before you can delete this group.';
+
+  @override
+  String get deleteGroupConfirmTitle => 'Delete this group?';
+
+  @override
+  String get deleteGroupConfirmMessage => 'This can\'t be undone.';
+
+  @override
+  String get deleteGroupSuccess => 'Group deleted';
+
+  @override
+  String get joinGroupDialogTitle => 'Join a Group';
+
+  @override
+  String get joinGroupDialogSubtitle =>
+      'Enter the code someone shared with you to join their health group.';
+
+  @override
+  String get inviteCodeHint => 'e.g. AB3D9F2KH';
+
+  @override
+  String get invalidCodeError => 'Enter a valid 9-character code';
+
+  @override
+  String get codeDidNotWorkError =>
+      'That code didn\'t work. Check it and try again.';
+
+  @override
+  String get joinGroupSubmit => 'Join Group';
+
+  @override
+  String get joinViaQr => 'Join via QR';
+
+  @override
+  String get scanQrTitle => 'Scan Invite QR';
+
+  @override
+  String get scanQrInstruction =>
+      'Point your camera at the QR code shared with you.';
+
+  @override
+  String get qrCameraPermissionDenied =>
+      'Camera permission is needed to scan a QR code.';
+
+  @override
+  String get inviteMemberTitle => 'Invite a Member';
+
+  @override
+  String get inviteMemberInstructions =>
+      'Share this code or QR with the person you want to add. It expires in 48 hours and can only be used once.';
+
+  @override
+  String get copyCode => 'Copy code';
+
+  @override
+  String get codeCopied => 'Code copied';
+
+  @override
+  String get revokeAndRegenerate => 'Revoke & Generate New Code';
+
+  @override
+  String get somethingWentWrong => 'Something went wrong. Please try again.';
 }

@@ -25,6 +25,8 @@ enum GroupMemberStatus { invited, active, left }
 
 enum GroupInviteStatus { pending, redeemed, revoked, expired }
 
+enum MemberRelationship { family, friend, lover, other }
+
 class HealthGroup {
   final String id;
   final String ownerUid;
@@ -76,6 +78,9 @@ class GroupMember {
 
   // "managed" members only:
   final String? displayName;
+  
+  // Relationship to the group owner (for managed members)
+  final MemberRelationship? relationship;
 
   // Encrypted blobs written ONLY by the Cloudflare Worker (Phase 6) for
   // "managed" members. Never written directly by the client. Left null
@@ -94,6 +99,7 @@ class GroupMember {
     this.updatedAt,
     this.linkedUid,
     this.displayName,
+    this.relationship,
     this.conditionsEncrypted,
     this.allergensEncrypted,
   });

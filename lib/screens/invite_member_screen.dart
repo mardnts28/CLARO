@@ -2,7 +2,8 @@
 //
 // Phase 4 (Option A) — the group owner generates an invite code/QR here
 // and shares it with a family member/friend/co-living partner, who
-// redeems it on their own device via JoinGroupScreen.
+// redeems it on their own device via the Join popup (see
+// widgets/join_group_dialog.dart, opened from GroupScreen's Join button).
 //
 // Uses qr_flutter for the QR code -- add it to pubspec.yaml:
 //   qr_flutter: ^4.1.0

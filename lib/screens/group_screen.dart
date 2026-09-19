@@ -1,20 +1,16 @@
 // lib/screens/group_screen.dart
 //
-// Phase 3 — entry point for the group feature. Reached from ProfileScreen
-// (see patches/profile_screen_patch.md for the one-row addition that
-// links here).
+// UPDATED (Health Group UI & Navigation Update): this used to be a
+// full-screen route pushed from ProfileScreen's "Health Group" menu row,
+// and it assumed a single group (getActiveGroup()). It's now the content
+// of its own bottom-nav "Group" tab (see home_screen.dart), and lists
+// EVERY group the user belongs to -- owned or joined -- since users can
+// now create/join multiple health groups.
 //
-// Visual style is deliberately copy-pasted from existing screens rather
-// than invented:
-//   - Header/empty-state card: same shape as ProfileScreen._buildProfileCard()
-//     (colorScheme.primaryContainer background, bold title, 80%-opacity subtitle).
-//   - Member list card: same bordered/rounded Container as
-//     PersonalInfoScreen._buildConditionsSection() (theme.cardColor,
-//     BorderRadius.circular(16), Border.all(color: theme.dividerColor)).
-//   - Member rows: same Icon + Expanded(Text) + trailing pattern as
-//     ProfileScreen._buildMenuItemWithArrow(), plus a small status pill.
-//   - "Add Member" chooser dialog: same SimpleDialog pattern as
-//     ProfileScreen._showLanguageChooser().
+// Layout: header, then a scrollable list of group cards (or a "No group
+// yet" empty state), then a fixed Join/Create button row pinned to the
+// bottom of this tab's content -- above HomeScreen's bottom navigation
+// bar, since that bar lives outside this widget entirely.
 
 import 'package:flutter/material.dart';
 
@@ -22,12 +18,11 @@ import '../data/models/health_group.dart';
 import '../data/services/backend_locator.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
-import 'invite_member_screen.dart';
-import 'add_managed_member_screen.dart';
-// Note: JoinGroupScreen (Phase 4) is linked from ProfileScreen directly,
-// not from here -- see patches/profile_screen_patch.md. A user who
-// already owns/belongs to a group doesn't need a "join" entry point on
-// this screen.
+import '../services/locale_service.dart';
+import '../generated/l10n/app_localizations.dart';
+import '../widgets/custom_text_field.dart';
+import '../widgets/join_group_dialog.dart';
+import 'group_details_screen.dart';
 
 class GroupScreen extends StatefulWidget {
   const GroupScreen({super.key});
@@ -41,316 +36,274 @@ class _GroupScreenState extends State<GroupScreen> {
   final _groupRepository = BackendLocator.groupRepository;
 
   bool _loading = true;
-  HealthGroup? _group;
-  bool _isOwner = false;
+  List<HealthGroup> _groups = [];
 
   @override
   void initState() {
     super.initState();
     _load();
+    // New/changed group screens support both English and Tagalog -- this
+    // screen isn't tied to a Localizations rebuild the way route pushes
+    // are, so it listens for language changes directly (same pattern
+    // ProfileScreen/HistoryScreen already use).
+    LocaleService.localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    LocaleService.localeNotifier.removeListener(_onLocaleChanged);
+    super.dispose();
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
     final uid = _authService.currentUser?.uid;
     if (uid == null) {
       setState(() => _loading = false);
       return;
     }
-    final group = await _groupRepository.getActiveGroup(uid);
+    setState(() => _loading = true);
+    final groups = await _groupRepository.getGroups(uid);
+    if (!mounted) return;
     setState(() {
-      _group = group;
-      _isOwner = group != null && group.ownerUid == uid;
+      _groups = groups;
       _loading = false;
     });
+  }
+
+  Future<void> _onRefresh() async {
+    HapticService().vibrate();
+    await _load();
+  }
+
+  Future<void> _openGroup(HealthGroup group) async {
+    HapticService().vibrate();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => GroupDetailsScreen(group: group)),
+    );
+    // The group may have been deleted, or a member added/removed --
+    // reload the list either way rather than trying to patch it in place.
+    if (mounted) await _load();
+  }
+
+  Future<void> _openJoinDialog() async {
+    HapticService().vibrate();
+    final joined = await showDialog<bool>(
+      context: context,
+      builder: (_) => const JoinGroupDialog(),
+    );
+    if (joined == true) await _load();
   }
 
   Future<void> _createGroup() async {
     final uid = _authService.currentUser?.uid;
     if (uid == null) return;
-    final nameController = TextEditingController(text: 'My Health Group');
+    final loc = AppLocalizations.of(context)!;
+
+    final nameController = TextEditingController();
+    HapticService().vibrate();
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Name your group'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(hintText: 'e.g. The Santos Household'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Create')),
-        ],
-      ),
+      builder: (ctx) {
+        final colorScheme = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          backgroundColor: colorScheme.surface,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(loc.nameYourGroup),
+          content: CustomTextField(
+            controller: nameController,
+            hintText: loc.groupNameHint,
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(loc.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(loc.createGroupButton),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true) return;
 
+    final name = nameController.text.trim();
     HapticService().vibrate();
-    final group = await _groupRepository.createGroup(
+    await _groupRepository.createGroup(
       ownerUid: uid,
-      name: nameController.text.trim().isEmpty ? 'My Health Group' : nameController.text.trim(),
+      name: name.isEmpty ? loc.defaultGroupName : name,
     );
-    setState(() {
-      _group = group;
-      _isOwner = true;
-    });
-  }
-
-  void _showAddMemberChooser() {
-    HapticService().vibrate();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => SimpleDialog(
-        title: const Text('Add a member'),
-        children: [
-          SimpleDialogOption(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => InviteMemberScreen(group: _group!)),
-              );
-            },
-            child: const ListTile(
-              leading: Icon(Icons.qr_code_2_outlined),
-              title: Text('Invite someone'),
-              subtitle: Text('They install the app and manage their own profile'),
-            ),
-          ),
-          SimpleDialogOption(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final added = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(builder: (_) => AddManagedMemberScreen(group: _group!)),
-              );
-              if (added == true) _load();
-            },
-            child: const ListTile(
-              leading: Icon(Icons.person_add_alt_outlined),
-              title: Text('Add manually'),
-              subtitle: Text('For someone without their own account'),
-            ),
-          ),
-        ],
-      ),
-    );
+    await _load();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    final primaryColor = theme.brightness == Brightness.dark ? Colors.red : colorScheme.primary;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Health Group')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  if (_group == null) ..._buildEmptyState(colorScheme) else ..._buildGroupView(theme, colorScheme),
-                ],
-              ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              loc.groupTab,
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
             ),
+          ),
+        ),
+        Expanded(
+          child: RefreshIndicator(
+            color: primaryColor,
+            onRefresh: _onRefresh,
+            child: _loading
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 200),
+                      Center(child: CircularProgressIndicator()),
+                    ],
+                  )
+                : _groups.isEmpty
+                    ? _buildEmptyState(theme, colorScheme, loc)
+                    : ListView.builder(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+                        itemCount: _groups.length,
+                        itemBuilder: (context, i) => _buildGroupCard(theme, colorScheme, _groups[i]),
+                      ),
+          ),
+        ),
+        _buildActionButtons(colorScheme, loc),
+      ],
     );
   }
 
-  List<Widget> _buildEmptyState(ColorScheme colorScheme) {
-    return [
-      // Same visual shape as ProfileScreen._buildProfileCard().
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(16),
+  Widget _buildEmptyState(ThemeData theme, ColorScheme colorScheme, AppLocalizations loc) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      children: [
+        const SizedBox(height: 60),
+        Icon(Icons.group_outlined, size: 56, color: colorScheme.onSurfaceVariant.withOpacity(0.5)),
+        const SizedBox(height: 16),
+        Text(
+          loc.noGroupYet,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Evaluate products for your whole household',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Create a group to see a health evaluation for each family member, '
-              'friend, or co-living partner every time you scan a product.',
-              style: TextStyle(
-                fontSize: 14,
-                color: colorScheme.onPrimaryContainer.withOpacity(0.8),
-              ),
-            ),
-          ],
+        const SizedBox(height: 8),
+        Text(
+          loc.groupEmptyStateSubtitle,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, color: colorScheme.onSurfaceVariant, height: 1.5),
         ),
-      ),
-      const SizedBox(height: 20),
-      SizedBox(
-        width: double.infinity,
-        child: FilledButton(
-          onPressed: _createGroup,
-          style: FilledButton.styleFrom(
-            backgroundColor: colorScheme.primary,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          child: const Text('Create a Group'),
-        ),
-      ),
-    ];
+      ],
+    );
   }
 
-  List<Widget> _buildGroupView(ThemeData theme, ColorScheme colorScheme) {
-    final group = _group!;
-    return [
-      Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
+  Widget _buildGroupCard(ThemeData theme, ColorScheme colorScheme, HealthGroup group) {
+    final uid = _authService.currentUser?.uid;
+    final isOwner = uid != null && uid == group.ownerUid;
+    final loc = AppLocalizations.of(context)!;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
           borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              group.name,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: colorScheme.onPrimaryContainer),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              _isOwner ? 'You own this group' : 'You are a member',
-              style: TextStyle(fontSize: 13, color: colorScheme.onPrimaryContainer.withOpacity(0.8)),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 20),
-      Text('Members', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
-      const SizedBox(height: 8),
-      StreamBuilder<List<GroupMember>>(
-        stream: _groupRepository.watchMembers(group.id),
-        builder: (context, snapshot) {
-          final members = snapshot.data ?? [];
-          if (!snapshot.hasData) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (members.isEmpty) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              child: Text('No members yet.', style: TextStyle(color: colorScheme.onSurfaceVariant)),
-            );
-          }
-          return Container(
+          onTap: () => _openGroup(group),
+          child: Container(
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: theme.cardColor,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: theme.dividerColor),
             ),
-            child: Column(
+            child: Row(
               children: [
-                for (var i = 0; i < members.length; i++) ...[
-                  _buildMemberRow(theme, colorScheme, members[i]),
-                  if (i != members.length - 1) Divider(height: 0, color: colorScheme.outlineVariant),
-                ],
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.group, color: colorScheme.primary),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        group.name,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isOwner ? loc.groupOwnerLabel : loc.groupMemberLabel,
+                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
               ],
-            ),
-          );
-        },
-      ),
-      const SizedBox(height: 20),
-      if (_isOwner)
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _showAddMemberChooser,
-            icon: const Icon(Icons.person_add_alt_1_outlined),
-            label: const Text('Add Member'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colorScheme.primary,
-              side: BorderSide(color: colorScheme.primary),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
           ),
         ),
-    ];
+      ),
+    );
   }
 
-  Widget _buildMemberRow(ThemeData theme, ColorScheme colorScheme, GroupMember member) {
-    final label = member.isLinked ? 'Linked' : 'Managed';
-    final name = member.isManaged ? (member.displayName ?? 'Member') : 'Group member';
-
+  Widget _buildActionButtons(ColorScheme colorScheme, AppLocalizations loc) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
       child: Row(
         children: [
-          Icon(
-            member.isLinked ? Icons.person_outline : Icons.person_pin_circle_outlined,
-            color: colorScheme.primary,
-            size: 20,
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _openJoinDialog,
+              icon: Icon(Icons.qr_code_scanner_outlined, color: colorScheme.primary),
+              label: Text(loc.joinGroupButton),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: colorScheme.primary,
+                side: BorderSide(color: colorScheme.primary),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(name, style: TextStyle(fontSize: 15, color: colorScheme.onSurface)),
-          ),
-          // Small status pill -- reuses colorScheme.secondary the same
-          // way advisory badges elsewhere in the app tint a pastel
-          // background behind a colored label.
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: colorScheme.secondary.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(20),
+            child: FilledButton.icon(
+              onPressed: _createGroup,
+              icon: const Icon(Icons.add),
+              label: Text(loc.createGroupButton),
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
             ),
-            child: Text(
-              label,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.secondary),
-            ),
-          ),
-          if (_isOwner) ...[
-            const SizedBox(width: 4),
-            IconButton(
-              icon: Icon(Icons.remove_circle_outline, color: colorScheme.outline, size: 20),
-              onPressed: () => _confirmRemove(member),
-              tooltip: member.isLinked ? 'Remove from group' : 'Delete member',
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Future<void> _confirmRemove(GroupMember member) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(member.isLinked ? 'Remove from group?' : 'Delete this member?'),
-        content: Text(
-          member.isLinked
-              ? "This removes them from the group. Their own health data is not affected."
-              : "This permanently deletes this member's entry and their health data.",
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text('Remove', style: TextStyle(color: Theme.of(ctx).colorScheme.error)),
           ),
         ],
       ),
     );
-    if (confirmed == true) {
-      await _groupRepository.removeMember(groupId: _group!.id, memberId: member.id);
-    }
   }
 }

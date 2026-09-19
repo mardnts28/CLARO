@@ -2689,6 +2689,346 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Please connect to mobile data or Wi-Fi to use the Voice Assistant.'**
   String get noInternetVoiceMessage;
+
+  // ---------------------------------------------------------------------
+  // Health Group feature (Group tab, Join/Create Group, Group Details).
+  // ---------------------------------------------------------------------
+
+  /// No description provided for @groupTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get groupTab;
+
+  /// No description provided for @noGroupYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No group yet'**
+  String get noGroupYet;
+
+  /// No description provided for @groupEmptyStateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Evaluate products for your whole household'**
+  String get groupEmptyStateTitle;
+
+  /// No description provided for @groupEmptyStateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a group to see a health evaluation for each family member, friend, or co-living partner every time you scan a product.'**
+  String get groupEmptyStateSubtitle;
+
+  /// No description provided for @joinGroupButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get joinGroupButton;
+
+  /// No description provided for @createGroupButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get createGroupButton;
+
+  /// No description provided for @nameYourGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Name your group'**
+  String get nameYourGroup;
+
+  /// No description provided for @groupNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. My Family'**
+  String get groupNameHint;
+
+  /// No description provided for @defaultGroupName.
+  ///
+  /// In en, this message translates to:
+  /// **'My Health Group'**
+  String get defaultGroupName;
+
+  /// No description provided for @groupOwnerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'You own this group'**
+  String get groupOwnerLabel;
+
+  /// No description provided for @groupMemberLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'You are a member'**
+  String get groupMemberLabel;
+
+  /// No description provided for @groupDetailsMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get groupDetailsMembers;
+
+  /// No description provided for @groupDetailsNoMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'No members yet.'**
+  String get groupDetailsNoMembers;
+
+  /// No description provided for @memberStatusLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked'**
+  String get memberStatusLinked;
+
+  /// No description provided for @memberStatusManaged.
+  ///
+  /// In en, this message translates to:
+  /// **'Managed'**
+  String get memberStatusManaged;
+
+  /// No description provided for @removeFromGroupTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from group'**
+  String get removeFromGroupTooltip;
+
+  /// No description provided for @deleteMemberTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete member'**
+  String get deleteMemberTooltip;
+
+  /// No description provided for @removeFromGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from group?'**
+  String get removeFromGroupTitle;
+
+  /// No description provided for @deleteMemberTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this member?'**
+  String get deleteMemberTitle;
+
+  /// No description provided for @removeFromGroupMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes them from the group. Their own health data is not affected.'**
+  String get removeFromGroupMessage;
+
+  /// No description provided for @deleteMemberMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This permanently deletes this member's entry and their health data.'**
+  String get deleteMemberMessage;
+
+  /// No description provided for @removeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get removeButton;
+
+  /// No description provided for @addMemberButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Member'**
+  String get addMemberButton;
+
+  /// No description provided for @addMemberChooserTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a member'**
+  String get addMemberChooserTitle;
+
+  /// No description provided for @inviteSomeoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite someone'**
+  String get inviteSomeoneTitle;
+
+  /// No description provided for @inviteSomeoneSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'They install the app and manage their own profile'**
+  String get inviteSomeoneSubtitle;
+
+  /// No description provided for @addManuallyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add manually'**
+  String get addManuallyTitle;
+
+  /// No description provided for @addManuallySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'For someone without their own account'**
+  String get addManuallySubtitle;
+
+  /// No description provided for @memberNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Member's name'**
+  String get memberNameHint;
+
+  /// No description provided for @memberNameEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter this member's name'**
+  String get memberNameEmptyError;
+
+  /// Confirmation after adding a managed member, e.g. "Juan added to your group"
+  ///
+  /// In en, this message translates to:
+  /// **'{name} added to your group'**
+  String memberAddedSuccess(Object name);
+
+  /// Confirmation after adding a managed member whose health data failed to save, e.g. "Juan was added, but health info failed to save. Edit them to retry."
+  ///
+  /// In en, this message translates to:
+  /// **'{name} was added, but health info failed to save. Edit them to retry.'**
+  String memberAddedHealthDataFailed(Object name);
+
+  /// No description provided for @viewOnlyHealthProfileNote.
+  ///
+  /// In en, this message translates to:
+  /// **'You can view this member's health profile, but only they can edit it.'**
+  String get viewOnlyHealthProfileNote;
+
+  /// No description provided for @noHealthProfileYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No health info added yet'**
+  String get noHealthProfileYet;
+
+  /// No description provided for @editHealthProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get editHealthProfile;
+
+  /// No description provided for @deleteGroupButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Group'**
+  String get deleteGroupButton;
+
+  /// No description provided for @deleteGroupDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove all members before you can delete this group.'**
+  String get deleteGroupDisabledHint;
+
+  /// No description provided for @deleteGroupConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this group?'**
+  String get deleteGroupConfirmTitle;
+
+  /// No description provided for @deleteGroupConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This can't be undone.'**
+  String get deleteGroupConfirmMessage;
+
+  /// No description provided for @deleteGroupSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Group deleted'**
+  String get deleteGroupSuccess;
+
+  /// No description provided for @joinGroupDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join a Group'**
+  String get joinGroupDialogTitle;
+
+  /// No description provided for @joinGroupDialogSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code someone shared with you to join their health group.'**
+  String get joinGroupDialogSubtitle;
+
+  /// No description provided for @inviteCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. AB3D9F2KH'**
+  String get inviteCodeHint;
+
+  /// No description provided for @invalidCodeError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid 9-character code'**
+  String get invalidCodeError;
+
+  /// No description provided for @codeDidNotWorkError.
+  ///
+  /// In en, this message translates to:
+  /// **'That code didn't work. Check it and try again.'**
+  String get codeDidNotWorkError;
+
+  /// No description provided for @joinGroupSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Join Group'**
+  String get joinGroupSubmit;
+
+  /// No description provided for @joinViaQr.
+  ///
+  /// In en, this message translates to:
+  /// **'Join via QR'**
+  String get joinViaQr;
+
+  /// No description provided for @scanQrTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan Invite QR'**
+  String get scanQrTitle;
+
+  /// No description provided for @scanQrInstruction.
+  ///
+  /// In en, this message translates to:
+  /// **'Point your camera at the QR code shared with you.'**
+  String get scanQrInstruction;
+
+  /// No description provided for @qrCameraPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera permission is needed to scan a QR code.'**
+  String get qrCameraPermissionDenied;
+
+  /// No description provided for @inviteMemberTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite a Member'**
+  String get inviteMemberTitle;
+
+  /// No description provided for @inviteMemberInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Share this code or QR with the person you want to add. It expires in 48 hours and can only be used once.'**
+  String get inviteMemberInstructions;
+
+  /// No description provided for @copyCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy code'**
+  String get copyCode;
+
+  /// No description provided for @codeCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Code copied'**
+  String get codeCopied;
+
+  /// No description provided for @revokeAndRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke & Generate New Code'**
+  String get revokeAndRegenerate;
+
+  /// Generic error shown when a group/member data stream or query fails (e.g. a permissions or connectivity issue).
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong. Please try again.'**
+  String get somethingWentWrong;
 }
 
 class _AppLocalizationsDelegate

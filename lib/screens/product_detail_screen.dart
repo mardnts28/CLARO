@@ -18,7 +18,6 @@ import '../data/models/health_advisory.dart';
 import '../data/models/product_evaluation.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/models/comparison_matrix.dart';
-import '../data/models/health_group.dart'; // Phase 7
 import '../core/constants/who_fda_thresholds.dart';
 import '../core/utils/rank_label_helper.dart';
 import '../core/utils/who_calculator.dart';

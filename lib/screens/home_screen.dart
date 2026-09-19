@@ -10,6 +10,7 @@ import 'profile_screen.dart';
 import 'camera_scanner_screen.dart';
 import 'history_screen.dart';
 import 'nutrition_guide_screen.dart';
+import 'group_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -167,6 +168,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 SafeArea(
                   bottom: false,
                   child: _buildHistoryPage(),
+                ),
+
+                // NEW -- "Group" tab, inserted between History and
+                // Profile per the Health Group UI & Navigation Update.
+                // Replaces the old ProfileScreen-menu entry points for
+                // "Health Group" / "Join a Group".
+                const SafeArea(
+                  bottom: false,
+                  child: GroupScreen(),
                 ),
 
                 const SafeArea(
@@ -1651,6 +1661,17 @@ class _HomeScreenState extends State<HomeScreen> {
         label:
             AppLocalizations.of(context)!
                 .history,
+      ),
+
+      // NEW -- "Group" tab, between History and Profile. Reuses the
+      // same icon the old ProfileScreen "Health Group" menu row used
+      // (Icons.group_outlined / Icons.group) for visual continuity.
+      (
+        icon: Icons.group_outlined,
+        activeIcon: Icons.group,
+        label:
+            AppLocalizations.of(context)!
+                .groupTab,
       ),
 
       (

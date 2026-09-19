@@ -12,9 +12,11 @@ import '../generated/l10n/app_localizations.dart';
 import 'personal_info_screen.dart';
 import 'preference_screen.dart';
 import 'suggestion_screen.dart';
-import 'group_screen.dart'; // Phase 3
-import 'join_group_screen.dart'; // Phase 4
 import '../core/utils/success_feedback_utils.dart';
+// NOTE: "Health Group" / "Join a Group" used to be entry points here
+// (Phase 3 / Phase 4). They've moved to their own "Group" bottom nav tab
+// (see home_screen.dart) so the group feature no longer routes through
+// this screen at all.
 
 const String claroWebsiteUrl = 'https://claro-52ia.onrender.com/';
 const String privacyPolicyUrl = 'https://claro-52ia.onrender.com/privacy-policy';
@@ -62,7 +64,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _announceIfVisible() {
-    if (HomeTabController.tabNotifier.value == 3 &&
+    // Profile moved from index 3 to index 4 when the "Group" tab was
+    // inserted between History and Profile -- see home_screen.dart.
+    if (HomeTabController.tabNotifier.value == 4 &&
         _authService.currentUser != null &&
         VoiceAssistantService.instance.isEnabled &&
         !VoiceAssistantService.isSpeakingNotifier.value) {
@@ -329,35 +333,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
               );
               if (mounted) await _loadUserData();
-            },
-          ),
-          Divider(height: 0, color: colorScheme.outlineVariant),
-          // NEW (Phase 3) -- entry point for the group feature.
-          _buildMenuItemWithArrow(
-            icon: Icons.group_outlined,
-            label: 'Health Group',
-            onTap: () {
-              HapticService().vibrate();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const GroupScreen()),
-              );
-            },
-          ),
-          Divider(height: 0, color: colorScheme.outlineVariant),
-          // NEW (Phase 4) -- lets someone who received an invite code
-          // join a group they don't own. Kept separate from "Health
-          // Group" above, which assumes/creates an owned-or-joined
-          // group; this is specifically the "I have a code" entry point.
-          _buildMenuItemWithArrow(
-            icon: Icons.qr_code_scanner_outlined,
-            label: 'Join a Group',
-            onTap: () {
-              HapticService().vibrate();
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const JoinGroupScreen()),
-              );
             },
           ),
         ],

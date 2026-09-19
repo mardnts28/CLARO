@@ -31,7 +31,19 @@ abstract class GroupRepository {
   /// The current user's active group, or null if they aren't in one
   /// (as owner OR as a linked member). Reads users/{uid}.primaryGroupId
   /// first, then falls back to the first entry of memberOfGroupIds.
+  ///
+  /// This stays a *single* group on purpose -- it backs the product-scan
+  /// evaluation flow (ProductDetailScreen), which evaluates against one
+  /// group at a time. It's unrelated to the Group tab's list of groups
+  /// (see getGroups() below), which supports a user owning/joining any
+  /// number of groups.
   Future<HealthGroup?> getActiveGroup(String uid);
+
+  /// Every group [uid] belongs to, whether as owner or as a linked
+  /// member -- users can own and/or join multiple health groups. Used by
+  /// the Group tab (GroupScreen) to render the full list of group cards.
+  /// Ordered oldest-created first.
+  Future<List<HealthGroup>> getGroups(String uid);
 
   Future<HealthGroup> createGroup({required String ownerUid, required String name});
 
@@ -69,6 +81,14 @@ abstract class GroupRepository {
   /// UserHealthProfile list, ready to hand to WhoCalculator/
   /// ProductRankingService exactly like today's single-profile call.
   Future<List<UserHealthProfile>> getGroupHealthProfiles(String groupId);
+
+  /// Deletes [groupId]. Only the group's owner may call this
+  /// ([requestingUid] must equal HealthGroup.ownerUid), and only once
+  /// every member has left/been removed -- GroupDetailsScreen keeps its
+  /// "Delete Group" button disabled while any active member remains, but
+  /// this is enforced here too so the rule holds regardless of caller.
+  /// Throws if the requester isn't the owner, or if active members remain.
+  Future<void> deleteGroup({required String groupId, required String requestingUid});
 
   /// Phase 8: cleans up group membership when an account is deleted.
   /// If [uid] owns a group, dissolves it. If they're a linked member of
@@ -111,6 +131,37 @@ class FirebaseGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<List<HealthGroup>> getGroups(String uid) async {
+    // Owned groups: direct query.
+    final ownedSnap = await _groups.where('ownerUid', isEqualTo: uid).get();
+    final owned = ownedSnap.docs
+        .map((d) => HealthGroup.fromFirestore(d.id, d.data()))
+        .toList();
+    final ownedIds = owned.map((g) => g.id).toSet();
+
+    // Joined groups: users/{uid}.memberOfGroupIds, populated by
+    // redeemInvite(). Fetched individually rather than via a
+    // whereIn/collectionGroup query to keep this working the same way
+    // regardless of list length or Firestore Rules shape.
+    final userDoc = await _firestore.collection('users').doc(uid).get();
+    final memberOfGroupIds =
+        List<String>.from(userDoc.data()?['memberOfGroupIds'] as List? ?? []);
+
+    final joined = <HealthGroup>[];
+    for (final groupId in memberOfGroupIds) {
+      if (ownedIds.contains(groupId)) continue; // shouldn't happen, but avoid dupes
+      final doc = await _groups.doc(groupId).get();
+      if (doc.exists) {
+        joined.add(HealthGroup.fromFirestore(doc.id, doc.data()!));
+      }
+    }
+
+    final all = [...owned, ...joined]
+      ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return all;
+  }
+
+  @override
   Future<HealthGroup> createGroup({required String ownerUid, required String name}) async {
     final docRef = _groups.doc();
     final group = HealthGroup(
@@ -120,10 +171,19 @@ class FirebaseGroupRepository implements GroupRepository {
       createdAt: DateTime.now(),
     );
     await docRef.set(group.toFirestore());
-    await _firestore.collection('users').doc(ownerUid).set(
-      {'primaryGroupId': docRef.id},
-      SetOptions(merge: true),
-    );
+
+    // Only claim this as the "active" group (used by the product-scan
+    // evaluation flow -- see getActiveGroup()) if the user doesn't
+    // already have one. Users can create/join further groups after that
+    // purely to organize them in the Group tab, without changing which
+    // group their scans get evaluated against.
+    final userRef = _firestore.collection('users').doc(ownerUid);
+    final userDoc = await userRef.get();
+    final hasPrimary =
+        (userDoc.data()?['primaryGroupId'] as String?)?.isNotEmpty ?? false;
+    if (!hasPrimary) {
+      await userRef.set({'primaryGroupId': docRef.id}, SetOptions(merge: true));
+    }
     return group;
   }
 
@@ -287,6 +347,50 @@ class FirebaseGroupRepository implements GroupRepository {
   }
 
   @override
+  Future<void> deleteGroup({required String groupId, required String requestingUid}) async {
+    final doc = await _groups.doc(groupId).get();
+    if (!doc.exists) return;
+
+    final group = HealthGroup.fromFirestore(doc.id, doc.data()!);
+    if (group.ownerUid != requestingUid) {
+      throw Exception('Only the group owner can delete this group.');
+    }
+
+    // Same rule GroupDetailsScreen enforces on its Delete Group button
+    // (disabled while any active member remains) -- checked again here
+    // so it holds no matter what calls this.
+    final activeMembers = await doc.reference
+        .collection('members')
+        .where('status', isEqualTo: 'active')
+        .limit(1)
+        .get();
+    if (activeMembers.docs.isNotEmpty) {
+      throw Exception('Remove all members before deleting this group.');
+    }
+
+    final batch = _firestore.batch();
+
+    final invites = await doc.reference.collection('invites').get();
+    for (final i in invites.docs) {
+      batch.delete(i.reference);
+    }
+    // Any leftover (left/removed) member records -- not "active", so not
+    // caught by the check above, but still cleaned up here.
+    final leftoverMembers = await doc.reference.collection('members').get();
+    for (final m in leftoverMembers.docs) {
+      batch.delete(m.reference);
+    }
+    batch.delete(doc.reference);
+    await batch.commit();
+
+    final ownerRef = _firestore.collection('users').doc(requestingUid);
+    final ownerDoc = await ownerRef.get();
+    if (ownerDoc.data()?['primaryGroupId'] == groupId) {
+      await ownerRef.update({'primaryGroupId': FieldValue.delete()});
+    }
+  }
+
+  @override
   Future<List<UserHealthProfile>> getGroupHealthProfiles(String groupId) async {
     final snap = await _groups
         .doc(groupId)
@@ -380,9 +484,16 @@ class FirebaseGroupRepository implements GroupRepository {
     }
   }
 
+  // 9 characters, all caps letters + digits -- matches the format
+  // JoinGroupDialog validates on entry (see widgets/join_group_dialog.dart).
+  // Ambiguous characters (0/O/1/I) are excluded so a code read off a
+  // screen or spoken aloud is never misheard/mistyped, but that's purely
+  // a generation-time choice -- the validator itself accepts any
+  // A-Z/0-9 character in that 9-character shape, since a code could in
+  // principle arrive from elsewhere.
   static String _generateInviteCode() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I ambiguity
     final rand = Random.secure();
-    return List.generate(8, (_) => chars[rand.nextInt(chars.length)]).join();
+    return List.generate(9, (_) => chars[rand.nextInt(chars.length)]).join();
   }
 }

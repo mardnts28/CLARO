@@ -40,11 +40,14 @@ class VoiceCommandRouter {
 
   static VoiceCommandRouter get instance => _instance;
 
+  // Group tab (index 3) was inserted between History and Profile --
+  // Profile moved from index 3 to 4. See home_screen.dart.
   static const Map<String, int> _tabPageKeys = {
     'home': 0,
     'scan': 1,
     'history': 2,
-    'profile': 3,
+    'group': 3,
+    'profile': 4,
   };
 
   Future<void> handleMicTap(BuildContext context) async {
@@ -606,7 +609,7 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'mfa_on') {
       try {
-        HomeTabController.switchToTab(3);
+        HomeTabController.switchToTab(4); // Profile tab (shifted from 3 after the new Group tab was inserted)
         await AuthService().setMfaEnabled(
           enabled: true,
         );
@@ -636,7 +639,7 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'mfa_off') {
       try {
-        HomeTabController.switchToTab(3);
+        HomeTabController.switchToTab(4); // Profile tab (shifted from 3 after the new Group tab was inserted)
         await AuthService().setMfaEnabled(
           enabled: false,
         );
@@ -666,7 +669,7 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'mfa') {
       try {
-        HomeTabController.switchToTab(3);
+        HomeTabController.switchToTab(4); // Profile tab (shifted from 3 after the new Group tab was inserted)
         final currentMfa = AuthService.mfaNotifier.value;
         final newMfa = !currentMfa;
         await AuthService().setMfaEnabled(enabled: newMfa);
@@ -979,7 +982,7 @@ class VoiceCommandRouter {
     // DELETE ACCOUNT
     // ============================================================
     if (target == 'delete_account') {
-      HomeTabController.switchToTab(3);
+      HomeTabController.switchToTab(4); // Profile tab (shifted from 3 after the new Group tab was inserted)
 
       final msg = localeKey == 'fil'
           ? 'Para burahin ang iyong account, mag-scroll sa ibaba ng Profile screen at i-tap ang Delete Account.'
