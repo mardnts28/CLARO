@@ -25,6 +25,7 @@ import '../data/services/backend_locator.dart';
 import '../services/haptic_service.dart';
 import '../widgets/custom_text_field.dart';
 import '../core/utils/success_feedback_utils.dart';
+import '../generated/l10n/app_localizations.dart';
 
 class AddManagedMemberScreen extends StatefulWidget {
   final HealthGroup group;
@@ -41,11 +42,13 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
 
   // Same fixed option set as PersonalInfoScreen, so the data this screen
   // produces is compatible with firestore_label_mappings.dart without any
-  // changes there.
+  // changes there. Supports both English and Tagalog labels for consistency.
   final Map<String, bool> _conditions = {
     'Diabetes': false,
     'Hypertension': false,
     'Heart condition': false,
+    'Low vision': false,
+    'None': false,
   };
   final Map<String, bool> _allergens = {
     'Fish': false,
@@ -59,6 +62,44 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
 
   bool _saving = false;
   String? _nameError;
+
+  String _getLocalizedConditionLabel(String key, AppLocalizations loc) {
+    switch (key) {
+      case 'Diabetes':
+        return loc.conditionDiabetes;
+      case 'Hypertension':
+        return loc.conditionHypertension;
+      case 'Heart condition':
+        return loc.conditionHeartCondition;
+      case 'Low vision':
+        return loc.conditionLowVision;
+      case 'None':
+        return loc.conditionNone;
+      default:
+        return key;
+    }
+  }
+
+  String _getLocalizedAllergenLabel(String key, AppLocalizations loc) {
+    switch (key) {
+      case 'Fish':
+        return loc.allergenFish;
+      case 'Milk/Dairy':
+        return loc.allergenMilk;
+      case 'Eggs':
+        return loc.allergenEggs;
+      case 'Soy':
+        return loc.allergenSoy;
+      case 'Wheat':
+        return loc.allergenWheat;
+      case 'Shellfish':
+        return loc.allergenShellfish;
+      case 'Peanuts':
+        return loc.allergenPeanuts;
+      default:
+        return key;
+    }
+  }
 
   @override
   void dispose() {
@@ -90,6 +131,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     // fails, the member still exists with no conditions/allergens set --
     // the owner can retry from the member's edit screen (same idea as
     // PersonalInfoScreen retrying a failed toggle).
+    // Always save English versions for consistency, matching PersonalInfoScreen.
     final selectedConditions =
         _conditions.entries.where((e) => e.value).map((e) => e.key).toList();
     final selectedAllergens =
@@ -168,6 +210,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
   // local screen state instead of pushing one toggle at a time to the
   // Worker (this screen batches everything into one save on submit).
   Widget _buildConditionsSection(ThemeData theme, ColorScheme colorScheme) {
+    final loc = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -183,13 +226,15 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
               Icon(Icons.favorite_outline, color: colorScheme.primary, size: 20),
               const SizedBox(width: 8),
               Text(
-                'Health Conditions',
+                loc.healthConditions,
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
               ),
             ],
           ),
           const SizedBox(height: 12),
           ..._conditions.entries.map((entry) {
+            if (entry.key == 'Wala' || entry.key == 'None') return const SizedBox.shrink();
+            final conditionLabel = _getLocalizedConditionLabel(entry.key, loc);
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
@@ -197,7 +242,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                   Icon(Icons.favorite, color: colorScheme.primary, size: 18),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(entry.key, style: TextStyle(fontSize: 14, color: colorScheme.onSurface)),
+                    child: Text(conditionLabel, style: TextStyle(fontSize: 14, color: colorScheme.onSurface)),
                   ),
                   Switch(
                     value: entry.value,
@@ -218,6 +263,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
   }
 
   Widget _buildAllergensSection(ThemeData theme, ColorScheme colorScheme) {
+    final loc = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -233,13 +279,14 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
               Icon(Icons.warning_amber_outlined, color: colorScheme.primary, size: 20),
               const SizedBox(width: 8),
               Text(
-                'Allergens',
+                loc.allergensLabel,
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
               ),
             ],
           ),
           const SizedBox(height: 12),
           ..._allergens.entries.map((entry) {
+            final allergenLabel = _getLocalizedAllergenLabel(entry.key, loc);
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(
@@ -247,7 +294,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                   Icon(Icons.circle_notifications_outlined, color: colorScheme.primary, size: 18),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(entry.key, style: TextStyle(fontSize: 14, color: colorScheme.onSurface)),
+                    child: Text(allergenLabel, style: TextStyle(fontSize: 14, color: colorScheme.onSurface)),
                   ),
                   Switch(
                     value: entry.value,

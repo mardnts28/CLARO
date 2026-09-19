@@ -10,6 +10,7 @@ import 'haptic_service.dart';
 import 'home_tab_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../data/services/backend_locator.dart'; // Phase 8
 
 // Base URL for the Cloudflare Worker that performs server-side encryption
 // and decryption of health conditions/allergens. The key never lives on
@@ -255,7 +256,7 @@ class AuthService {
   Future<Map<String, dynamic>> _prepareAndSendOtp(String uid, String email) async {
     final code = (100000 + DateTime.now().microsecondsSinceEpoch % 900000).toString().padLeft(6, '0');
     final now = Timestamp.now();
-    final expiresAt = Timestamp.fromDate(now.toDate().add(const Duration(minutes: 3)));
+    final expiresAt = Timestamp.fromDate(now.toDate().add(const Duration(minutes: 1)));
 
     await _firebaseDb.collection('login_otps').doc(uid).set({
       'uid': uid,
@@ -911,6 +912,25 @@ class AuthService {
                 : getFriendlyAuthErrorMessage(e),
           );
         }
+      }
+
+      // Phase 8 -- clean up group membership BEFORE deleting anything else,
+      // while `uid` is still a valid authenticated caller (the cleanup
+      // reads users/{uid}.memberOfGroupIds and any groups/{id} this uid
+      // owns, both of which require an authenticated request under the
+      // Firestore Rules from Phase 1/6). If this fails, deliberately
+      // don't block account deletion on it -- a leftover group/membership
+      // record is recoverable manually; a user unable to delete their
+      // account at all is a worse outcome. See
+      // GroupRepository.cleanupMembershipsForDeletedAccount() in
+      // group_repository.dart for what this does: dissolves any group
+      // `uid` owns (deleting its managed members' health data with it),
+      // and marks `uid`'s membership "left" in any group they belong to
+      // as a linked member.
+      try {
+        await BackendLocator.groupRepository.cleanupMembershipsForDeletedAccount(uid);
+      } catch (e) {
+        debugPrint('Group membership cleanup error (continuing with deletion): $e');
       }
 
       // Delete the Firestore user document FIRST, while the user is still

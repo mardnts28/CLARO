@@ -1,3 +1,13 @@
+// src/firestore.ts
+//
+// CORRECTED Phase 6 addition. Everything above the line marked below is
+// your existing file, completely untouched. Added: two generic
+// path-based helpers (getDocByPath/patchDocByPath) that getUserDoc/
+// patchUserDoc could in principle be rewritten in terms of -- but I've
+// left those two alone rather than risk touching something that already
+// works. The new group-scoped functions below just call the generic
+// helpers directly.
+
 import { Env } from "./env";
 
 import { SignJWT, importPKCS8 } from "jose";
@@ -90,4 +100,71 @@ function unwrapFirestoreFields(fields: Record<string, any>) {
       null;
   }
   return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// NEW (Phase 6) below this line. Generic versions of the two functions
+// above, parameterized by document path instead of hardcoded to
+// `users/{uid}`, so they can read/write `groups/{id}` and
+// `groups/{id}/members/{memberId}` too without duplicating the OAuth +
+// wrap/unwrap logic a third and fourth time.
+// ─────────────────────────────────────────────────────────────────────
+
+export async function getDocByPath(env: Env, path: string): Promise<Record<string, any> | null> {
+  const token = await getAccessToken(env);
+  const res = await fetch(`${FIRESTORE_BASE(env.FIREBASE_PROJECT_ID)}/${path}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.status === 404) return null;
+
+  const doc = await res.json<{ fields?: Record<string, any>; error?: any }>();
+  if (!res.ok) {
+    throw new Error(`Firestore read failed (${path}): ${res.status} — ${JSON.stringify(doc)}`);
+  }
+  return unwrapFirestoreFields(doc.fields ?? {});
+}
+
+export async function patchDocByPath(env: Env, path: string, fields: Record<string, string>) {
+  const token = await getAccessToken(env);
+  const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join("&");
+  const res = await fetch(`${FIRESTORE_BASE(env.FIREBASE_PROJECT_ID)}/${path}?${mask}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ fields: wrapFirestoreFields(fields) }),
+  });
+
+  if (!res.ok) {
+    const errBody = await res.text();
+    throw new Error(`Firestore write failed (${path}): ${res.status} — ${errBody}`);
+  }
+}
+
+/** Reads `groups/{groupId}` -- used to check `ownerUid` before any
+ * group-member write/read is allowed. */
+export async function getGroupDoc(env: Env, groupId: string) {
+  return getDocByPath(env, `groups/${groupId}`);
+}
+
+/** Reads `groups/{groupId}/members/{memberId}` -- used to check
+ * `sourceType === "managed"` (never "linked") before allowing a write. */
+export async function getGroupMemberDoc(env: Env, groupId: string, memberId: string) {
+  return getDocByPath(env, `groups/${groupId}/members/${memberId}`);
+}
+
+/** Writes conditionsEncrypted/allergensEncrypted onto a managed member's
+ * doc. `updatedAt` is stored as an ISO string (not a Firestore
+ * timestampValue) so this can reuse wrapFirestoreFields' plain-string
+ * wrapping without extending it for a second value type. */
+export async function patchGroupMemberHealthDoc(
+  env: Env,
+  groupId: string,
+  memberId: string,
+  fields: { conditionsEncrypted: string; allergensEncrypted: string }
+) {
+  return patchDocByPath(env, `groups/${groupId}/members/${memberId}`, {
+    conditionsEncrypted: fields.conditionsEncrypted,
+    allergensEncrypted: fields.allergensEncrypted,
+    updatedAt: new Date().toISOString(),
+  });
 }

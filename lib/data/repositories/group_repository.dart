@@ -181,7 +181,13 @@ class FirebaseGroupRepository implements GroupRepository {
       throw Exception('This invite code is expired or already used.');
     }
 
-    final memberRef = _groups.doc(groupId).collection('members').doc();
+    // Linked members are keyed by their own uid (not an auto-generated
+    // id) -- this lets Firestore Rules cheaply check "is this caller a
+    // member of this group" with a single exists() lookup instead of a
+    // query, which rules can't do. See the corrected groups/{groupId}
+    // and groups/{groupId}/members/{memberId} read rules in
+    // firestore/group_rules_addition.rules.
+    final memberRef = _groups.doc(groupId).collection('members').doc(joiningUid);
     final member = GroupMember(
       id: memberRef.id,
       groupId: groupId,
