@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
+import '../widgets/avatar_picker.dart';
 import '../widgets/date_of_birth_picker.dart';
 import 'home_screen.dart';
 
@@ -50,6 +51,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // treat the date of birth as "selected and valid".
   DateTime? _dateOfBirth;
   String? _dobError;
+
+  // Avatar asset path chosen on the Basic Info page (required).
+  String? _avatar;
+  bool _avatarError = false;
 
   // Internal storage keys -- DO NOT translate these, see class doc above.
   final Map<String, bool> _conditions = {
@@ -148,27 +153,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // than being blocked repeatedly one field at a time.
       final nameEmpty = _nameController.text.trim().isEmpty;
       final dobMissing = _dateOfBirth == null;
+      final avatarMissing = _avatar == null;
 
-      if (nameEmpty || dobMissing) {
+      if (nameEmpty || dobMissing || avatarMissing) {
+        final tl = Localizations.localeOf(context).languageCode == 'tl';
         setState(() {
           _nameError = nameEmpty ? loc.onboardingNameEmpty : null;
           _dobError = dobMissing ? loc.onboardingDobError : null;
+          _avatarError = avatarMissing;
         });
         HapticService().vibrate();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              nameEmpty && dobMissing
-                  ? loc.onboardingNameAndDobError
-                  : (nameEmpty ? loc.onboardingNameEmpty : loc.onboardingDobError),
-            ),
-          ),
-        );
+        // Name/DOB keep their existing messages; the avatar message is
+        // only shown alone or when it's the only thing missing.
+        final String message;
+        if (avatarMissing && !nameEmpty && !dobMissing) {
+          message = tl ? 'Pumili ng avatar.' : 'Please choose an avatar.';
+        } else if (nameEmpty && dobMissing) {
+          message = loc.onboardingNameAndDobError;
+        } else if (nameEmpty) {
+          message = loc.onboardingNameEmpty;
+        } else if (dobMissing) {
+          message = loc.onboardingDobError;
+        } else {
+          message = tl ? 'Pumili ng avatar.' : 'Please choose an avatar.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
         return;
       } else {
         setState(() {
           _nameError = null;
           _dobError = null;
+          _avatarError = false;
         });
       }
 
@@ -206,6 +221,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         await _authService.saveOnboardingData(
           name: _nameController.text.trim(),
           dateOfBirth: _dateOfBirth,
+          avatar: _avatar,
           conditions: selectedConditions,
           allergens: selectedAllergens,
         );
@@ -394,6 +410,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 24),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Avatar',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+            ),
+          ),
+          const SizedBox(height: 12),
+          AvatarPicker(
+            selected: _avatar,
+            allowClear: false, // required: one avatar is always kept once chosen
+            onChanged: (a) => setState(() {
+              _avatar = a;
+              if (a != null) _avatarError = false;
+            }),
+          ),
+          if (_avatarError) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.error_outline, size: 14, color: colorScheme.error),
+                    const SizedBox(width: 4),
+                    Text(
+                      Localizations.localeOf(context).languageCode == 'tl'
+                          ? 'Pumili ng avatar.'
+                          : 'Please choose an avatar.',
+                      style: TextStyle(color: colorScheme.error, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -730,7 +785,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   bool isBasicInfoValid() {
-    return _nameController.text.trim().isNotEmpty && _dateOfBirth != null;
+    return _nameController.text.trim().isNotEmpty && _dateOfBirth != null && _avatar != null;
   }
 
   bool _isFormValid() {

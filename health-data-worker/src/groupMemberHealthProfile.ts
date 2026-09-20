@@ -62,27 +62,36 @@ async function assertOwnerCanManageMember(
 // any active member's health profile (members consent to this when they
 // join; the owner is a member too). Writes never go through this check --
 // they stay owner-only for managed members (assertOwnerCanManageMember).
+//
+// Returns the member doc it already loaded so the caller doesn't fetch it
+// a second time, and loads the group + caller-membership docs in parallel.
+type ReadAuthResult =
+  | { ok: true; member: Record<string, any> }
+  | { ok: false; status: number; message: string };
+
 async function assertCanReadMember(
   env: Env,
   callerUid: string,
   groupId: string,
   memberId: string
-): Promise<AuthResult> {
-  const group = await getGroupDoc(env, groupId);
+): Promise<ReadAuthResult> {
+  const [group, callerDoc, member] = await Promise.all([
+    getGroupDoc(env, groupId),
+    getGroupMemberDoc(env, groupId, callerUid),
+    getGroupMemberDoc(env, groupId, memberId),
+  ]);
   if (!group) {
     return { ok: false, status: 404, message: "Group not found." };
   }
   if (group.ownerUid !== callerUid) {
-    const caller = await getGroupMemberDoc(env, groupId, callerUid);
-    if (!caller || caller.status !== "active") {
+    if (!callerDoc || callerDoc.status !== "active") {
       return { ok: false, status: 403, message: "Not authorized for this group." };
     }
   }
-  const member = await getGroupMemberDoc(env, groupId, memberId);
   if (!member || member.status !== "active") {
     return { ok: false, status: 404, message: "Member not found." };
   }
-  return { ok: true };
+  return { ok: true, member };
 }
 
 export async function handleGroupMemberHealthProfilePost(
@@ -154,12 +163,21 @@ async function getImpl(env: Env, uid: string, url: URL): Promise<Response> {
   if (!authCheck.ok) {
     return new Response(authCheck.message, { status: authCheck.status });
   }
+  const member = authCheck.member;
 
-  const member = await getGroupMemberDoc(env, groupId, memberId);
-
-  // Linked member: their health data lives on users/{linkedUid}, encrypted
-  // the same way /health-profile stores it. Owner-only read, checked above.
-  if (member?.sourceType === "linked" && member.linkedUid) {
+  // Linked member (QR-invited, or the owner's own record): their health
+  // data lives on users/{linkedUid}, encrypted the same way /health-profile
+  // stores it. It is read by the MEMBER'S OWN uid -- never the caller's --
+  // so every viewer (owner or fellow member) gets that member's data.
+  //
+  // A linked record's doc id is always its own uid (redeemInvite() and
+  // ensureOwnerMember() both key it that way). Refuse anything else so a
+  // hand-written linked record can't be pointed at some third user's uid
+  // to read their health data.
+  if (member.sourceType === "linked") {
+    if (!member.linkedUid || member.linkedUid !== memberId) {
+      return new Response("Member not found.", { status: 404 });
+    }
     const userDoc = await getUserDoc(env, member.linkedUid);
     return Response.json({
       conditions: await decryptField(env, userDoc.conditions),
@@ -168,7 +186,7 @@ async function getImpl(env: Env, uid: string, url: URL): Promise<Response> {
   }
 
   return Response.json({
-    conditions: await decryptField(env, member?.conditionsEncrypted),
-    allergens: await decryptField(env, member?.allergensEncrypted),
+    conditions: await decryptField(env, member.conditionsEncrypted),
+    allergens: await decryptField(env, member.allergensEncrypted),
   });
 }

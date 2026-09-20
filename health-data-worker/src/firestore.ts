@@ -12,7 +12,35 @@ import { Env } from "./env";
 
 import { SignJWT, importPKCS8 } from "jose";
 
+// Every Firestore REST call needs a Google OAuth access token. Minting one
+// means parsing the RSA private key, signing a JWT and making a network
+// round-trip to oauth2.googleapis.com -- and this file used to do that on
+// EVERY call. A single group-member health read makes 3-5 Firestore calls,
+// so it minted 3-5 tokens per request (vs. 1 for the plain /health-profile
+// route), which is what pushed the group routes over the Worker's CPU
+// budget for exactly the "someone else's linked profile" cases. The token
+// is valid for an hour, so keep it per isolate and reuse it.
+let cachedToken: { value: string; expiresAtMs: number } | null = null;
+let inflightToken: Promise<string> | null = null;
+
 async function getAccessToken(env: Env): Promise<string> {
+  if (cachedToken && cachedToken.expiresAtMs - 60_000 > Date.now()) {
+    return cachedToken.value;
+  }
+  if (!inflightToken) {
+    inflightToken = mintAccessToken(env)
+      .then(t => {
+        cachedToken = { value: t.token, expiresAtMs: Date.now() + t.expiresInSec * 1000 };
+        return t.token;
+      })
+      .finally(() => {
+        inflightToken = null;
+      });
+  }
+  return inflightToken;
+}
+
+async function mintAccessToken(env: Env): Promise<{ token: string; expiresInSec: number }> {
   const privateKey = await importPKCS8(env.GCP_PRIVATE_KEY, "RS256");
   const now = Math.floor(Date.now() / 1000);
   const jwt = await new SignJWT({
@@ -36,6 +64,7 @@ async function getAccessToken(env: Env): Promise<string> {
   });
   const data = await res.json<{
     access_token: string;
+    expires_in?: number;
     error?: string;
     error_description?: string;
   }>();
@@ -46,7 +75,7 @@ async function getAccessToken(env: Env): Promise<string> {
     );
   }
 
-  return data.access_token;
+  return { token: data.access_token, expiresInSec: data.expires_in ?? 3600 };
 }
 
 const FIRESTORE_BASE = (projectId: string) =>

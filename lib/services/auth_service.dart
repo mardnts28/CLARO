@@ -695,6 +695,11 @@ class AuthService {
     // wants to backfill them -- onboarding itself never passes these now.
     String? age,
     DateTime? dateOfBirth,
+    // Asset path chosen on the Basic Information screen, e.g.
+    // 'assets/images/avatars/female_1.png'. Stored as users/{uid}.avatar --
+    // the same field the Profile screen, the Join Group flow and
+    // GroupRepository.ensureOwnerMember() already read.
+    String? avatar,
     required List<String> conditions,
     required List<String> allergens,
   }) async {
@@ -718,6 +723,7 @@ class AuthService {
       final data = <String, dynamic>{
         'uid': uid,
         'onboardingComplete': true,
+        if (avatar != null && avatar.isNotEmpty) 'avatar': avatar,
       };
 
       final docData = userDoc.data();

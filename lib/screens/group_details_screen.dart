@@ -47,6 +47,17 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
   bool _isOwner = false;
   bool _deleting = false;
 
+  // Cached so the profile fetch is NOT restarted by every rebuild. It used to
+  // be created inline in build(), so each members-stream emission / setState
+  // threw away the in-flight fetch and reset every card to "no health
+  // profile yet".
+  Future<List<UserHealthProfile>>? _profilesFuture;
+  String? _memberSignature; // null until the first members snapshot arrives
+
+  void _refreshProfiles() {
+    _profilesFuture = _groupRepository.getGroupHealthProfiles(_group.id);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -92,7 +103,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                 context,
                 MaterialPageRoute(builder: (_) => AddManagedMemberScreen(group: _group)),
               );
-              if (mounted) setState(() {}); // membership stream + profile FutureBuilder both refresh
+              if (mounted) setState(_refreshProfiles); // re-fetch profiles for the new member
             },
             child: ListTile(
               leading: const Icon(Icons.person_add_alt_outlined),
@@ -129,7 +140,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     if (confirmed == true) {
       HapticService().vibrate();
       await _groupRepository.removeMember(groupId: _group.id, memberId: member.id);
-      if (mounted) setState(() {});
+      if (mounted) setState(_refreshProfiles);
     }
   }
 
@@ -265,11 +276,16 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
             final membersLoading = !memberSnap.hasData && !memberSnap.hasError;
             final membersError = memberSnap.hasError;
 
+            // Re-fetch profiles only when the SET of active members changes
+            // (e.g. a QR-invited member joins), not on every rebuild.
+            final signature = (members.map((m) => '${m.id}:${m.linkedUid}').toList()..sort()).join('|');
+            if (!membersLoading && !membersError && signature != _memberSignature) {
+              _memberSignature = signature;
+              _profilesFuture = _groupRepository.getGroupHealthProfiles(_group.id);
+            }
+
             return FutureBuilder<List<UserHealthProfile>>(
-              // Fetched once per members-list change rather than once per
-              // member card -- getGroupHealthProfiles() already returns
-              // every active member's profile in a single call.
-              future: _groupRepository.getGroupHealthProfiles(_group.id),
+              future: _profilesFuture,
               builder: (context, profileSnap) {
                 final profiles = profileSnap.data ?? const <UserHealthProfile>[];
                 final profileByKey = <String, UserHealthProfile>{
@@ -482,7 +498,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                           builder: (_) => AddManagedMemberScreen(group: _group, existingMember: member),
                         ),
                       );
-                      if (mounted) setState(() {});
+                      if (mounted) setState(_refreshProfiles);
                     },
                   ),
                 if (canRemove)

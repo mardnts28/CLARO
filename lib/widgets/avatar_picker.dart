@@ -14,7 +14,16 @@ class AvatarPicker extends StatefulWidget {
   final String? selected;
   final ValueChanged<String?> onChanged;
 
-  const AvatarPicker({super.key, required this.selected, required this.onChanged});
+  /// When false (required-avatar screens: onboarding, profile), tapping the
+  /// selected avatar again keeps it selected instead of clearing it.
+  final bool allowClear;
+
+  const AvatarPicker({
+    super.key,
+    required this.selected,
+    required this.onChanged,
+    this.allowClear = true,
+  });
 
   @override
   State<AvatarPicker> createState() => _AvatarPickerState();
@@ -48,7 +57,7 @@ class _AvatarPickerState extends State<AvatarPicker> {
         return GestureDetector(
           onTap: () {
             HapticService().vibrate();
-            widget.onChanged(selected ? null : path);
+            widget.onChanged(selected && widget.allowClear ? null : path);
           },
           child: Stack(
             children: [

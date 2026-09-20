@@ -503,8 +503,9 @@ class FirebaseGroupRepository implements GroupRepository {
   Future<void> ensureOwnerMember(HealthGroup group) async {
     final memberRef = _groups.doc(group.id).collection('members').doc(group.ownerUid);
     final existing = await memberRef.get();
-    if (existing.exists) return;
 
+    // The owner's name/avatar come from their own profile (users/{uid}),
+    // the same record onboarding writes and the Profile screen edits.
     String? name;
     String? avatar;
     try {
@@ -514,6 +515,20 @@ class FirebaseGroupRepository implements GroupRepository {
       final a = userDoc.data()?['avatar']?.toString();
       if (a != null && a.isNotEmpty) avatar = a;
     } catch (_) {}
+
+    if (existing.exists) {
+      // Backfill / re-sync: the owner may have picked or changed their
+      // avatar after this record was first written.
+      final currentAvatar = existing.data()?['avatar']?.toString();
+      if (avatar != null && avatar != currentAvatar) {
+        try {
+          await memberRef.update({'avatar': avatar});
+        } catch (e) {
+          debugPrint('ensureOwnerMember: avatar sync failed: $e');
+        }
+      }
+      return;
+    }
 
     final member = GroupMember(
       id: group.ownerUid,
@@ -580,43 +595,51 @@ class FirebaseGroupRepository implements GroupRepository {
         .where('status', isEqualTo: 'active')
         .get();
 
-    final profiles = <UserHealthProfile>[];
-    for (final doc in snap.docs) {
+    final myUid = FirebaseAuth.instance.currentUser?.uid;
+
+    // Every member is resolved independently and in parallel: one slow or
+    // failing member must not hide the others, and N sequential Worker
+    // round-trips made the screen slow enough to be rebuilt mid-load.
+    final results = await Future.wait(snap.docs.map((doc) async {
       final member = GroupMember.fromFirestore(doc.id, groupId, doc.data());
-      if (member.isLinked && member.linkedUid != null) {
-        try {
-          final myUid = FirebaseAuth.instance.currentUser?.uid;
-          if (member.linkedUid == myUid) {
-            // My own card: my own profile, read the normal way.
-            if (_userRepository == null) continue;
-            profiles.add(await _userRepository.getHealthProfile(member.linkedUid!));
-          } else {
-            // The owner viewing a linked member: only the Worker can
-            // decrypt that member's health data (it verifies the caller
-            // owns the group). Keyed by the member's uid, matching how
-            // the group screen looks profiles up.
-            final profile = await _fetchManagedMemberProfile(
-              groupId,
-              member,
-              profileUserId: member.linkedUid,
-            );
-            if (profile != null) profiles.add(profile);
-          }
-        } catch (_) {
-          // A linked member's profile may be unreadable (e.g. they left
-          // between the membership list load and this fetch) -- skip
-          // rather than fail the whole group evaluation.
-          continue;
-        }
-      } else if (member.isManaged) {
-        final profile = await _fetchManagedMemberProfile(groupId, member);
-        if (profile != null) profiles.add(profile);
+      try {
+        return await _profileForMember(groupId, member, myUid);
+      } catch (e) {
+        debugPrint('getGroupHealthProfiles: member ${member.id} failed: $e');
+        return null;
       }
-    }
-    return profiles;
+    }));
+    return results.whereType<UserHealthProfile>().toList();
   }
 
-  Future<UserHealthProfile?> _fetchManagedMemberProfile(
+  /// Resolves ONE member's profile from that member's own identity:
+  ///  - linked  -> keyed/fetched by member.linkedUid (their own account)
+  ///  - managed -> keyed/fetched by member.id (the doc the owner wrote)
+  /// The current user is only special-cased as a fast path for their OWN
+  /// card; every other card is fetched for its real uid via the Worker's
+  /// group endpoint (the plain /health-profile route always returns the
+  /// CALLER's data, so it must never be used for someone else's card).
+  Future<UserHealthProfile?> _profileForMember(
+    String groupId,
+    GroupMember member,
+    String? myUid,
+  ) async {
+    if (member.isLinked) {
+      final memberUid = member.linkedUid;
+      if (memberUid == null || memberUid.isEmpty) return null;
+
+      if (memberUid == myUid && _userRepository != null) {
+        return _userRepository.getHealthProfile(memberUid);
+      }
+      return _fetchMemberProfileFromWorker(groupId, member, profileUserId: memberUid);
+    }
+    if (member.isManaged) {
+      return _fetchMemberProfileFromWorker(groupId, member);
+    }
+    return null;
+  }
+
+  Future<UserHealthProfile?> _fetchMemberProfileFromWorker(
     String groupId,
     GroupMember member, {
     String? profileUserId,
@@ -629,7 +652,8 @@ class FirebaseGroupRepository implements GroupRepository {
         headers: {'Authorization': 'Bearer $idToken'},
       );
       if (res.statusCode < 200 || res.statusCode >= 300) {
-        debugPrint('_fetchManagedMemberProfile failed: ${res.statusCode} ${res.body}');
+        debugPrint('_fetchMemberProfileFromWorker failed for member ${member.id} '
+            '(${member.sourceType.name}): ${res.statusCode} ${res.body}');
         return null;
       }
       final healthData = jsonDecode(res.body) as Map<String, dynamic>;
@@ -650,7 +674,7 @@ class FirebaseGroupRepository implements GroupRepository {
         allergies: mapAllergenLabels((healthData['allergens'] as List<dynamic>?) ?? const []),
       );
     } catch (e) {
-      debugPrint('_fetchManagedMemberProfile error: $e');
+      debugPrint('_fetchMemberProfileFromWorker error for member ${member.id}: $e');
       return null;
     }
   }
