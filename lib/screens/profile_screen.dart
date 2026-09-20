@@ -305,7 +305,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -342,7 +348,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -431,7 +443,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.14),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -1018,14 +1036,7 @@ class _DeleteAccountDialogContentState
               hintStyle: TextStyle(
                 color: colorScheme.onSurfaceVariant.withOpacity(0.5),
               ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: colorScheme.outlineVariant),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: deleteColor, width: 2),
-              ),
+              border: InputBorder.none,
               errorText: _errorMessage,
               errorStyle: TextStyle(
                 color: deleteColor,
@@ -1238,7 +1249,7 @@ class _ReauthDialogContentState extends State<_ReauthDialogContent> {
                 label: Text(_isProcessing ? 'Verifying...' : 'Continue with Google'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: accentColor,
-                  side: BorderSide(color: accentColor),
+                  side: BorderSide.none,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
@@ -1260,14 +1271,7 @@ class _ReauthDialogContentState extends State<_ReauthDialogContent> {
                 hintStyle: TextStyle(
                   color: colorScheme.onSurfaceVariant.withOpacity(0.5),
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: colorScheme.outlineVariant),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: accentColor, width: 2),
-                ),
+                border: InputBorder.none,
                 errorText: _errorMessage,
                 errorStyle: TextStyle(color: accentColor),
               ),

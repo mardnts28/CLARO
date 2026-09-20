@@ -255,7 +255,7 @@ class AuthService {
   Future<Map<String, dynamic>> _prepareAndSendOtp(String uid, String email) async {
     final code = (100000 + DateTime.now().microsecondsSinceEpoch % 900000).toString().padLeft(6, '0');
     final now = Timestamp.now();
-    final expiresAt = Timestamp.fromDate(now.toDate().add(const Duration(minutes: 3)));
+    final expiresAt = Timestamp.fromDate(now.toDate().add(const Duration(minutes: 5)));
 
     await _firebaseDb.collection('login_otps').doc(uid).set({
       'uid': uid,

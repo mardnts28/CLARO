@@ -116,7 +116,13 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
               decoration: BoxDecoration(
                 color: theme.cardColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.dividerColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.shadowColor.withOpacity(0.14),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -215,7 +221,8 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                                 icon: Icon(Icons.play_arrow, color: theme.colorScheme.primary),
                                 label: Text(loc.previewAudio, style: TextStyle(color: theme.colorScheme.primary)),
                                 style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: theme.colorScheme.primary),
+                                  side: BorderSide.none,
+                                  elevation: 2,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                   padding: const EdgeInsets.symmetric(vertical: 12),
                                 ),
@@ -246,7 +253,13 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
               decoration: BoxDecoration(
                 color: theme.cardColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.dividerColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.shadowColor.withOpacity(0.14),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,7 +327,13 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
               decoration: BoxDecoration(
                 color: theme.cardColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: theme.dividerColor),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.shadowColor.withOpacity(0.14),
+                    blurRadius: 14,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

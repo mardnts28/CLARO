@@ -41,6 +41,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   bool _isVerifying = false;
   bool _isResending = false;
   int _remainingSeconds = 180;
+  int _resendCooldownSeconds = 15;
   int _attempts = 0;
   Timer? _timer;
   DateTime? _currentExpiresAt;
@@ -70,8 +71,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       final difference = _currentExpiresAt!.difference(now);
       _remainingSeconds = difference.inSeconds;
     } else {
-      _remainingSeconds = 180;
+      _remainingSeconds = 300;
     }
+    _resendCooldownSeconds = 15;
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
@@ -79,7 +81,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       setState(() {
         if (_remainingSeconds > 0) {
           _remainingSeconds--;
-        } else {
+        }
+        if (_resendCooldownSeconds > 0) {
+          _resendCooldownSeconds--;
+        }
+        if (_remainingSeconds == 0 && _resendCooldownSeconds == 0) {
           timer.cancel();
         }
       });
@@ -373,13 +379,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         width: double.infinity,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _remainingSeconds > 0
+                            backgroundColor: _resendCooldownSeconds > 0
                                 ? Colors.grey.shade400
                                 : Colors.red,
                             foregroundColor: Colors.white,
                             disabledBackgroundColor: Colors.grey.shade400,
                           ),
-                          onPressed: _isResending || _remainingSeconds > 0
+                          onPressed: _isResending || _resendCooldownSeconds > 0
                               ? null
                               : _resendCode,
                           child: _isResending
@@ -392,9 +398,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                                   ),
                                 )
                               : Text(
-                                  _remainingSeconds > 0
-                                      ? 'Resend Code'
-                                      : 'Resend Code',
+                                  _resendCooldownSeconds > 0
+                                    ? 'Resend Code in ${_formatTime(_resendCooldownSeconds)}'
+                                    : 'Resend Code',
                                   style: const TextStyle(fontWeight: FontWeight.w600),
                                 ),
                         ),

@@ -258,8 +258,13 @@ class _ReviewHistoryScreenState extends State<ReviewHistoryScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.dividerColor),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 6)],
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withOpacity(0.16),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,7 +352,13 @@ class _ReviewHistoryScreenState extends State<ReviewHistoryScreen> {
       decoration: BoxDecoration(
         color: colorScheme.primary.withOpacity(0.06),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: colorScheme.primary.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withOpacity(0.12),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

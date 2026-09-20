@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -16,9 +17,14 @@ import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
 import '../services/voice_assistant_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 class HistoryScreen extends StatefulWidget {
   final bool embeddedMode;
-  const HistoryScreen({super.key, this.embeddedMode = false});
+
+  const HistoryScreen({
+    super.key,
+    this.embeddedMode = false,
+  });
 
   @override
   State<HistoryScreen> createState() => _HistoryScreenState();
@@ -29,8 +35,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   // Caches in-flight/completed product lookups by product ID so the list
-  // doesn't re-hit Firestore on every rebuild (search typing, tab switches,
-  // favorites stream updates, etc.) -- each ID is only ever fetched once.
+  // doesn't re-hit Firestore on every rebuild.
   final Map<String, Future<Product?>> _productLookupCache = {};
 
   Future<Product?> _lookupProduct(String productId) {
@@ -43,20 +48,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
     });
   }
+
   final _authService = AuthService();
+
   StreamSubscription<void>? _subscription;
   StreamSubscription<List<Product>>? _favoritesSubscription;
 
-  String _activeTab = 'Lahat'; // 'Lahat', 'Paborito', 'Kumpara'
+  String _activeTab = 'Lahat';
   String _searchQuery = '';
 
   // Favorites are loaded directly from BackendLocator.favoritesService
-  // as full Product objects, independent of scan history. This shows all
-  // favorited products regardless of how they were discovered (scan, compare, etc.).
+  // as full Product objects.
   List<Product> _favoriteProducts = [];
   bool _favoritesLoading = true;
 
-  static const _tabs = ['Lahat', 'Paborito', 'Kumpara', 'Mga Ulat'];
+  static const _tabs = [
+    'Lahat',
+    'Paborito',
+    'Kumpara',
+    'Mga Ulat',
+  ];
 
   StreamSubscription<QuerySnapshot>? _reportsSubscription;
   List<ReportModel> _reports = [];
@@ -67,40 +78,52 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   void initState() {
     super.initState();
+
     HomeTabController.tabNotifier.addListener(_handleTabChange);
     HomeTabController.historySubTabNotifier.addListener(_handleSubTabChange);
+
     _announceIfVisible();
+
     _subscription = _historyService.onUpdate.listen((_) {
-      if (mounted) setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     });
+
     _searchController.addListener(() {
       _searchDebounce?.cancel();
-      _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-        if (mounted) {
-          setState(() => _searchQuery = _searchController.text);
-        }
-      });
+
+      _searchDebounce = Timer(
+        const Duration(milliseconds: 300),
+        () {
+          if (mounted) {
+            setState(() {
+              _searchQuery = _searchController.text;
+            });
+          }
+        },
+      );
     });
+
     _subscribeFavorites();
     _subscribeReports();
-    // Listen for language changes to refresh the UI with localized labels
+
     LocaleService.localeNotifier.addListener(_onLocaleChanged);
   }
 
   void _handleSubTabChange() {
     if (!mounted) return;
+
     final newTab = HomeTabController.historySubTabNotifier.value;
+
     setState(() {
       _activeTab = newTab;
     });
-    // Do NOT call announcePage here — voice commands that trigger
-    // switchToHistorySubTab() already speak their own reply via the
-    // voice command router. Announcing again would cause overlap.
   }
 
   void _onLocaleChanged() {
     if (mounted) {
-      setState(() {}); // Force rebuild to update localized labels
+      setState(() {});
     }
   }
 
@@ -112,24 +135,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
     if (HomeTabController.tabNotifier.value == 2 &&
         _authService.currentUser != null &&
         VoiceAssistantService.instance.isEnabled &&
-        // Only announce if on the All tab — sub-tabs handle their own
-        // announcements via onTap. Also skip if voice is already speaking
-        // (e.g. voice command router already said "Opening history").
         _activeTab == 'Lahat' &&
         !VoiceAssistantService.isSpeakingNotifier.value) {
       final isTagalog =
           LocaleService.localeNotifier.value.languageCode == 'tl';
+
       final preamble = isTagalog
           ? 'Binubuksan ang kasaysayan ng pag-scan.'
           : 'Opening scan history.';
-      // 350 ms delay lets stopAudio() from the navigator observer finish
-      // before the announcement begins.
-      Future.delayed(const Duration(milliseconds: 350), () {
-        if (mounted) {
-          VoiceAssistantService.instance
-              .announcePageWithPreamble(preamble, 'history');
-        }
-      });
+
+      Future.delayed(
+        const Duration(milliseconds: 350),
+        () {
+          if (mounted) {
+            VoiceAssistantService.instance
+                .announcePageWithPreamble(preamble, 'history');
+          }
+        },
+      );
     }
   }
 
@@ -138,17 +161,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
     HomeTabController.historySubTabNotifier.removeListener(_handleSubTabChange);
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
+
     _subscription?.cancel();
     _favoritesSubscription?.cancel();
     _reportsSubscription?.cancel();
+
+    _searchDebounce?.cancel();
     _searchController.dispose();
+
     super.dispose();
   }
 
   void _subscribeReports() {
     final uid = _authService.currentUser?.uid;
+
     if (uid == null) {
-      if (mounted) setState(() => _reportsLoading = false);
+      if (mounted) {
+        setState(() {
+          _reportsLoading = false;
+        });
+      }
       return;
     }
 
@@ -156,38 +188,46 @@ class _HistoryScreenState extends State<HistoryScreen> {
         .collection('reports')
         .where('reportedBy', isEqualTo: uid)
         .snapshots()
-        .listen((snapshot) {
-      if (mounted) {
-        setState(() {
-          _reports = snapshot.docs
-              .map((doc) => ReportModel.fromFirestore(doc))
-              .toList();
-          // Sort descending by date
-          _reports.sort((a, b) => b.dateSubmitted.compareTo(a.dateSubmitted));
-          _reportsLoading = false;
-        });
-      }
-    }, onError: (e) {
-      debugPrint('Error watching reports: $e');
-      if (mounted) setState(() => _reportsLoading = false);
-    });
+        .listen(
+      (snapshot) {
+        if (mounted) {
+          setState(() {
+            _reports = snapshot.docs
+                .map((doc) => ReportModel.fromFirestore(doc))
+                .toList();
+
+            _reports.sort(
+              (a, b) => b.dateSubmitted.compareTo(a.dateSubmitted),
+            );
+
+            _reportsLoading = false;
+          });
+        }
+      },
+      onError: (e) {
+        debugPrint('Error watching reports: $e');
+
+        if (mounted) {
+          setState(() {
+            _reportsLoading = false;
+          });
+        }
+      },
+    );
   }
 
-  // Live Firestore stream -- this is the single source of truth for the
-  // Favorites tab now. It's what makes favoriting correct from EVERY
-  // navigation path (All tab, Compare tab -> saved comparison -> ranked
-  // list, multi-scan results, etc.) without each screen needing to call
-  // back into History to trigger a refresh. The previous pattern relied on
-  // each screen remembering to do that after its own specific
-  // Navigator.push returned -- _buildScanCard did it, _buildCompareCard
-  // didn't, and multi_scan_results_screen.dart's path to ProductDetailScreen
-  // had no connection to History at all. That asymmetry was the actual bug.
   void _subscribeFavorites() {
     final uid = _authService.currentUser?.uid;
+
     if (uid == null) {
-      if (mounted) setState(() => _favoritesLoading = false);
+      if (mounted) {
+        setState(() {
+          _favoritesLoading = false;
+        });
+      }
       return;
     }
+
     _favoritesSubscription =
         BackendLocator.favoritesService.watchFavoriteProducts(uid).listen(
       (products) {
@@ -200,7 +240,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
       },
       onError: (e) {
         debugPrint('Error watching favorites: $e');
-        if (mounted) setState(() => _favoritesLoading = false);
+
+        if (mounted) {
+          setState(() {
+            _favoritesLoading = false;
+          });
+        }
       },
     );
   }
@@ -208,9 +253,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<void> _toggleFavoriteForItem(HistoryItem item) async {
     final uid = _authService.currentUser?.uid;
     final productId = item.productId;
+
     if (uid == null || productId == null) return;
 
-    final wasFavorite = _favoriteProducts.any((p) => p.id == productId);
+    final wasFavorite =
+        _favoriteProducts.any((p) => p.id == productId);
 
     try {
       await BackendLocator.favoritesService.toggleFavorite(
@@ -218,20 +265,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
         productId: productId,
         isCurrentlyFavorite: wasFavorite,
       );
-      // No manual refresh needed -- _favoritesSubscription above picks this
-      // up automatically, the same way it picks up every other navigation
-      // path's favorite toggles.
     } catch (e) {
       debugPrint('Error toggling favorite: $e');
     }
   }
 
-  // ── Group items by date label ──────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // GROUP HISTORY ITEMS BY DATE
+  // ─────────────────────────────────────────────────────────────────────────
+
   Map<String, List<HistoryItem>> _groupItems(List<HistoryItem> items) {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final lastWeek = today.subtract(const Duration(days: 7));
+
+    final today = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    );
+
+    final yesterday = today.subtract(
+      const Duration(days: 1),
+    );
+
+    final lastWeek = today.subtract(
+      const Duration(days: 7),
+    );
 
     final loc = AppLocalizations.of(context)!;
 
@@ -243,9 +301,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     };
 
     for (final item in items) {
-      final d = DateTime(item.timestamp.year, item.timestamp.month, item.timestamp.day);
-      
-      // "no last year" -> ignore items from previous years
+      final d = DateTime(
+        item.timestamp.year,
+        item.timestamp.month,
+        item.timestamp.day,
+      );
+
       if (d.year < now.year) continue;
 
       if (d == today) {
@@ -259,17 +320,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
     }
 
-    // Remove empty groups
-    grouped.removeWhere((_, list) => list.isEmpty);
+    grouped.removeWhere(
+      (_, list) => list.isEmpty,
+    );
+
     return grouped;
   }
 
-  // ── Group reports by date label ──────────────
-  Map<String, List<ReportModel>> _groupReports(List<ReportModel> reports) {
+  // ─────────────────────────────────────────────────────────────────────────
+  // GROUP REPORTS BY DATE
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Map<String, List<ReportModel>> _groupReports(
+    List<ReportModel> reports,
+  ) {
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final lastWeek = today.subtract(const Duration(days: 7));
+
+    final today = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    );
+
+    final yesterday = today.subtract(
+      const Duration(days: 1),
+    );
+
+    final lastWeek = today.subtract(
+      const Duration(days: 7),
+    );
 
     final loc = AppLocalizations.of(context)!;
 
@@ -281,9 +360,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     };
 
     for (final report in reports) {
-      final d = DateTime(report.dateSubmitted.year, report.dateSubmitted.month, report.dateSubmitted.day);
-      
-      // "no last year" -> ignore items from previous years
+      final d = DateTime(
+        report.dateSubmitted.year,
+        report.dateSubmitted.month,
+        report.dateSubmitted.day,
+      );
+
       if (d.year < now.year) continue;
 
       if (d == today) {
@@ -297,8 +379,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
     }
 
-    // Remove empty groups
-    grouped.removeWhere((_, list) => list.isEmpty);
+    grouped.removeWhere(
+      (_, list) => list.isEmpty,
+    );
+
     return grouped;
   }
 
@@ -306,29 +390,43 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
     final minute = dt.minute.toString().padLeft(2, '0');
     final period = dt.hour >= 12 ? 'pm' : 'am';
+
     return '$hour:$minute $period';
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CLEAR ALL DIALOG
+  // ─────────────────────────────────────────────────────────────────────────
 
   void _showClearAllDialog() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+
     final isFavoritesTab = _activeTab == 'Paborito';
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: theme.cardColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(loc.clearAllTitle,
-            style: GoogleFonts.outfit(
-                fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          loc.clearAllTitle,
+          style: GoogleFonts.outfit(
+            fontWeight: FontWeight.bold,
+            color: colorScheme.onSurface,
+          ),
+        ),
         content: Text(
           isFavoritesTab
               ? loc.clearAllFavoritesConfirm
               : loc.clearAllConfirm,
           style: GoogleFonts.inter(
-              fontSize: 14, color: colorScheme.onSurfaceVariant),
+            fontSize: 14,
+            color: colorScheme.onSurfaceVariant,
+          ),
         ),
         actions: [
           TextButton(
@@ -336,33 +434,44 @@ class _HistoryScreenState extends State<HistoryScreen> {
               HapticService().vibrate();
               Navigator.pop(ctx);
             },
-            child: Text(loc.cancel,
-                style: GoogleFonts.inter(color: colorScheme.onSurfaceVariant)),
+            child: Text(
+              loc.cancel,
+              style: GoogleFonts.inter(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () {
               HapticService().vibrate();
               Navigator.pop(ctx);
+
               if (isFavoritesTab) {
                 _clearAllFavorites();
               } else {
                 _historyService.clearAllHistory();
               }
             },
-            child: Text(loc.clear,
-                style: GoogleFonts.inter(
-                    color: colorScheme.primary, fontWeight: FontWeight.bold)),
+            child: Text(
+              loc.clear,
+              style: GoogleFonts.inter(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  /// Removes every currently-favorited product for this user.
   Future<void> _clearAllFavorites() async {
     final uid = _authService.currentUser?.uid;
+
     if (uid == null) return;
+
     final ids = List<Product>.from(_favoriteProducts);
+
     for (final product in ids) {
       try {
         await BackendLocator.favoritesService.removeFavorite(
@@ -370,19 +479,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
           productId: product.id,
         );
       } catch (e) {
-        debugPrint('HistoryScreen._clearAllFavorites: failed for ${product.id}: $e');
+        debugPrint(
+          'HistoryScreen._clearAllFavorites: failed for ${product.id}: $e',
+        );
       }
     }
   }
 
-  // ── Build a single scan-type card ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // SCAN CARD
+  // ─────────────────────────────────────────────────────────────────────────
+
   Widget _buildScanCard(HistoryItem item) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isFavorite =
-        item.productId != null && _favoriteProducts.any((p) => p.id == item.productId);
 
-    // For Favorites tab, use unfavorite logic instead of delete
+    final isFavorite = item.productId != null &&
+        _favoriteProducts.any(
+          (p) => p.id == item.productId,
+        );
+
     final isFavoritesTab = _activeTab == 'Paborito';
 
     return Dismissible(
@@ -395,62 +511,84 @@ class _HistoryScreenState extends State<HistoryScreen> {
           color: colorScheme.primary,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
+        child: Icon(
+          Icons.delete_outline,
+          color: colorScheme.onPrimary,
+          size: 26,
+        ),
       ),
       onDismissed: (_) {
         if (isFavoritesTab && item.productId != null) {
-          // Use unfavorite logic for Favorites tab
           _toggleFavoriteForItem(item);
         } else {
-          // Use delete logic for All tab
           _historyService.deleteRecord(item.id);
         }
       },
-      // Product lookup is now an async Firestore read instead of an
-      // instant in-memory one, so the tile itself carries its own loading
-      // state via FutureBuilder rather than the whole screen blocking.
       child: FutureBuilder<Product?>(
-        future: item.productId != null ? _lookupProduct(item.productId!) : null,
+        future: item.productId != null
+            ? _lookupProduct(item.productId!)
+            : null,
         builder: (context, snapshot) {
           final product = snapshot.data;
-          final isLoadingProduct = item.productId != null &&
-              snapshot.connectionState != ConnectionState.done;
+
+          final isLoadingProduct =
+              item.productId != null &&
+                  snapshot.connectionState != ConnectionState.done;
 
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () async {
               HapticService().vibrate();
+
               if (product != null) {
                 await Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => ProductDetailScreen(product: product),
+                    builder: (_) => ProductDetailScreen(
+                      product: product,
+                    ),
                   ),
                 );
-                // Favorites no longer need a manual refresh here --
-                // _favoritesSubscription (Firestore stream) keeps this screen's
-                // Favorites tab in sync in real time regardless of what
-                // happened on the screen(s) we navigated to.
               }
             },
             child: Container(
               margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 12,
+              ),
               decoration: BoxDecoration(
                 color: theme.cardColor,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: theme.dividerColor),
+
+                // Removed black/gray outline.
+                // Replaced with a more visible soft shadow.
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withOpacity(
+                      theme.brightness == Brightness.dark
+                          ? 0.20
+                          : 0.09,
+                    ),
+                    blurRadius: 14,
+                    spreadRadius: -2,
+                    offset: const Offset(0, 5),
+                  ),
+                  BoxShadow(
+                    color: colorScheme.primary.withOpacity(
+                      theme.brightness == Brightness.dark
+                          ? 0.05
+                          : 0.035,
+                    ),
+                    blurRadius: 18,
+                    spreadRadius: -5,
+                    offset: const Offset(0, 7),
                   ),
                 ],
               ),
               child: Row(
                 children: [
-                  // Product image, loading spinner, or placeholder
+                  // Product image
                   ClipRRect(
                     borderRadius: BorderRadius.circular(8),
                     child: Container(
@@ -468,67 +606,89 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 ),
                               ),
                             )
-                          : (product != null && product.imageUrl.isNotEmpty
+                          : (product != null &&
+                                  product.imageUrl.isNotEmpty
                               ? Image.network(
                                   product.imageUrl,
                                   fit: BoxFit.cover,
                                   cacheWidth: 150,
                                   cacheHeight: 150,
-                                  loadingBuilder: (context, child, progress) {
-                                    if (progress == null) return child;
+                                  loadingBuilder:
+                                      (context, child, progress) {
+                                    if (progress == null) {
+                                      return child;
+                                    }
+
                                     return Center(
                                       child: SizedBox(
                                         width: 18,
                                         height: 18,
-                                        child: CircularProgressIndicator(
+                                        child:
+                                            CircularProgressIndicator(
                                           strokeWidth: 2,
                                           color: colorScheme.primary,
                                         ),
                                       ),
                                     );
                                   },
-                                  errorBuilder: (_, __, ___) => Icon(
-                                      Icons.inventory_2_outlined,
-                                      color: colorScheme.primary,
-                                      size: 30),
+                                  errorBuilder: (_, __, ___) =>
+                                      Icon(
+                                    Icons.inventory_2_outlined,
+                                    color: colorScheme.primary,
+                                    size: 30,
+                                  ),
                                 )
-                              : Icon(Icons.inventory_2_outlined,
-                                  color: colorScheme.primary, size: 30)),
+                              : Icon(
+                                  Icons.inventory_2_outlined,
+                                  color: colorScheme.primary,
+                                  size: 30,
+                                )),
                     ),
                   ),
+
                   const SizedBox(width: 12),
+
                   // Product name + time
                   Expanded(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
                       children: [
                         Text(
                           item.title,
                           style: GoogleFonts.outfit(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: colorScheme.onSurface,
+                          ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           _formatTime(item.timestamp),
                           style: GoogleFonts.inter(
-                              fontSize: 12, color: colorScheme.onSurfaceVariant),
+                            fontSize: 12,
+                            color:
+                                colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  // Favorite heart toggle
+
+                  // Favorite heart
                   GestureDetector(
                     onTap: () {
                       HapticService().vibrate();
                       _toggleFavoriteForItem(item);
                     },
                     child: Icon(
-                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      isFavorite
+                          ? Icons.favorite
+                          : Icons.favorite_border,
                       color: isFavorite
                           ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant.withOpacity(0.4),
+                          : colorScheme.onSurfaceVariant
+                              .withOpacity(0.4),
                       size: 22,
                     ),
                   ),
@@ -541,35 +701,68 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  Future<Product?> _findProductForComparison(HistoryItem item) async {
+  // ─────────────────────────────────────────────────────────────────────────
+  // FIND PRODUCT FOR COMPARISON
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Future<Product?> _findProductForComparison(
+    HistoryItem item,
+  ) async {
     final targetId = item.sourceProductId ?? item.productId;
+
     if (targetId != null && targetId.isNotEmpty) {
       final p = await _lookupProduct(targetId);
-      if (p != null) return p;
+
+      if (p != null) {
+        return p;
+      }
     }
 
     try {
-      final allProducts = await BackendLocator.productRepository.getAllProducts();
+      final allProducts =
+          await BackendLocator.productRepository.getAllProducts();
+
       if (allProducts.isEmpty) return null;
 
       final cleanTitle = item.title
-          .replaceAll(RegExp(r'\s+Comparison\s+Result', caseSensitive: false), '')
-          .replaceAll(RegExp(r'\s+Resulta\s+ng\s+Paghahambing', caseSensitive: false), '')
+          .replaceAll(
+            RegExp(
+              r'\s+Comparison\s+Result',
+              caseSensitive: false,
+            ),
+            '',
+          )
+          .replaceAll(
+            RegExp(
+              r'\s+Resulta\s+ng\s+Paghahambing',
+              caseSensitive: false,
+            ),
+            '',
+          )
           .trim()
           .toLowerCase();
 
       if (cleanTitle.isNotEmpty) {
         for (final p in allProducts) {
           final pName = p.name.toLowerCase();
-          if (pName == cleanTitle || pName.contains(cleanTitle) || cleanTitle.contains(pName)) {
+
+          if (pName == cleanTitle ||
+              pName.contains(cleanTitle) ||
+              cleanTitle.contains(pName)) {
             return p;
           }
         }
       }
 
       final parts = item.subtitle.split(':');
+
       if (parts.length > 1) {
-        final cat = parts.sublist(1).join(':').trim().toLowerCase();
+        final cat = parts
+            .sublist(1)
+            .join(':')
+            .trim()
+            .toLowerCase();
+
         for (final p in allProducts) {
           if (p.category.toLowerCase() == cat) {
             return p;
@@ -577,15 +770,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
         }
       }
     } catch (e) {
-      debugPrint('HistoryScreen: error looking up comparison product: $e');
+      debugPrint(
+        'HistoryScreen: error looking up comparison product: $e',
+      );
     }
+
     return null;
   }
 
-  // ── Build a single comparison-type card (same layout as scan card) ─────────
+  // ─────────────────────────────────────────────────────────────────────────
+  // COMPARISON CARD
+  // ─────────────────────────────────────────────────────────────────────────
+
   Widget _buildCompareCard(HistoryItem item) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
     return Dismissible(
       key: Key(item.id),
       direction: DismissDirection.endToStart,
@@ -596,14 +796,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
           color: colorScheme.primary,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
+        child: Icon(
+          Icons.delete_outline,
+          color: colorScheme.onPrimary,
+          size: 26,
+        ),
       ),
-      onDismissed: (_) => _historyService.deleteRecord(item.id),
+      onDismissed: (_) =>
+          _historyService.deleteRecord(item.id),
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: () async {
           HapticService().vibrate();
-          final sourceProduct = await _findProductForComparison(item);
+
+          final sourceProduct =
+              await _findProductForComparison(item);
+
           if (sourceProduct != null && mounted) {
             await Navigator.push(
               context,
@@ -618,22 +826,41 @@ class _HistoryScreenState extends State<HistoryScreen> {
         },
         child: Container(
           margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 12,
+          ),
           decoration: BoxDecoration(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: theme.dividerColor),
+
+            // Removed outline.
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: Colors.black.withOpacity(
+                  theme.brightness == Brightness.dark
+                      ? 0.20
+                      : 0.09,
+                ),
+                blurRadius: 14,
+                spreadRadius: -2,
+                offset: const Offset(0, 5),
+              ),
+              BoxShadow(
+                color: colorScheme.primary.withOpacity(
+                  theme.brightness == Brightness.dark
+                      ? 0.05
+                      : 0.035,
+                ),
+                blurRadius: 18,
+                spreadRadius: -5,
+                offset: const Offset(0, 7),
               ),
             ],
           ),
           child: Row(
             children: [
-              // Compare icon placeholder — same size as product image thumbnail
+              // Compare icon
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Container(
@@ -641,50 +868,68 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   height: 52,
                   color: colorScheme.primary.withOpacity(0.12),
                   child: Center(
-                    child: Icon(Icons.compare_arrows_rounded,
-                      color: colorScheme.primary, size: 28),
+                    child: Icon(
+                      Icons.compare_arrows_rounded,
+                      color: colorScheme.primary,
+                      size: 28,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            // Title + time
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: GoogleFonts.outfit(
+
+              const SizedBox(width: 12),
+
+              // Title + time
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: GoogleFonts.outfit(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _formatTime(item.timestamp),
-                    style: GoogleFonts.inter(
-                        fontSize: 12, color: colorScheme.onSurfaceVariant),
-                  ),
-                ],
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatTime(item.timestamp),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color:
+                            colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // Compare badge icon on right
-            Icon(Icons.bar_chart_rounded,
-                color: colorScheme.primary, size: 22),
-          ],
+
+              // Compare icon
+              Icon(
+                Icons.bar_chart_rounded,
+                color: colorScheme.primary,
+                size: 22,
+              ),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // REPORT CARD
+  // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildReportCard(ReportModel report) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Status Badge colors
     Color statusBg;
     Color statusText;
+
     final status = report.status.toLowerCase();
 
     if (status == 'approved') {
@@ -693,7 +938,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     } else if (status == 'rejected') {
       statusBg = Colors.red.withOpacity(0.15);
       statusText = Colors.red[700]!;
-    } else { // pending
+    } else {
       statusBg = Colors.orange.withOpacity(0.15);
       statusText = Colors.orange[800]!;
     }
@@ -701,10 +946,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return GestureDetector(
       onTap: () {
         HapticService().vibrate();
+
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ReportDetailScreen(report: report),
+            builder: (_) => ReportDetailScreen(
+              report: report,
+            ),
           ),
         );
       },
@@ -714,37 +962,66 @@ class _HistoryScreenState extends State<HistoryScreen> {
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.dividerColor),
+
+          // Removed outline.
+          // Stronger but soft shadow gives the card separation.
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            )
+              color: Colors.black.withOpacity(
+                theme.brightness == Brightness.dark
+                    ? 0.20
+                    : 0.085,
+              ),
+              blurRadius: 15,
+              spreadRadius: -2,
+              offset: const Offset(0, 5),
+            ),
+            BoxShadow(
+              color: colorScheme.primary.withOpacity(
+                theme.brightness == Brightness.dark
+                    ? 0.04
+                    : 0.025,
+              ),
+              blurRadius: 20,
+              spreadRadius: -6,
+              offset: const Offset(0, 8),
+            ),
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment:
+                  MainAxisAlignment.spaceBetween,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Text(
-                    report.productName.isEmpty ? 'Unknown Product' : report.productName,
+                    report.productName.isEmpty
+                        ? 'Unknown Product'
+                        : report.productName,
                     style: GoogleFonts.outfit(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                 ),
+
                 const SizedBox(width: 8),
+
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusBg,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius:
+                        BorderRadius.circular(12),
                   ),
                   child: Text(
                     report.status,
@@ -757,178 +1034,279 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               ],
             ),
+
             if (report.category.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
                 report.category,
                 style: GoogleFonts.inter(
-                    fontSize: 12, color: colorScheme.onSurfaceVariant),
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
+
             const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.access_time, size: 14, color: colorScheme.onSurfaceVariant),
-              const SizedBox(width: 6),
-              Text(
-                _formatTime(report.dateSubmitted),
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ],
+
+            Row(
+              children: [
+                Icon(
+                  Icons.access_time,
+                  size: 14,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _formatTime(report.dateSubmitted),
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color:
+                        colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // BOTTOM NAVIGATION
+  // ─────────────────────────────────────────────────────────────────────────
 
   Widget _buildBottomNav() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    // Active nav item uses a white pill in dark mode so it stands out
-    // against the dark bottom bar background; the icon/text stay in
-    // colorScheme.primary (a saturated red), which reads clearly on white.
-    final navPillColor = theme.brightness == Brightness.dark
-        ? Colors.white
-        : const Color(0xFFF6CDCD);
+
+    final navPillColor =
+        theme.brightness == Brightness.dark
+            ? Colors.white
+            : const Color(0xFFF6CDCD);
 
     final items = [
-      (icon: Icons.home_outlined, activeIcon: Icons.home, label: loc.home),
-      (icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: loc.scan),
-      (icon: Icons.history_outlined, activeIcon: Icons.history, label: loc.history),
-      (icon: Icons.person_outline, activeIcon: Icons.person, label: loc.profile),
+      (
+        icon: Icons.home_outlined,
+        activeIcon: Icons.home,
+        label: loc.home,
+      ),
+      (
+        icon: Icons.qr_code_scanner_outlined,
+        activeIcon: Icons.qr_code_scanner,
+        label: loc.scan,
+      ),
+      (
+        icon: Icons.history_outlined,
+        activeIcon: Icons.history,
+        label: loc.history,
+      ),
+      (
+        icon: Icons.person_outline,
+        activeIcon: Icons.person,
+        label: loc.profile,
+      ),
     ];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 10,
+      ),
       decoration: BoxDecoration(
         color: theme.cardColor,
         boxShadow: [
           BoxShadow(
-            color: theme.brightness == Brightness.dark ? Colors.black.withOpacity(0.25) : Colors.black.withOpacity(0.05),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
+            color: theme.brightness == Brightness.dark
+                ? Colors.black.withOpacity(0.30)
+                : Colors.black.withOpacity(0.08),
+            blurRadius: 16,
+            spreadRadius: -3,
+            offset: const Offset(0, -4),
           ),
         ],
       ),
       child: SafeArea(
         top: false,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(items.length, (index) {
-            final item = items[index];
-            final isSelected = index == 2;
-            return Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  HapticService().vibrate();
-                  HomeTabController.tabNotifier.value = index;
-                  Navigator.popUntil(context, (r) => r.isFirst);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  decoration: BoxDecoration(
-                    color: isSelected ? navPillColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isSelected ? item.activeIcon : item.icon,
-                        color: colorScheme.primary,
-                        size: 22,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        item.label,
-                        style: TextStyle(
-                          fontSize: 11,
+          mainAxisAlignment:
+              MainAxisAlignment.spaceBetween,
+          children: List.generate(
+            items.length,
+            (index) {
+              final item = items[index];
+              final isSelected = index == 2;
+
+              return Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticService().vibrate();
+
+                    HomeTabController.tabNotifier.value =
+                        index;
+
+                    Navigator.popUntil(
+                      context,
+                      (r) => r.isFirst,
+                    );
+                  },
+                  child: AnimatedContainer(
+                    duration:
+                        const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                    ),
+                    padding:
+                        const EdgeInsets.symmetric(
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? navPillColor
+                          : Colors.transparent,
+                      borderRadius:
+                          BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isSelected
+                              ? item.activeIcon
+                              : item.icon,
                           color: colorScheme.primary,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          size: 22,
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 4),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color:
+                                colorScheme.primary,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            );
-          }),
+              );
+            },
+          ),
         ),
       ),
     );
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MAIN BUILD
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final topPadding = MediaQuery.of(context).padding.top;
+
+    final topPadding =
+        MediaQuery.of(context).padding.top;
+
     final items = _activeTab == 'Paborito'
-        // Favorites are loaded directly from BackendLocator.favoritesService
-        // as full Product objects, independent of scan history. Convert them to
-        // HistoryItem-like objects for display in the existing card UI.
         ? _favoriteProducts
-            .where((product) =>
-                _searchQuery.isEmpty ||
-                product.name.toLowerCase().contains(_searchQuery.toLowerCase()))
-            .map((product) => HistoryItem(
-                  id: 'fav_${product.id}',
-                  title: product.name,
-                  subtitle: product.nutritionalFacts.servingSize,
-                  timestamp: DateTime.now(), // Could use favorited timestamp if tracked
-                  type: HistoryType.scan,
-                  productId: product.id,
-                ))
+            .where(
+              (product) =>
+                  _searchQuery.isEmpty ||
+                  product.name
+                      .toLowerCase()
+                      .contains(
+                        _searchQuery.toLowerCase(),
+                      ),
+            )
+            .map(
+              (product) => HistoryItem(
+                id: 'fav_${product.id}',
+                title: product.name,
+                subtitle:
+                    product.nutritionalFacts.servingSize,
+                timestamp: DateTime.now(),
+                type: HistoryType.scan,
+                productId: product.id,
+              ),
+            )
             .toList()
-        : _historyService.getItems(filter: _activeTab, searchQuery: _searchQuery);
+        : _historyService.getItems(
+            filter: _activeTab,
+            searchQuery: _searchQuery,
+          );
+
     final grouped = _groupItems(items);
 
-    final groupedReportsMap = _groupReports(_reports);
+    final groupedReportsMap =
+        _groupReports(_reports);
+
     final flattenedReports = <dynamic>[];
+
     for (final entry in groupedReportsMap.entries) {
       flattenedReports.add(entry.key);
       flattenedReports.addAll(entry.value);
     }
 
     final flattenedHistory = <dynamic>[];
+
     for (final entry in grouped.entries) {
       flattenedHistory.add(entry.key);
       flattenedHistory.addAll(entry.value);
     }
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      floatingActionButton: widget.embeddedMode ? null : const VoiceAssistantFab(),
-      bottomNavigationBar: widget.embeddedMode ? null : _buildBottomNav(),
+      backgroundColor:
+          theme.scaffoldBackgroundColor,
+      floatingActionButton:
+          widget.embeddedMode
+              ? null
+              : const VoiceAssistantFab(),
+      bottomNavigationBar:
+          widget.embeddedMode
+              ? null
+              : _buildBottomNav(),
       body: Column(
         children: [
-          // ── Top bar ──────────────────────────────────────────────────────
+          // ───────────────────────────────────────────────────────────────
+          // TOP BAR
+          // ───────────────────────────────────────────────────────────────
+
           Container(
             color: colorScheme.surface,
             padding: EdgeInsets.only(
-                top: topPadding + 8, left: 20, right: 20, bottom: 12),
+              top: topPadding + 8,
+              left: 20,
+              right: 20,
+              bottom: 12,
+            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  CrossAxisAlignment.start,
               children: [
-                // Row: title + clear button (+ dev-only seed button)
+                // Title + Clear All
                 Row(
                   children: [
                     Expanded(
                       child: Text(
                         loc.history,
                         style: GoogleFonts.outfit(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color:
+                              colorScheme.onSurface,
+                        ),
                       ),
                     ),
+
                     if (_activeTab != 'Mga Ulat')
                       GestureDetector(
                         onTap: () {
@@ -938,146 +1316,307 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         child: Text(
                           loc.clearAll,
                           style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: colorScheme.primary,
-                              fontWeight: FontWeight.w500),
+                            fontSize: 12,
+                            color:
+                                colorScheme.primary,
+                            fontWeight:
+                                FontWeight.w500,
+                          ),
                         ),
                       ),
                   ],
                 ),
+
                 const SizedBox(height: 12),
-                // Search bar
+
+                // ─────────────────────────────────────────────────────────
+                // SEARCH BAR
+                // ─────────────────────────────────────────────────────────
+
                 Container(
                   height: 44,
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: theme.dividerColor),
+                    color: colorScheme
+                        .surfaceContainerHighest
+                        .withOpacity(0.55),
+                    borderRadius:
+                        BorderRadius.circular(22),
+
+                    // Removed border.
+                    // Visible soft shadow instead.
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(
+                          theme.brightness ==
+                                  Brightness.dark
+                              ? 0.18
+                              : 0.08,
+                        ),
+                        blurRadius: 12,
+                        spreadRadius: -2,
+                        offset:
+                            const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: colorScheme.primary
+                            .withOpacity(
+                          theme.brightness ==
+                                  Brightness.dark
+                              ? 0.04
+                              : 0.025,
+                        ),
+                        blurRadius: 16,
+                        spreadRadius: -5,
+                        offset:
+                            const Offset(0, 6),
+                      ),
+                    ],
                   ),
                   child: Row(
                     children: [
                       const SizedBox(width: 14),
-                      Icon(Icons.search,
-                          color: colorScheme.onSurfaceVariant, size: 20),
+
+                      Icon(
+                        Icons.search,
+                        color:
+                            colorScheme
+                                .onSurfaceVariant,
+                        size: 20,
+                      ),
+
                       const SizedBox(width: 8),
+
                       Expanded(
                         child: TextField(
-                          controller: _searchController,
-                          style: GoogleFonts.inter(
-                               fontSize: 14, color: colorScheme.onSurface),
-                          decoration: InputDecoration(
-                            hintText: loc.searchHint,
-                            hintStyle: GoogleFonts.inter(
-                                fontSize: 14, color: colorScheme.onSurfaceVariant),
-                            border: InputBorder.none,
+                          controller:
+                              _searchController,
+                          style:
+                              GoogleFonts.inter(
+                            fontSize: 14,
+                            color:
+                                colorScheme.onSurface,
+                          ),
+                          decoration:
+                              InputDecoration(
+                            hintText:
+                                loc.searchHint,
+                            hintStyle:
+                                GoogleFonts.inter(
+                              fontSize: 14,
+                              color: colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                            border:
+                                InputBorder.none,
                             isDense: true,
-                            contentPadding: EdgeInsets.zero,
+                            contentPadding:
+                                EdgeInsets.zero,
                           ),
                         ),
                       ),
+
                       if (_searchQuery.isNotEmpty)
                         GestureDetector(
                           onTap: () {
-                            HapticService().vibrate();
-                            _searchController.clear();
+                            HapticService()
+                                .vibrate();
+                            _searchController
+                                .clear();
                           },
-                          child: Icon(Icons.close,
-                              color: colorScheme.onSurfaceVariant, size: 18),
+                          child: Icon(
+                            Icons.close,
+                            color: colorScheme
+                                .onSurfaceVariant,
+                            size: 18,
+                          ),
                         ),
+
                       const SizedBox(width: 12),
                     ],
                   ),
                 ),
+
                 const SizedBox(height: 12),
-                // Tab row
+
+                // ─────────────────────────────────────────────────────────
+                // TAB ROW
+                // ─────────────────────────────────────────────────────────
+
                 Container(
-                  padding: const EdgeInsets.all(4),
+                  padding:
+                      const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(24),
+                    color: colorScheme
+                        .surfaceContainerHighest
+                        .withOpacity(0.5),
+                    borderRadius:
+                        BorderRadius.circular(24),
                   ),
                   child: Row(
                     children: _tabs.map((tab) {
-                      final isActive = _activeTab == tab;
+                      final isActive =
+                          _activeTab == tab;
+
                       String tabLabel = tab;
-                      if (tab == 'Lahat') tabLabel = loc.tabAll;
-                      if (tab == 'Paborito') tabLabel = loc.tabFavorites;
-                      if (tab == 'Kumpara') tabLabel = loc.tabCompare;
-                      if (tab == 'Mga Ulat') tabLabel = loc.tabReports;
+
+                      if (tab == 'Lahat') {
+                        tabLabel = loc.tabAll;
+                      }
+
+                      if (tab == 'Paborito') {
+                        tabLabel =
+                            loc.tabFavorites;
+                      }
+
+                      if (tab == 'Kumpara') {
+                        tabLabel =
+                            loc.tabCompare;
+                      }
+
+                      if (tab == 'Mga Ulat') {
+                        tabLabel =
+                            loc.tabReports;
+                      }
 
                       return Expanded(
                         child: GestureDetector(
                           onTap: () {
-                              HapticService().vibrate();
-                              setState(() => _activeTab = tab);
-                              if (VoiceAssistantService.instance.isEnabled) {
-                                final String? pageKey = switch (tab) {
-                                  'Paborito' => 'favorites',
-                                  'Kumpara'  => 'compare',
-                                  'Mga Ulat' => 'reports',
-                                  _          => null,
-                                };
-                                if (pageKey != null) {
-                                  final isTagalog = LocaleService
-                                      .localeNotifier.value.languageCode == 'tl';
-                                  final String preamble = switch (tab) {
-                                    'Paborito' => isTagalog
+                            HapticService()
+                                .vibrate();
+
+                            setState(() {
+                              _activeTab = tab;
+                            });
+
+                            if (VoiceAssistantService
+                                .instance
+                                .isEnabled) {
+                              final String? pageKey =
+                                  switch (tab) {
+                                'Paborito' =>
+                                  'favorites',
+                                'Kumpara' =>
+                                  'compare',
+                                'Mga Ulat' =>
+                                  'reports',
+                                _ => null,
+                              };
+
+                              if (pageKey !=
+                                  null) {
+                                final isTagalog =
+                                    LocaleService
+                                        .localeNotifier
+                                        .value
+                                        .languageCode ==
+                                    'tl';
+
+                                final String
+                                    preamble =
+                                    switch (tab) {
+                                  'Paborito' =>
+                                    isTagalog
                                         ? 'Binubuksan ang mga paboritong produkto.'
                                         : 'Opening your favorites.',
-                                    'Kumpara' => isTagalog
+                                  'Kumpara' =>
+                                    isTagalog
                                         ? 'Binubuksan ang kasaysayan ng paghahambing.'
                                         : 'Opening your comparison history.',
-                                    'Mga Ulat' => isTagalog
+                                  'Mga Ulat' =>
+                                    isTagalog
                                         ? 'Binubuksan ang iyong mga ulat.'
                                         : 'Opening your submitted reports.',
-                                    _ => '',
-                                  };
-                                  // Stop the history-tab announcement if it is
-                                  // still playing, then speak preamble + page description.
-                                  VoiceAssistantService.instance.stopAudio();
-                                  Future.delayed(
-                                    const Duration(milliseconds: 350),
-                                    () {
-                                      if (mounted) {
-                                        VoiceAssistantService.instance
-                                            .announcePageWithPreamble(
-                                                preamble, pageKey);
-                                      }
-                                    },
-                                  );
-                                }
+                                  _ => '',
+                                };
+
+                                VoiceAssistantService
+                                    .instance
+                                    .stopAudio();
+
+                                Future.delayed(
+                                  const Duration(
+                                    milliseconds:
+                                        350,
+                                  ),
+                                  () {
+                                    if (mounted) {
+                                      VoiceAssistantService
+                                          .instance
+                                          .announcePageWithPreamble(
+                                        preamble,
+                                        pageKey,
+                                      );
+                                    }
+                                  },
+                                );
                               }
-                            },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
+                            }
+                          },
+                          child:
+                              AnimatedContainer(
+                            duration:
+                                const Duration(
+                              milliseconds: 200,
+                            ),
+                            padding:
+                                const EdgeInsets
+                                    .symmetric(
+                              vertical: 8,
+                            ),
+                            decoration:
+                                BoxDecoration(
                               color: isActive
                                   ? theme.cardColor
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(20),
+                                  : Colors
+                                      .transparent,
+                              borderRadius:
+                                  BorderRadius
+                                      .circular(
+                                20,
+                              ),
                               boxShadow: isActive
                                   ? [
                                       BoxShadow(
-                                        color: Colors.black
-                                            .withOpacity(0.06),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      )
+                                        color: Colors
+                                            .black
+                                            .withOpacity(
+                                          theme.brightness ==
+                                                  Brightness
+                                                      .dark
+                                              ? 0.18
+                                              : 0.08,
+                                        ),
+                                        blurRadius:
+                                            8,
+                                        spreadRadius:
+                                            -2,
+                                        offset:
+                                            const Offset(
+                                          0,
+                                          3,
+                                        ),
+                                      ),
                                     ]
                                   : [],
                             ),
                             child: Center(
                               child: Text(
                                 tabLabel,
-                                style: GoogleFonts.outfit(
+                                style:
+                                    GoogleFonts
+                                        .outfit(
                                   fontSize: 13,
-                                  fontWeight: isActive
-                                      ? FontWeight.bold
-                                      : FontWeight.w500,
+                                  fontWeight:
+                                      isActive
+                                          ? FontWeight
+                                              .bold
+                                          : FontWeight
+                                              .w500,
                                   color: isActive
-                                      ? colorScheme.primary
-                                      : colorScheme.onSurfaceVariant,
+                                      ? colorScheme
+                                          .primary
+                                      : colorScheme
+                                          .onSurfaceVariant,
                                 ),
                               ),
                             ),
@@ -1091,68 +1630,142 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
 
-          // ── Scrollable content (virtualized on-demand rendering) ───────────
+          // ───────────────────────────────────────────────────────────────
+          // SCROLLABLE CONTENT
+          // ───────────────────────────────────────────────────────────────
+
           Expanded(
             child: _activeTab == 'Mga Ulat'
                 ? (_reportsLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                        child:
+                            CircularProgressIndicator(),
+                      )
                     : flattenedReports.isEmpty
                         ? _buildEmptyState()
                         : ListView.builder(
-                            key: const PageStorageKey<String>('reports_scroll'),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
-                            itemCount: flattenedReports.length,
-                            itemBuilder: (context, index) {
-                              final item = flattenedReports[index];
+                            key: const PageStorageKey<
+                                String>(
+                              'reports_scroll',
+                            ),
+                            padding:
+                                const EdgeInsets
+                                    .symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            itemCount:
+                                flattenedReports
+                                    .length,
+                            itemBuilder:
+                                (context, index) {
+                              final item =
+                                  flattenedReports[
+                                      index];
+
                               if (item is String) {
                                 return Padding(
-                                  padding: const EdgeInsets.only(top: 18, bottom: 10),
+                                  padding:
+                                      const EdgeInsets
+                                          .only(
+                                    top: 18,
+                                    bottom: 10,
+                                  ),
                                   child: Text(
                                     item,
-                                    style: GoogleFonts.outfit(
+                                    style: GoogleFonts
+                                        .outfit(
                                       fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.onSurface,
+                                      fontWeight:
+                                          FontWeight
+                                              .bold,
+                                      color: theme
+                                          .colorScheme
+                                          .onSurface,
                                     ),
                                   ),
                                 );
-                              } else if (item is ReportModel) {
-                                return _buildReportCard(item);
                               }
-                              return const SizedBox.shrink();
+
+                              if (item
+                                  is ReportModel) {
+                                return _buildReportCard(
+                                  item,
+                                );
+                              }
+
+                              return const SizedBox
+                                  .shrink();
                             },
                           ))
-                : ((_activeTab == 'Paborito' && _favoritesLoading) ||
+                : ((_activeTab == 'Paborito' &&
+                            _favoritesLoading) ||
                         _historyService.isLoading)
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(
+                        child:
+                            CircularProgressIndicator(),
+                      )
                     : flattenedHistory.isEmpty
                         ? _buildEmptyState()
                         : ListView.builder(
-                            key: const PageStorageKey<String>('history_scroll'),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
-                            itemCount: flattenedHistory.length,
-                            itemBuilder: (context, index) {
-                              final item = flattenedHistory[index];
+                            key: const PageStorageKey<
+                                String>(
+                              'history_scroll',
+                            ),
+                            padding:
+                                const EdgeInsets
+                                    .symmetric(
+                              horizontal: 16,
+                              vertical: 4,
+                            ),
+                            itemCount:
+                                flattenedHistory
+                                    .length,
+                            itemBuilder:
+                                (context, index) {
+                              final item =
+                                  flattenedHistory[
+                                      index];
+
                               if (item is String) {
                                 return Padding(
-                                  padding: const EdgeInsets.only(top: 18, bottom: 10),
+                                  padding:
+                                      const EdgeInsets
+                                          .only(
+                                    top: 18,
+                                    bottom: 10,
+                                  ),
                                   child: Text(
                                     item,
-                                    style: GoogleFonts.outfit(
+                                    style: GoogleFonts
+                                        .outfit(
                                       fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: theme.colorScheme.onSurface,
+                                      fontWeight:
+                                          FontWeight
+                                              .bold,
+                                      color: theme
+                                          .colorScheme
+                                          .onSurface,
                                     ),
                                   ),
                                 );
-                              } else if (item is HistoryItem) {
-                                return item.type == HistoryType.comparison
-                                    ? _buildCompareCard(item)
-                                    : _buildScanCard(item);
                               }
-                              return const SizedBox.shrink();
+
+                              if (item
+                                  is HistoryItem) {
+                                return item.type ==
+                                        HistoryType
+                                            .comparison
+                                    ? _buildCompareCard(
+                                        item,
+                                      )
+                                    : _buildScanCard(
+                                        item,
+                                      );
+                              }
+
+                              return const SizedBox
+                                  .shrink();
                             },
                           ),
           ),
@@ -1161,36 +1774,53 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // EMPTY STATE
+  // ─────────────────────────────────────────────────────────────────────────
+
   Widget _buildEmptyState() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+
     String message;
+
     if (_activeTab == 'Paborito') {
       message = loc.emptyFavorites;
     } else if (_activeTab == 'Kumpara') {
       message = loc.emptyComparisons;
     } else if (_searchQuery.isNotEmpty) {
-      message = loc.noSearchResults(_searchQuery);
+      message = loc.noSearchResults(
+        _searchQuery,
+      );
     } else {
       message = loc.emptyHistory;
     }
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.history,
-                color: colorScheme.primary.withOpacity(0.2), size: 72),
+            Icon(
+              Icons.history,
+              color:
+                  colorScheme.primary.withOpacity(0.2),
+              size: 72,
+            ),
+
             const SizedBox(height: 20),
+
             Text(
               message,
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
-                  fontSize: 14,
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.6),
+                fontSize: 14,
+                color:
+                    colorScheme.onSurfaceVariant,
+                height: 1.6,
+              ),
             ),
           ],
         ),
@@ -1198,3 +1828,4 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 }
+

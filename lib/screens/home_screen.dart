@@ -10,6 +10,9 @@ import 'profile_screen.dart';
 import 'camera_scanner_screen.dart';
 import 'history_screen.dart';
 import 'nutrition_guide_screen.dart';
+import 'multi_scan_results_screen.dart';
+import 'product_detail_screen.dart';
+import '../data/services/backend_locator.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,6 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
 
   final _authService = AuthService();
+  final _searchController = TextEditingController();
+  bool _isSearching = false;
 
   String _userName = 'User';
 
@@ -74,6 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
     AuthService.userNameNotifier.removeListener(_handleNameChanged);
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
@@ -134,6 +140,78 @@ class _HomeScreenState extends State<HomeScreen> {
     await _loadUserName();
   }
 
+  Future<void> _searchProducts(String rawQuery) async {
+    final query = rawQuery.trim();
+    if (query.isEmpty || _isSearching) return;
+
+    HapticService().vibrate();
+    FocusManager.instance.primaryFocus?.unfocus();
+    _searchController.clear();
+    setState(() => _isSearching = true);
+
+    try {
+      final products = await BackendLocator.productRepository.getAllProducts();
+      if (!mounted) return;
+      final normalizedQuery = query.toLowerCase();
+      final productMatches = products.where((product) {
+        final searchable = [
+          product.name,
+          product.brand,
+          product.variant,
+        ].join(' ').toLowerCase();
+        return searchable.contains(normalizedQuery);
+      }).toList();
+      final exactProduct = products.where((product) {
+        return [
+          product.name,
+          product.brand,
+          product.variant,
+        ].any((value) => value.trim().toLowerCase() == normalizedQuery);
+      }).toList();
+      final categoryMatches = products.where((product) {
+        return product.category.toLowerCase().contains(normalizedQuery);
+      }).toList();
+
+      if (exactProduct.length == 1) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductDetailScreen(product: exactProduct.single),
+          ),
+        );
+      } else {
+        final results = categoryMatches.isNotEmpty
+            ? categoryMatches
+            : productMatches;
+        if (results.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No products found for "$query".')),
+          );
+        } else {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => MultiScanResultsScreen(
+                detectedProducts: results,
+                initiallyShowTopFive:
+                    categoryMatches.isNotEmpty || results.length > 5,
+              ),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Product search failed: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Unable to search products right now.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
   void _onNavTap(int index) {
     HapticService().vibrate();
 
@@ -157,22 +235,13 @@ class _HomeScreenState extends State<HomeScreen> {
             IndexedStack(
               index: _selectedIndex,
               children: [
-                SafeArea(
-                  bottom: false,
-                  child: _buildHomeContent(),
-                ),
+                SafeArea(bottom: false, child: _buildHomeContent()),
 
                 _buildScanPage(),
 
-                SafeArea(
-                  bottom: false,
-                  child: _buildHistoryPage(),
-                ),
+                SafeArea(bottom: false, child: _buildHistoryPage()),
 
-                const SafeArea(
-                  bottom: false,
-                  child: ProfileScreen(),
-                ),
+                const SafeArea(bottom: false, child: ProfileScreen()),
               ],
             ),
           ],
@@ -202,10 +271,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
 
-        padding: const EdgeInsets.symmetric(
-          horizontal: 20,
-          vertical: 24,
-        ),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,7 +298,6 @@ class _HomeScreenState extends State<HomeScreen> {
             // ---------------------------------------------------------------
             // NEW FDA / WHO SECTION
             // ---------------------------------------------------------------
-
             const SizedBox(height: 28),
 
             _buildNutritionInformationSection(),
@@ -253,35 +318,158 @@ class _HomeScreenState extends State<HomeScreen> {
     final bodyLarge = theme.textTheme.bodyLarge;
     final bodyMedium = theme.textTheme.bodyMedium;
     final loc = AppLocalizations.of(context)!;
+    final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
+    final isDark = theme.brightness == Brightness.dark;
+    final primaryColor = isDark ? Colors.red.shade400 : theme.colorScheme.primary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-
       children: [
-        Image.asset(
-          'assets/images/logoII.png',
-          height: 60,
+        // Greeting + logo
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Text(
+                loc.greeting(_userName),
+                style: bodyLarge?.copyWith(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  height: 1.15,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 52,
+              height: 52,
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(isDark ? 0.18 : 0.07),
+                    blurRadius: 14,
+                    spreadRadius: -4,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: ClipOval(
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          ],
         ),
 
-        const SizedBox(height: 12),
+        const SizedBox(height: 5),
 
-        Text(
-          loc.greeting(_userName),
-
-          style: bodyLarge?.copyWith(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-
-        const SizedBox(height: 4),
-
+        // Tagline directly below the greeting/logo row
         Text(
           loc.homeTagline,
-
           style: bodyMedium?.copyWith(
             fontSize: 13,
             height: 1.5,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+
+        const SizedBox(height: 18),
+
+        // Full-width search engine
+        Container(
+          height: 54,
+          decoration: BoxDecoration(
+            color: isDark
+                ? theme.colorScheme.surfaceContainerHighest
+                : theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.09),
+                blurRadius: 18,
+                spreadRadius: -5,
+                offset: const Offset(0, 7),
+              ),
+            ],
+          ),
+          child: TextField(
+            controller: _searchController,
+            textInputAction: TextInputAction.search,
+            textCapitalization: TextCapitalization.sentences,
+            onSubmitted: _searchProducts,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: theme.colorScheme.onSurface,
+            ),
+            cursorColor: primaryColor,
+            decoration: InputDecoration(
+              hintText: isTagalog
+                  ? 'Maghanap ng produkto o kategorya...'
+                  : 'Search products or categories...',
+              hintStyle: TextStyle(
+                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.72),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w400,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsets.only(left: 15, right: 9),
+                child: Icon(Icons.search_rounded, size: 23, color: primaryColor),
+              ),
+              prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 54),
+              suffixIcon: _isSearching
+                  ? Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: SizedBox(
+                        width: 19,
+                        height: 19,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.2,
+                          color: primaryColor,
+                        ),
+                      ),
+                    )
+                  : _searchController.text.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Clear search',
+                          splashRadius: 20,
+                          icon: Icon(
+                            Icons.close_rounded,
+                            size: 20,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {});
+                          },
+                        ),
+              suffixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 54),
+              filled: true,
+              fillColor: Colors.transparent,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide.none,
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide(
+                  color: primaryColor.withOpacity(0.45),
+                  width: 1.2,
+                ),
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
           ),
         ),
       ],
@@ -304,25 +492,22 @@ class _HomeScreenState extends State<HomeScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
 
-          colors: [
-            Color(0xFFC62E2E),
-            Color(0xFF6B0F0F),
-          ],
+          colors: [Color(0xFFC62E2E), Color(0xFF6B0F0F)],
         ),
 
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(26),
 
         boxShadow: [
           BoxShadow(
             color: theme.colorScheme.primary.withOpacity(
-              theme.brightness == Brightness.dark
-                  ? 0.35
-                  : 0.18,
+              theme.brightness == Brightness.dark ? 0.35 : 0.18,
             ),
 
-            blurRadius: 18,
+            blurRadius: 26,
 
-            offset: const Offset(0, 10),
+            spreadRadius: -4,
+
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -404,10 +589,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // VIEWFINDER
   // -------------------------------------------------------------------------
 
-  Widget _buildViewfinderIcon({
-    double size = 100,
-    double bracketSize = 26,
-  }) {
+  Widget _buildViewfinderIcon({double size = 100, double bracketSize = 26}) {
     const strokeWidth = 2.4;
     const cornerRadius = Radius.circular(8);
 
@@ -426,46 +608,30 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             border: Border(
               top: top
-                  ? const BorderSide(
-                      color: Colors.white,
-                      width: strokeWidth,
-                    )
+                  ? const BorderSide(color: Colors.white, width: strokeWidth)
                   : BorderSide.none,
 
               bottom: !top
-                  ? const BorderSide(
-                      color: Colors.white,
-                      width: strokeWidth,
-                    )
+                  ? const BorderSide(color: Colors.white, width: strokeWidth)
                   : BorderSide.none,
 
               left: left
-                  ? const BorderSide(
-                      color: Colors.white,
-                      width: strokeWidth,
-                    )
+                  ? const BorderSide(color: Colors.white, width: strokeWidth)
                   : BorderSide.none,
 
               right: !left
-                  ? const BorderSide(
-                      color: Colors.white,
-                      width: strokeWidth,
-                    )
+                  ? const BorderSide(color: Colors.white, width: strokeWidth)
                   : BorderSide.none,
             ),
 
             borderRadius: BorderRadius.only(
-              topLeft:
-                  top && left ? cornerRadius : Radius.zero,
+              topLeft: top && left ? cornerRadius : Radius.zero,
 
-              topRight:
-                  top && !left ? cornerRadius : Radius.zero,
+              topRight: top && !left ? cornerRadius : Radius.zero,
 
-              bottomLeft:
-                  !top && left ? cornerRadius : Radius.zero,
+              bottomLeft: !top && left ? cornerRadius : Radius.zero,
 
-              bottomRight:
-                  !top && !left ? cornerRadius : Radius.zero,
+              bottomRight: !top && !left ? cornerRadius : Radius.zero,
             ),
           ),
         ),
@@ -478,29 +644,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
       child: Stack(
         children: [
-          bracket(
-            alignment: Alignment.topLeft,
-            top: true,
-            left: true,
-          ),
+          bracket(alignment: Alignment.topLeft, top: true, left: true),
 
-          bracket(
-            alignment: Alignment.topRight,
-            top: true,
-            left: false,
-          ),
+          bracket(alignment: Alignment.topRight, top: true, left: false),
 
-          bracket(
-            alignment: Alignment.bottomLeft,
-            top: false,
-            left: true,
-          ),
+          bracket(alignment: Alignment.bottomLeft, top: false, left: true),
 
-          bracket(
-            alignment: Alignment.bottomRight,
-            top: false,
-            left: false,
-          ),
+          bracket(alignment: Alignment.bottomRight, top: false, left: false),
 
           const Center(
             child: Icon(
@@ -548,10 +698,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Text(
                 loc.labelIntroSubtitle,
 
-                style: bodyMedium?.copyWith(
-                  fontSize: 13,
-                  height: 1.5,
-                ),
+                style: bodyMedium?.copyWith(fontSize: 13, height: 1.5),
               ),
             ],
           ),
@@ -571,10 +718,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Padding(
             padding: const EdgeInsets.all(12),
 
-            child: Image.asset(
-              'assets/images/cart.png',
-              fit: BoxFit.contain,
-            ),
+            child: Image.asset('assets/images/cart.png', fit: BoxFit.contain),
           ),
         ),
       ],
@@ -593,39 +737,26 @@ class _HomeScreenState extends State<HomeScreen> {
     Color(0xFFEA3F2D),
   ];
 
-  static const List<String> _gradeLetters = [
-    'A',
-    'B',
-    'C',
-    'D',
-    'E',
-  ];
+  static const List<String> _gradeLetters = ['A', 'B', 'C', 'D', 'E'];
 
   Widget _buildHealthCard() {
     return _buildGradeCard(
       icon: Icons.balance,
 
-      title: AppLocalizations.of(context)!
-          .healthGradeTitle,
+      title: AppLocalizations.of(context)!.healthGradeTitle,
 
-      subtitle: AppLocalizations.of(context)!
-          .healthGradeSubtitle,
+      subtitle: AppLocalizations.of(context)!.healthGradeSubtitle,
 
       values: [
-        AppLocalizations.of(context)!
-            .healthGradeValue0,
+        AppLocalizations.of(context)!.healthGradeValue0,
 
-        AppLocalizations.of(context)!
-            .healthGradeValue1,
+        AppLocalizations.of(context)!.healthGradeValue1,
 
-        AppLocalizations.of(context)!
-            .healthGradeValue2,
+        AppLocalizations.of(context)!.healthGradeValue2,
 
-        AppLocalizations.of(context)!
-            .healthGradeValue3,
+        AppLocalizations.of(context)!.healthGradeValue3,
 
-        AppLocalizations.of(context)!
-            .healthGradeValue4,
+        AppLocalizations.of(context)!.healthGradeValue4,
       ],
 
       expanded: _healthExpanded,
@@ -662,19 +793,19 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
 
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
 
-        border: Border.all(
-          color: theme.dividerColor,
-        ),
-
+        // Use a soft, visible shadow instead of a dark outline.
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-
-            blurRadius: 10,
-
-            offset: const Offset(0, 4),
+            color: primaryColor.withOpacity(
+              expanded
+                  ? (theme.brightness == Brightness.dark ? 0.34 : 0.20)
+                  : (theme.brightness == Brightness.dark ? 0.24 : 0.10),
+            ),
+            blurRadius: expanded ? 30 : 22,
+            spreadRadius: expanded ? 1 : -3,
+            offset: Offset(0, expanded ? 12 : 7),
           ),
         ],
       ),
@@ -697,22 +828,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 CircleAvatar(
                   radius: 18,
 
-                  backgroundColor:
-                      primaryColor.withOpacity(0.12),
+                  backgroundColor: primaryColor.withOpacity(0.12),
 
-                  child: Icon(
-                    icon,
-                    size: 18,
-                    color: primaryColor,
-                  ),
+                  child: Icon(icon, size: 18, color: primaryColor),
                 ),
 
                 const SizedBox(width: 12),
 
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
 
                     children: [
                       Text(
@@ -729,10 +854,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         subtitle,
 
-                        style: bodyMedium?.copyWith(
-                          fontSize: 12,
-                          height: 1.4,
-                        ),
+                        style: bodyMedium?.copyWith(fontSize: 12, height: 1.4),
                       ),
                     ],
                   ),
@@ -743,13 +865,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 Icon(
                   expanded
                       ? Icons.keyboard_arrow_up
-                      : (Directionality.of(context) ==
-                              TextDirection.ltr
-                          ? Icons.chevron_right
-                          : Icons.chevron_left),
+                      : (Directionality.of(context) == TextDirection.ltr
+                            ? Icons.chevron_right
+                            : Icons.chevron_left),
 
-                  color:
-                      theme.colorScheme.onSurfaceVariant,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
             ),
@@ -758,18 +878,15 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 14),
 
           AnimatedCrossFade(
-            duration:
-                const Duration(milliseconds: 220),
+            duration: const Duration(milliseconds: 220),
 
             crossFadeState: expanded
                 ? CrossFadeState.showSecond
                 : CrossFadeState.showFirst,
 
-            firstChild:
-                _buildGradeSummaryBar(),
+            firstChild: _buildGradeSummaryBar(),
 
-            secondChild:
-                _buildGradeDetailList(values),
+            secondChild: _buildGradeDetailList(values),
           ),
         ],
       ),
@@ -790,8 +907,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             style: TextStyle(
               fontSize: 10,
-              color:
-                  theme.colorScheme.onSurfaceVariant,
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.2,
             ),
           ),
@@ -801,11 +917,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
         Expanded(
           child: Row(
-            children:
-                List.generate(_gradeColors.length, (index) {
+            children: List.generate(_gradeColors.length, (index) {
               final isFirst = index == 0;
-              final isLast =
-                  index == _gradeColors.length - 1;
+              final isLast = index == _gradeColors.length - 1;
 
               return Expanded(
                 child: Container(
@@ -816,15 +930,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     color: _gradeColors[index],
 
-                    borderRadius:
-                        BorderRadius.horizontal(
-                      left: isFirst
-                          ? const Radius.circular(13)
-                          : Radius.zero,
+                    borderRadius: BorderRadius.horizontal(
+                      left: isFirst ? const Radius.circular(13) : Radius.zero,
 
-                      right: isLast
-                          ? const Radius.circular(13)
-                          : Radius.zero,
+                      right: isLast ? const Radius.circular(13) : Radius.zero,
                     ),
                   ),
 
@@ -855,8 +964,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             style: TextStyle(
               fontSize: 10,
-              color:
-                  theme.colorScheme.onSurfaceVariant,
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.2,
             ),
           ),
@@ -865,15 +973,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildGradeDetailList(
-    List<String> values,
-  ) {
+  Widget _buildGradeDetailList(List<String> values) {
     final theme = Theme.of(context);
     final loc = AppLocalizations.of(context)!;
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
 
       children: [
         Text(
@@ -881,44 +986,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
           style: TextStyle(
             fontSize: 11,
-            color:
-                theme.colorScheme.onSurfaceVariant,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
 
         const SizedBox(height: 8),
 
-        ...List.generate(
-          values.length,
-          (index) {
-            final widthFactor =
-                1.0 - (index * 0.05);
+        ...List.generate(values.length, (index) {
+          final widthFactor = 1.0 - (index * 0.05);
 
-            return Padding(
-              padding:
-                  const EdgeInsets.only(bottom: 8),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
 
-              child: Align(
-                alignment: Alignment.centerLeft,
+            child: Align(
+              alignment: Alignment.centerLeft,
 
-                child: FractionallySizedBox(
-                  widthFactor: widthFactor,
+              child: FractionallySizedBox(
+                widthFactor: widthFactor,
 
-                  child: _buildArrowRibbon(
-                    letter:
-                        _gradeLetters[index],
+                child: _buildArrowRibbon(
+                  letter: _gradeLetters[index],
 
-                    label:
-                        values[index],
+                  label: values[index],
 
-                    color:
-                        _gradeColors[index],
-                  ),
+                  color: _gradeColors[index],
                 ),
               ),
-            );
-          },
-        ),
+            ),
+          );
+        }),
 
         const SizedBox(height: 2),
 
@@ -927,8 +1023,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           style: TextStyle(
             fontSize: 11,
-            color:
-                theme.colorScheme.onSurfaceVariant,
+            color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
       ],
@@ -942,25 +1037,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     return IntrinsicHeight(
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
 
         children: [
           Container(
             width: 30,
 
-            constraints:
-                const BoxConstraints(
-              minHeight: 34,
-            ),
+            constraints: const BoxConstraints(minHeight: 34),
 
             alignment: Alignment.center,
 
             decoration: BoxDecoration(
               color: color,
 
-              borderRadius:
-                  const BorderRadius.horizontal(
+              borderRadius: const BorderRadius.horizontal(
                 left: Radius.circular(8),
               ),
             ),
@@ -983,21 +1073,16 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Container(
                 color: color,
 
-                constraints:
-                    const BoxConstraints(
-                  minHeight: 34,
-                ),
+                constraints: const BoxConstraints(minHeight: 34),
 
-                padding:
-                    const EdgeInsets.only(
+                padding: const EdgeInsets.only(
                   left: 10,
                   right: 18,
                   top: 7,
                   bottom: 7,
                 ),
 
-                alignment:
-                    Alignment.centerLeft,
+                alignment: Alignment.centerLeft,
 
                 child: Text(
                   label,
@@ -1008,8 +1093,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Colors.white,
                     fontSize: 11.5,
                     height: 1.25,
-                    fontWeight:
-                        FontWeight.w600,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ),
@@ -1054,24 +1138,25 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
 
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(22),
 
-        border: Border.all(
-          color: theme.dividerColor,
-        ),
-
+        // Highlight the expanded card with a soft red-tinted shadow.
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: primaryColor.withOpacity(
+              _processExpanded
+                  ? (theme.brightness == Brightness.dark ? 0.34 : 0.20)
+                  : (theme.brightness == Brightness.dark ? 0.24 : 0.10),
+            ),
+            blurRadius: _processExpanded ? 30 : 22,
+            spreadRadius: _processExpanded ? 1 : -3,
+            offset: Offset(0, _processExpanded ? 12 : 7),
           ),
         ],
       ),
 
       child: Column(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
           GestureDetector(
@@ -1081,28 +1166,23 @@ class _HomeScreenState extends State<HomeScreen> {
               HapticService().vibrate();
 
               setState(() {
-                _processExpanded =
-                    !_processExpanded;
+                _processExpanded = !_processExpanded;
               });
             },
 
             child: Row(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
 
               children: [
                 CircleAvatar(
                   radius: 18,
 
-                  backgroundColor:
-                      primaryColor
-                          .withOpacity(0.12),
+                  backgroundColor: primaryColor.withOpacity(0.12),
 
                   child: Icon(
                     Icons.blender_outlined,
                     size: 18,
-                    color:
-                        primaryColor,
+                    color: primaryColor,
                   ),
                 ),
 
@@ -1110,8 +1190,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
 
                     children: [
                       Text(
@@ -1119,8 +1198,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         style: bodyLarge?.copyWith(
                           fontSize: 15,
-                          fontWeight:
-                              FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
 
@@ -1129,11 +1207,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         loc.processGradeSubtitle,
 
-                        style:
-                            bodyMedium?.copyWith(
-                          fontSize: 12,
-                          height: 1.4,
-                        ),
+                        style: bodyMedium?.copyWith(fontSize: 12, height: 1.4),
                       ),
                     ],
                   ),
@@ -1144,14 +1218,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 Icon(
                   _processExpanded
                       ? Icons.keyboard_arrow_up
-                      : (Directionality.of(context) ==
-                              TextDirection.ltr
-                          ? Icons.chevron_right
-                          : Icons.chevron_left),
+                      : (Directionality.of(context) == TextDirection.ltr
+                            ? Icons.chevron_right
+                            : Icons.chevron_left),
 
-                  color:
-                      theme.colorScheme
-                          .onSurfaceVariant,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ],
             ),
@@ -1160,8 +1231,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 14),
 
           Row(
-            mainAxisAlignment:
-                MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
             children: [
               Flexible(
@@ -1169,40 +1239,32 @@ class _HomeScreenState extends State<HomeScreen> {
                   loc.processGroupFirst,
                   style: TextStyle(
                     fontSize: 10,
-                    color:
-                        theme.colorScheme
-                            .onSurfaceVariant,
+                    color: theme.colorScheme.onSurfaceVariant,
                     height: 1.2,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
 
-              ...List.generate(
-                4,
-                (index) {
-                  final level = index + 1;
+              ...List.generate(4, (index) {
+                final level = index + 1;
 
-                  return CircleAvatar(
-                    radius: 15,
+                return CircleAvatar(
+                  radius: 15,
 
-                    backgroundColor:
-                        _processColors[index],
+                  backgroundColor: _processColors[index],
 
-                    child: Text(
-                      '$level',
+                  child: Text(
+                    '$level',
 
-                      style:
-                          const TextStyle(
-                        color: Colors.white,
-                        fontWeight:
-                            FontWeight.bold,
-                        fontSize: 13,
-                      ),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              }),
 
               Flexible(
                 child: Text(
@@ -1212,9 +1274,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   style: TextStyle(
                     fontSize: 10,
-                    color:
-                        theme.colorScheme
-                            .onSurfaceVariant,
+                    color: theme.colorScheme.onSurfaceVariant,
                     height: 1.2,
                   ),
                   overflow: TextOverflow.ellipsis,
@@ -1224,70 +1284,46 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
 
           AnimatedCrossFade(
-            duration:
-                const Duration(milliseconds: 220),
+            duration: const Duration(milliseconds: 220),
 
-            crossFadeState:
-                _processExpanded
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
+            crossFadeState: _processExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
 
-            firstChild:
-                const SizedBox(
-              width: double.infinity,
-            ),
+            firstChild: const SizedBox(width: double.infinity),
 
             secondChild: Padding(
-              padding:
-                  const EdgeInsets.only(
-                top: 14,
-              ),
+              padding: const EdgeInsets.only(top: 14),
 
               child: Column(
-                children:
-                    List.generate(
-                  processLabels.length,
-                  (index) {
-                    return Container(
-                      width: double.infinity,
+                children: List.generate(processLabels.length, (index) {
+                  return Container(
+                    width: double.infinity,
 
-                      margin:
-                          const EdgeInsets.only(
-                        bottom: 8,
+                    margin: const EdgeInsets.only(bottom: 8),
+
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 14,
+                    ),
+
+                    decoration: BoxDecoration(
+                      color: _processColors[index],
+
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+
+                    child: Text(
+                      '${index + 1}  ${processLabels[index]}',
+
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
-
-                      padding:
-                          const EdgeInsets
-                              .symmetric(
-                        vertical: 10,
-                        horizontal: 14,
-                      ),
-
-                      decoration:
-                          BoxDecoration(
-                        color:
-                            _processColors[
-                                index],
-
-                        borderRadius:
-                            BorderRadius
-                                .circular(10),
-                      ),
-
-                      child: Text(
-                        '${index + 1}  ${processLabels[index]}',
-
-                        style:
-                            const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight:
-                              FontWeight.w600,
-                        ),
-                      ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                }),
               ),
             ),
           ),
@@ -1308,8 +1344,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final loc = AppLocalizations.of(context)!;
 
     return Column(
-      crossAxisAlignment:
-          CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
 
       children: [
         // Section title
@@ -1331,8 +1366,7 @@ class _HomeScreenState extends State<HomeScreen> {
           loc.learnMoreSubtitle,
 
           style: TextStyle(
-            color:
-                theme.colorScheme.onSurfaceVariant,
+            color: theme.colorScheme.onSurfaceVariant,
             fontSize: 12.5,
             height: 1.4,
           ),
@@ -1342,14 +1376,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // FDA + WHO cards
         Row(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
 
           children: [
             Expanded(
               child: _buildInformationCard(
-                imagePath:
-                    'assets/images/fdaimg.png',
+                imagePath: 'assets/images/fdaimg.png',
 
                 title: loc.fdaCardTitle,
 
@@ -1362,10 +1394,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
 
                     MaterialPageRoute(
-                      builder: (_) =>
-                          const NutritionGuideScreen(
-                        type:
-                            NutritionGuideType.fda,
+                      builder: (_) => const NutritionGuideScreen(
+                        type: NutritionGuideType.fda,
                       ),
                     ),
                   );
@@ -1377,8 +1407,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             Expanded(
               child: _buildInformationCard(
-                imagePath:
-                    'assets/images/whoimg.png',
+                imagePath: 'assets/images/whoimg.png',
 
                 title: loc.whoCardTitle,
 
@@ -1391,10 +1420,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     context,
 
                     MaterialPageRoute(
-                      builder: (_) =>
-                          const NutritionGuideScreen(
-                        type:
-                            NutritionGuideType.who,
+                      builder: (_) => const NutritionGuideScreen(
+                        type: NutritionGuideType.who,
                       ),
                     ),
                   );
@@ -1432,21 +1459,22 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: theme.cardColor,
 
-          borderRadius:
-              BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(20),
 
           border: Border.all(
-            color: theme.dividerColor,
+            color: theme.colorScheme.outline.withOpacity(
+              theme.brightness == Brightness.dark ? 0.16 : 0.07,
+            ),
           ),
 
           boxShadow: [
             BoxShadow(
-              color:
-                  Colors.black.withOpacity(0.04),
-
-              blurRadius: 10,
-
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(
+                theme.brightness == Brightness.dark ? 0.20 : 0.055,
+              ),
+              blurRadius: 24,
+              spreadRadius: -5,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -1454,14 +1482,12 @@ class _HomeScreenState extends State<HomeScreen> {
         clipBehavior: Clip.antiAlias,
 
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.start,
 
           children: [
             // ---------------------------------------------------------------
             // IMAGE
             // ---------------------------------------------------------------
-
             AspectRatio(
               aspectRatio: 1.05,
 
@@ -1472,21 +1498,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 fit: BoxFit.cover,
 
-                errorBuilder:
-                    (context, error, stackTrace) {
+                errorBuilder: (context, error, stackTrace) {
                   return Container(
-                    color: theme.colorScheme
-                        .surfaceContainerHighest,
+                    color: theme.colorScheme.surfaceContainerHighest,
 
                     child: Icon(
-                      Icons
-                          .image_not_supported_outlined,
+                      Icons.image_not_supported_outlined,
 
                       size: 40,
 
-                      color: theme
-                          .colorScheme
-                          .onSurfaceVariant,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   );
                 },
@@ -1496,25 +1517,16 @@ class _HomeScreenState extends State<HomeScreen> {
             // ---------------------------------------------------------------
             // CARD TEXT
             // ---------------------------------------------------------------
-
             Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(
-                12,
-                12,
-                10,
-                12,
-              ),
+              padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
 
               child: Row(
-                crossAxisAlignment:
-                    CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.end,
 
                 children: [
                   Expanded(
                     child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.start,
 
                       children: [
                         Text(
@@ -1522,20 +1534,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
                           maxLines: 3,
 
-                          overflow:
-                              TextOverflow.ellipsis,
+                          overflow: TextOverflow.ellipsis,
 
                           style: TextStyle(
                             fontSize: 13,
 
                             height: 1.25,
 
-                            fontWeight:
-                                FontWeight.bold,
+                            fontWeight: FontWeight.bold,
 
-                            color: theme
-                                .colorScheme
-                                .onSurface,
+                            color: theme.colorScheme.onSurface,
                           ),
                         ),
 
@@ -1547,8 +1555,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: TextStyle(
                             fontSize: 11,
 
-                            fontWeight:
-                                FontWeight.w600,
+                            fontWeight: FontWeight.w600,
 
                             color: primaryColor,
                           ),
@@ -1564,8 +1571,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 28,
 
                     decoration: BoxDecoration(
-                      color: primaryColor
-                          .withOpacity(0.10),
+                      color: primaryColor.withOpacity(0.10),
 
                       shape: BoxShape.circle,
                     ),
@@ -1603,9 +1609,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // -------------------------------------------------------------------------
 
   Widget _buildHistoryPage() {
-    return const HistoryScreen(
-      embeddedMode: true,
-    );
+    return const HistoryScreen(embeddedMode: true);
   }
 
   // -------------------------------------------------------------------------
@@ -1623,67 +1627,54 @@ class _HomeScreenState extends State<HomeScreen> {
     // Active nav item uses a white pill in dark mode so it stands out
     // against the dark bottom bar background; the icon/text stay in
     // colorScheme.primary (a saturated red), which reads clearly on white.
-    final navPillColor =
-        theme.brightness == Brightness.dark
-            ? Colors.grey.withOpacity(0.3)
-            : const Color(0xFFF6CDCD);
+    final navPillColor = theme.brightness == Brightness.dark
+        ? Colors.grey.withOpacity(0.3)
+        : const Color(0xFFF6CDCD);
 
     final items = [
       (
         icon: Icons.home_outlined,
         activeIcon: Icons.home,
-        label:
-            AppLocalizations.of(context)!
-                .home,
+        label: AppLocalizations.of(context)!.home,
       ),
 
       (
         icon: Icons.qr_code_scanner_outlined,
         activeIcon: Icons.qr_code_scanner,
-        label:
-            AppLocalizations.of(context)!
-                .scan,
+        label: AppLocalizations.of(context)!.scan,
       ),
 
       (
         icon: Icons.history_outlined,
         activeIcon: Icons.history,
-        label:
-            AppLocalizations.of(context)!
-                .history,
+        label: AppLocalizations.of(context)!.history,
       ),
 
       (
         icon: Icons.person_outline,
         activeIcon: Icons.person,
-        label:
-            AppLocalizations.of(context)!
-                .profile,
+        label: AppLocalizations.of(context)!.profile,
       ),
     ];
 
     return Container(
-      padding:
-          const EdgeInsets.symmetric(
-        horizontal: 10,
-        vertical: 10,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
 
       decoration: BoxDecoration(
         color: theme.cardColor,
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outline.withOpacity(0.08)),
+        ),
 
         boxShadow: [
           BoxShadow(
-            color: theme.brightness ==
-                    Brightness.dark
-                ? Colors.black
-                    .withOpacity(0.25)
-                : Colors.black
-                    .withOpacity(0.05),
+            color: theme.brightness == Brightness.dark
+                ? Colors.black.withOpacity(0.25)
+                : Colors.black.withOpacity(0.05),
 
-            blurRadius: 12,
-
-            offset: const Offset(0, -2),
+            blurRadius: 18,
+            spreadRadius: -6,
+            offset: const Offset(0, -5),
           ),
         ],
       ),
@@ -1692,99 +1683,65 @@ class _HomeScreenState extends State<HomeScreen> {
         top: false,
 
         child: Row(
-          mainAxisAlignment:
-              MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
 
-          children:
-              List.generate(
-            items.length,
-            (index) {
-              final item = items[index];
+          children: List.generate(items.length, (index) {
+            final item = items[index];
 
-              final isSelected =
-                  index == _selectedIndex;
+            final isSelected = index == _selectedIndex;
 
-              return Expanded(
-                child: GestureDetector(
-                  behavior:
-                      HitTestBehavior.opaque,
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
 
-                  onTap: () =>
-                      _onNavTap(index),
+                onTap: () => _onNavTap(index),
 
-                  child: AnimatedContainer(
-                    duration:
-                        const Duration(
-                      milliseconds: 200,
-                    ),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
 
-                    margin:
-                        const EdgeInsets
-                            .symmetric(
-                      horizontal: 4,
-                    ),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
 
-                    padding:
-                        const EdgeInsets
-                            .symmetric(
-                      vertical: 8,
-                    ),
+                  padding: const EdgeInsets.symmetric(vertical: 8),
 
-                    decoration:
-                        BoxDecoration(
-                      color: isSelected
-                          ? navPillColor
-                          : Colors.transparent,
+                  decoration: BoxDecoration(
+                    color: isSelected ? navPillColor : Colors.transparent,
 
-                      borderRadius:
-                          BorderRadius
-                              .circular(18),
-                    ),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
 
-                    child: Column(
-                      mainAxisSize:
-                          MainAxisSize.min,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
 
-                      children: [
-                        Icon(
-                          isSelected
-                              ? item.activeIcon
-                              : item.icon,
+                    children: [
+                      Icon(
+                        isSelected ? item.activeIcon : item.icon,
 
-                          color:
-                              primaryColor,
+                        color: primaryColor,
 
-                          size: 22,
+                        size: 22,
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      Text(
+                        item.label,
+
+                        style: TextStyle(
+                          fontSize: 11,
+
+                          color: primaryColor,
+
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                         ),
-
-                        const SizedBox(
-                          height: 4,
-                        ),
-
-                        Text(
-                          item.label,
-
-                          style: TextStyle(
-                            fontSize: 11,
-
-                            color:
-                                primaryColor,
-
-                            fontWeight:
-                                isSelected
-                                    ? FontWeight
-                                        .bold
-                                    : FontWeight
-                                        .w500,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          }),
         ),
       ),
     );
@@ -1805,20 +1762,11 @@ class _ArrowClipper extends CustomClipper<Path> {
 
     path.moveTo(0, 0);
 
-    path.lineTo(
-      size.width - arrowWidth,
-      0,
-    );
+    path.lineTo(size.width - arrowWidth, 0);
 
-    path.lineTo(
-      size.width,
-      size.height / 2,
-    );
+    path.lineTo(size.width, size.height / 2);
 
-    path.lineTo(
-      size.width - arrowWidth,
-      size.height,
-    );
+    path.lineTo(size.width - arrowWidth, size.height);
 
     path.lineTo(0, size.height);
 
@@ -1828,9 +1776,7 @@ class _ArrowClipper extends CustomClipper<Path> {
   }
 
   @override
-  bool shouldReclip(
-    covariant CustomClipper<Path> oldClipper,
-  ) {
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) {
     return false;
   }
 }
@@ -1844,10 +1790,7 @@ class _ArrowClipper extends CustomClipper<Path> {
 // -----------------------------------------------------------------------
 
 class _ShineSweepButton extends StatefulWidget {
-  const _ShineSweepButton({
-    required this.child,
-    required this.borderRadius,
-  });
+  const _ShineSweepButton({required this.child, required this.borderRadius});
 
   final Widget child;
   final BorderRadius borderRadius;
@@ -1863,7 +1806,11 @@ class _ShineSweepButtonState extends State<_ShineSweepButton>
   // Sweep runs during the first 55% of the cycle, then holds off-screen
   // for the remaining 45% - this reads as a periodic "flash" rather than
   // a restless, continuously-moving shimmer.
-  static const _sweepInterval = Interval(0.0, 0.55, curve: Curves.easeInOutCubic);
+  static const _sweepInterval = Interval(
+    0.0,
+    0.55,
+    curve: Curves.easeInOutCubic,
+  );
   static const _bandWidth = 34.0;
 
   @override
