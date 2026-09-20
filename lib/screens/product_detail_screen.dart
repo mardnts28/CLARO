@@ -17,6 +17,9 @@ import '../data/models/health_profile.dart';
 import '../data/models/health_advisory.dart';
 import '../data/models/product_evaluation.dart';
 import '../data/models/ranked_product_result.dart';
+import '../data/models/group_evaluation.dart';
+import '../data/repositories/group_repository.dart' show GroupMemberProfile;
+import '../core/utils/group_advisory_builder.dart';
 import '../data/models/comparison_matrix.dart';
 import '../core/constants/who_fda_thresholds.dart';
 import '../core/utils/rank_label_helper.dart';
@@ -79,6 +82,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   late String _scanEventId;
 
   bool _advisoryStarted = false;
+
+  // ── Group mode ────────────────────────────────────────────────────────
+  // Group mode is only active when the user's active health group has at
+  // least one OTHER member whose profile could be read. Otherwise every
+  // field below stays empty and the screen behaves exactly as it always
+  // has for a solo user.
+  //
+  // While group mode is active, `_evaluation` / `_userHealthProfile` hold
+  // the SELECTED member's data, so the existing Health Analysis rows
+  // (nutrients, allergens) render for whoever is selected without any
+  // change to how those rows are built. The banner switches to the group
+  // verdict.
+  bool _groupChecking = true; // group lookup + group advisory still in flight
+  List<MemberEvaluation> _groupMembers = const [];
+  String? _selectedMemberKey;
+  HealthAdvisory? _groupAdvisory;
+  double _groupAdvisorySizeG = 0; // serving size the Gemini text was written for
+
+  bool get _isGroupMode => _groupMembers.length > 1;
 
   // Local state for the current product to allow updates from Compare
   late Product _currentProduct;
@@ -290,6 +312,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _rankingExplanation = null;
       _fdaResult = null;
       _userHealthProfile = null;
+      _groupChecking = true;
+      _groupMembers = const [];
+      _selectedMemberKey = null;
+      _groupAdvisory = null;
       _isFavorite = false;
       _hasAutoAnnouncedSummary = false;
       _favoriteBusy = true; // Prevent interaction while loading new product's favorite status
@@ -410,7 +436,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid == null) {
-        if (mounted) setState(() => _advisoryLoading = false);
+        if (mounted) {
+          setState(() {
+            _advisoryLoading = false;
+            _groupChecking = false;
+          });
+        }
         return;
       }
 
@@ -425,17 +456,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           setState(() {
             _nutritionUnavailable = true;
             _advisoryLoading = false;
+            _groupChecking = false;
           });
         }
         return;
       }
 
-      // Advisory is always evaluated against the signed-in (primary) user's
-      // own health profile.
+      // Group lookup runs alongside the solo pipeline (it never throws --
+      // any failure just means "solo"). The solo pipeline still runs for
+      // everyone: it produces the primary user's own evaluation plus the
+      // comparison matrix / ranking text, none of which are group-specific.
+      final groupFuture = _prepareGroupMembers(uid);
       await _loadSoloAdvisory(uid);
+      await _finishGroup(groupFuture);
     } catch (e) {
       debugPrint('Error loading health advisory: $e');
-      if (mounted) setState(() => _advisoryLoading = false);
+      if (mounted) {
+        setState(() {
+          _advisoryLoading = false;
+          _groupChecking = false;
+        });
+      }
     }
   }
 
@@ -491,21 +532,190 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         _rankingExplanation = detail.rankingExplanation;
         _advisoryLoading = false;
       });
-      _refreshVoiceSummary();
+      // Voice summary + auto-announce happen in _finishGroup() so a group
+      // user hears the GROUP verdict instead of the solo one.
+    }
+  }
 
-      // Auto-speak the full analysis the moment it's ready, so the user
-      // doesn't have to say "summarize" to hear it -- only once per
-      // product, and only if voice assistant is actually enabled.
-      if (!_hasAutoAnnouncedSummary &&
-          VoiceAssistantService.instance.isEnabled) {
-        _hasAutoAnnouncedSummary = true;
-        final summary =
-            VoiceAssistantService.latestScanSummaryNotifier.value;
-        if (summary != null && summary.trim().isNotEmpty) {
-          unawaited(VoiceAssistantService.instance.speak(summary));
-        }
+  /// Refreshes the spoken summary and, once per product, auto-announces it
+  /// when the voice assistant is enabled.
+  void _finishVoice() {
+    if (!mounted) return;
+    _refreshVoiceSummary();
+
+    // Auto-speak the full analysis the moment it's ready, so the user
+    // doesn't have to say "summarize" to hear it -- only once per
+    // product, and only if voice assistant is actually enabled.
+    if (!_hasAutoAnnouncedSummary && VoiceAssistantService.instance.isEnabled) {
+      _hasAutoAnnouncedSummary = true;
+      final summary = VoiceAssistantService.latestScanSummaryNotifier.value;
+      if (summary != null && summary.trim().isNotEmpty) {
+        unawaited(VoiceAssistantService.instance.speak(summary));
       }
     }
+  }
+
+  // ── Group evaluation ────────────────────────────────────────────────
+
+  MemberEvaluation _evaluateMember({
+    required String key,
+    required String name,
+    required String? avatar,
+    required bool isSelf,
+    required UserHealthProfile profile,
+  }) {
+    final ranked = BackendLocator.productRankingService.rankProducts(
+      products: [_currentProduct],
+      user: profile,
+    );
+    return MemberEvaluation(
+      key: key,
+      name: name,
+      avatar: avatar,
+      isSelf: isSelf,
+      profile: profile,
+      evaluation: ranked.first.evaluation,
+    );
+  }
+
+  /// Returns every member's evaluation of the current product (signed-in
+  /// user first), or null when this should stay a solo screen: no group,
+  /// a group with only the user in it, or any lookup failure.
+  Future<List<MemberEvaluation>?> _prepareGroupMembers(String uid) async {
+    try {
+      final repo = BackendLocator.groupRepository;
+      final group = await repo.getActiveGroup(uid);
+      if (group == null) return null;
+
+      final entries = await repo.getGroupMemberProfiles(group.id);
+      bool isSelfEntry(GroupMemberProfile e) =>
+          e.member.isLinked && e.member.linkedUid == uid;
+      if (!entries.any((e) => !isSelfEntry(e))) return null; // nobody else
+
+      final members = <MemberEvaluation>[];
+      for (final e in entries) {
+        final self = isSelfEntry(e);
+        final memberName = e.member.displayName?.trim();
+        members.add(_evaluateMember(
+          // Same identity the profile was fetched under: uid for linked
+          // members, member id for managed ones.
+          key: e.profile.userId,
+          name: (memberName != null && memberName.isNotEmpty)
+              ? memberName
+              : (e.profile.displayName.isNotEmpty ? e.profile.displayName : 'Member'),
+          avatar: e.member.avatar,
+          isSelf: self,
+          profile: e.profile,
+        ));
+      }
+
+      // The user's own member record can be missing on older groups (it is
+      // created when the owner first opens Group Details). Their own card
+      // must always be part of the group view, so add it from their profile.
+      if (!members.any((m) => m.isSelf)) {
+        final profile = await BackendLocator.userRepository.getHealthProfile(uid);
+        String? avatar;
+        try {
+          final doc = await _authService.db.collection('users').doc(uid).get();
+          final a = doc.data()?['avatar']?.toString();
+          if (a != null && a.isNotEmpty) avatar = a;
+        } catch (_) {}
+        members.insert(
+          0,
+          _evaluateMember(
+            key: profile.userId,
+            name: profile.displayName.isNotEmpty ? profile.displayName : 'Me',
+            avatar: avatar,
+            isSelf: true,
+            profile: profile,
+          ),
+        );
+      }
+      return members.length > 1 ? members : null;
+    } catch (e) {
+      debugPrint('Group evaluation skipped: $e');
+      return null;
+    }
+  }
+
+  Future<HealthAdvisory> _generateGroupAdvisory(List<MemberEvaluation> members) {
+    final size = _currentProduct.servingSizeG > 0 ? _currentProduct.servingSizeG : 100.0;
+    final languageCode = mounted ? Localizations.localeOf(context).languageCode : 'en';
+    _groupAdvisorySizeG = size;
+    return BackendLocator.geminiAdvisoryService.generateGroupAdvisory(
+      productId: _currentProduct.id,
+      productName: _currentProduct.name,
+      servingSizeG: size,
+      facts: GroupAdvisoryBuilder.buildFacts(members, size),
+      languageCode: languageCode,
+    );
+  }
+
+  Future<void> _finishGroup(Future<List<MemberEvaluation>?> pending) async {
+    final token = _scanEventId; // detects a product switch mid-load
+    final members = await pending;
+    if (!mounted || token != _scanEventId) return;
+
+    if (members == null) {
+      setState(() => _groupChecking = false);
+      _finishVoice();
+      return;
+    }
+
+    final advisory = await _generateGroupAdvisory(members);
+    if (!mounted || token != _scanEventId) return;
+
+    final self = members.firstWhere((m) => m.isSelf);
+    setState(() {
+      _groupMembers = members;
+      _groupAdvisory = advisory;
+      _selectedMemberKey = self.key;
+      _userHealthProfile = self.profile;
+      _evaluation = self.evaluation;
+      _groupChecking = false;
+    });
+    _finishVoice();
+  }
+
+  void _selectMember(MemberEvaluation m) {
+    if (m.key == _selectedMemberKey) return;
+    HapticService().vibrate();
+    setState(() {
+      _selectedMemberKey = m.key;
+      _userHealthProfile = m.profile;
+      _evaluation = m.evaluation;
+    });
+  }
+
+  /// Members ordered for display: most severe first (at the serving size
+  /// currently selected), then the signed-in user, then by name.
+  List<MemberEvaluation> get _sortedGroupMembers {
+    final list = [..._groupMembers];
+    list.sort((a, b) {
+      final la = GroupAdvisoryBuilder.severity(GroupAdvisoryBuilder.levelAt(a.evaluation, _selectedSizeG));
+      final lb = GroupAdvisoryBuilder.severity(GroupAdvisoryBuilder.levelAt(b.evaluation, _selectedSizeG));
+      if (la != lb) return lb.compareTo(la);
+      if (a.isSelf != b.isSelf) return a.isSelf ? -1 : 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return list;
+  }
+
+  AdvisoryLevel get _groupLevel => GroupAdvisoryBuilder.groupLevel(
+        _groupMembers.map((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG)),
+      );
+
+  /// The Gemini group text while the pack size is still the one it was
+  /// written for; a deterministic rewrite for any other size (same idea as
+  /// _effectiveAdvisory() on the single-user card -- no extra AI call, and
+  /// it can never disagree with the levels shown on screen).
+  HealthAdvisory? _effectiveGroupAdvisory(BuildContext context) {
+    if (_groupAdvisory == null) return null;
+    if (_selectedSizeG == _groupAdvisorySizeG) return _groupAdvisory;
+    return GroupAdvisoryBuilder.fallback(
+      GroupAdvisoryBuilder.buildFacts(_groupMembers, _selectedSizeG),
+      languageCode: Localizations.localeOf(context).languageCode,
+    );
   }
 
   @override
@@ -882,7 +1092,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
+                        // Group mode: pick whose health profile the rows below
+                        // are evaluated for. Solo users keep the original spacing.
+                        if (_isGroupMode) ...[
+                          const SizedBox(height: 16),
+                          _buildMemberSwitcher(context, colorScheme),
+                          const Divider(height: 28),
+                        ] else
+                          const SizedBox(height: 20),
 
                         if (!p.nutritionalFacts.hasNutritionData)
                           Padding(
@@ -1644,7 +1861,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    if (_advisoryLoading) {
+    if (_advisoryLoading || _groupChecking) {
       return Container(
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.all(16),
@@ -1687,6 +1904,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
       );
     }
+
+    // Group mode: one verdict for the whole health group (Gemini-written
+    // explanation + member avatars). Solo users never reach this.
+    if (_isGroupMode) return _buildGroupBanner(context, loc);
 
     // The backend's `_evaluation.overallLevel` is fixed to the product's
     // labeled serving size (`product.servingSizeG`) -- deliberately, so
@@ -1771,6 +1992,335 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  // ── Group mode widgets ───────────────────────────────────────────────
+
+  Color _groupLevelColor(AdvisoryLevel level) {
+    switch (level) {
+      case AdvisoryLevel.suitable:
+        return Colors.green;
+      case AdvisoryLevel.moderate:
+        return Colors.amber[800]!;
+      case AdvisoryLevel.caution:
+        return Colors.red;
+    }
+  }
+
+  String _memberLabel(MemberEvaluation m, bool tl) =>
+      m.isSelf ? (tl ? 'Ako' : 'Me') : m.name;
+
+  String _groupConditionName(HealthCondition c, bool tl) {
+    switch (c) {
+      case HealthCondition.hypertension:
+        return tl ? 'Alta-presyon' : 'Hypertension';
+      case HealthCondition.diabetes:
+        return 'Diabetes';
+      case HealthCondition.heartCondition:
+        return tl ? 'Sakit sa puso' : 'Heart condition';
+    }
+  }
+
+  // Member avatar (their chosen image, or initials) with an optional
+  // status dot showing their verdict for the product.
+  Widget _memberAvatar(MemberEvaluation m, ColorScheme cs,
+      {double size = 32, bool showDot = true}) {
+    final level = GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG);
+    final trimmed = m.name.trim();
+    final initials = trimmed.isEmpty ? '?' : trimmed.substring(0, 1).toUpperCase();
+
+    Widget initialsCircle() => Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          color: cs.primaryContainer,
+          child: Text(
+            initials,
+            style: GoogleFonts.inter(
+              fontSize: size * 0.42,
+              fontWeight: FontWeight.w700,
+              color: cs.onPrimaryContainer,
+            ),
+          ),
+        );
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipOval(
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: m.avatar != null
+                ? Image.asset(
+                    m.avatar!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => initialsCircle(),
+                  )
+                : initialsCircle(),
+          ),
+        ),
+        if (showDot)
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              width: size * 0.38,
+              height: size * 0.38,
+              decoration: BoxDecoration(
+                color: _groupLevelColor(level),
+                shape: BoxShape.circle,
+                border: Border.all(color: cs.surface, width: 2),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // Group verdict banner: replaces the single-user advisory banner when the
+  // user's health group has other members.
+  Widget _buildGroupBanner(BuildContext context, AppLocalizations loc) {
+    final cs = Theme.of(context).colorScheme;
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+    final members = _sortedGroupMembers;
+    final level = _groupLevel;
+    final color = _groupLevelColor(level);
+    final icon = switch (level) {
+      AdvisoryLevel.suitable => Icons.verified_user_outlined,
+      AdvisoryLevel.moderate => Icons.info_outline,
+      AdvisoryLevel.caution => Icons.warning_amber_rounded,
+    };
+
+    final flaggedCount = members
+        .where((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) != AdvisoryLevel.suitable)
+        .length;
+    final levelLabel = _levelLabel(level);
+    final advisory = _effectiveGroupAdvisory(context);
+
+    // Same "<Level> - <headline>" shape as the single-user banner, minus
+    // any decision word the AI repeated at the start of the headline.
+    var headline = advisory?.warningText.trim() ?? '';
+    if (headline.toLowerCase().startsWith(levelLabel.toLowerCase())) {
+      headline = headline.substring(levelLabel.length).trim();
+      if (headline.startsWith(':') || headline.startsWith('-')) {
+        headline = headline.substring(1).trim();
+      }
+    }
+    final title = headline.isEmpty ? levelLabel : '$levelLabel - $headline';
+
+    final caption = flaggedCount == 0
+        ? (tl ? 'Walang naka-flag na miyembro' : 'No members flagged')
+        : (tl
+            ? '$flaggedCount sa ${members.length} miyembro ang naka-flag'
+            : '$flaggedCount of ${members.length} members flagged');
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 36),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: color,
+                      ),
+                    ),
+                    if (advisory != null && advisory.explanation.trim().isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      _buildAdvisorySubtitle(advisory.explanation, cs, level),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            caption,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            clipBehavior: Clip.none,
+            child: Row(
+              children: members.map((m) {
+                final memberLevel = GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG);
+                return Semantics(
+                  button: true,
+                  label: '${_memberLabel(m, tl)}, ${_levelLabel(memberLevel)}',
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => _selectMember(m),
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 14),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _memberAvatar(m, cs, size: 38),
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            width: 56,
+                            child: Text(
+                              _memberLabel(m, tl),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(fontSize: 11, color: cs.onSurface),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Member chips + the selected member's summary line, shown at the top of
+  // the Health Analysis card in group mode. Everything below it in the card
+  // is evaluated for the selected member.
+  Widget _buildMemberSwitcher(BuildContext context, ColorScheme cs) {
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+    final members = _sortedGroupMembers;
+    final selected = _groupMembers.firstWhere(
+      (m) => m.key == _selectedMemberKey,
+      orElse: () => _groupMembers.first,
+    );
+    final selectedLevel = GroupAdvisoryBuilder.levelAt(selected.evaluation, _selectedSizeG);
+    final selectedColor = _groupLevelColor(selectedLevel);
+    final conditions = selected.profile.conditions.isEmpty
+        ? (tl ? 'Walang kondisyon sa kalusugan' : 'No health conditions')
+        : selected.profile.conditions.map((c) => _groupConditionName(c, tl)).join(', ');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: members.map((m) {
+              final isSel = m.key == selected.key;
+              final level = GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG);
+              return Semantics(
+                button: true,
+                selected: isSel,
+                label: '${_memberLabel(m, tl)}, ${_levelLabel(level)}',
+                child: GestureDetector(
+                  onTap: () => _selectMember(m),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.fromLTRB(6, 5, 12, 5),
+                    decoration: BoxDecoration(
+                      color: isSel ? cs.primary.withOpacity(0.12) : cs.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSel ? cs.primary : cs.outlineVariant,
+                        width: isSel ? 1.5 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _memberAvatar(m, cs, size: 24, showDot: false),
+                        const SizedBox(width: 6),
+                        Text(
+                          _memberLabel(m, tl),
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                            color: cs.onSurface,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _groupLevelColor(level),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            _memberAvatar(selected, cs, size: 40, showDot: false),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _memberLabel(selected, tl),
+                    style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: cs.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    conditions,
+                    style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: selectedColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                _levelLabel(selectedLevel),
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: selectedColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -2240,25 +2790,44 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     final sections = <String>[];
-    if (allergenLabels.isNotEmpty) {
+    if (allergenLabels.isNotEmpty && !_isGroupMode) {
       sections.add('Allergen warning: ${allergenLabels.join(', ')}.');
     }
 
     sections.add(
       'Product: ${_currentProduct.name}, size ${_selectedSizeG.toStringAsFixed(0)} grams.',
     );
-    sections.add('Overall verdict: $verdict.');
-
-    if (advisory != null) {
-      if (advisory.warningText.trim().isNotEmpty) {
-        sections.add(advisory.warningText.trim());
+    if (_isGroupMode) {
+      final groupAdvisory = _effectiveGroupAdvisory(context);
+      final flaggedCount = _groupMembers
+          .where((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) != AdvisoryLevel.suitable)
+          .length;
+      sections.add(
+        'Group verdict: ${_levelLabel(_groupLevel)}. '
+        '$flaggedCount of ${_groupMembers.length} members flagged.',
+      );
+      if (groupAdvisory != null) {
+        if (groupAdvisory.warningText.trim().isNotEmpty) {
+          sections.add('${groupAdvisory.warningText.trim()}.');
+        }
+        if (groupAdvisory.explanation.trim().isNotEmpty) {
+          sections.add(groupAdvisory.explanation.trim());
+        }
       }
-      if (advisory.explanation.trim().isNotEmpty) {
-        sections.add(advisory.explanation.trim());
+    } else {
+      sections.add('Overall verdict: $verdict.');
+
+      if (advisory != null) {
+        if (advisory.warningText.trim().isNotEmpty) {
+          sections.add(advisory.warningText.trim());
+        }
+        if (advisory.explanation.trim().isNotEmpty) {
+          sections.add(advisory.explanation.trim());
+        }
       }
     }
 
-    if (flaggedNutrients.isNotEmpty) {
+    if (flaggedNutrients.isNotEmpty && !_isGroupMode) {
       sections.add('Nutrients driving this verdict: ${flaggedNutrients.join(', ')}.');
     }
 

@@ -20,6 +20,7 @@ import '../../core/constants/who_fda_thresholds.dart';
 import '../../core/utils/advisory_prompt_builder.dart';
 import '../../core/utils/comparison_calculator.dart';
 import '../../core/utils/fallback_advisory_generator.dart';
+import '../../core/utils/group_advisory_builder.dart';
 
 class GeminiAdvisoryService {
   GeminiAdvisoryService({
@@ -191,6 +192,110 @@ class GeminiAdvisoryService {
     _cache[pKey] = advisory;
     _persistAdvisory(pKey, advisory);
     return advisory;
+  }
+
+  /// ONE Gemini call that writes the group verdict shown on the product
+  /// detail banner when the user's health group has other members.
+  ///
+  /// [facts] come from GroupAdvisoryBuilder.buildFacts(). Member names are
+  /// never sent -- Gemini only sees [M1]-style tags that are swapped back
+  /// locally. Never throws: on timeout/API/parse errors, or when nothing
+  /// needs explaining (everyone suitable), it returns the deterministic
+  /// GroupAdvisoryBuilder.fallback() text instead, same as the single-user
+  /// flow does.
+  Future<HealthAdvisory> generateGroupAdvisory({
+    required String productId,
+    required String productName,
+    required double servingSizeG,
+    required List<GroupMemberFacts> facts,
+    String languageCode = 'en',
+  }) async {
+    final key =
+        'group_advisory_${GroupAdvisoryBuilder.fingerprint(productId, servingSizeG, facts)}_$languageCode';
+
+    final cached = _cache[key];
+    if (cached != null) return cached;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(key);
+      if (raw != null && raw.isNotEmpty) {
+        final advisory = HealthAdvisory.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        _cache[key] = advisory;
+        return advisory;
+      }
+    } catch (e) {
+      print('Group advisory cache read warning: $e');
+    }
+
+    final level = GroupAdvisoryBuilder.groupLevel(facts.map((f) => f.level));
+    final needsAi = level != AdvisoryLevel.suitable || facts.any((f) => f.allergens.isNotEmpty);
+
+    HealthAdvisory advisory;
+    if (!needsAi) {
+      advisory = GroupAdvisoryBuilder.fallback(facts, languageCode: languageCode);
+    } else {
+      try {
+        final text = await _callGemini(
+          GroupAdvisoryBuilder.buildPrompt(
+            productName: productName,
+            servingSizeG: servingSizeG,
+            facts: facts,
+            languageCode: languageCode,
+          ),
+          timeout: _timeout,
+        );
+        advisory = _parseGroupResponse(text, facts, level, languageCode) ??
+            GroupAdvisoryBuilder.fallback(facts, languageCode: languageCode);
+      } catch (e) {
+        print('GEMINI GROUP ADVISORY ERROR: $e');
+        advisory = GroupAdvisoryBuilder.fallback(facts, languageCode: languageCode);
+      }
+    }
+
+    _cache[key] = advisory;
+    // Only persist AI text -- a fallback shouldn't stick around for weeks
+    // just because Gemini was briefly unreachable.
+    if (!advisory.isFallback) _persistAdvisory(key, advisory);
+    return advisory;
+  }
+
+  HealthAdvisory? _parseGroupResponse(
+    String? text,
+    List<GroupMemberFacts> facts,
+    AdvisoryLevel level,
+    String languageCode,
+  ) {
+    if (text == null || text.trim().isEmpty) return null;
+    try {
+      var cleaned = text.trim();
+      if (cleaned.startsWith('```json')) {
+        cleaned = cleaned.substring(7);
+      } else if (cleaned.startsWith('```')) {
+        cleaned = cleaned.substring(3);
+      }
+      if (cleaned.endsWith('```')) cleaned = cleaned.substring(0, cleaned.length - 3);
+
+      final json = jsonDecode(cleaned.trim()) as Map<String, dynamic>;
+      final warning = json['warningText'] as String?;
+      final explanation = json['explanation'] as String?;
+      if (warning == null || explanation == null) return null;
+
+      final w = GroupAdvisoryBuilder.restoreNames(warning, facts, languageCode);
+      final e = GroupAdvisoryBuilder.restoreNames(explanation, facts, languageCode);
+      if (w == null || e == null) return null;
+
+      return HealthAdvisory(
+        overallLevel: level,
+        warningText: w,
+        explanation: e,
+        safeServingSize: null,
+        source: AdvisorySource.aiGenerated,
+        generatedAt: DateTime.now(),
+      );
+    } catch (e) {
+      print('GROUP PARSE ERROR: $e');
+      return null;
+    }
   }
 
   void _persistAdvisory(String key, HealthAdvisory advisory) {

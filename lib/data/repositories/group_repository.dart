@@ -29,6 +29,15 @@ import 'user_repository.dart';
 
 const _groupWorkerUrl = 'https://health-data-worker.claro-app.workers.dev';
 
+/// A group member together with their resolved health profile -- what the
+/// product detail screen needs to evaluate a product for every member and
+/// show each one's name and avatar.
+class GroupMemberProfile {
+  final GroupMember member;
+  final UserHealthProfile profile;
+  const GroupMemberProfile({required this.member, required this.profile});
+}
+
 abstract class GroupRepository {
   /// The current user's active group, or null if they aren't in one
   /// (as owner OR as a linked member). Reads users/{uid}.primaryGroupId
@@ -110,6 +119,11 @@ abstract class GroupRepository {
   /// UserHealthProfile list, ready to hand to WhoCalculator/
   /// ProductRankingService exactly like today's single-profile call.
   Future<List<UserHealthProfile>> getGroupHealthProfiles(String groupId);
+
+  /// Like [getGroupHealthProfiles] but keeps each profile paired with its
+  /// member record (name, avatar, linked/managed). Members whose profile
+  /// can't be fetched are left out rather than shown with a fake result.
+  Future<List<GroupMemberProfile>> getGroupMemberProfiles(String groupId);
 
   /// Deletes [groupId]. Only the group's owner may call this
   /// ([requestingUid] must equal HealthGroup.ownerUid), and only once
@@ -589,6 +603,12 @@ class FirebaseGroupRepository implements GroupRepository {
 
   @override
   Future<List<UserHealthProfile>> getGroupHealthProfiles(String groupId) async {
+    final entries = await getGroupMemberProfiles(groupId);
+    return entries.map((e) => e.profile).toList();
+  }
+
+  @override
+  Future<List<GroupMemberProfile>> getGroupMemberProfiles(String groupId) async {
     final snap = await _groups
         .doc(groupId)
         .collection('members')
@@ -603,13 +623,15 @@ class FirebaseGroupRepository implements GroupRepository {
     final results = await Future.wait(snap.docs.map((doc) async {
       final member = GroupMember.fromFirestore(doc.id, groupId, doc.data());
       try {
-        return await _profileForMember(groupId, member, myUid);
+        final profile = await _profileForMember(groupId, member, myUid);
+        if (profile == null) return null;
+        return GroupMemberProfile(member: member, profile: profile);
       } catch (e) {
-        debugPrint('getGroupHealthProfiles: member ${member.id} failed: $e');
+        debugPrint('getGroupMemberProfiles: member ${member.id} failed: $e');
         return null;
       }
     }));
-    return results.whereType<UserHealthProfile>().toList();
+    return results.whereType<GroupMemberProfile>().toList();
   }
 
   /// Resolves ONE member's profile from that member's own identity:
