@@ -36,7 +36,7 @@ import '../data/models/health_profile.dart';
 import '../data/services/backend_locator.dart';
 import '../services/haptic_service.dart';
 import '../widgets/custom_text_field.dart';
-import '../core/utils/relationship_labels.dart';
+import '../core/utils/avatar_assets.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../generated/l10n/app_localizations.dart';
 
@@ -100,8 +100,10 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     'Peanuts': Icons.spa_outlined,
   };
 
-  // Optional-to-pick relation of this member to the group owner.
-  MemberRelationship? _relationship;
+  // Optional avatar (asset path) for this member, chosen from the images
+  // in assets/images/avatars/.
+  String? _avatar;
+  List<String> _avatarOptions = const [];
 
   bool _saving = false;
   bool _loadingExisting = false;
@@ -151,9 +153,12 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     // Rebuild on every keystroke so the Add Member button's enabled state
     // tracks whether a name has been entered.
     _nameController.addListener(() => setState(() {}));
+    AvatarAssets.load().then((list) {
+      if (mounted) setState(() => _avatarOptions = list);
+    });
     final existing = widget.existingMember;
     if (existing != null) {
-      _relationship = existing.relationship;
+      _avatar = existing.avatar;
       _nameController.text = existing.displayName ?? '';
       _loadExistingProfile(existing);
     }
@@ -242,12 +247,14 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
   }
 
   // Add/Save is enabled only when a name is entered (locked and always
-  // present in edit mode) AND at least one health condition is selected
-  // ("None" counts as a selection). Allergens stay optional.
+  // present in edit mode), an avatar is selected, AND at least one health
+  // condition is selected ("None" counts as a selection). Allergens stay
+  // optional.
   bool get _canSubmit {
     final hasName = widget.isEditing || _nameController.text.trim().isNotEmpty;
+    final hasAvatar = _avatar != null;
     final hasCondition = _conditions.values.any((v) => v);
-    return hasName && hasCondition;
+    return hasName && hasAvatar && hasCondition;
   }
 
   void _toggleAllergen(String key) {
@@ -286,11 +293,11 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     try {
       if (isEditing) {
         memberId = widget.existingMember!.id;
-        if (_relationship != widget.existingMember!.relationship) {
-          await _groupRepository.updateMemberRelationship(
+        if (_avatar != widget.existingMember!.avatar) {
+          await _groupRepository.updateMemberAvatar(
             groupId: widget.group.id,
             memberId: memberId,
-            relationship: _relationship,
+            avatar: _avatar,
           );
         }
       } else {
@@ -299,7 +306,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
         final member = await _groupRepository.addManagedMember(
           groupId: widget.group.id,
           displayName: name,
-          relationship: _relationship,
+          avatar: _avatar,
         );
         memberId = member.id;
       }
@@ -360,7 +367,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                     enabled: !widget.isEditing,
                   ),
                   const SizedBox(height: 20),
-                  _buildRelationSection(theme, colorScheme, loc),
+                  _buildAvatarSection(theme, colorScheme, loc),
                   const SizedBox(height: 16),
                   _buildConditionsSection(theme, colorScheme, loc),
                   const SizedBox(height: 16),
@@ -397,7 +404,9 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     );
   }
 
-  Widget _buildRelationSection(ThemeData theme, ColorScheme colorScheme, AppLocalizations loc) {
+  // Avatar picker: image-only options (no text labels), laid out as two
+  // rows of four. Tapping the selected avatar again clears it.
+  Widget _buildAvatarSection(ThemeData theme, ColorScheme colorScheme, AppLocalizations loc) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -410,81 +419,73 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.diversity_1_outlined, color: colorScheme.primary, size: 20),
+              Icon(Icons.face_outlined, color: colorScheme.primary, size: 20),
               const SizedBox(width: 8),
               Text(
-                RelationshipLabels.sectionTitle(context),
+                'Avatar',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 4,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: 0.85,
-            children: MemberRelationship.values.map((r) {
-              final selected = _relationship == r;
-              return GestureDetector(
-                onTap: () {
-                  HapticService().vibrate();
-                  // Single-select; tapping the selected option clears it.
-                  setState(() => _relationship = selected ? null : r);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  decoration: BoxDecoration(
-                    color: selected ? colorScheme.surfaceContainerHighest : theme.cardColor,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: selected ? colorScheme.primary : colorScheme.outlineVariant,
-                      width: selected ? 1.5 : 1,
-                    ),
-                  ),
+          if (_avatarOptions.isEmpty)
+            const SizedBox(height: 8)
+          else
+            GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1,
+              children: _avatarOptions.map((path) {
+                final selected = _avatar == path;
+                return GestureDetector(
+                  onTap: () {
+                    HapticService().vibrate();
+                    setState(() => _avatar = selected ? null : path);
+                  },
                   child: Stack(
                     children: [
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            RelationshipLabels.icon(
-                              context,
-                              r,
-                              size: 28,
-                              color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      Positioned.fill(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: selected ? colorScheme.primary : Colors.transparent,
+                              width: 2.5,
                             ),
-                            const SizedBox(height: 4),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: _gridLabel(
-                                RelationshipLabels.label(r, context),
-                                selected,
-                                colorScheme,
+                          ),
+                          child: ClipOval(
+                            child: Image.asset(
+                              path,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: colorScheme.surfaceContainerHighest,
+                                child: Icon(Icons.person_outline, color: colorScheme.onSurfaceVariant),
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
                       if (selected)
                         Positioned(
-                          top: 4,
-                          right: 4,
+                          top: 0,
+                          right: 0,
                           child: Container(
-                            width: 16,
-                            height: 16,
+                            width: 18,
+                            height: 18,
                             decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
-                            child: const Icon(Icons.check, size: 10, color: Colors.white),
+                            child: const Icon(Icons.check, size: 12, color: Colors.white),
                           ),
                         ),
                     ],
                   ),
-                ),
-              );
-            }).toList(),
-          ),
+                );
+              }).toList(),
+            ),
         ],
       ),
     );
@@ -578,9 +579,13 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     );
     final isSingleWord = !text.trim().contains(RegExp(r'\s'));
     if (isSingleWord) {
-      return FittedBox(
-        fit: BoxFit.scaleDown,
-        child: Text(text, maxLines: 1, softWrap: false, textAlign: TextAlign.center, style: style),
+      return SizedBox(
+        width: double.infinity,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.center,
+          child: Text(text, maxLines: 1, softWrap: false, textAlign: TextAlign.center, style: style),
+        ),
       );
     }
     return Text(

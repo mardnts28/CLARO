@@ -47,7 +47,11 @@ abstract class GroupRepository {
   /// Ordered oldest-created first.
   Future<List<HealthGroup>> getGroups(String uid);
 
-  Future<HealthGroup> createGroup({required String ownerUid, required String name});
+  Future<HealthGroup> createGroup({
+    required String ownerUid,
+    required String name,
+    GroupType? groupType,
+  });
 
   Stream<List<GroupMember>> watchMembers(String groupId);
 
@@ -65,14 +69,14 @@ abstract class GroupRepository {
   Future<GroupMember> addManagedMember({
     required String groupId,
     required String displayName,
-    MemberRelationship? relationship,
+    String? avatar,
   });
 
-  /// Updates the relation of an existing managed member (edit flow).
-  Future<void> updateMemberRelationship({
+  /// Updates the avatar of an existing managed member (edit flow).
+  Future<void> updateMemberAvatar({
     required String groupId,
     required String memberId,
-    required MemberRelationship? relationship,
+    required String? avatar,
   });
 
   /// Phase 6: writes a managed member's conditions/allergens through the
@@ -175,13 +179,18 @@ class FirebaseGroupRepository implements GroupRepository {
   }
 
   @override
-  Future<HealthGroup> createGroup({required String ownerUid, required String name}) async {
+  Future<HealthGroup> createGroup({
+    required String ownerUid,
+    required String name,
+    GroupType? groupType,
+  }) async {
     final docRef = _groups.doc();
     final group = HealthGroup(
       id: docRef.id,
       ownerUid: ownerUid,
       name: name,
       createdAt: DateTime.now(),
+      groupType: groupType,
     );
     await docRef.set(group.toFirestore());
 
@@ -293,7 +302,7 @@ class FirebaseGroupRepository implements GroupRepository {
   Future<GroupMember> addManagedMember({
     required String groupId,
     required String displayName,
-    MemberRelationship? relationship,
+    String? avatar,
   }) async {
     final memberRef = _groups.doc(groupId).collection('members').doc();
     final member = GroupMember(
@@ -303,20 +312,20 @@ class FirebaseGroupRepository implements GroupRepository {
       status: GroupMemberStatus.active,
       addedAt: DateTime.now(),
       displayName: displayName,
-      relationship: relationship,
+      avatar: avatar,
     );
     await memberRef.set(member.toFirestore());
     return member;
   }
 
   @override
-  Future<void> updateMemberRelationship({
+  Future<void> updateMemberAvatar({
     required String groupId,
     required String memberId,
-    required MemberRelationship? relationship,
+    required String? avatar,
   }) async {
     await _groups.doc(groupId).collection('members').doc(memberId).update({
-      'relationship': relationship?.name ?? FieldValue.delete(),
+      'avatar': avatar ?? FieldValue.delete(),
     });
   }
 

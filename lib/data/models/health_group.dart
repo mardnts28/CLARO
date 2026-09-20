@@ -25,14 +25,14 @@ enum GroupMemberStatus { invited, active, left }
 
 enum GroupInviteStatus { pending, redeemed, revoked, expired }
 
-enum MemberRelationship { family, friend, lover, other }
+enum GroupType { family, friends, lovers, others }
 
-/// Parses the string stored in Firestore ('family', 'friend', 'lover',
-/// 'other') back into a [MemberRelationship]. Returns null when absent or
-/// unrecognised (e.g. members added before relations existed).
-MemberRelationship? relationshipFromString(String? raw) {
-  for (final r in MemberRelationship.values) {
-    if (r.name == raw) return r;
+/// Parses the string stored in Firestore back into a [GroupType]. Returns
+/// null when absent or unrecognised (groups created before group types
+/// existed).
+GroupType? groupTypeFromString(String? raw) {
+  for (final t in GroupType.values) {
+    if (t.name == raw) return t;
   }
   return null;
 }
@@ -46,6 +46,8 @@ class HealthGroup {
   // present here (e.g. just added) is appended at render time -- this
   // list is a display hint, not a source of truth for membership.
   final List<String> memberOrder;
+  // Family / Friends / Lovers / Others. Null for older groups.
+  final GroupType? groupType;
 
   const HealthGroup({
     required this.id,
@@ -53,6 +55,7 @@ class HealthGroup {
     required this.name,
     required this.createdAt,
     this.memberOrder = const [],
+    this.groupType,
   });
 
   factory HealthGroup.fromFirestore(String id, Map<String, dynamic> data) {
@@ -64,12 +67,14 @@ class HealthGroup {
       memberOrder: (data['memberOrder'] as List<dynamic>? ?? [])
           .map((e) => e.toString())
           .toList(),
+      groupType: groupTypeFromString(data['groupType']?.toString()),
     );
   }
 
   Map<String, dynamic> toFirestore() => {
         'ownerUid': ownerUid,
         'name': name,
+        if (groupType != null) 'groupType': groupType!.name,
         'createdAt': Timestamp.fromDate(createdAt),
         'memberOrder': memberOrder,
       };
@@ -89,8 +94,9 @@ class GroupMember {
   // "managed" members only:
   final String? displayName;
   
-  // Relationship to the group owner (for managed members)
-  final MemberRelationship? relationship;
+  // Asset path of the avatar chosen for this member (managed members),
+  // e.g. 'assets/images/avatars/female_1.png'. Null if none was chosen.
+  final String? avatar;
 
   // Encrypted blobs written ONLY by the Cloudflare Worker (Phase 6) for
   // "managed" members. Never written directly by the client. Left null
@@ -109,7 +115,7 @@ class GroupMember {
     this.updatedAt,
     this.linkedUid,
     this.displayName,
-    this.relationship,
+    this.avatar,
     this.conditionsEncrypted,
     this.allergensEncrypted,
   });
@@ -133,7 +139,7 @@ class GroupMember {
       updatedAt: _readDate(data['updatedAt']),
       linkedUid: data['linkedUid']?.toString(),
       displayName: data['displayName']?.toString(),
-      relationship: relationshipFromString(data['relationship']?.toString()),
+      avatar: data['avatar']?.toString(),
       conditionsEncrypted: data['conditionsEncrypted']?.toString(),
       allergensEncrypted: data['allergensEncrypted']?.toString(),
     );
@@ -146,7 +152,7 @@ class GroupMember {
         if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
         if (linkedUid != null) 'linkedUid': linkedUid,
         if (displayName != null) 'displayName': displayName,
-        if (relationship != null) 'relationship': relationship!.name,
+        if (avatar != null) 'avatar': avatar,
         // conditionsEncrypted/allergensEncrypted deliberately omitted here:
         // the client never writes these fields (see Phase 6 Worker + Phase
         // 1 Firestore Rules, which reject direct client writes to them --

@@ -28,26 +28,6 @@ import '../core/utils/nova_score_calculator.dart';
 import '../data/services/backend_locator.dart';
 import '../data/services/favorites_service.dart';
 
-/// NEW (Phase 7). Pairs one group member's identity with their evaluation
-/// of the current product. ProductEvaluation itself deliberately carries
-/// no identity (see product_evaluation.dart's header comment) -- this is
-/// where that identity gets attached, at the call site, matching how the
-/// rest of this architecture already expects identity to be handled by
-/// the caller, not the model.
-class _MemberEvaluation {
-  final String memberId;
-  final String displayName;
-  final bool isLinked;
-  final ProductEvaluation evaluation;
-
-  const _MemberEvaluation({
-    required this.memberId,
-    required this.displayName,
-    required this.isLinked,
-    required this.evaluation,
-  });
-}
-
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
   final double confidence;
@@ -92,13 +72,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   ComparisonMatrix? _comparisonMatrix;
   String? _rankingExplanation;
   UserHealthProfile? _userHealthProfile;
-
-  // Phase 7 — group mode. Empty/false when the user has no active group,
-  // in which case the existing single-user fields above (_evaluation,
-  // _advisory, _comparisonMatrix, _rankingExplanation) are used exactly
-  // as before -- nothing about them changes.
-  bool _isGroupMode = false;
-  List<_MemberEvaluation> _memberEvaluations = [];
 
   // Placeholder scan-event id used only for GeminiAdvisoryService's
   // per-scan-event response cache. Once a real scan-session id is threaded
@@ -457,27 +430,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return;
       }
 
-      // Phase 7: check for an active group first. getActiveGroup() returns
-      // null for the vast majority of users (anyone who hasn't created or
-      // joined a group), in which case behavior is byte-for-byte identical
-      // to before this phase.
-      final group = await BackendLocator.groupRepository.getActiveGroup(uid);
-
-      if (group == null) {
-        await _loadSoloAdvisory(uid);
-      } else {
-        await _loadGroupAdvisory(group.id, uid);
-      }
+      // Advisory is always evaluated against the signed-in (primary) user's
+      // own health profile.
+      await _loadSoloAdvisory(uid);
     } catch (e) {
       debugPrint('Error loading health advisory: $e');
       if (mounted) setState(() => _advisoryLoading = false);
     }
   }
 
-  /// Exactly the logic _loadAdvisory() contained before Phase 7 --
-  /// unchanged, just extracted into its own method so it can be called
-  /// either directly (no group) or from within the group path for the
-  /// owner's own card (see _loadGroupAdvisory).
+  /// Evaluates the current product against the primary user's own health
+  /// profile only.
   Future<void> _loadSoloAdvisory(String uid) async {
     final profile = await BackendLocator.userRepository.getHealthProfile(uid);
 
@@ -522,7 +485,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     if (mounted) {
       setState(() {
-        _isGroupMode = false;
         _evaluation = target.evaluation;
         _advisory = detail.advisory;
         _comparisonMatrix = detail.comparisonMatrix;
@@ -543,85 +505,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           unawaited(VoiceAssistantService.instance.speak(summary));
         }
       }
-    }
-  }
-
-  /// NEW (Phase 7). Evaluates the current product against every active
-  /// group member -- one WhoCalculator/ProductRankingService call per
-  /// member, via the SAME unmodified rankProducts()/getProductDetail()
-  /// calls _loadSoloAdvisory() already used. This is purely a loop around
-  /// them; the scoring/advisory engine itself needed no changes for
-  /// group support. The owner's own result also populates the existing
-  /// single-user fields (_evaluation/_advisory/_comparisonMatrix/
-  /// _rankingExplanation), so every existing widget further down in
-  /// build() keeps showing "your own" result exactly as before -- the
-  /// group summary + per-member list is additive UI, not a replacement.
-  Future<void> _loadGroupAdvisory(String groupId, String ownerUid) async {
-    final profiles = await BackendLocator.groupRepository.getGroupHealthProfiles(groupId);
-    if (profiles.isEmpty) {
-      // Group exists but has no readable members yet -- fall back to solo
-      // rather than show an empty group summary.
-      await _loadSoloAdvisory(ownerUid);
-      return;
-    }
-
-    final languageCode =
-        mounted ? Localizations.localeOf(context).languageCode : 'en';
-    final members = await BackendLocator.groupRepository.watchMembers(groupId).first;
-
-    final results = <_MemberEvaluation>[];
-    for (final profile in profiles) {
-      final ranked = BackendLocator.productRankingService.rankProducts(
-        products: [_currentProduct],
-        user: profile,
-      );
-      final target = ranked.first;
-
-      final matchingMember = members.firstWhere(
-        (m) => (m.isLinked ? m.linkedUid : m.id) == profile.userId,
-        orElse: () => members.first,
-      );
-
-      results.add(_MemberEvaluation(
-        memberId: matchingMember.id,
-        displayName: matchingMember.isManaged
-            ? (matchingMember.displayName ?? 'Member')
-            : profile.displayName,
-        isLinked: matchingMember.isLinked,
-        evaluation: target.evaluation,
-      ));
-
-      // The owner's own evaluation also populates the existing
-      // single-user fields, so the detailed advisory card / comparison
-      // matrix elsewhere on this screen show THEIR result exactly as
-      // they always have.
-      if (matchingMember.linkedUid == ownerUid || profile.userId == ownerUid) {
-        final detail = await BackendLocator.productRankingService.getProductDetail(
-          target: target,
-          comparisonSet: null,
-          user: profile,
-          scanEventId: _scanEventId,
-          languageCode: languageCode,
-        );
-        if (mounted) {
-          setState(() {
-            _userHealthProfile = profile;
-            _evaluation = target.evaluation;
-            _advisory = detail.advisory;
-            _comparisonMatrix = detail.comparisonMatrix;
-            _rankingExplanation = detail.rankingExplanation;
-          });
-        }
-      }
-    }
-
-    if (mounted) {
-      setState(() {
-        _isGroupMode = true;
-        _memberEvaluations = results;
-        _advisoryLoading = false;
-      });
-      _refreshVoiceSummary();
     }
   }
 
@@ -938,7 +821,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
 
                   const SizedBox(height: 16),
-                  if (_isGroupMode) _buildGroupSummaryCard(),
                   _buildAdvisoryBanner(context, loc),
 
                   const SizedBox(height: 12),
@@ -1758,150 +1640,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // ── Health advisory banner (WhoCalculator + GeminiAdvisoryService) ──────
-  /// NEW (Phase 7). Colors intentionally reuse the exact same
-  /// suitable/moderate/caution palette already used lower in this file
-  /// for per-nutrient badges (see _buildAdvisorySubtitle /
-  /// _buildAdvisoryBanner below), so this card matches the existing
-  /// color language instead of inventing a new one. Card shape (16px
-  /// radius, bordered container) matches every other card on this
-  /// screen.
-  Widget _buildGroupSummaryCard() {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
-
-    if (_memberEvaluations.isEmpty) return const SizedBox.shrink();
-
-    final suitableCount = _memberEvaluations
-        .where((m) => m.evaluation.overallLevel == AdvisoryLevel.suitable)
-        .length;
-    final moderateCount = _memberEvaluations
-        .where((m) => m.evaluation.overallLevel == AdvisoryLevel.moderate)
-        .length;
-    final cautionCount = _memberEvaluations
-        .where((m) => m.evaluation.overallLevel == AdvisoryLevel.caution)
-        .length;
-
-    Widget countChip(String label, int count, Color fg, Color bg) {
-      if (count == 0) return const SizedBox.shrink();
-      return Container(
-        margin: const EdgeInsets.only(right: 8, bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-        child: Text(
-          '$count $label',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg),
-        ),
-      );
-    }
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.group_outlined, color: colorScheme.primary, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                'Group Summary',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            children: [
-              countChip(
-                'Suitable',
-                suitableCount,
-                isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32),
-                isDark ? const Color(0xFF1B3320) : const Color(0xFFE8F5E9),
-              ),
-              countChip(
-                'Moderate',
-                moderateCount,
-                isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100),
-                isDark ? const Color(0xFF3A2A12) : const Color(0xFFFFF3E0),
-              ),
-              countChip(
-                'Caution',
-                cautionCount,
-                isDark ? const Color(0xFFEF9A9A) : const Color(0xFFC62828),
-                isDark ? const Color(0xFF3A1414) : const Color(0xFFFFEBEE),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Divider(height: 24, color: colorScheme.outlineVariant),
-          ..._memberEvaluations.map((m) => _buildGroupMemberRow(theme, colorScheme, isDark, m)),
-        ],
-      ),
-    );
-  }
-
-  /// NEW (Phase 7). One row per group member inside the summary card --
-  /// same row shape (icon + name + trailing pill) used for member rows
-  /// on group_screen.dart, so the two screens read as one consistent
-  /// pattern.
-  Widget _buildGroupMemberRow(
-    ThemeData theme,
-    ColorScheme colorScheme,
-    bool isDark,
-    _MemberEvaluation m,
-  ) {
-    late Color fg;
-    late Color bg;
-    late String label;
-    switch (m.evaluation.overallLevel) {
-      case AdvisoryLevel.suitable:
-        fg = isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32);
-        bg = isDark ? const Color(0xFF1B3320) : const Color(0xFFE8F5E9);
-        label = 'Suitable';
-        break;
-      case AdvisoryLevel.moderate:
-        fg = isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100);
-        bg = isDark ? const Color(0xFF3A2A12) : const Color(0xFFFFF3E0);
-        label = 'Moderate';
-        break;
-      case AdvisoryLevel.caution:
-        fg = isDark ? const Color(0xFFEF9A9A) : const Color(0xFFC62828);
-        bg = isDark ? const Color(0xFF3A1414) : const Color(0xFFFFEBEE);
-        label = 'Caution';
-        break;
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Icon(
-            m.isLinked ? Icons.person_outline : Icons.person_pin_circle_outlined,
-            color: colorScheme.onSurfaceVariant,
-            size: 18,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(m.displayName, style: TextStyle(fontSize: 14, color: colorScheme.onSurface)),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-            child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAdvisoryBanner(BuildContext context, AppLocalizations loc) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;

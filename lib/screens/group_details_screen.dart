@@ -25,7 +25,6 @@ import '../data/models/health_profile.dart';
 import '../data/services/backend_locator.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
-import '../core/utils/relationship_labels.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../generated/l10n/app_localizations.dart';
 import 'invite_member_screen.dart';
@@ -353,44 +352,34 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                Icon(
-                  member.isLinked ? Icons.person_outline : Icons.person_pin_circle_outlined,
-                  color: colorScheme.primary,
-                  size: 20,
-                ),
+                // Leading image is the member's chosen avatar; members with
+                // no avatar (e.g. linked members) keep the original icon.
+                if (member.avatar != null)
+                  ClipOval(
+                    child: Image.asset(
+                      member.avatar!,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Icon(
+                        Icons.person_pin_circle_outlined,
+                        color: colorScheme.primary,
+                        size: 28,
+                      ),
+                    ),
+                  )
+                else
+                  Icon(
+                    member.isLinked ? Icons.person_outline : Icons.person_pin_circle_outlined,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(name, style: TextStyle(fontSize: 15, color: colorScheme.onSurface)),
-                      if (member.relationship != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2),
-                          child: Row(
-                            children: [
-                              RelationshipLabels.icon(
-                                context,
-                                member.relationship!,
-                                size: 16,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                              const SizedBox(width: 4),
-                              // Flexible + ellipsis: longer Tagalog labels no
-                              // longer overflow the row next to the status
-                              // badge and action buttons.
-                              Flexible(
-                                child: Text(
-                                  RelationshipLabels.label(member.relationship!, context),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  softWrap: false,
-                                  style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                     ],
                   ),
                 ),

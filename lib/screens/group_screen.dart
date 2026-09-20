@@ -14,6 +14,7 @@
 
 import 'package:flutter/material.dart';
 
+import '../core/utils/group_type_ui.dart';
 import '../data/models/health_group.dart';
 import '../data/services/backend_locator.dart';
 import '../services/auth_service.dart';
@@ -107,39 +108,128 @@ class _GroupScreenState extends State<GroupScreen> {
     final nameController = TextEditingController();
     HapticService().vibrate();
 
+    GroupType? selectedType;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         final colorScheme = Theme.of(ctx).colorScheme;
-        return AlertDialog(
-          backgroundColor: colorScheme.surface,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(loc.nameYourGroup),
-          content: CustomTextField(
-            controller: nameController,
-            hintText: loc.groupNameHint,
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(loc.cancel),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(loc.createGroupButton),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            // Create is enabled only once BOTH a group name has been
+            // entered and a group type has been chosen.
+            final canCreate = nameController.text.trim().isNotEmpty && selectedType != null;
+            return AlertDialog(
+              backgroundColor: colorScheme.surface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: Text(loc.nameYourGroup),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CustomTextField(
+                      controller: nameController,
+                      hintText: loc.groupNameHint,
+                      autofocus: true,
+                      onChanged: (_) => setDialogState(() {}),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      GroupTypeUi.sectionTitle(ctx),
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                    ),
+                    const SizedBox(height: 10),
+                    GridView.count(
+                      crossAxisCount: 4,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                      childAspectRatio: 0.72,
+                      children: GroupType.values.map((t) {
+                        final selected = selectedType == t;
+                        return GestureDetector(
+                          onTap: () {
+                            HapticService().vibrate();
+                            setDialogState(() => selectedType = t);
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            decoration: BoxDecoration(
+                              color: selected ? colorScheme.surfaceContainerHighest : Theme.of(ctx).cardColor,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+                                width: selected ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                GroupTypeUi.icon(
+                                  ctx,
+                                  t,
+                                  size: 30,
+                                  color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                ),
+                                const SizedBox(height: 6),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 2),
+                                  child: SizedBox(
+                                    width: double.infinity,
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        GroupTypeUi.label(t, ctx),
+                                        maxLines: 1,
+                                        softWrap: false,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: selected ? colorScheme.primary : colorScheme.onSurface,
+                                          fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(loc.cancel),
+                ),
+                TextButton(
+                  onPressed: canCreate ? () => Navigator.pop(ctx, true) : null,
+                  style: TextButton.styleFrom(
+                    disabledForegroundColor: Theme.of(ctx).brightness == Brightness.dark
+                        ? Colors.grey.shade600
+                        : Colors.grey.shade400,
+                  ),
+                  child: Text(loc.createGroupButton),
+                ),
+              ],
+            );
+          },
         );
       },
     );
-    if (confirmed != true) return;
+    if (confirmed != true || selectedType == null) return;
 
     final name = nameController.text.trim();
     HapticService().vibrate();
     await _groupRepository.createGroup(
       ownerUid: uid,
       name: name.isEmpty ? loc.defaultGroupName : name,
+      groupType: selectedType,
     );
     await _load();
   }
@@ -241,7 +331,18 @@ class _GroupScreenState extends State<GroupScreen> {
                     color: colorScheme.primary.withOpacity(0.12),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(Icons.group, color: colorScheme.primary),
+                  // The group's chosen type icon replaces the placeholder;
+                  // older groups without a type keep the original icon.
+                  child: group.groupType != null
+                      ? Center(
+                          child: GroupTypeUi.icon(
+                            context,
+                            group.groupType!,
+                            size: 28,
+                            color: colorScheme.primary,
+                          ),
+                        )
+                      : Icon(Icons.group, color: colorScheme.primary),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
