@@ -38,6 +38,7 @@ class _InviteMemberScreenState extends State<InviteMemberScreen> {
   final _groupRepository = BackendLocator.groupRepository;
   GroupInvite? _invite;
   bool _generating = false;
+  String? _error;
 
   @override
   void initState() {
@@ -46,16 +47,29 @@ class _InviteMemberScreenState extends State<InviteMemberScreen> {
   }
 
   Future<void> _generateInvite() async {
-    setState(() => _generating = true);
-    final invite = await _groupRepository.createInvite(
-      groupId: widget.group.id,
-      ownerUid: widget.group.ownerUid,
-    );
-    if (mounted) {
-      setState(() {
-        _invite = invite;
-        _generating = false;
-      });
+    setState(() {
+      _generating = true;
+      _error = null;
+    });
+    try {
+      final invite = await _groupRepository.createInvite(
+        groupId: widget.group.id,
+        ownerUid: widget.group.ownerUid,
+      );
+      if (mounted) {
+        setState(() {
+          _invite = invite;
+          _generating = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to create invite: $e');
+      if (mounted) {
+        setState(() {
+          _generating = false;
+          _error = 'Could not generate an invite code. Please check your connection and try again.';
+        });
+      }
     }
   }
 
@@ -69,7 +83,24 @@ class _InviteMemberScreenState extends State<InviteMemberScreen> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
-          child: _generating || _invite == null
+          child: _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline, size: 40, color: colorScheme.error),
+                      const SizedBox(height: 12),
+                      Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+                      ),
+                      const SizedBox(height: 16),
+                      OutlinedButton(onPressed: _generateInvite, child: const Text('Try again')),
+                    ],
+                  ),
+                )
+              : _generating || _invite == null
               ? const Center(child: CircularProgressIndicator())
               : ListView(
                   children: [

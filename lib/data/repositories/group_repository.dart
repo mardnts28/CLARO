@@ -280,7 +280,9 @@ class FirebaseGroupRepository implements GroupRepository {
     );
 
     final batch = _firestore.batch();
-    batch.set(memberRef, member.toFirestore());
+    // `inviteCode` lets the Firestore rule verify this write is backed by a
+    // real, unexpired invite for THIS group (see the members `create` rule).
+    batch.set(memberRef, {...member.toFirestore(), 'inviteCode': code});
     batch.update(doc.reference, {'status': 'redeemed', 'redeemedByUid': joiningUid});
     batch.delete(_firestore.collection('inviteCodes').doc(code));
     batch.set(
