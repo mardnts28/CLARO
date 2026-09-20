@@ -59,7 +59,15 @@ abstract class GroupRepository {
 
   /// Redeems [code] for [joiningUid], adding them as a "linked" member.
   /// Throws if the invite is missing/expired/already used.
-  Future<void> redeemInvite({required String code, required String joiningUid});
+  Future<void> redeemInvite({
+    required String code,
+    required String joiningUid,
+    String? displayName,
+    String? avatar,
+  });
+
+  /// Throws if [code] is missing/expired/already used; does not join.
+  Future<void> validateInvite(String code);
 
   Future<void> revokeInvite({required String groupId, required String code});
 
@@ -94,6 +102,10 @@ abstract class GroupRepository {
   /// the owner). Does NOT touch a linked member's own users/{uid} data.
   Future<void> removeMember({required String groupId, required String memberId});
 
+  /// A linked (invited) member leaves the group themselves. Deletes their
+  /// own member record and drops the group from their users/{uid} list.
+  Future<void> leaveGroup({required String groupId, required String uid});
+
   /// Fetches every ACTIVE member's health profile as a plain
   /// UserHealthProfile list, ready to hand to WhoCalculator/
   /// ProductRankingService exactly like today's single-profile call.
@@ -106,6 +118,13 @@ abstract class GroupRepository {
   /// this is enforced here too so the rule holds regardless of caller.
   /// Throws if the requester isn't the owner, or if active members remain.
   Future<void> deleteGroup({required String groupId, required String requestingUid});
+
+  /// Makes sure the group owner has their own member record (id == ownerUid,
+  /// a "linked" member pointing at their own account) so they appear on the
+  /// group details screen and their health profile is readable by the
+  /// other members. Idempotent; also backfills groups created before this
+  /// existed.
+  Future<void> ensureOwnerMember(HealthGroup group);
 
   /// Phase 8: cleans up group membership when an account is deleted.
   /// If [uid] owns a group, dissolves it. If they're a linked member of
@@ -165,12 +184,40 @@ class FirebaseGroupRepository implements GroupRepository {
         List<String>.from(userDoc.data()?['memberOfGroupIds'] as List? ?? []);
 
     final joined = <HealthGroup>[];
+    final staleGroupIds = <String>[];
     for (final groupId in memberOfGroupIds) {
       if (ownedIds.contains(groupId)) continue; // shouldn't happen, but avoid dupes
-      final doc = await _groups.doc(groupId).get();
-      if (doc.exists) {
-        joined.add(HealthGroup.fromFirestore(doc.id, doc.data()!));
+      try {
+        // Only list a group while I still have an ACTIVE member record in
+        // it. If the owner removed me (record deleted / marked left) the
+        // group must disappear from my list, even though it's still in
+        // my users/{uid}.memberOfGroupIds.
+        final memberDoc = await _groups.doc(groupId).collection('members').doc(uid).get();
+        if (!memberDoc.exists || memberDoc.data()?['status'] != 'active') {
+          staleGroupIds.add(groupId);
+          continue;
+        }
+        final doc = await _groups.doc(groupId).get();
+        if (doc.exists) {
+          joined.add(HealthGroup.fromFirestore(doc.id, doc.data()!));
+        } else {
+          staleGroupIds.add(groupId);
+        }
+      } catch (e) {
+        // Permission denied / group deleted -- not a group I can see.
+        debugPrint('getGroups: dropping $groupId: $e');
+        staleGroupIds.add(groupId);
       }
+    }
+
+    // Self-heal my own list (I'm allowed to edit my own user doc; the
+    // owner isn't, which is why removal can't clean this up itself).
+    if (staleGroupIds.isNotEmpty) {
+      try {
+        await _firestore.collection('users').doc(uid).update({
+          'memberOfGroupIds': FieldValue.arrayRemove(staleGroupIds),
+        });
+      } catch (_) {}
     }
 
     final all = [...owned, ...joined]
@@ -193,6 +240,9 @@ class FirebaseGroupRepository implements GroupRepository {
       groupType: groupType,
     );
     await docRef.set(group.toFirestore());
+
+    // The owner is a member of their own group (with owner privileges).
+    await ensureOwnerMember(group);
 
     // Only claim this as the "active" group (used by the product-scan
     // evaluation flow -- see getActiveGroup()) if the user doesn't
@@ -246,7 +296,23 @@ class FirebaseGroupRepository implements GroupRepository {
   }
 
   @override
-  Future<void> redeemInvite({required String code, required String joiningUid}) async {
+  Future<void> validateInvite(String code) async {
+    final lookup = await _firestore.collection('inviteCodes').doc(code).get();
+    if (!lookup.exists) throw Exception('Invite code not found.');
+    final groupId = lookup.data()!['groupId'] as String;
+    final doc = await _groups.doc(groupId).collection('invites').doc(code).get();
+    if (!doc.exists) throw Exception('Invite code not found.');
+    final invite = GroupInvite.fromFirestore(doc.id, groupId, doc.data()!);
+    if (!invite.isUsable) throw Exception('This invite code is expired or already used.');
+  }
+
+  @override
+  Future<void> redeemInvite({
+    required String code,
+    required String joiningUid,
+    String? displayName,
+    String? avatar,
+  }) async {
     final lookup = await _firestore.collection('inviteCodes').doc(code).get();
     if (!lookup.exists) {
       throw Exception('Invite code not found.');
@@ -277,6 +343,10 @@ class FirebaseGroupRepository implements GroupRepository {
       status: GroupMemberStatus.active,
       addedAt: DateTime.now(),
       linkedUid: joiningUid,
+      // Name/avatar chosen in the Join Group modal -- what both the owner
+      // and the member see on the member card.
+      displayName: displayName,
+      avatar: avatar,
     );
 
     final batch = _firestore.batch();
@@ -289,6 +359,7 @@ class FirebaseGroupRepository implements GroupRepository {
       _firestore.collection('users').doc(joiningUid),
       {
         'memberOfGroupIds': FieldValue.arrayUnion([groupId]),
+        if (avatar != null) 'avatar': avatar,
       },
       SetOptions(merge: true),
     );
@@ -387,16 +458,74 @@ class FirebaseGroupRepository implements GroupRepository {
     if (!snap.exists) return;
     final member = GroupMember.fromFirestore(snap.id, groupId, snap.data()!);
 
+    // The owner can't be removed from their own group (delete the group
+    // instead).
+    final groupDoc = await _groups.doc(groupId).get();
+    if (groupDoc.data()?['ownerUid'] == member.linkedUid) {
+      throw Exception('The group owner cannot be removed.');
+    }
+
     if (member.isLinked && member.linkedUid != null) {
-      // Leave, don't delete: their own health data is untouched.
-      await memberRef.update({'status': 'left'});
-      await _firestore.collection('users').doc(member.linkedUid).update({
-        'memberOfGroupIds': FieldValue.arrayRemove([groupId]),
-      });
+      // Delete the group's membership record -- this is what actually
+      // revokes their access (Firestore rules + the Worker both require an
+      // active member record). Their own account/health data is untouched,
+      // and deleting (rather than marking "left") lets them rejoin later.
+      await memberRef.delete();
+      // Best-effort: Firestore rules don't let the OWNER edit that user's
+      // own document, so the user's own group list self-heals the next
+      // time they open the Group tab (see getGroups).
+      try {
+        await _firestore.collection('users').doc(member.linkedUid).update({
+          'memberOfGroupIds': FieldValue.arrayRemove([groupId]),
+        });
+      } catch (e) {
+        debugPrint('removeMember: could not update users/${member.linkedUid}: $e');
+      }
     } else {
       // Managed member: nothing else references this record, safe to delete.
       await memberRef.delete();
     }
+  }
+
+  @override
+  Future<void> leaveGroup({required String groupId, required String uid}) async {
+    final groupDoc = await _groups.doc(groupId).get();
+    if (groupDoc.data()?['ownerUid'] == uid) {
+      throw Exception('The group owner cannot leave their own group.');
+    }
+    await _groups.doc(groupId).collection('members').doc(uid).delete();
+    await _firestore.collection('users').doc(uid).set({
+      'memberOfGroupIds': FieldValue.arrayRemove([groupId]),
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> ensureOwnerMember(HealthGroup group) async {
+    final memberRef = _groups.doc(group.id).collection('members').doc(group.ownerUid);
+    final existing = await memberRef.get();
+    if (existing.exists) return;
+
+    String? name;
+    String? avatar;
+    try {
+      final userDoc = await _firestore.collection('users').doc(group.ownerUid).get();
+      final n = userDoc.data()?['name']?.toString().trim();
+      if (n != null && n.isNotEmpty) name = n;
+      final a = userDoc.data()?['avatar']?.toString();
+      if (a != null && a.isNotEmpty) avatar = a;
+    } catch (_) {}
+
+    final member = GroupMember(
+      id: group.ownerUid,
+      groupId: group.id,
+      sourceType: GroupMemberSourceType.linked,
+      status: GroupMemberStatus.active,
+      addedAt: DateTime.now(),
+      linkedUid: group.ownerUid,
+      displayName: name,
+      avatar: avatar,
+    );
+    await memberRef.set(member.toFirestore());
   }
 
   @override
@@ -410,15 +539,15 @@ class FirebaseGroupRepository implements GroupRepository {
     }
 
     // Same rule GroupDetailsScreen enforces on its Delete Group button
-    // (disabled while any active member remains) -- checked again here
-    // so it holds no matter what calls this.
+    // (enabled only when the owner is the sole remaining member) --
+    // checked again here so it holds no matter what calls this.
     final activeMembers = await doc.reference
         .collection('members')
         .where('status', isEqualTo: 'active')
-        .limit(1)
         .get();
-    if (activeMembers.docs.isNotEmpty) {
-      throw Exception('Remove all members before deleting this group.');
+    final others = activeMembers.docs.where((d) => d.id != group.ownerUid);
+    if (others.isNotEmpty) {
+      throw Exception('Remove all other members before deleting this group.');
     }
 
     final batch = _firestore.batch();
@@ -455,10 +584,24 @@ class FirebaseGroupRepository implements GroupRepository {
     for (final doc in snap.docs) {
       final member = GroupMember.fromFirestore(doc.id, groupId, doc.data());
       if (member.isLinked && member.linkedUid != null) {
-        if (_userRepository == null) continue;
         try {
-          final profile = await _userRepository.getHealthProfile(member.linkedUid!);
-          profiles.add(profile);
+          final myUid = FirebaseAuth.instance.currentUser?.uid;
+          if (member.linkedUid == myUid) {
+            // My own card: my own profile, read the normal way.
+            if (_userRepository == null) continue;
+            profiles.add(await _userRepository.getHealthProfile(member.linkedUid!));
+          } else {
+            // The owner viewing a linked member: only the Worker can
+            // decrypt that member's health data (it verifies the caller
+            // owns the group). Keyed by the member's uid, matching how
+            // the group screen looks profiles up.
+            final profile = await _fetchManagedMemberProfile(
+              groupId,
+              member,
+              profileUserId: member.linkedUid,
+            );
+            if (profile != null) profiles.add(profile);
+          }
         } catch (_) {
           // A linked member's profile may be unreadable (e.g. they left
           // between the membership list load and this fetch) -- skip
@@ -475,8 +618,9 @@ class FirebaseGroupRepository implements GroupRepository {
 
   Future<UserHealthProfile?> _fetchManagedMemberProfile(
     String groupId,
-    GroupMember member,
-  ) async {
+    GroupMember member, {
+    String? profileUserId,
+  }) async {
     try {
       final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
       if (idToken == null) return null;
@@ -500,7 +644,7 @@ class FirebaseGroupRepository implements GroupRepository {
         // profileFingerprint and gemini_advisory_service.dart's cache key,
         // both of which already key off `userId` generically, not
         // specifically a Firebase Auth uid.
-        userId: member.id,
+        userId: profileUserId ?? member.id,
         displayName: member.displayName ?? 'Member',
         conditions: mapConditionLabels((healthData['conditions'] as List<dynamic>?) ?? const []),
         allergies: mapAllergenLabels((healthData['allergens'] as List<dynamic>?) ?? const []),
@@ -541,7 +685,7 @@ class FirebaseGroupRepository implements GroupRepository {
           .where('linkedUid', isEqualTo: uid)
           .get();
       for (final m in matches.docs) {
-        await m.reference.update({'status': 'left'});
+        await m.reference.delete();
       }
     }
   }

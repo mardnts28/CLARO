@@ -22,6 +22,7 @@ import '../services/haptic_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../screens/qr_scan_screen.dart';
 import 'custom_text_field.dart';
+import 'join_profile_dialog.dart';
 
 /// Invite codes are exactly this many characters -- see
 /// GroupRepository._generateInviteCode() in data/repositories/group_repository.dart.
@@ -88,7 +89,30 @@ class _JoinGroupDialogState extends State<JoinGroupDialog> {
     });
 
     try {
-      await _groupRepository.redeemInvite(code: code, joiningUid: uid);
+      // 1. Make sure the code is real/unexpired BEFORE asking for a
+      //    profile, so nobody fills in a form for a dead code.
+      await _groupRepository.validateInvite(code);
+      if (!mounted) return;
+
+      // 2. Collect the name + avatar that will appear on their member card.
+      final profile = await showDialog<JoinProfile>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => JoinProfileDialog(uid: uid),
+      );
+      if (profile == null) {
+        // Cancelled -- back to the code dialog, nothing joined.
+        if (mounted) setState(() => _submitting = false);
+        return;
+      }
+
+      // 3. Join with that profile (existing redeem flow).
+      await _groupRepository.redeemInvite(
+        code: code,
+        joiningUid: uid,
+        displayName: profile.name,
+        avatar: profile.avatar,
+      );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;

@@ -23,7 +23,7 @@
 
 import { Env } from "./env";
 import { encryptField, decryptField } from "./crypto";
-import { getGroupDoc, getGroupMemberDoc, patchGroupMemberHealthDoc } from "./firestore";
+import { getGroupDoc, getGroupMemberDoc, getUserDoc, patchGroupMemberHealthDoc } from "./firestore";
 
 type AuthResult = { ok: true } | { ok: false; status: number; message: string };
 
@@ -55,6 +55,33 @@ async function assertOwnerCanManageMember(
     };
   }
 
+  return { ok: true };
+}
+
+// READ access: the group owner OR any active member of the group may read
+// any active member's health profile (members consent to this when they
+// join; the owner is a member too). Writes never go through this check --
+// they stay owner-only for managed members (assertOwnerCanManageMember).
+async function assertCanReadMember(
+  env: Env,
+  callerUid: string,
+  groupId: string,
+  memberId: string
+): Promise<AuthResult> {
+  const group = await getGroupDoc(env, groupId);
+  if (!group) {
+    return { ok: false, status: 404, message: "Group not found." };
+  }
+  if (group.ownerUid !== callerUid) {
+    const caller = await getGroupMemberDoc(env, groupId, callerUid);
+    if (!caller || caller.status !== "active") {
+      return { ok: false, status: 403, message: "Not authorized for this group." };
+    }
+  }
+  const member = await getGroupMemberDoc(env, groupId, memberId);
+  if (!member || member.status !== "active") {
+    return { ok: false, status: 404, message: "Member not found." };
+  }
   return { ok: true };
 }
 
@@ -123,12 +150,22 @@ async function getImpl(env: Env, uid: string, url: URL): Promise<Response> {
     return new Response("groupId and memberId are required", { status: 400 });
   }
 
-  const authCheck = await assertOwnerCanManageMember(env, uid, groupId, memberId);
+  const authCheck = await assertCanReadMember(env, uid, groupId, memberId);
   if (!authCheck.ok) {
     return new Response(authCheck.message, { status: authCheck.status });
   }
 
   const member = await getGroupMemberDoc(env, groupId, memberId);
+
+  // Linked member: their health data lives on users/{linkedUid}, encrypted
+  // the same way /health-profile stores it. Owner-only read, checked above.
+  if (member?.sourceType === "linked" && member.linkedUid) {
+    const userDoc = await getUserDoc(env, member.linkedUid);
+    return Response.json({
+      conditions: await decryptField(env, userDoc.conditions),
+      allergens: await decryptField(env, userDoc.allergens),
+    });
+  }
 
   return Response.json({
     conditions: await decryptField(env, member?.conditionsEncrypted),

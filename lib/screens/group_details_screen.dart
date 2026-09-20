@@ -53,6 +53,14 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     _group = widget.group;
     final uid = _authService.currentUser?.uid;
     _isOwner = uid != null && uid == _group.ownerUid;
+    // The owner is a member of their own group; make sure their member
+    // record exists (also backfills groups created before this change).
+    // The members stream picks it up automatically once written.
+    if (_isOwner) {
+      _groupRepository.ensureOwnerMember(_group).catchError((e) {
+        debugPrint('ensureOwnerMember failed: $e');
+      });
+    }
   }
 
   void _showAddMemberChooser() {
@@ -122,6 +130,47 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
       HapticService().vibrate();
       await _groupRepository.removeMember(groupId: _group.id, memberId: member.id);
       if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _leaveGroup() async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final uid = _authService.currentUser?.uid;
+    if (uid == null) return;
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+    final loc = AppLocalizations.of(context)!;
+
+    HapticService().vibrate();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(tl ? 'Umalis sa grupo?' : 'Leave group?'),
+        content: Text(tl
+            ? 'Hindi mo na makikita ang grupong ito at ang mga miyembro nito. Maaari kang sumali muli gamit ang bagong imbitasyon.'
+            : "You won't be able to see this group or its members anymore. You can rejoin later with a new invitation."),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(tl ? 'Umalis' : 'Leave', style: TextStyle(color: colorScheme.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    HapticService().vibrate();
+    setState(() => _deleting = true);
+    try {
+      await _groupRepository.leaveGroup(groupId: _group.id, uid: uid);
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _deleting = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -249,7 +298,13 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               child: Text(
-                                loc.somethingWentWrong,
+                                // A non-owner losing read access (e.g. the owner
+                                // removed them) surfaces here as a stream error.
+                                _isOwner
+                                    ? loc.somethingWentWrong
+                                    : (Localizations.localeOf(context).languageCode == 'tl'
+                                        ? 'Hindi ka na miyembro ng grupong ito.'
+                                        : "You're no longer a member of this group."),
                                 style: TextStyle(color: colorScheme.error),
                               ),
                             )
@@ -262,9 +317,15 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                               ),
                             )
                           else
-                            ...members.map(
-                              (m) => _buildMemberCard(theme, colorScheme, loc, m, profileByKey),
-                            ),
+                            // Owner's card first, then everyone else in the
+                            // order they were added.
+                            ...(([...members]..sort((a, b) {
+                              final ao = a.linkedUid == _group.ownerUid ? 0 : 1;
+                              final bo = b.linkedUid == _group.ownerUid ? 0 : 1;
+                              if (ao != bo) return ao.compareTo(bo);
+                              return a.addedAt.compareTo(b.addedAt);
+                            })))
+                                .map((m) => _buildMemberCard(theme, colorScheme, loc, m, profileByKey)),
                           if (_isOwner) ...[
                             const SizedBox(height: 4),
                             SizedBox(
@@ -285,7 +346,10 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                         ],
                       ),
                     ),
-                    if (_isOwner) _buildDeleteGroupSection(colorScheme, loc, members),
+                    if (_isOwner)
+                      _buildDeleteGroupSection(colorScheme, loc, members)
+                    else
+                      _buildLeaveGroupSection(colorScheme, loc),
                   ],
                 );
               },
@@ -334,10 +398,23 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     // Owner can VIEW + MANAGE (edit/remove) a "managed" member's health
     // profile -- the owner entered it. Owner can only VIEW a "linked"
     // member's profile; that member's own account owns their data.
+    final isOwnerMember = member.linkedUid != null && member.linkedUid == _group.ownerUid;
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
     final canManageHealthProfile = _isOwner && member.isManaged;
-    final canRemove = _isOwner;
-    final statusLabel = member.isLinked ? loc.memberStatusLinked : loc.memberStatusManaged;
-    final name = member.isManaged ? (member.displayName ?? loc.memberStatusManaged) : loc.groupMemberLabel;
+    // The owner's own card can't be removed (delete the group instead).
+    final canRemove = _isOwner && !isOwnerMember;
+    final statusLabel = isOwnerMember
+        ? (tl ? 'May-ari' : 'Owner')
+        : (member.isLinked ? loc.memberStatusLinked : loc.memberStatusManaged);
+    // Both member kinds now carry a display name (linked members choose
+    // theirs in the Join Group modal); older linked members without one
+    // fall back to the generic label.
+    final hasName = member.displayName != null && member.displayName!.trim().isNotEmpty;
+    final name = hasName
+        ? member.displayName!
+        : (isOwnerMember
+            ? (tl ? 'May-ari' : 'Owner')
+            : (member.isManaged ? loc.memberStatusManaged : loc.groupMemberLabel));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -459,7 +536,13 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         // Only the "view-only" note is shown for linked members -- a
         // managed member's card instead gets the edit pencil icon above,
         // which already communicates that the owner can act on it.
-        if (member.isLinked)
+        // Only for an INVITED member's card viewed by someone else. The
+        // owner's own member record is also sourceType "linked" (it points
+        // at their own account), and a member looking at their own card can
+        // edit their own data -- neither should show this note.
+        if (member.isLinked &&
+            member.linkedUid != _group.ownerUid &&
+            member.linkedUid != _authService.currentUser?.uid)
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
@@ -471,8 +554,36 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     );
   }
 
+  // Invited (non-owner) members get a Leave Group button instead of Delete.
+  Widget _buildLeaveGroupSection(ColorScheme colorScheme, AppLocalizations loc) {
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+    final isDarkMode = colorScheme.brightness == Brightness.dark;
+    final color = isDarkMode ? Colors.red.shade400 : Colors.red.shade700;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          onPressed: _deleting ? null : _leaveGroup,
+          icon: _deleting
+              ? SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: color))
+              : Icon(Icons.logout, color: color),
+          label: Text(tl ? 'Umalis sa Grupo' : 'Leave Group'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: color,
+            side: BorderSide(color: color),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDeleteGroupSection(ColorScheme colorScheme, AppLocalizations loc, List<GroupMember> members) {
-    final hasMembers = members.isNotEmpty;
+    // Delete is available only when the owner is the sole remaining member.
+    final hasMembers = members.any((m) => m.linkedUid != _group.ownerUid);
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
     final isDarkMode = colorScheme.brightness == Brightness.dark;
     
     // Determine colors based on state and theme
@@ -492,7 +603,9 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(
-                loc.deleteGroupDisabledHint,
+                tl
+                    ? 'Alisin muna ang lahat ng iba pang miyembro bago mabura ang grupong ito.'
+                    : 'Remove all other members before you can delete this group.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
               ),
