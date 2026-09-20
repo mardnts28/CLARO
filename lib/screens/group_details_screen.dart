@@ -25,6 +25,7 @@ import '../data/models/health_profile.dart';
 import '../data/services/backend_locator.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
+import '../core/utils/relationship_labels.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../generated/l10n/app_localizations.dart';
 import 'invite_member_screen.dart';
@@ -359,7 +360,39 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(name, style: TextStyle(fontSize: 15, color: colorScheme.onSurface)),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(name, style: TextStyle(fontSize: 15, color: colorScheme.onSurface)),
+                      if (member.relationship != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Row(
+                            children: [
+                              RelationshipLabels.icon(
+                                context,
+                                member.relationship!,
+                                size: 16,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              // Flexible + ellipsis: longer Tagalog labels no
+                              // longer overflow the row next to the status
+                              // badge and action buttons.
+                              Flexible(
+                                child: Text(
+                                  RelationshipLabels.label(member.relationship!, context),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  softWrap: false,
+                                  style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

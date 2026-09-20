@@ -36,6 +36,7 @@ import '../data/models/health_profile.dart';
 import '../data/services/backend_locator.dart';
 import '../services/haptic_service.dart';
 import '../widgets/custom_text_field.dart';
+import '../core/utils/relationship_labels.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../generated/l10n/app_localizations.dart';
 
@@ -99,6 +100,9 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     'Peanuts': Icons.spa_outlined,
   };
 
+  // Optional-to-pick relation of this member to the group owner.
+  MemberRelationship? _relationship;
+
   bool _saving = false;
   bool _loadingExisting = false;
   String? _nameError;
@@ -144,8 +148,12 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
   @override
   void initState() {
     super.initState();
+    // Rebuild on every keystroke so the Add Member button's enabled state
+    // tracks whether a name has been entered.
+    _nameController.addListener(() => setState(() {}));
     final existing = widget.existingMember;
     if (existing != null) {
+      _relationship = existing.relationship;
       _nameController.text = existing.displayName ?? '';
       _loadExistingProfile(existing);
     }
@@ -233,6 +241,15 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     });
   }
 
+  // Add/Save is enabled only when a name is entered (locked and always
+  // present in edit mode) AND at least one health condition is selected
+  // ("None" counts as a selection). Allergens stay optional.
+  bool get _canSubmit {
+    final hasName = widget.isEditing || _nameController.text.trim().isNotEmpty;
+    final hasCondition = _conditions.values.any((v) => v);
+    return hasName && hasCondition;
+  }
+
   void _toggleAllergen(String key) {
     HapticService().vibrate();
     setState(() => _allergens[key] = !_allergens[key]!);
@@ -247,6 +264,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
       setState(() => _nameError = loc.memberNameEmptyError);
       return;
     }
+    if (!_canSubmit) return;
     if (isEditing) {
       // Locked field in edit mode -- always the existing member's name.
       name = widget.existingMember!.displayName ?? '';
@@ -265,15 +283,32 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
         _allergens.entries.where((e) => e.value).map((e) => e.key).toList();
 
     String memberId;
-    if (isEditing) {
-      memberId = widget.existingMember!.id;
-    } else {
-      // Step 1: create the member record (name only, no health data yet).
-      final member = await _groupRepository.addManagedMember(
-        groupId: widget.group.id,
-        displayName: name,
-      );
-      memberId = member.id;
+    try {
+      if (isEditing) {
+        memberId = widget.existingMember!.id;
+        if (_relationship != widget.existingMember!.relationship) {
+          await _groupRepository.updateMemberRelationship(
+            groupId: widget.group.id,
+            memberId: memberId,
+            relationship: _relationship,
+          );
+        }
+      } else {
+        // Step 1: create the member record (name + relation, no health
+        // data yet).
+        final member = await _groupRepository.addManagedMember(
+          groupId: widget.group.id,
+          displayName: name,
+          relationship: _relationship,
+        );
+        memberId = member.id;
+      }
+    } catch (e) {
+      debugPrint('Failed to create/update member record: $e');
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.somethingWentWrong)));
+      return;
     }
 
     // Step 2: push health data through the Worker (Phase 6). If this
@@ -325,6 +360,8 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                     enabled: !widget.isEditing,
                   ),
                   const SizedBox(height: 20),
+                  _buildRelationSection(theme, colorScheme, loc),
+                  const SizedBox(height: 16),
                   _buildConditionsSection(theme, colorScheme, loc),
                   const SizedBox(height: 16),
                   _buildAllergensSection(theme, colorScheme, loc),
@@ -332,9 +369,16 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: _saving ? null : _save,
+                      onPressed: (_saving || !_canSubmit) ? null : _save,
                       style: FilledButton.styleFrom(
                         backgroundColor: colorScheme.primary,
+                        foregroundColor: Colors.white,
+                        // Darker gray in dark mode so the disabled button
+                        // doesn't glare against the dark surface.
+                        disabledBackgroundColor:
+                            theme.brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade400,
+                        disabledForegroundColor:
+                            theme.brightness == Brightness.dark ? Colors.grey.shade500 : Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
@@ -349,6 +393,99 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                   ),
                 ],
               ),
+      ),
+    );
+  }
+
+  Widget _buildRelationSection(ThemeData theme, ColorScheme colorScheme, AppLocalizations loc) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.diversity_1_outlined, color: colorScheme.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                RelationshipLabels.sectionTitle(context),
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          GridView.count(
+            crossAxisCount: 4,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: 8,
+            mainAxisSpacing: 8,
+            childAspectRatio: 0.85,
+            children: MemberRelationship.values.map((r) {
+              final selected = _relationship == r;
+              return GestureDetector(
+                onTap: () {
+                  HapticService().vibrate();
+                  // Single-select; tapping the selected option clears it.
+                  setState(() => _relationship = selected ? null : r);
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: selected ? colorScheme.surfaceContainerHighest : theme.cardColor,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+                      width: selected ? 1.5 : 1,
+                    ),
+                  ),
+                  child: Stack(
+                    children: [
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            RelationshipLabels.icon(
+                              context,
+                              r,
+                              size: 28,
+                              color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 4),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: _gridLabel(
+                                RelationshipLabels.label(r, context),
+                                selected,
+                                colorScheme,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (selected)
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
+                            child: const Icon(Icons.check, size: 10, color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -430,6 +567,31 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
   // checkmark badge instead of a Switch. Kept as one shared builder here
   // (rather than two near-duplicate grids like onboarding's) since both
   // sections use Material icons instead of onboarding's image assets.
+  // Grid option label. A single word (e.g. "Hypertension") stays on ONE
+  // line and shrinks slightly if the cell is too narrow instead of
+  // breaking mid-word; multi-word labels can still wrap to 2 lines.
+  Widget _gridLabel(String text, bool selected, ColorScheme colorScheme) {
+    final style = TextStyle(
+      fontSize: 10,
+      color: selected ? colorScheme.primary : colorScheme.onSurface,
+      fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+    );
+    final isSingleWord = !text.trim().contains(RegExp(r'\s'));
+    if (isSingleWord) {
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(text, maxLines: 1, softWrap: false, textAlign: TextAlign.center, style: style),
+      );
+    }
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: style,
+    );
+  }
+
   Widget _buildToggleGrid({
     required ThemeData theme,
     required List<String> keys,
@@ -474,18 +636,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                       const SizedBox(height: 4),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Text(
-                          labelFor(key),
-                          textAlign: TextAlign.center,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          softWrap: true,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: selected ? colorScheme.primary : colorScheme.onSurface,
-                            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
+                        child: _gridLabel(labelFor(key), selected, colorScheme),
                       ),
                     ],
                   ),

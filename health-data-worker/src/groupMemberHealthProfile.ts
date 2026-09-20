@@ -63,6 +63,15 @@ export async function handleGroupMemberHealthProfilePost(
   uid: string,
   request: Request
 ): Promise<Response> {
+  try {
+    return await postImpl(env, uid, request);
+  } catch (e) {
+    console.error("group-member-health-profile POST failed:", e);
+    return new Response(`Server error: ${e instanceof Error ? e.message : String(e)}`, { status: 500 });
+  }
+}
+
+async function postImpl(env: Env, uid: string, request: Request): Promise<Response> {
   const body = await request.json<{
     groupId?: string;
     memberId?: string;
@@ -99,6 +108,15 @@ export async function handleGroupMemberHealthProfileGet(
   uid: string,
   url: URL
 ): Promise<Response> {
+  try {
+    return await getImpl(env, uid, url);
+  } catch (e) {
+    console.error("group-member-health-profile GET failed:", e);
+    return new Response(`Server error: ${e instanceof Error ? e.message : String(e)}`, { status: 500 });
+  }
+}
+
+async function getImpl(env: Env, uid: string, url: URL): Promise<Response> {
   const groupId = url.searchParams.get("groupId");
   const memberId = url.searchParams.get("memberId");
   if (!groupId || !memberId) {

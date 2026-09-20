@@ -18,11 +18,13 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/health_group.dart';
 import '../models/health_profile.dart';
+import 'firestore_label_mappings.dart';
 import 'user_repository.dart';
 
 const _groupWorkerUrl = 'https://health-data-worker.claro-app.workers.dev';
@@ -60,7 +62,18 @@ abstract class GroupRepository {
   /// Adds a "managed" member with no health data yet -- the caller should
   /// follow up with saveManagedMemberHealthData() once the owner fills in
   /// the form (Phase 5).
-  Future<GroupMember> addManagedMember({required String groupId, required String displayName});
+  Future<GroupMember> addManagedMember({
+    required String groupId,
+    required String displayName,
+    MemberRelationship? relationship,
+  });
+
+  /// Updates the relation of an existing managed member (edit flow).
+  Future<void> updateMemberRelationship({
+    required String groupId,
+    required String memberId,
+    required MemberRelationship? relationship,
+  });
 
   /// Phase 6: writes a managed member's conditions/allergens through the
   /// Worker's group-scoped endpoint (never directly to Firestore -- see
@@ -280,6 +293,7 @@ class FirebaseGroupRepository implements GroupRepository {
   Future<GroupMember> addManagedMember({
     required String groupId,
     required String displayName,
+    MemberRelationship? relationship,
   }) async {
     final memberRef = _groups.doc(groupId).collection('members').doc();
     final member = GroupMember(
@@ -289,9 +303,21 @@ class FirebaseGroupRepository implements GroupRepository {
       status: GroupMemberStatus.active,
       addedAt: DateTime.now(),
       displayName: displayName,
+      relationship: relationship,
     );
     await memberRef.set(member.toFirestore());
     return member;
+  }
+
+  @override
+  Future<void> updateMemberRelationship({
+    required String groupId,
+    required String memberId,
+    required MemberRelationship? relationship,
+  }) async {
+    await _groups.doc(groupId).collection('members').doc(memberId).update({
+      'relationship': relationship?.name ?? FieldValue.delete(),
+    });
   }
 
   @override
@@ -305,26 +331,42 @@ class FirebaseGroupRepository implements GroupRepository {
     // checks that this token's uid == groups/{groupId}.ownerUid AND that
     // {memberId} is sourceType "managed" before writing anything -- see
     // health-data-worker/group_member_health_profile.md.
-    try {
-      final idToken = await FirebaseAuth.instance.currentUser?.getIdToken();
-      if (idToken == null) return false;
-      final res = await http.post(
-        Uri.parse('$_groupWorkerUrl/group-member-health-profile'),
-        headers: {
-          'Authorization': 'Bearer $idToken',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'groupId': groupId,
-          'memberId': memberId,
-          'conditions': conditions,
-          'allergens': allergens,
-        }),
-      );
-      return res.statusCode == 200;
-    } catch (e) {
-      return false;
+    // Tries once with the cached ID token and, if the Worker rejects it,
+    // once more with a force-refreshed token (an expired/stale token is
+    // the most common transient cause of a 401/403 here). Any 2xx counts
+    // as success -- the Worker isn't required to answer with exactly 200.
+    // Failures are logged with the Worker's status + body so the real
+    // cause is visible in the debug console instead of a silent `false`.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final user = FirebaseAuth.instance.currentUser;
+        final idToken = await user?.getIdToken(attempt > 0);
+        if (idToken == null) {
+          debugPrint('saveManagedMemberHealthData: no authenticated user / ID token');
+          return false;
+        }
+        final res = await http.post(
+          Uri.parse('$_groupWorkerUrl/group-member-health-profile'),
+          headers: {
+            'Authorization': 'Bearer $idToken',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'groupId': groupId,
+            'memberId': memberId,
+            'conditions': conditions,
+            'allergens': allergens,
+          }),
+        );
+        if (res.statusCode >= 200 && res.statusCode < 300) return true;
+        debugPrint(
+            'saveManagedMemberHealthData failed (attempt ${attempt + 1}): ${res.statusCode} ${res.body}');
+      } catch (e) {
+        debugPrint('saveManagedMemberHealthData error (attempt ${attempt + 1}): $e');
+      }
+      await Future.delayed(const Duration(milliseconds: 400));
     }
+    return false;
   }
 
   @override
@@ -431,20 +473,29 @@ class FirebaseGroupRepository implements GroupRepository {
         Uri.parse('$_groupWorkerUrl/group-member-health-profile?groupId=$groupId&memberId=${member.id}'),
         headers: {'Authorization': 'Bearer $idToken'},
       );
-      if (res.statusCode != 200) return null;
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        debugPrint('_fetchManagedMemberProfile failed: ${res.statusCode} ${res.body}');
+        return null;
+      }
       final healthData = jsonDecode(res.body) as Map<String, dynamic>;
-      return UserHealthProfile.fromJson({
+      // The Worker returns the display LABELS this screen saved (e.g.
+      // "Heart condition", "Milk/Dairy"), not enum names, so they must go
+      // through the label mappings -- UserHealthProfile.fromJson() only
+      // understands enum names and silently dropped every value, which
+      // is why the member card showed no health info.
+      return UserHealthProfile(
         // member.id (not a Firebase uid) becomes this profile's identity
         // for fingerprinting/caching purposes -- see health_profile.dart's
         // profileFingerprint and gemini_advisory_service.dart's cache key,
         // both of which already key off `userId` generically, not
         // specifically a Firebase Auth uid.
-        'userId': member.id,
-        'displayName': member.displayName ?? 'Member',
-        'conditions': healthData['conditions'] ?? [],
-        'allergies': healthData['allergens'] ?? [],
-      });
+        userId: member.id,
+        displayName: member.displayName ?? 'Member',
+        conditions: mapConditionLabels((healthData['conditions'] as List<dynamic>?) ?? const []),
+        allergies: mapAllergenLabels((healthData['allergens'] as List<dynamic>?) ?? const []),
+      );
     } catch (e) {
+      debugPrint('_fetchManagedMemberProfile error: $e');
       return null;
     }
   }

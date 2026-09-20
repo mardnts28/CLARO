@@ -58,6 +58,11 @@ final Map<String, AllergenType> _allergenLabelMap = {
   _normalize('Lamang-Dagat'): AllergenType.shellfish,
   _normalize('Peanut'): AllergenType.peanuts,
   _normalize('Mani'): AllergenType.peanuts,
+  // Labels used by the group "Add member" screen's allergen grid.
+  _normalize('Milk/Dairy'): AllergenType.dairy,
+  _normalize('Eggs'): AllergenType.eggs,
+  _normalize('Soy'): AllergenType.soy,
+  _normalize('Peanuts'): AllergenType.peanuts,
 };
 
 List<HealthCondition> mapConditionLabels(List<dynamic> raw) {

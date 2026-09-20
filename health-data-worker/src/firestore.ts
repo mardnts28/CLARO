@@ -125,13 +125,26 @@ export async function getDocByPath(env: Env, path: string): Promise<Record<strin
   return unwrapFirestoreFields(doc.fields ?? {});
 }
 
-export async function patchDocByPath(env: Env, path: string, fields: Record<string, string>) {
+export async function patchDocByPath(
+  env: Env,
+  path: string,
+  fields: Record<string, string>,
+  // Fields written as real Firestore timestampValue (ISO-8601 input), so
+  // the Flutter client's `as Timestamp` reads work.
+  timestampFields: Record<string, string> = {}
+) {
   const token = await getAccessToken(env);
-  const mask = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join("&");
+  const mask = [...Object.keys(fields), ...Object.keys(timestampFields)]
+    .map(k => `updateMask.fieldPaths=${k}`)
+    .join("&");
+  const wrapped: Record<string, any> = wrapFirestoreFields(fields);
+  for (const [k, iso] of Object.entries(timestampFields)) {
+    wrapped[k] = { timestampValue: iso };
+  }
   const res = await fetch(`${FIRESTORE_BASE(env.FIREBASE_PROJECT_ID)}/${path}?${mask}`, {
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ fields: wrapFirestoreFields(fields) }),
+    body: JSON.stringify({ fields: wrapped }),
   });
 
   if (!res.ok) {
@@ -162,9 +175,13 @@ export async function patchGroupMemberHealthDoc(
   memberId: string,
   fields: { conditionsEncrypted: string; allergensEncrypted: string }
 ) {
-  return patchDocByPath(env, `groups/${groupId}/members/${memberId}`, {
-    conditionsEncrypted: fields.conditionsEncrypted,
-    allergensEncrypted: fields.allergensEncrypted,
-    updatedAt: new Date().toISOString(),
-  });
+  return patchDocByPath(
+    env,
+    `groups/${groupId}/members/${memberId}`,
+    {
+      conditionsEncrypted: fields.conditionsEncrypted,
+      allergensEncrypted: fields.allergensEncrypted,
+    },
+    { updatedAt: new Date().toISOString() }
+  );
 }

@@ -27,6 +27,16 @@ enum GroupInviteStatus { pending, redeemed, revoked, expired }
 
 enum MemberRelationship { family, friend, lover, other }
 
+/// Parses the string stored in Firestore ('family', 'friend', 'lover',
+/// 'other') back into a [MemberRelationship]. Returns null when absent or
+/// unrecognised (e.g. members added before relations existed).
+MemberRelationship? relationshipFromString(String? raw) {
+  for (final r in MemberRelationship.values) {
+    if (r.name == raw) return r;
+  }
+  return null;
+}
+
 class HealthGroup {
   final String id;
   final String ownerUid;
@@ -119,10 +129,11 @@ class GroupMember {
           ? GroupMemberSourceType.managed
           : GroupMemberSourceType.linked,
       status: _statusFromString(data['status'] as String?),
-      addedAt: (data['addedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
-      updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
+      addedAt: _readDate(data['addedAt']) ?? DateTime.now(),
+      updatedAt: _readDate(data['updatedAt']),
       linkedUid: data['linkedUid']?.toString(),
       displayName: data['displayName']?.toString(),
+      relationship: relationshipFromString(data['relationship']?.toString()),
       conditionsEncrypted: data['conditionsEncrypted']?.toString(),
       allergensEncrypted: data['allergensEncrypted']?.toString(),
     );
@@ -135,11 +146,21 @@ class GroupMember {
         if (updatedAt != null) 'updatedAt': Timestamp.fromDate(updatedAt!),
         if (linkedUid != null) 'linkedUid': linkedUid,
         if (displayName != null) 'displayName': displayName,
+        if (relationship != null) 'relationship': relationship!.name,
         // conditionsEncrypted/allergensEncrypted deliberately omitted here:
         // the client never writes these fields (see Phase 6 Worker + Phase
         // 1 Firestore Rules, which reject direct client writes to them --
         // same rule shape as users/{uid}.conditions/allergens today).
       };
+
+  // The Worker used to write `updatedAt` as an ISO string rather than a
+  // Firestore Timestamp; a hard `as Timestamp?` cast on such a document
+  // throws and breaks the whole members stream. Accept both.
+  static DateTime? _readDate(dynamic raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is String) return DateTime.tryParse(raw);
+    return null;
+  }
 
   static GroupMemberStatus _statusFromString(String? raw) {
     switch (raw) {
