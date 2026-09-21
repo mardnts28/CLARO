@@ -222,11 +222,11 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   color: theme.cardColor,
-                  border: Border.all(color: theme.dividerColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 6,
+                      color: theme.shadowColor.withValues(alpha: 0.16),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
@@ -253,11 +253,11 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   color: theme.cardColor,
-                  border: Border.all(color: theme.dividerColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 6,
+                      color: theme.shadowColor.withValues(alpha: 0.16),
+                      blurRadius: 14,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
@@ -282,18 +282,7 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                         hintStyle: bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: theme.dividerColor),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: theme.dividerColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: colorScheme.primary),
-                        ),
+                        border: InputBorder.none,
                       ),
                     ),
                   ],

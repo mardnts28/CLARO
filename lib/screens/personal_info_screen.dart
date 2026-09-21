@@ -17,6 +17,23 @@ import 'change_password_screen.dart';
 // and decryption of health conditions/allergens. The key never lives on
 // the client -- see health-data-worker/ for the Worker implementation.
 const _workerUrl = 'https://health-data-worker.claro-app.workers.dev';
+
+/// Soft drop shadow (same style as the Profile screen cards) used in place
+/// of the old outlines. Pass a smaller [blur]/[dy] for small elements
+/// like chips.
+List<BoxShadow> _cardShadow(
+  ColorScheme colorScheme, {
+  double opacity = 0.14,
+  double blur = 14,
+  double dy = 5,
+}) => [
+  BoxShadow(
+    color: colorScheme.shadow.withValues(alpha: opacity),
+    blurRadius: blur,
+    offset: Offset(0, dy),
+  ),
+];
+
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
 
@@ -45,7 +62,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   int _calculateAge(DateTime dateOfBirth) {
     final now = DateTime.now();
     int age = now.year - dateOfBirth.year;
-    final birthdayHasOccurredThisYear = (now.month > dateOfBirth.month) ||
+    final birthdayHasOccurredThisYear =
+        (now.month > dateOfBirth.month) ||
         (now.month == dateOfBirth.month && now.day >= dateOfBirth.day);
     if (!birthdayHasOccurredThisYear) {
       age--;
@@ -67,7 +85,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         headers: {'Authorization': 'Bearer $idToken'},
       );
       if (res.statusCode != 200) {
-        debugPrint('Worker health-profile fetch failed: ${res.statusCode} ${res.body}');
+        debugPrint(
+          'Worker health-profile fetch failed: ${res.statusCode} ${res.body}',
+        );
         return null;
       }
       return jsonDecode(res.body) as Map<String, dynamic>;
@@ -81,7 +101,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   /// encrypts them server-side before writing to Firestore. Only the
   /// field(s) provided are updated -- pass null to leave a field
   /// unchanged.
-  Future<bool> _pushHealthData({List<String>? conditions, List<String>? allergens}) async {
+  Future<bool> _pushHealthData({
+    List<String>? conditions,
+    List<String>? allergens,
+  }) async {
     try {
       final idToken = await _authService.currentUser?.getIdToken();
       if (idToken == null) return false;
@@ -93,12 +116,14 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          if (conditions != null) 'conditions': conditions,
-          if (allergens != null) 'allergens': allergens,
+          'conditions': ?conditions,
+          'allergens': ?allergens,
         }),
       );
       if (res.statusCode != 200) {
-        debugPrint('Worker health-profile update failed: ${res.statusCode} ${res.body}');
+        debugPrint(
+          'Worker health-profile update failed: ${res.statusCode} ${res.body}',
+        );
         return false;
       }
       return true;
@@ -178,7 +203,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
 
     if (userDoc == null) {
-      debugPrint('Error loading user data: exhausted retries on permission-denied');
+      debugPrint(
+        'Error loading user data: exhausted retries on permission-denied',
+      );
       // One last attempt against the cache before giving up, so a
       // transient server issue doesn't blank out data we already have
       // locally.
@@ -217,24 +244,56 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             _age = null;
           }
 
-          final conditionsList = List<String>.from(healthData?['conditions'] ?? []);
+          final conditionsList = List<String>.from(
+            healthData?['conditions'] ?? [],
+          );
           _conditions = {
-            'Diabetes': conditionsList.contains('Diabetes') || conditionsList.contains('Diabetes'),
-            'Hypertension': conditionsList.contains('Hypertension') || conditionsList.contains('Alta-presyon'),
-            'Heart condition': conditionsList.contains('Heart condition') || conditionsList.contains('Sakit sa puso'),
-            'Low vision': conditionsList.contains('Low vision') || conditionsList.contains('Mababang Paningin'),
-            'None': conditionsList.contains('None') || conditionsList.contains('Wala'),
+            'Diabetes':
+                conditionsList.contains('Diabetes') ||
+                conditionsList.contains('Diabetes'),
+            'Hypertension':
+                conditionsList.contains('Hypertension') ||
+                conditionsList.contains('Alta-presyon'),
+            'Heart condition':
+                conditionsList.contains('Heart condition') ||
+                conditionsList.contains('Sakit sa puso'),
+            'GERD': conditionsList.contains('GERD'),
+            'Kidney disease':
+                conditionsList.contains('Kidney disease') ||
+                conditionsList.contains('Kidney Disease') ||
+                conditionsList.contains('Sakit sa bato'),
+            'Low vision':
+                conditionsList.contains('Low vision') ||
+                conditionsList.contains('Mababang Paningin'),
+            'None':
+                conditionsList.contains('None') ||
+                conditionsList.contains('Wala'),
           };
 
-          final allergensList = List<String>.from(healthData?['allergens'] ?? []);
+          final allergensList = List<String>.from(
+            healthData?['allergens'] ?? [],
+          );
           _allergens = {
-            'Fish': allergensList.contains('Fish') || allergensList.contains('Isda'),
-            'Milk/Dairy': allergensList.contains('Milk/Dairy') || allergensList.contains('Gatas'),
-            'Eggs': allergensList.contains('Eggs') || allergensList.contains('Itlog'),
-            'Soy': allergensList.contains('Soy') || allergensList.contains('Soya'),
-            'Wheat': allergensList.contains('Wheat') || allergensList.contains('Trigo'),
-            'Shellfish': allergensList.contains('Shellfish') || allergensList.contains('Lamang-Dagat'),
-            'Peanuts': allergensList.contains('Peanuts') || allergensList.contains('Mani'),
+            'Fish':
+                allergensList.contains('Fish') ||
+                allergensList.contains('Isda'),
+            'Milk/Dairy':
+                allergensList.contains('Milk/Dairy') ||
+                allergensList.contains('Gatas'),
+            'Eggs':
+                allergensList.contains('Eggs') ||
+                allergensList.contains('Itlog'),
+            'Soy':
+                allergensList.contains('Soy') || allergensList.contains('Soya'),
+            'Wheat':
+                allergensList.contains('Wheat') ||
+                allergensList.contains('Trigo'),
+            'Shellfish':
+                allergensList.contains('Shellfish') ||
+                allergensList.contains('Lamang-Dagat'),
+            'Peanuts':
+                allergensList.contains('Peanuts') ||
+                allergensList.contains('Mani'),
           };
         });
         // Keep the app-wide name notifier in sync so HomeScreen's
@@ -281,12 +340,29 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       final ok = await _authService.updateUserData({'name': newName});
       setState(() => _isSavingName = false);
       if (ok) {
+        BackendLocator.userRepository.invalidateCache(uid);
+        // Linked group memberships keep a denormalized display name for
+        // member cards. Keep those records synchronized with users/{uid}.name.
+        try {
+          await BackendLocator.groupRepository.syncLinkedMemberDisplayName(
+            uid: uid,
+            displayName: newName,
+          );
+        } catch (e) {
+          // The profile update succeeded; a later group refresh can retry.
+          debugPrint('Error syncing group member name: $e');
+        }
         // Update the shared notifier immediately so HomeScreen's
         // greeting and ProfileScreen's header reflect the change right
         // away, rather than waiting on the Firestore round-trip below.
         AuthService.userNameNotifier.value = newName;
         await _loadUserData();
-        if (mounted) SuccessFeedbackUtils.showSuccessSnackBar(context, loc.profileUpdateSuccess);
+        if (mounted) {
+          SuccessFeedbackUtils.showSuccessSnackBar(
+            context,
+            loc.profileUpdateSuccess,
+          );
+        }
       } else {
         if (mounted) {
           final isNet = !(await SuccessFeedbackUtils.hasInternetConnection());
@@ -299,7 +375,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               buttonText: loc.gotIt,
             );
           } else {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(loc.profileUpdateError)));
           }
         }
       }
@@ -321,7 +399,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           builder: (context, dialogSetState) {
             return AlertDialog(
               backgroundColor: dialogTheme.cardColor,
-              title: Text(loc.editName, style: TextStyle(color: dialogTheme.colorScheme.onSurface)),
+              title: Text(
+                loc.editName,
+                style: TextStyle(color: dialogTheme.colorScheme.onSurface),
+              ),
               content: CustomTextField(
                 controller: _nameController,
                 hintText: loc.onboardingNameHint,
@@ -335,22 +416,31 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 },
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: Text(loc.cancel)),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(loc.cancel),
+                ),
                 TextButton(
                   onPressed: _isSavingName
                       ? null
                       : () async {
-                    final newName = _nameController.text.trim();
-                    if (newName.isEmpty) {
-                      dialogSetState(() => dialogNameError = loc.onboardingNameHint);
-                      return;
-                    }
-                    setState(() => _isSavingName = true);
-                    Navigator.pop(context);
-                    await _saveUserName(newName);
-                  },
+                          final newName = _nameController.text.trim();
+                          if (newName.isEmpty) {
+                            dialogSetState(
+                              () => dialogNameError = loc.onboardingNameHint,
+                            );
+                            return;
+                          }
+                          setState(() => _isSavingName = true);
+                          Navigator.pop(context);
+                          await _saveUserName(newName);
+                        },
                   child: _isSavingName
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
                       : Text(loc.save),
                 ),
               ],
@@ -361,7 +451,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     );
   }
 
-  Future<void> _updateConditions({String? toggledKey, bool? previousValue}) async {
+  Future<void> _updateConditions({
+    String? toggledKey,
+    bool? previousValue,
+  }) async {
     final loc = AppLocalizations.of(context)!;
     final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
     if (!hasInternet) {
@@ -385,7 +478,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         // Always save English versions for consistency. Encryption now
         // happens server-side inside the Cloudflare Worker -- this
         // client only ever handles plaintext in memory, never the key.
-        final selectedConditions = _conditions.entries.where((e) => e.value).map((e) => e.key).toList();
+        final selectedConditions = _conditions.entries
+            .where((e) => e.value)
+            .map((e) => e.key)
+            .toList();
         final ok = await _pushHealthData(conditions: selectedConditions);
         if (ok) {
           BackendLocator.userRepository.invalidateCache(uid);
@@ -412,7 +508,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
     }
   }
 
-  Future<void> _updateAllergens({String? toggledKey, bool? previousValue}) async {
+  Future<void> _updateAllergens({
+    String? toggledKey,
+    bool? previousValue,
+  }) async {
     final loc = AppLocalizations.of(context)!;
     final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
     if (!hasInternet) {
@@ -435,7 +534,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       if (uid != null) {
         // Always save English versions for consistency. Encryption now
         // happens server-side inside the Cloudflare Worker.
-        final selectedAllergens = _allergens.entries.where((e) => e.value).map((e) => e.key).toList();
+        final selectedAllergens = _allergens.entries
+            .where((e) => e.value)
+            .map((e) => e.key)
+            .toList();
         final ok = await _pushHealthData(allergens: selectedAllergens);
         if (ok) {
           BackendLocator.userRepository.invalidateCache(uid);
@@ -470,6 +572,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         return loc.conditionHypertension;
       case 'Heart condition':
         return loc.conditionHeartCondition;
+      case 'GERD':
+        return loc.conditionGerd;
+      case 'Kidney disease':
+        return loc.conditionKidneyDisease;
       case 'Low vision':
         return loc.conditionLowVision;
       case 'None':
@@ -510,28 +616,31 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         child: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : RefreshIndicator(
-          color: theme.colorScheme.primary,
-          onRefresh: _onRefresh,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(theme),
-                const SizedBox(height: 24),
-                _buildProfileCard(theme),
-                const SizedBox(height: 20),
-                _buildConditionsSection(theme),
-                const SizedBox(height: 20),
-                _buildAllergensSection(theme),
-                const SizedBox(height: 20),
-                _buildAccountSettings(theme),
-                const SizedBox(height: 24),
-              ],
-            ),
-          ),
-        ),
+                color: theme.colorScheme.primary,
+                onRefresh: _onRefresh,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(theme),
+                      const SizedBox(height: 24),
+                      _buildProfileCard(theme),
+                      const SizedBox(height: 20),
+                      _buildConditionsSection(theme),
+                      const SizedBox(height: 20),
+                      _buildAllergensSection(theme),
+                      const SizedBox(height: 20),
+                      _buildAccountSettings(theme),
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
+              ),
       ),
     );
   }
@@ -545,13 +654,21 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             HapticService().vibrate();
             Navigator.pop(context);
           },
-          child: Icon(Icons.arrow_back, color: theme.colorScheme.primary, size: 24),
+          child: Icon(
+            Icons.arrow_back,
+            color: theme.colorScheme.primary,
+            size: 24,
+          ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             loc.personalInfo,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: theme.colorScheme.primary),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
           ),
         ),
       ],
@@ -572,14 +689,22 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 Flexible(
                   child: Text(
                     '${loc.onboardingNameHint}: $_userName',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: theme.colorScheme.onSurface),
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface,
+                    ),
                     textAlign: TextAlign.center,
                     maxLines: null,
                     overflow: TextOverflow.visible,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.edit, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                Icon(
+                  Icons.edit,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ],
             ),
           ),
@@ -589,7 +714,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             // birth (see _calculateAge) and is never directly editable.
             Text(
               '${loc.ageLabel}: $_age',
-              style: TextStyle(fontSize: 15, color: theme.colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 15,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ],
@@ -605,21 +733,34 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
+        boxShadow: _cardShadow(colorScheme),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.favorite_outline, color: colorScheme.primary, size: 20),
+              Icon(
+                Icons.favorite_outline,
+                color: colorScheme.primary,
+                size: 20,
+              ),
               const SizedBox(width: 8),
-              Text(loc.healthConditions, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+              Text(
+                loc.healthConditions,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           ..._conditions.entries.map((entry) {
-            if (entry.key == 'Wala' || entry.key == 'None') return const SizedBox.shrink();
+            if (entry.key == 'Wala' || entry.key == 'None') {
+              return const SizedBox.shrink();
+            }
             final conditionLabel = _getLocalizedConditionLabel(entry.key, loc);
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -627,14 +768,25 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                 children: [
                   Icon(Icons.favorite, color: colorScheme.primary, size: 18),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(conditionLabel, style: TextStyle(fontSize: 14, color: colorScheme.onSurface))),
+                  Expanded(
+                    child: Text(
+                      conditionLabel,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
                   Switch(
                     value: entry.value,
                     onChanged: (value) {
                       HapticService().vibrate();
                       final prev = entry.value;
                       setState(() => _conditions[entry.key] = value);
-                      _updateConditions(toggledKey: entry.key, previousValue: prev);
+                      _updateConditions(
+                        toggledKey: entry.key,
+                        previousValue: prev,
+                      );
                     },
                     activeThumbColor: colorScheme.primary,
                     activeTrackColor: colorScheme.primary.withAlpha(120),
@@ -651,14 +803,17 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
   Widget _buildAllergensSection(ThemeData theme) {
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final selectedAllergens = _allergens.entries.where((e) => e.value).map((e) => e.key).toList();
+    final selectedAllergens = _allergens.entries
+        .where((e) => e.value)
+        .map((e) => e.key)
+        .toList();
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
+        boxShadow: _cardShadow(colorScheme),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -668,9 +823,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.warning_outlined, color: colorScheme.primary, size: 20),
+                  Icon(
+                    Icons.warning_outlined,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
-                  Text(loc.allergensLabel, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+                  Text(
+                    loc.allergensLabel,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
                 ],
               ),
               GestureDetector(
@@ -685,27 +851,53 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
-            runSpacing: 8,
+            runSpacing: 10,
             children: selectedAllergens.map((allergen) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.12),
+                  // Opaque tint (not a translucent one) so the chip's
+                  // shadow doesn't show through its own fill.
+                  color: Color.alphaBlend(
+                    colorScheme.primary.withValues(alpha: 0.12),
+                    theme.cardColor,
+                  ),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: colorScheme.primary),
+                  boxShadow: _cardShadow(
+                    colorScheme,
+                    opacity: 0.18,
+                    blur: 6,
+                    dy: 2,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(allergen, style: TextStyle(fontSize: 13, color: colorScheme.primary)),
+                    Text(
+                      allergen,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.primary,
+                      ),
+                    ),
                     const SizedBox(width: 6),
                     GestureDetector(
                       onTap: () {
                         HapticService().vibrate();
                         setState(() => _allergens[allergen] = false);
-                        _updateAllergens(toggledKey: allergen, previousValue: true);
+                        _updateAllergens(
+                          toggledKey: allergen,
+                          previousValue: true,
+                        );
                       },
-                      child: Icon(Icons.close, size: 16, color: colorScheme.primary),
+                      child: Icon(
+                        Icons.close,
+                        size: 16,
+                        color: colorScheme.primary,
+                      ),
                     ),
                   ],
                 ),
@@ -724,7 +916,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
+        boxShadow: _cardShadow(colorScheme),
       ),
       child: Column(
         children: [
@@ -732,13 +924,23 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                Icon(Icons.settings_outlined, color: colorScheme.primary, size: 20),
+                Icon(
+                  Icons.settings_outlined,
+                  color: colorScheme.primary,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
-                Text(loc.accountSettings, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+                Text(
+                  loc.accountSettings,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
               ],
             ),
           ),
-          Divider(height: 0, color: theme.dividerColor),
           GestureDetector(
             onTap: () async {
               HapticService().vibrate();
@@ -749,7 +951,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               // the screen is always showing fresh data after a
               // password change, rather than relying on the instance
               // never having been recreated in between.
-              await Navigator.push(context, MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+              );
               if (mounted) await _loadUserData();
             },
             behavior: HitTestBehavior.opaque,
@@ -757,10 +962,26 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
-                  Icon(Icons.lock_outline, color: colorScheme.primary, size: 20),
+                  Icon(
+                    Icons.lock_outline,
+                    color: colorScheme.primary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 12),
-                  Expanded(child: Text(loc.changePassword, style: TextStyle(fontSize: 15, color: colorScheme.onSurface))),
-                  Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant, size: 20),
+                  Expanded(
+                    child: Text(
+                      loc.changePassword,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.chevron_right,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 20,
+                  ),
                 ],
               ),
             ),
@@ -781,36 +1002,75 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: sheetTheme.cardColor,
-            borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
+            ),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(loc.selectAllergen, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: colorScheme.onSurface)),
+              Text(
+                loc.selectAllergen,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
               const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
-                runSpacing: 8,
+                runSpacing: 12,
                 children: _allergens.entries.map((entry) {
                   final isSelected = entry.value;
-                  final allergenLabel = _getLocalizedAllergenLabel(entry.key, loc);
+                  final allergenLabel = _getLocalizedAllergenLabel(
+                    entry.key,
+                    loc,
+                  );
                   return GestureDetector(
                     onTap: () {
                       HapticService().vibrate();
                       final prev = entry.value;
                       setState(() => _allergens[entry.key] = !prev);
-                      _updateAllergens(toggledKey: entry.key, previousValue: prev);
+                      _updateAllergens(
+                        toggledKey: entry.key,
+                        previousValue: prev,
+                      );
                       Navigator.pop(context);
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isSelected ? colorScheme.primary : colorScheme.primary.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: colorScheme.primary, width: isSelected ? 2 : 1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
                       ),
-                      child: Text(allergenLabel, style: TextStyle(fontSize: 13, color: isSelected ? colorScheme.onPrimary : colorScheme.primary)),
+                      decoration: BoxDecoration(
+                        // Selected: solid primary. Unselected: opaque tint
+                        // (so the shadow doesn't bleed through the fill).
+                        color: isSelected
+                            ? colorScheme.primary
+                            : Color.alphaBlend(
+                                colorScheme.primary.withValues(alpha: 0.12),
+                                sheetTheme.cardColor,
+                              ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: _cardShadow(
+                          colorScheme,
+                          opacity: isSelected ? 0.28 : 0.18,
+                          blur: isSelected ? 8 : 6,
+                          dy: isSelected ? 3 : 2,
+                        ),
+                      ),
+                      child: Text(
+                        allergenLabel,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isSelected
+                              ? colorScheme.onPrimary
+                              : colorScheme.primary,
+                        ),
+                      ),
                     ),
                   );
                 }).toList(),

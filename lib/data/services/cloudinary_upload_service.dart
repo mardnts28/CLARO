@@ -26,10 +26,9 @@ import 'package:http/http.dart' as http;
 
 class CloudinaryUploadService {
   CloudinaryUploadService({
-    required String cloudName,
-    required String uploadPreset,
-  })  : _cloudName = cloudName,
-        _uploadPreset = uploadPreset;
+    required this._cloudName,
+    required this._uploadPreset,
+  });
 
   final String _cloudName;
   final String _uploadPreset;

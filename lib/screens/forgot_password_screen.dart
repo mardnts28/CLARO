@@ -24,7 +24,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final loc = AppLocalizations.of(context)!;
     final email = _emailController.text.trim();
 
-    // Validate email
     final emailError = ValidationService.validateEmail(email, loc);
     if (emailError != null) {
       setState(() => _emailError = emailError);
@@ -36,15 +35,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     final error = await _authService.sendPasswordResetEmail(email: email);
     if (!mounted) return;
     setState(() => _isLoading = false);
-
     if (error != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(error)));
-    } else {
-      setState(() => _emailSent = true);
-      SuccessFeedbackUtils.showSuccessSnackBar(context, loc.emailSent);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      return;
     }
+
+    setState(() => _emailSent = true);
+    SuccessFeedbackUtils.showSuccessSnackBar(context, loc.emailSent);
   }
 
   @override
@@ -163,8 +160,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                   ),
                                 ),
                                 onPressed: _isLoading || _emailSent
-                                    ? null
-                                    : _handlePasswordReset,
+                                  ? null
+                                  : _handlePasswordReset,
                                 child: _isLoading
                                     ? const SizedBox(
                                         height: 20,
@@ -175,10 +172,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                         ),
                                       )
                                     : Text(
-                                        _emailSent
-                                            ? 'Email Sent'
-                                            : 'Send Reset Link',
-                                        style: const TextStyle(
+                                      _emailSent ? 'Email Sent' : 'Send Reset Link',
+                                      style: const TextStyle(
                                           fontSize: 16,
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
@@ -193,16 +188,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                 decoration: BoxDecoration(
                                   color: Colors.green.shade50,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.green.shade300,
-                                  ),
+                                  border: Border.all(color: Colors.green.shade300),
                                 ),
                                 child: Column(
                                   children: [
-                                    Icon(
-                                      Icons.check_circle,
-                                      color: Colors.green.shade700,
-                                    ),
+                                    Icon(Icons.check_circle, color: Colors.green.shade700),
                                     const SizedBox(height: 8),
                                     Text(
                                       'Check your email',
@@ -263,6 +253,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     required String hint,
     required IconData icon,
     bool enabled = true,
+    String? errorText,
+    TextInputType? keyboardType,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     return CustomTextField(
@@ -270,7 +262,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       hintText: hint,
       prefixIcon: Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
       enabled: enabled,
-      errorText: _emailError,
+      errorText: errorText ?? _emailError,
+      keyboardType: keyboardType,
       onChanged: (val) {
         if (_emailError != null && val.trim().isNotEmpty) {
           setState(() => _emailError = null);

@@ -16,6 +16,7 @@ import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
 import '../services/voice_assistant_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 class HistoryScreen extends StatefulWidget {
   final bool embeddedMode;
   const HistoryScreen({super.key, this.embeddedMode = false});
@@ -43,6 +44,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       }
     });
   }
+
   final _authService = AuthService();
   StreamSubscription<void>? _subscription;
   StreamSubscription<List<Product>>? _favoritesSubscription;
@@ -145,6 +147,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
     super.dispose();
   }
 
+  // ---------------------------------------------------------------------------
+  // SHARED SHADOW STYLE
+  //
+  // Replaces the old thin outlines. Two layers: a soft ambient shadow plus a
+  // tight contact shadow so cards read clearly as raised surfaces. Dark mode
+  // uses a stronger opacity because black shadows are much harder to see
+  // against a dark background.
+  // ---------------------------------------------------------------------------
+  List<BoxShadow> _softShadows() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: isDark ? 0.50 : 0.14),
+        blurRadius: 14,
+        spreadRadius: 0,
+        offset: const Offset(0, 5),
+      ),
+      BoxShadow(
+        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
+        blurRadius: 4,
+        spreadRadius: 0,
+        offset: const Offset(0, 1.5),
+      ),
+    ];
+  }
+
   void _subscribeReports() {
     final uid = _authService.currentUser?.uid;
     if (uid == null) {
@@ -243,8 +272,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     };
 
     for (final item in items) {
-      final d = DateTime(item.timestamp.year, item.timestamp.month, item.timestamp.day);
-      
+      final d = DateTime(
+          item.timestamp.year, item.timestamp.month, item.timestamp.day);
+
       // "no last year" -> ignore items from previous years
       if (d.year < now.year) continue;
 
@@ -281,8 +311,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     };
 
     for (final report in reports) {
-      final d = DateTime(report.dateSubmitted.year, report.dateSubmitted.month, report.dateSubmitted.day);
-      
+      final d = DateTime(report.dateSubmitted.year, report.dateSubmitted.month,
+          report.dateSubmitted.day);
+
       // "no last year" -> ignore items from previous years
       if (d.year < now.year) continue;
 
@@ -370,7 +401,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           productId: product.id,
         );
       } catch (e) {
-        debugPrint('HistoryScreen._clearAllFavorites: failed for ${product.id}: $e');
+        debugPrint(
+            'HistoryScreen._clearAllFavorites: failed for ${product.id}: $e');
       }
     }
   }
@@ -379,8 +411,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildScanCard(HistoryItem item) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isFavorite =
-        item.productId != null && _favoriteProducts.any((p) => p.id == item.productId);
+    final isFavorite = item.productId != null &&
+        _favoriteProducts.any((p) => p.id == item.productId);
 
     // For Favorites tab, use unfavorite logic instead of delete
     final isFavoritesTab = _activeTab == 'Paborito';
@@ -395,7 +427,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           color: colorScheme.primary,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
+        child:
+            Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
       ),
       onDismissed: (_) {
         if (isFavoritesTab && item.productId != null) {
@@ -433,20 +466,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 // happened on the screen(s) we navigated to.
               }
             },
+            // No outline -- visible shadow instead.
             child: Container(
-              margin: const EdgeInsets.only(bottom: 10),
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: theme.cardColor,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: theme.dividerColor),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                boxShadow: _softShadows(),
               ),
               child: Row(
                 children: [
@@ -487,7 +514,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       ),
                                     );
                                   },
-                                  errorBuilder: (_, __, ___) => Icon(
+                                  errorBuilder: (_, _, _) => Icon(
                                       Icons.inventory_2_outlined,
                                       color: colorScheme.primary,
                                       size: 30),
@@ -513,7 +540,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         Text(
                           _formatTime(item.timestamp),
                           style: GoogleFonts.inter(
-                              fontSize: 12, color: colorScheme.onSurfaceVariant),
+                              fontSize: 12,
+                              color: colorScheme.onSurfaceVariant),
                         ),
                       ],
                     ),
@@ -528,7 +556,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       isFavorite ? Icons.favorite : Icons.favorite_border,
                       color: isFavorite
                           ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant.withOpacity(0.4),
+                          : colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                       size: 22,
                     ),
                   ),
@@ -549,19 +577,25 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     try {
-      final allProducts = await BackendLocator.productRepository.getAllProducts();
+      final allProducts =
+          await BackendLocator.productRepository.getAllProducts();
       if (allProducts.isEmpty) return null;
 
       final cleanTitle = item.title
-          .replaceAll(RegExp(r'\s+Comparison\s+Result', caseSensitive: false), '')
-          .replaceAll(RegExp(r'\s+Resulta\s+ng\s+Paghahambing', caseSensitive: false), '')
+          .replaceAll(
+              RegExp(r'\s+Comparison\s+Result', caseSensitive: false), '')
+          .replaceAll(
+              RegExp(r'\s+Resulta\s+ng\s+Paghahambing', caseSensitive: false),
+              '')
           .trim()
           .toLowerCase();
 
       if (cleanTitle.isNotEmpty) {
         for (final p in allProducts) {
           final pName = p.name.toLowerCase();
-          if (pName == cleanTitle || pName.contains(cleanTitle) || cleanTitle.contains(pName)) {
+          if (pName == cleanTitle ||
+              pName.contains(cleanTitle) ||
+              cleanTitle.contains(pName)) {
             return p;
           }
         }
@@ -586,6 +620,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget _buildCompareCard(HistoryItem item) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
     return Dismissible(
       key: Key(item.id),
       direction: DismissDirection.endToStart,
@@ -596,7 +631,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
           color: colorScheme.primary,
           borderRadius: BorderRadius.circular(14),
         ),
-        child: Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
+        child:
+            Icon(Icons.delete_outline, color: colorScheme.onPrimary, size: 26),
       ),
       onDismissed: (_) => _historyService.deleteRecord(item.id),
       child: GestureDetector(
@@ -616,20 +652,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
             );
           }
         },
+        // No outline -- visible shadow instead.
         child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
+          margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: theme.cardColor,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: theme.dividerColor),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+            boxShadow: _softShadows(),
           ),
           child: Row(
             children: [
@@ -639,42 +669,45 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: Container(
                   width: 52,
                   height: 52,
-                  color: colorScheme.primary.withOpacity(0.12),
+                  color: colorScheme.primary.withValues(alpha: 0.12),
                   child: Center(
-                    child: Icon(Icons.compare_arrows_rounded,
-                      color: colorScheme.primary, size: 28),
+                    child: Icon(
+                      Icons.compare_arrows_rounded,
+                      color: colorScheme.primary,
+                      size: 28,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            // Title + time
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: GoogleFonts.outfit(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _formatTime(item.timestamp),
-                    style: GoogleFonts.inter(
-                        fontSize: 12, color: colorScheme.onSurfaceVariant),
-                  ),
-                ],
+              const SizedBox(width: 12),
+              // Title + time
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: GoogleFonts.outfit(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.onSurface),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatTime(item.timestamp),
+                      style: GoogleFonts.inter(
+                          fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            // Compare badge icon on right
-            Icon(Icons.bar_chart_rounded,
-                color: colorScheme.primary, size: 22),
-          ],
+              // Compare badge icon on right
+              Icon(Icons.bar_chart_rounded,
+                  color: colorScheme.primary, size: 22),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -688,13 +721,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final status = report.status.toLowerCase();
 
     if (status == 'approved') {
-      statusBg = Colors.green.withOpacity(0.15);
+      statusBg = Colors.green.withValues(alpha: 0.15);
       statusText = Colors.green[700]!;
     } else if (status == 'rejected') {
-      statusBg = Colors.red.withOpacity(0.15);
+      statusBg = Colors.red.withValues(alpha: 0.15);
       statusText = Colors.red[700]!;
-    } else { // pending
-      statusBg = Colors.orange.withOpacity(0.15);
+    } else {
+      // pending
+      statusBg = Colors.orange.withValues(alpha: 0.15);
       statusText = Colors.orange[800]!;
     }
 
@@ -708,20 +742,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         );
       },
+      // No outline -- visible shadow instead.
       child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
+        margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: theme.dividerColor),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            )
-          ],
+          boxShadow: _softShadows(),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -732,7 +760,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    report.productName.isEmpty ? 'Unknown Product' : report.productName,
+                    report.productName.isEmpty
+                        ? 'Unknown Product'
+                        : report.productName,
                     style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -741,7 +771,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: statusBg,
                     borderRadius: BorderRadius.circular(12),
@@ -766,20 +797,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ],
             const SizedBox(height: 12),
-          Row(
-            children: [
-              Icon(Icons.access_time, size: 14, color: colorScheme.onSurfaceVariant),
-              const SizedBox(width: 6),
-              Text(
-                _formatTime(report.dateSubmitted),
-                style: GoogleFonts.inter(
-                    fontSize: 12, color: colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
-        ],
+            Row(
+              children: [
+                Icon(Icons.access_time,
+                    size: 14, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Text(
+                  _formatTime(report.dateSubmitted),
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-    ),
     );
   }
 
@@ -796,9 +828,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final items = [
       (icon: Icons.home_outlined, activeIcon: Icons.home, label: loc.home),
-      (icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: loc.scan),
-      (icon: Icons.history_outlined, activeIcon: Icons.history, label: loc.history),
-      (icon: Icons.person_outline, activeIcon: Icons.person, label: loc.profile),
+      (
+        icon: Icons.qr_code_scanner_outlined,
+        activeIcon: Icons.qr_code_scanner,
+        label: loc.scan
+      ),
+      (
+        icon: Icons.history_outlined,
+        activeIcon: Icons.history,
+        label: loc.history
+      ),
+      (
+        icon: Icons.group_outlined,
+        activeIcon: Icons.group,
+        label: loc.groupTab
+      ),
+      (
+        icon: Icons.person_outline,
+        activeIcon: Icons.person,
+        label: loc.profile
+      ),
     ];
 
     return Container(
@@ -807,7 +856,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
         color: theme.cardColor,
         boxShadow: [
           BoxShadow(
-            color: theme.brightness == Brightness.dark ? Colors.black.withOpacity(0.25) : Colors.black.withOpacity(0.05),
+            color: theme.brightness == Brightness.dark
+                ? Colors.black.withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, -2),
           ),
@@ -850,7 +901,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           color: colorScheme.primary,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.w500,
                         ),
                       ),
                     ],
@@ -882,12 +934,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   id: 'fav_${product.id}',
                   title: product.name,
                   subtitle: product.nutritionalFacts.servingSize,
-                  timestamp: DateTime.now(), // Could use favorited timestamp if tracked
+                  timestamp:
+                      DateTime.now(), // Could use favorited timestamp if tracked
                   type: HistoryType.scan,
                   productId: product.id,
                 ))
             .toList()
-        : _historyService.getItems(filter: _activeTab, searchQuery: _searchQuery);
+        : _historyService.getItems(
+            filter: _activeTab, searchQuery: _searchQuery);
     final grouped = _groupItems(items);
 
     final groupedReportsMap = _groupReports(_reports);
@@ -905,7 +959,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      floatingActionButton: widget.embeddedMode ? null : const VoiceAssistantFab(),
+      floatingActionButton:
+          widget.embeddedMode ? null : const VoiceAssistantFab(),
       bottomNavigationBar: widget.embeddedMode ? null : _buildBottomNav(),
       body: Column(
         children: [
@@ -913,7 +968,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           Container(
             color: colorScheme.surface,
             padding: EdgeInsets.only(
-                top: topPadding + 8, left: 20, right: 20, bottom: 12),
+                top: topPadding + 8, left: 20, right: 20, bottom: 16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -946,13 +1001,15 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                // Search bar
+                // Search bar -- no outline, solid surface + soft shadow.
+                // (Solid color, not translucent, so the shadow doesn't bleed
+                // through the inside of the bar.)
                 Container(
                   height: 44,
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    color: theme.cardColor,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: theme.dividerColor),
+                    boxShadow: _softShadows(),
                   ),
                   child: Row(
                     children: [
@@ -964,12 +1021,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         child: TextField(
                           controller: _searchController,
                           style: GoogleFonts.inter(
-                               fontSize: 14, color: colorScheme.onSurface),
+                              fontSize: 14, color: colorScheme.onSurface),
                           decoration: InputDecoration(
                             hintText: loc.searchHint,
                             hintStyle: GoogleFonts.inter(
-                                fontSize: 14, color: colorScheme.onSurfaceVariant),
+                                fontSize: 14,
+                                color: colorScheme.onSurfaceVariant),
                             border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            disabledBorder: InputBorder.none,
+                            errorBorder: InputBorder.none,
+                            focusedErrorBorder: InputBorder.none,
                             isDense: true,
                             contentPadding: EdgeInsets.zero,
                           ),
@@ -988,12 +1051,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 // Tab row
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Row(
@@ -1008,46 +1071,47 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       return Expanded(
                         child: GestureDetector(
                           onTap: () {
-                              HapticService().vibrate();
-                              setState(() => _activeTab = tab);
-                              if (VoiceAssistantService.instance.isEnabled) {
-                                final String? pageKey = switch (tab) {
-                                  'Paborito' => 'favorites',
-                                  'Kumpara'  => 'compare',
-                                  'Mga Ulat' => 'reports',
-                                  _          => null,
+                            HapticService().vibrate();
+                            setState(() => _activeTab = tab);
+                            if (VoiceAssistantService.instance.isEnabled) {
+                              final String? pageKey = switch (tab) {
+                                'Paborito' => 'favorites',
+                                'Kumpara' => 'compare',
+                                'Mga Ulat' => 'reports',
+                                _ => null,
+                              };
+                              if (pageKey != null) {
+                                final isTagalog = LocaleService.localeNotifier
+                                        .value.languageCode ==
+                                    'tl';
+                                final String preamble = switch (tab) {
+                                  'Paborito' => isTagalog
+                                      ? 'Binubuksan ang mga paboritong produkto.'
+                                      : 'Opening your favorites.',
+                                  'Kumpara' => isTagalog
+                                      ? 'Binubuksan ang kasaysayan ng paghahambing.'
+                                      : 'Opening your comparison history.',
+                                  'Mga Ulat' => isTagalog
+                                      ? 'Binubuksan ang iyong mga ulat.'
+                                      : 'Opening your submitted reports.',
+                                  _ => '',
                                 };
-                                if (pageKey != null) {
-                                  final isTagalog = LocaleService
-                                      .localeNotifier.value.languageCode == 'tl';
-                                  final String preamble = switch (tab) {
-                                    'Paborito' => isTagalog
-                                        ? 'Binubuksan ang mga paboritong produkto.'
-                                        : 'Opening your favorites.',
-                                    'Kumpara' => isTagalog
-                                        ? 'Binubuksan ang kasaysayan ng paghahambing.'
-                                        : 'Opening your comparison history.',
-                                    'Mga Ulat' => isTagalog
-                                        ? 'Binubuksan ang iyong mga ulat.'
-                                        : 'Opening your submitted reports.',
-                                    _ => '',
-                                  };
-                                  // Stop the history-tab announcement if it is
-                                  // still playing, then speak preamble + page description.
-                                  VoiceAssistantService.instance.stopAudio();
-                                  Future.delayed(
-                                    const Duration(milliseconds: 350),
-                                    () {
-                                      if (mounted) {
-                                        VoiceAssistantService.instance
-                                            .announcePageWithPreamble(
-                                                preamble, pageKey);
-                                      }
-                                    },
-                                  );
-                                }
+                                // Stop the history-tab announcement if it is
+                                // still playing, then speak preamble + page description.
+                                VoiceAssistantService.instance.stopAudio();
+                                Future.delayed(
+                                  const Duration(milliseconds: 350),
+                                  () {
+                                    if (mounted) {
+                                      VoiceAssistantService.instance
+                                          .announcePageWithPreamble(
+                                              preamble, pageKey);
+                                    }
+                                  },
+                                );
                               }
-                            },
+                            }
+                          },
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
                             padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1059,11 +1123,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               boxShadow: isActive
                                   ? [
                                       BoxShadow(
-                                        color: Colors.black
-                                            .withOpacity(0.06),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      )
+                                        color: Colors.black.withValues(
+                                          alpha: theme.brightness == Brightness.dark
+                                              ? 0.45
+                                              : 0.16,
+                                        ),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 3),
+                                      ),
                                     ]
                                   : [],
                             ),
@@ -1100,14 +1167,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ? _buildEmptyState()
                         : ListView.builder(
                             key: const PageStorageKey<String>('reports_scroll'),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
+                            // Extra bottom padding so the last card's shadow
+                            // isn't clipped by the list viewport.
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 4, 16, 20),
                             itemCount: flattenedReports.length,
                             itemBuilder: (context, index) {
                               final item = flattenedReports[index];
                               if (item is String) {
                                 return Padding(
-                                  padding: const EdgeInsets.only(top: 18, bottom: 10),
+                                  padding: const EdgeInsets.only(
+                                      top: 18, bottom: 10),
                                   child: Text(
                                     item,
                                     style: GoogleFonts.outfit(
@@ -1130,14 +1200,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         ? _buildEmptyState()
                         : ListView.builder(
                             key: const PageStorageKey<String>('history_scroll'),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 4),
+                            // Extra bottom padding so the last card's shadow
+                            // isn't clipped by the list viewport.
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 4, 16, 20),
                             itemCount: flattenedHistory.length,
                             itemBuilder: (context, index) {
                               final item = flattenedHistory[index];
                               if (item is String) {
                                 return Padding(
-                                  padding: const EdgeInsets.only(top: 18, bottom: 10),
+                                  padding: const EdgeInsets.only(
+                                      top: 18, bottom: 10),
                                   child: Text(
                                     item,
                                     style: GoogleFonts.outfit(
@@ -1182,7 +1255,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.history,
-                color: colorScheme.primary.withOpacity(0.2), size: 72),
+                color: colorScheme.primary.withValues(alpha: 0.2), size: 72),
             const SizedBox(height: 20),
             Text(
               message,

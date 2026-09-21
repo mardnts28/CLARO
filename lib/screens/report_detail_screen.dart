@@ -36,13 +36,13 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final status = widget.report.status.toLowerCase();
 
     if (status == 'approved') {
-      statusBg = Colors.green.withOpacity(0.15);
+      statusBg = Colors.green.withValues(alpha: 0.15);
       statusText = Colors.green[700]!;
     } else if (status == 'rejected') {
-      statusBg = Colors.red.withOpacity(0.15);
+      statusBg = Colors.red.withValues(alpha: 0.15);
       statusText = Colors.red[700]!;
     } else { // pending
-      statusBg = Colors.orange.withOpacity(0.15);
+      statusBg = Colors.orange.withValues(alpha: 0.15);
       statusText = Colors.orange[800]!;
     }
 
@@ -112,18 +112,18 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: theme.brightness == Brightness.dark
-                              ? Colors.red.withOpacity(0.12)
+                              ? Colors.red.withValues(alpha: 0.12)
                               : const Color(0xFFFFF5F5),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: theme.brightness == Brightness.dark
-                                ? Colors.red.withOpacity(0.35)
+                                ? Colors.red.withValues(alpha: 0.35)
                                 : const Color(0xFFFECACA),
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.red.withOpacity(0.04),
+                              color: Colors.red.withValues(alpha: 0.04),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -137,7 +137,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(4),
                                   decoration: BoxDecoration(
-                                    color: Colors.red.withOpacity(0.15),
+                                    color: Colors.red.withValues(alpha: 0.15),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Icon(
@@ -167,7 +167,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                                 fontWeight: FontWeight.w500,
                                 height: 1.4,
                                 color: theme.brightness == Brightness.dark
-                                    ? Colors.white.withOpacity(0.9)
+                                    ? Colors.white.withValues(alpha: 0.9)
                                     : const Color(0xFF991B1B),
                               ),
                             ),
@@ -234,10 +234,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           widget.report.frontImageUrl,
                           fit: BoxFit.cover,
                           cacheWidth: 600,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             height: 200,
                             decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Center(
@@ -254,7 +254,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       Container(
                         height: 200,
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(
@@ -284,10 +284,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           widget.report.backImageUrl,
                           fit: BoxFit.cover,
                           cacheWidth: 600,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             height: 200,
                             decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Center(
@@ -304,7 +304,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       Container(
                         height: 200,
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(

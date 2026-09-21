@@ -13,10 +13,9 @@ import '../repositories/product_repository.dart';
 
 class FavoritesService {
   FavoritesService({
-    required FavoritesRepository favoritesRepository,
-    required ProductRepository productRepository,
-  })  : _favoritesRepository = favoritesRepository,
-        _productRepository = productRepository;
+    required this._favoritesRepository,
+    required this._productRepository,
+  });
 
   final FavoritesRepository _favoritesRepository;
   final ProductRepository _productRepository;

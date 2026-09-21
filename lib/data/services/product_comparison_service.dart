@@ -48,10 +48,9 @@ import 'product_ranking_service.dart';
 
 class ProductComparisonService {
   ProductComparisonService({
-    required ProductRepository productRepository,
-    required ProductRankingService productRankingService,
-  })  : _productRepository = productRepository,
-        _productRankingService = productRankingService;
+    required this._productRepository,
+    required this._productRankingService,
+  });
 
   final ProductRepository _productRepository;
   final ProductRankingService _productRankingService;

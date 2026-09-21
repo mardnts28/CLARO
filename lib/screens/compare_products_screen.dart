@@ -19,6 +19,31 @@ import '../widgets/ranked_product_card.dart';
 import 'product_detail_screen.dart';
 import 'camera_scanner_screen.dart';
 
+/// Soft drop shadow used everywhere an outline/border used to be.
+List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) {
+  final isDark = theme.brightness == Brightness.dark;
+  return [
+    BoxShadow(
+      color: Colors.black.withValues(alpha: isDark ? 0.48 : 0.16),
+      blurRadius: blur,
+      spreadRadius: 0,
+      offset: Offset(0, dy),
+    ),
+    BoxShadow(
+      color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.07),
+      blurRadius: blur * 0.45,
+      spreadRadius: 0,
+      offset: Offset(0, dy * 0.35),
+    ),
+  ];
+}
+
+/// Opaque version of a translucent tint (tint blended over the scaffold
+/// background). Needed because a BoxShadow shows through translucent fills,
+/// so tinted containers that now carry a shadow must have an opaque fill.
+Color _tint(ThemeData theme, Color tint, double opacity) =>
+    Color.alphaBlend(tint.withValues(alpha: opacity), theme.scaffoldBackgroundColor);
+
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
   /// and to highlight it in the list.
@@ -108,7 +133,8 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   @override
   void initState() {
     super.initState();
-    if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
+    if (_authService.currentUser != null &&
+        VoiceAssistantService.instance.isEnabled) {
       VoiceAssistantService.instance.announcePage('compare_products');
     }
     _searchCtrl.addListener(_onSearch);
@@ -163,10 +189,11 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         return;
       }
 
-      final ranked = await BackendLocator.productComparisonService.compareWithAlternatives(
-        scannedProduct: widget.sourceProduct,
-        user: profile,
-      );
+      final ranked = await BackendLocator.productComparisonService
+          .compareWithAlternatives(
+            scannedProduct: widget.sourceProduct,
+            user: profile,
+          );
 
       if (!mounted) return;
       setState(() {
@@ -181,8 +208,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         // computed against the full profile above, so this matches the
         // list just shown -- it's the same ranking, just reflected in
         // the filter UI's default state.
+        // Include every condition participating in deterministic ranking.
         _selectedConditions = HealthCondition.values
-            .where(profile.conditions.contains)
+            .where((c) => c.isScored && profile.conditions.contains(c))
             .toSet();
       });
 
@@ -213,7 +241,8 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     final source = widget.sourceProduct;
     final top = ranked.first;
     final topProduct = top.evaluation.product;
-    final isTagalog = VoiceAssistantService.languageNotifier.value == VoiceLang.tagalog;
+    final isTagalog =
+        VoiceAssistantService.languageNotifier.value == VoiceLang.tagalog;
     final summary = isTagalog
         ? 'Resulta ng paghahambing para sa ${source.name}. Mayroong ${ranked.length} na mga produkto sa kategoryang ito. Ang nangungunang rekomendasyon ay ${topProduct.name}.'
         : 'Comparison results for ${source.name}. Found ${ranked.length} products in this category. The top recommendation is ${topProduct.name}.';
@@ -233,9 +262,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     for (final product in _comparisonProducts) {
       typeTags.addAll(ProductCharacteristics.typeTags(product));
       final flavors = ProductCharacteristics.flavorTags(product);
-      flavorTags.addAll(flavors.where(
-        (f) => !ProductCharacteristics.spicyKeywords.contains(f),
-      ));
+      flavorTags.addAll(
+        flavors.where((f) => !ProductCharacteristics.spicyKeywords.contains(f)),
+      );
       if (flavors.any(ProductCharacteristics.spicyKeywords.contains)) {
         hasSpicy = true;
       }
@@ -279,10 +308,14 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
       final productFlavorTags = ProductCharacteristics.flavorTags(product);
       final isSpicy = ProductCharacteristics.isSpicy(product);
 
-      final spicySelection =
-          _selectedFlavorTags.intersection({_spicyTag, _nonSpicyTag});
-      final keywordSelection =
-          _selectedFlavorTags.difference({_spicyTag, _nonSpicyTag});
+      final spicySelection = _selectedFlavorTags.intersection({
+        _spicyTag,
+        _nonSpicyTag,
+      });
+      final keywordSelection = _selectedFlavorTags.difference({
+        _spicyTag,
+        _nonSpicyTag,
+      });
 
       // Facet 1: Spicy/Non-Spicy -- must match if selected.
       if (spicySelection.isNotEmpty) {
@@ -309,22 +342,21 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     Iterable<RankedProductResult> results = source;
 
     if (_hasActiveTagFilters) {
-      results =
-          results.where((r) => _matchesTagFilters(r.evaluation.product));
+      results = results.where((r) => _matchesTagFilters(r.evaluation.product));
     }
 
     final q = _searchCtrl.text.toLowerCase().trim();
     if (q.isNotEmpty) {
-      results = results.where((r) =>
-          r.evaluation.product.name.toLowerCase().contains(q) ||
-          r.evaluation.product.brand.toLowerCase().contains(q) ||
-          r.evaluation.product.variant.toLowerCase().contains(q));
+      results = results.where(
+        (r) =>
+            r.evaluation.product.name.toLowerCase().contains(q) ||
+            r.evaluation.product.brand.toLowerCase().contains(q) ||
+            r.evaluation.product.variant.toLowerCase().contains(q),
+      );
     }
 
     return results.toList();
   }
-
-
 
   /// Re-ranks the SAME comparison set (no new DB fetch, no new Gemini call)
   /// against a health profile narrowed to just [condition] -- or the full
@@ -450,6 +482,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         return loc.conditionDiabetes;
       case HealthCondition.heartCondition:
         return loc.conditionHeartCondition;
+      case HealthCondition.gerd:
+        return loc.conditionGerd;
+      case HealthCondition.kidneyDisease:
+        return loc.conditionKidneyDisease;
     }
   }
 
@@ -480,17 +516,18 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         return StatefulBuilder(
           builder: (sheetContext, setSheetState) {
             Widget sectionTitle(String text) => Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-                  child: Text(
-                    text,
-                    style: GoogleFonts.outfit(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                );
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                text,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.primary,
+                ),
+              ),
+            );
 
+            // Chips use Material elevation (shadow) instead of an outline.
             Widget tagChip({
               required String label,
               required bool selected,
@@ -503,17 +540,21 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   HapticService().vibrate();
                   onTap();
                 },
-                selectedColor: colorScheme.primary.withOpacity(0.15),
+                selectedColor: colorScheme.primary.withValues(alpha: 0.15),
                 checkmarkColor: colorScheme.primary,
                 labelStyle: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: selected ? colorScheme.primary : colorScheme.onSurface,
                 ),
-                side: BorderSide(
-                  color: selected
-                      ? colorScheme.primary.withOpacity(0.5)
-                      : theme.dividerColor,
+                side: BorderSide.none,
+                elevation: selected ? 3 : 2,
+                pressElevation: 1,
+                shadowColor: Colors.black.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.6 : 0.35,
+                ),
+                selectedShadowColor: Colors.black.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.6 : 0.35,
                 ),
                 backgroundColor: colorScheme.surface,
               );
@@ -529,7 +570,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                     // Multi-select: any combination of the 3 conditions
                     // can be checked at once (e.g. Diabetes + Heart
                     // Condition together).
-                    for (final condition in HealthCondition.values)
+                    for (final condition in HealthCondition.values.where(
+                      (c) => c.isScored,
+                    ))
                       CheckboxListTile(
                         value: tempConditions.contains(condition),
                         activeColor: colorScheme.primary,
@@ -549,13 +592,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                     // ── Product Type (only shown if this comparison set
                     // actually has products with a curated type tag) ────
                     if (_availableTypeTags.isNotEmpty) ...[
-                      Divider(height: 1, color: theme.dividerColor),
                       sectionTitle(loc.filterProductTypeTitle),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Wrap(
                           spacing: 8,
-                          runSpacing: 8,
+                          runSpacing: 10,
                           children: [
                             for (final tag in _availableTypeTags)
                               tagChip(
@@ -576,13 +618,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                     // ── Flavor (spicy/non-spicy toggle + any other
                     // curated flavor tags actually present) ─────────────
                     if (_hasSpicyOption || _availableFlavorTags.isNotEmpty) ...[
-                      Divider(height: 1, color: theme.dividerColor),
                       sectionTitle(loc.filterFlavorTitle),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Wrap(
                           spacing: 8,
-                          runSpacing: 8,
+                          runSpacing: 10,
                           children: [
                             if (_hasSpicyOption) ...[
                               tagChip(
@@ -598,8 +639,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                               ),
                               tagChip(
                                 label: loc.nonSpicyLabel,
-                                selected:
-                                    tempFlavorTags.contains(_nonSpicyTag),
+                                selected: tempFlavorTags.contains(_nonSpicyTag),
                                 onTap: () => setSheetState(() {
                                   if (!tempFlavorTags.remove(_nonSpicyTag)) {
                                     tempFlavorTags
@@ -630,7 +670,18 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                elevation: 4,
+                                shadowColor: Colors.black.withValues(
+                                  alpha: theme.brightness == Brightness.dark ? 0.55 : 0.20,
+                                ),
+                                backgroundColor: colorScheme.surface,
+                                foregroundColor: colorScheme.onSurface,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
                               onPressed: () => setSheetState(() {
                                 tempConditions.clear();
                                 tempTypeTags.clear();
@@ -677,10 +728,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
       Navigator.pop(
         context,
         _allRanked.isNotEmpty
-            ? {
-                'product': widget.sourceProduct,
-                'comparisonSet': _allRanked,
-              }
+            ? {'product': widget.sourceProduct, 'comparisonSet': _allRanked}
             : null,
       );
     } else {
@@ -706,9 +754,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header row: back + title ──────────────────────────────
+            // ── Header row: back + title (shadow instead of divider) ──
             Container(
-              color: colorScheme.surface,
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                boxShadow: _softShadow(theme, blur: 12, dy: 4),
+              ),
               padding: EdgeInsets.only(
                 left: 16,
                 right: 16,
@@ -719,8 +770,11 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                 children: [
                   GestureDetector(
                     onTap: _handleBack,
-                    child: Icon(Icons.arrow_back,
-                        color: colorScheme.primary, size: 24),
+                    child: Icon(
+                      Icons.arrow_back,
+                      color: colorScheme.primary,
+                      size: 24,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Text(
@@ -731,174 +785,193 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                       color: colorScheme.primary,
                     ),
                   ),
-                const Spacer(),
-                if (_profile != null)
-                  GestureDetector(
-                    onTap: () {
-                      HapticService().vibrate();
-                      _showFilterSheet();
-                    },
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        Icon(Icons.filter_list,
-                            color: colorScheme.primary, size: 24),
-                        if (_selectedConditions.isNotEmpty || _hasActiveTagFilters)
-                          Positioned(
-                            top: -2,
-                            right: -2,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: colorScheme.secondary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: theme.dividerColor),
-
-          // ── Category chip + active filter chips ────────────────────
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: colorScheme.primary.withOpacity(0.4)),
-                  ),
-                  child: Text(
-                    widget.sourceProduct.category,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Text(
-                  loc.productCount(_allRanked.length),
-                  style: GoogleFonts.inter(
-                      fontSize: 12, color: colorScheme.onSurfaceVariant),
-                ),
-                for (final condition in _selectedConditions)
-                  _buildRemovableChip(
-                    label: _conditionLabel(condition),
-                    onRemove: () => _removeConditionTag(condition),
-                  ),
-                for (final tag in _selectedTypeTags)
-                  _buildRemovableChip(
-                    label: _tagLabel(tag),
-                    onRemove: () => _removeTypeTag(tag),
-                  ),
-                for (final tag in _selectedFlavorTags)
-                  _buildRemovableChip(
-                    label: _tagLabel(tag),
-                    onRemove: () => _removeFlavorTag(tag),
-                  ),
-              ],
-            ),
-          ),
-
-          // ── Search bar ────────────────────────────────────────────
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Container(
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: theme.dividerColor),
-              ),
-              child: Row(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: Icon(Icons.search,
-                        color: colorScheme.onSurfaceVariant, size: 22),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: _searchCtrl,
-                      style: GoogleFonts.inter(
-                          fontSize: 14, color: colorScheme.onSurface),
-                      decoration: InputDecoration(
-                        hintText: loc.searchHint,
-                        hintStyle: GoogleFonts.inter(
-                            fontSize: 14, color: colorScheme.onSurfaceVariant),
-                        border: InputBorder.none,
-                        contentPadding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                  if (_searchCtrl.text.isNotEmpty)
+                  const Spacer(),
+                  if (_profile != null)
                     GestureDetector(
                       onTap: () {
-                        _searchCtrl.clear();
-                        FocusScope.of(context).unfocus();
+                        HapticService().vibrate();
+                        _showFilterSheet();
                       },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Icon(Icons.close,
-                            color: colorScheme.onSurfaceVariant, size: 18),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Icon(
+                            Icons.filter_list,
+                            color: colorScheme.primary,
+                            size: 24,
+                          ),
+                          if (_selectedConditions.isNotEmpty ||
+                              _hasActiveTagFilters)
+                            Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.secondary,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                 ],
               ),
             ),
-          ),
 
-          const SizedBox(height: 6),
-
-          // ── Ranked-by-suitability label ───────────────────────────
-          if (!_loading && _error == null && !_nutritionUnavailable)
+            // ── Category chip + active filter chips ────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Text(
-                loc.rankedBySuitability,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _tint(theme, colorScheme.primary, 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: _softShadow(theme, blur: 9, dy: 3),
+                    ),
+                    child: Text(
+                      widget.sourceProduct.category,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    loc.productCount(_allRanked.length),
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  for (final condition in _selectedConditions)
+                    _buildRemovableChip(
+                      label: _conditionLabel(condition),
+                      onRemove: () => _removeConditionTag(condition),
+                    ),
+                  for (final tag in _selectedTypeTags)
+                    _buildRemovableChip(
+                      label: _tagLabel(tag),
+                      onRemove: () => _removeTypeTag(tag),
+                    ),
+                  for (final tag in _selectedFlavorTags)
+                    _buildRemovableChip(
+                      label: _tagLabel(tag),
+                      onRemove: () => _removeFlavorTag(tag),
+                    ),
+                ],
+              ),
+            ),
+
+            // ── Search bar ────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: _softShadow(theme),
+                ),
+                child: Row(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      child: Icon(
+                        Icons.search,
+                        color: colorScheme.onSurfaceVariant,
+                        size: 22,
+                      ),
+                    ),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchCtrl,
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: colorScheme.onSurface,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: loc.searchHint,
+                          hintStyle: GoogleFonts.inter(
+                            fontSize: 14,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: false,
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (_searchCtrl.text.isNotEmpty)
+                      GestureDetector(
+                        onTap: () {
+                          _searchCtrl.clear();
+                          FocusScope.of(context).unfocus();
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Icon(
+                            Icons.close,
+                            color: colorScheme.onSurfaceVariant,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
 
-          const SizedBox(height: 4),
+            const SizedBox(height: 6),
 
-          // ── Product list ──────────────────────────────────────────
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _nutritionUnavailable
-                    ? _buildNutritionUnavailable()
-                    : _filtered.isEmpty
-                    ? _buildEmpty()
-                    : _buildRankedList(),
-          ),
-        ],
+            // ── Ranked-by-suitability label ───────────────────────────
+            if (!_loading && _error == null && !_nutritionUnavailable)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+                child: Text(
+                  loc.rankedBySuitability,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+
+            const SizedBox(height: 4),
+
+            // ── Product list ──────────────────────────────────────────
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _nutritionUnavailable
+                  ? _buildNutritionUnavailable()
+                  : _filtered.isEmpty
+                  ? _buildEmpty()
+                  : _buildRankedList(),
+            ),
+          ],
+        ),
+
+        // ── Floating mic button (matching design) ─────────────────────
+        floatingActionButton: const VoiceAssistantFab(),
       ),
-
-      // ── Floating mic button (matching design) ─────────────────────
-      floatingActionButton: const VoiceAssistantFab(),
-    ),
-  );
-}
+    );
+  }
 
   /// Builds the ranked list with Scenario B's "top 5 + See More" behavior.
   /// While a search query is active, this is bypassed entirely -- every
@@ -932,9 +1005,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     final bottomSafeInset = MediaQuery.of(context).padding.bottom;
 
     return ListView.separated(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomSafeInset + 24),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottomSafeInset + 24),
       itemCount: addProductIndex + 1,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, i) {
         if (showSeeMore && i == visibleCount) {
           return _buildSeeMoreButton();
@@ -949,17 +1022,15 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
             ranked.evaluation.product.id == widget.sourceProduct.id;
         return RankedProductCard(
           ranked: ranked,
+          totalProducts: _filtered.length,
           isCurrent: isCurrent,
           onTap: () async {
             if (widget.saveToHistory) {
               // Normal flow: return result to caller (ProductDetailScreen)
-              Navigator.pop(
-                context,
-                {
-                  'product': ranked.evaluation.product,
-                  'comparisonSet': _allRanked,
-                },
-              );
+              Navigator.pop(context, {
+                'product': ranked.evaluation.product,
+                'comparisonSet': _allRanked,
+              });
             } else {
               // Saved comparison flow: navigate directly to ProductDetailScreen
               await Navigator.push(
@@ -993,17 +1064,18 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withOpacity(0.08),
+          color: _tint(theme, colorScheme.primary, 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: colorScheme.primary.withOpacity(0.4),
-            style: BorderStyle.solid,
-          ),
+          boxShadow: _softShadow(theme),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.add_circle_outline, size: 18, color: colorScheme.primary),
+            Icon(
+              Icons.add_circle_outline,
+              size: 18,
+              color: colorScheme.primary,
+            ),
             const SizedBox(width: 6),
             Text(
               loc.addProductButton,
@@ -1041,9 +1113,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     final products = recognized.whereType<Product>().toList();
     if (products.isEmpty) {
       final loc = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.noNewProductsDetected)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.noNewProductsDetected)));
       return;
     }
 
@@ -1127,10 +1199,13 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: products.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          separatorBuilder: (_, _) =>
+                              const SizedBox(height: 10),
                           itemBuilder: (context, i) {
                             final product = products[i];
-                            final alreadyRanked = existingIds.contains(product.id);
+                            final alreadyRanked = existingIds.contains(
+                              product.id,
+                            );
                             return SelectableScannedProductCard(
                               product: product,
                               selected: selectedIds.contains(product.id),
@@ -1156,10 +1231,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: colorScheme.primary,
                             foregroundColor: colorScheme.onPrimary,
-                            disabledBackgroundColor:
-                                colorScheme.primary.withOpacity(0.3),
-                            disabledForegroundColor:
-                                colorScheme.onPrimary.withOpacity(0.7),
+                            disabledBackgroundColor: colorScheme.primary
+                                .withValues(alpha: 0.3),
+                            disabledForegroundColor: colorScheme.onPrimary
+                                .withValues(alpha: 0.7),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -1249,9 +1324,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: colorScheme.secondary.withOpacity(0.12),
+          color: _tint(theme, colorScheme.secondary, 0.12),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colorScheme.secondary.withOpacity(0.4)),
+          boxShadow: _softShadow(theme, blur: 9, dy: 3),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1287,9 +1362,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withOpacity(0.08),
+          color: _tint(theme, colorScheme.primary, 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+          boxShadow: _softShadow(theme),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1303,7 +1378,11 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(Icons.keyboard_arrow_down, size: 18, color: colorScheme.primary),
+            Icon(
+              Icons.keyboard_arrow_down,
+              size: 18,
+              color: colorScheme.primary,
+            ),
           ],
         ),
       ),
@@ -1319,13 +1398,19 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.info_outline,
-                size: 48, color: colorScheme.onSurfaceVariant.withOpacity(0.6)),
+            Icon(
+              Icons.info_outline,
+              size: 48,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+            ),
             const SizedBox(height: 16),
             Text(
               loc.nutritionDataUnavailable,
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(fontSize: 14, color: colorScheme.onSurfaceVariant),
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -1340,20 +1425,27 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off_rounded,
-              size: 64, color: colorScheme.onSurfaceVariant.withOpacity(0.4)),
+          Icon(
+            Icons.search_off_rounded,
+            size: 64,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 16),
           Text(
             loc.noProductsFound,
             style: GoogleFonts.outfit(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurfaceVariant),
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             loc.noSearchMatchDesc,
-            style: GoogleFonts.inter(fontSize: 13, color: colorScheme.onSurfaceVariant),
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
