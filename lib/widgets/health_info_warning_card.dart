@@ -59,8 +59,8 @@ class HealthInfoWarningCard extends StatelessWidget {
     // verdict.
     final accentColor = isDark ? Colors.orange[300]! : Colors.orange[800]!;
     final backgroundColor =
-        isDark ? Colors.orange.withOpacity(0.14) : Colors.orange.withOpacity(0.08);
-    final borderColor = accentColor.withOpacity(0.5);
+        isDark ? Colors.orange.withValues(alpha: 0.14) : Colors.orange.withValues(alpha: 0.08);
+    final borderColor = accentColor.withValues(alpha: 0.5);
 
     return Container(
       width: double.infinity,
@@ -96,7 +96,7 @@ class HealthInfoWarningCard extends StatelessWidget {
             intro,
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: colorScheme.onSurface.withOpacity(0.85),
+              color: colorScheme.onSurface.withValues(alpha: 0.85),
               height: 1.4,
             ),
           ),

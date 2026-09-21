@@ -57,7 +57,7 @@ class RankedProductCard extends StatelessWidget {
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(12),
           border: isCurrent
-              ? Border.all(color: colorScheme.primary.withOpacity(0.5), width: 1.5)
+              ? Border.all(color: colorScheme.primary.withValues(alpha: 0.5), width: 1.5)
               : Border.all(color: theme.dividerColor),
           boxShadow: [
             BoxShadow(
@@ -84,7 +84,7 @@ class RankedProductCard extends StatelessWidget {
               height: 28,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: _labelColor().withOpacity(0.15),
+                color: _labelColor().withValues(alpha: 0.15),
                 shape: BoxShape.circle,
                 border: Border.all(color: _labelColor()),
               ),
@@ -133,7 +133,7 @@ class RankedProductCard extends StatelessWidget {
                                       ),
                                     );
                                   },
-                                  errorBuilder: (_, __, ___) => Icon(
+                                  errorBuilder: (_, _, _) => Icon(
                                       Icons.inventory_2_outlined,
                                       color: colorScheme.primary,
                                       size: 28),
@@ -179,7 +179,7 @@ class RankedProductCard extends StatelessWidget {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: _labelColor().withOpacity(0.12),
+                                    color: _labelColor().withValues(alpha: 0.12),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
@@ -245,7 +245,7 @@ class RankedProductCard extends StatelessWidget {
             return Icon(
               Icons.error_outline,
               size: 12,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.75),
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
             );
           },
         ),

@@ -48,7 +48,7 @@ class SelectableScannedProductCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
             color: isSelected
-                ? colorScheme.primary.withOpacity(0.08)
+                ? colorScheme.primary.withValues(alpha: 0.08)
                 : theme.cardColor,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
@@ -59,7 +59,7 @@ class SelectableScannedProductCard extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.04),
+                color: Colors.black.withValues(alpha: 0.04),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -93,7 +93,7 @@ class SelectableScannedProductCard extends StatelessWidget {
                               ),
                             );
                           },
-                          errorBuilder: (_, __, ___) => Icon(
+                          errorBuilder: (_, _, _) => Icon(
                               Icons.inventory_2_outlined,
                               color: colorScheme.primary,
                               size: 30),
@@ -144,7 +144,7 @@ class SelectableScannedProductCard extends StatelessWidget {
                     : Icons.radio_button_unchecked,
                 color: isSelected
                     ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant.withOpacity(0.4),
+                    : colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                 size: 24,
               ),
             ],

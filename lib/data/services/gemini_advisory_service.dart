@@ -24,12 +24,10 @@ import '../../core/utils/group_advisory_builder.dart';
 
 class GeminiAdvisoryService {
   GeminiAdvisoryService({
-    required String proxyUrl,
-    required String appSecret,
-    String model = 'gemini-3.5-flash',
-  }) : _proxyUrl = proxyUrl,
-       _appSecret = appSecret,
-       _model = model;
+    required this._proxyUrl,
+    required this._appSecret,
+    this._model = 'gemini-3.5-flash',
+  });
 
   final String _proxyUrl;
   final String _appSecret;
@@ -94,7 +92,7 @@ class GeminiAdvisoryService {
     required String languageCode,
     required bool isComparison,
   }) =>
-      'advisory_cache_${fingerprint}_${productId}_${languageCode}${isComparison ? '_cmp' : ''}';
+      'advisory_cache_${fingerprint}_${productId}_$languageCode${isComparison ? '_cmp' : ''}';
 
   Future<HealthAdvisory> generateAdvisory({
     required String scanEventId,
@@ -305,8 +303,9 @@ class GeminiAdvisoryService {
       } else if (cleaned.startsWith('```')) {
         cleaned = cleaned.substring(3);
       }
-      if (cleaned.endsWith('```'))
+      if (cleaned.endsWith('```')) {
         cleaned = cleaned.substring(0, cleaned.length - 3);
+      }
 
       final json = jsonDecode(cleaned.trim()) as Map<String, dynamic>;
       final warning = json['warningText'] as String?;

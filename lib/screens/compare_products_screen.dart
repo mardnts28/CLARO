@@ -24,13 +24,13 @@ List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) 
   final isDark = theme.brightness == Brightness.dark;
   return [
     BoxShadow(
-      color: Colors.black.withOpacity(isDark ? 0.48 : 0.16),
+      color: Colors.black.withValues(alpha: isDark ? 0.48 : 0.16),
       blurRadius: blur,
       spreadRadius: 0,
       offset: Offset(0, dy),
     ),
     BoxShadow(
-      color: Colors.black.withOpacity(isDark ? 0.24 : 0.07),
+      color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.07),
       blurRadius: blur * 0.45,
       spreadRadius: 0,
       offset: Offset(0, dy * 0.35),
@@ -42,7 +42,7 @@ List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) 
 /// background). Needed because a BoxShadow shows through translucent fills,
 /// so tinted containers that now carry a shadow must have an opaque fill.
 Color _tint(ThemeData theme, Color tint, double opacity) =>
-    Color.alphaBlend(tint.withOpacity(opacity), theme.scaffoldBackgroundColor);
+    Color.alphaBlend(tint.withValues(alpha: opacity), theme.scaffoldBackgroundColor);
 
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
@@ -540,7 +540,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   HapticService().vibrate();
                   onTap();
                 },
-                selectedColor: colorScheme.primary.withOpacity(0.15),
+                selectedColor: colorScheme.primary.withValues(alpha: 0.15),
                 checkmarkColor: colorScheme.primary,
                 labelStyle: GoogleFonts.inter(
                   fontSize: 13,
@@ -550,11 +550,11 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                 side: BorderSide.none,
                 elevation: selected ? 3 : 2,
                 pressElevation: 1,
-                shadowColor: Colors.black.withOpacity(
-                  theme.brightness == Brightness.dark ? 0.6 : 0.35,
+                shadowColor: Colors.black.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.6 : 0.35,
                 ),
-                selectedShadowColor: Colors.black.withOpacity(
-                  theme.brightness == Brightness.dark ? 0.6 : 0.35,
+                selectedShadowColor: Colors.black.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.6 : 0.35,
                 ),
                 backgroundColor: colorScheme.surface,
               );
@@ -673,8 +673,8 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 elevation: 4,
-                                shadowColor: Colors.black.withOpacity(
-                                  theme.brightness == Brightness.dark ? 0.55 : 0.20,
+                                shadowColor: Colors.black.withValues(
+                                  alpha: theme.brightness == Brightness.dark ? 0.55 : 0.20,
                                 ),
                                 backgroundColor: colorScheme.surface,
                                 foregroundColor: colorScheme.onSurface,
@@ -1007,7 +1007,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     return ListView.separated(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottomSafeInset + 24),
       itemCount: addProductIndex + 1,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, i) {
         if (showSeeMore && i == visibleCount) {
           return _buildSeeMoreButton();
@@ -1199,7 +1199,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: products.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
                           itemBuilder: (context, i) {
                             final product = products[i];
@@ -1232,9 +1232,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                             backgroundColor: colorScheme.primary,
                             foregroundColor: colorScheme.onPrimary,
                             disabledBackgroundColor: colorScheme.primary
-                                .withOpacity(0.3),
+                                .withValues(alpha: 0.3),
                             disabledForegroundColor: colorScheme.onPrimary
-                                .withOpacity(0.7),
+                                .withValues(alpha: 0.7),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -1401,7 +1401,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
             Icon(
               Icons.info_outline,
               size: 48,
-              color: colorScheme.onSurfaceVariant.withOpacity(0.6),
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 16),
             Text(
@@ -1428,7 +1428,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
           Icon(
             Icons.search_off_rounded,
             size: 64,
-            color: colorScheme.onSurfaceVariant.withOpacity(0.4),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
           ),
           const SizedBox(height: 16),
           Text(

@@ -280,7 +280,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   borderRadius: BorderRadius.circular(8),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
+                      color: Colors.black.withValues(alpha: 0.25),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -1095,7 +1095,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   child: Container(
                                     width: 80,
                                     height: 80,
-                                    color: theme.cardColor.withOpacity(0.5),
+                                    color: theme.cardColor.withValues(alpha: 0.5),
                                     child: _displayedImageUrl.isEmpty
                                         ? Icon(
                                             Icons.dining_outlined,
@@ -1110,8 +1110,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                             fit: BoxFit.cover,
                                             loadingBuilder:
                                                 (context, child, progress) {
-                                                  if (progress == null)
+                                                  if (progress == null) {
                                                     return child;
+                                                  }
                                                   return Center(
                                                     child: SizedBox(
                                                       width: 20,
@@ -1145,7 +1146,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                   ),
                                   decoration: BoxDecoration(
                                     color: colorScheme.surfaceContainerHighest
-                                        .withOpacity(0.3),
+                                        .withValues(alpha: 0.3),
                                     borderRadius: BorderRadius.circular(8),
                                     border: Border.all(
                                       color: theme.dividerColor,
@@ -1235,13 +1236,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           padding: const EdgeInsets.all(14),
                           decoration: BoxDecoration(
                             color: _fdaResult!.isExpired
-                                ? Colors.red.withOpacity(0.1)
-                                : Colors.amber.withOpacity(0.1),
+                                ? Colors.red.withValues(alpha: 0.1)
+                                : Colors.amber.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: _fdaResult!.isExpired
-                                  ? Colors.red.withOpacity(0.5)
-                                  : Colors.amber.withOpacity(0.5),
+                                  ? Colors.red.withValues(alpha: 0.5)
+                                  : Colors.amber.withValues(alpha: 0.5),
                             ),
                           ),
                           child: Row(
@@ -2242,7 +2243,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     for (int i = 0; i < sentences.length - 1; i++) {
       textSpans.add(
         TextSpan(
-          text: sentences[i] + ' ',
+          text: '${sentences[i]} ',
           style: GoogleFonts.inter(
             fontSize: 13,
             color: colorScheme.onSurface,
@@ -2280,7 +2281,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(16),
         ),
         child: const SizedBox(height: 20, child: LinearProgressIndicator()),
@@ -2292,9 +2293,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorScheme.outline.withOpacity(0.4)),
+          border: Border.all(color: colorScheme.outline.withValues(alpha: 0.4)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2402,7 +2403,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       // Remove decision word from advisoryTitle if it's duplicated at the start
       // This handles cases where AI might include "Caution" in warningText despite instructions
       String cleanAdvisoryTitle = advisoryTitle;
-      if (advisoryTitle.toLowerCase().startsWith('$levelLabel'.toLowerCase()) ||
+      if (advisoryTitle.toLowerCase().startsWith(levelLabel.toLowerCase()) ||
           advisoryTitle.toLowerCase().startsWith(
             '${levelLabel.toLowerCase()}:',
           )) {
@@ -2425,12 +2426,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color, width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -2863,7 +2864,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ? Image.asset(
                     m.avatar!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => initialsCircle(),
+                    errorBuilder: (_, _, _) => initialsCircle(),
                   )
                 : initialsCircle(),
           ),
@@ -2951,9 +2952,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               constraints: const BoxConstraints(maxWidth: 190),
               padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
               decoration: BoxDecoration(
-                color: cs.primary.withOpacity(0.10),
+                color: cs.primary.withValues(alpha: 0.10),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: cs.primary.withOpacity(0.6)),
+                border: Border.all(color: cs.primary.withValues(alpha: 0.6)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -3027,7 +3028,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return SafeArea(
           child: ValueListenableBuilder<int>(
             valueListenable: _groupOptionsTick,
-            builder: (ctx, _, __) {
+            builder: (ctx, _, _) {
               return SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 child: Column(
@@ -3091,7 +3092,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       trailing = Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(
@@ -3121,7 +3122,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           margin: const EdgeInsets.symmetric(vertical: 3),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? cs.primary.withOpacity(0.08) : null,
+            color: isSelected ? cs.primary.withValues(alpha: 0.08) : null,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isSelected ? cs.primary : cs.outlineVariant,
@@ -3213,7 +3214,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: color, width: 1.5),
       ),
@@ -3364,7 +3365,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.fromLTRB(6, 5, 12, 5),
                     decoration: BoxDecoration(
-                      color: isSel ? cs.primary.withOpacity(0.12) : cs.surface,
+                      color: isSel ? cs.primary.withValues(alpha: 0.12) : cs.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isSel ? cs.primary : cs.outlineVariant,
@@ -3434,7 +3435,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: selectedColor.withOpacity(0.12),
+                color: selectedColor.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -3454,7 +3455,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: selectedColor.withOpacity(0.08),
+              color: selectedColor.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -3499,11 +3500,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.primary.withOpacity(0.08),
+        color: colorScheme.primary.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -3691,7 +3692,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         border: Border.all(color: theme.dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -3747,7 +3748,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           Divider(
             height: 1,
             thickness: 1,
-            color: theme.dividerColor.withOpacity(0.5),
+            color: theme.dividerColor.withValues(alpha: 0.5),
           ),
       ],
     );
@@ -3773,7 +3774,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         border: Border.all(color: theme.dividerColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),

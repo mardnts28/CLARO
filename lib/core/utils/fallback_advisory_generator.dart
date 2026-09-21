@@ -106,7 +106,7 @@ class FallbackAdvisoryGenerator {
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.caution,
         warningText: isTagalog
-            ? 'Naglalaman ng ${allergenLabels} – allergen na natukoy'
+            ? 'Naglalaman ng $allergenLabels – allergen na natukoy'
             : 'Contains $allergenLabels – allergen detected',
         explanation: explanation,
         safeServingSize: null,
@@ -425,7 +425,7 @@ class FallbackAdvisoryGenerator {
     final isTagalog = languageCode == 'tl';
     final conditionClause = healthCondition.isNotEmpty
         ? (isTagalog
-              ? ' base sa iyong ${healthCondition}'
+              ? ' base sa iyong $healthCondition'
               : ' given your $healthCondition')
         : '';
 
@@ -449,11 +449,11 @@ class FallbackAdvisoryGenerator {
     // made the contradiction confusing to read.
     final comparisonClause = percentageDiffStr != null
         ? (isTagalog
-              ? ', na $percentageDiffStr% mas mataas kumpara sa pinakamababa sa paghahambingang ito (${bestValueStr}$nutrientUnit kada 100g)'
-              : ', which is $percentageDiffStr% more than the lowest in this comparison (${bestValueStr}$nutrientUnit per 100g)')
+              ? ', na $percentageDiffStr% mas mataas kumpara sa pinakamababa sa paghahambingang ito ($bestValueStr$nutrientUnit kada 100g)'
+              : ', which is $percentageDiffStr% more than the lowest in this comparison ($bestValueStr$nutrientUnit per 100g)')
         : (isTagalog
-              ? ' (ang pinakamababa sa paghahambingang ito ay may ${bestValueStr}$nutrientUnit kada 100g)'
-              : ' (the lowest in this comparison has ${bestValueStr}$nutrientUnit per 100g)');
+              ? ' (ang pinakamababa sa paghahambingang ito ay may $bestValueStr$nutrientUnit kada 100g)'
+              : ' (the lowest in this comparison has $bestValueStr$nutrientUnit per 100g)');
 
     // Derived from rank/totalProducts ONLY, never from a separately
     // computed "lowest value of this one nutrient" check -- that mismatch
@@ -469,8 +469,8 @@ class FallbackAdvisoryGenerator {
         // This product really is both #1 overall AND the single lowest
         // for this nutrient -- no tension, no extra clause needed.
         return isTagalog
-            ? 'Ang produktong ito ay nangunguna ($rank sa $totalProducts) na may ${thisValueStr}$nutrientUnit na $nutrientName kada 100g$conditionClause.'
-            : 'This product ranks $rank of $totalProducts (highest-ranked) with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause.';
+            ? 'Ang produktong ito ay nangunguna ($rank sa $totalProducts) na may $thisValueStr$nutrientUnit na $nutrientName kada 100g$conditionClause.'
+            : 'This product ranks $rank of $totalProducts (highest-ranked) with $thisValueStr$nutrientUnit $nutrientName per 100g$conditionClause.';
       }
       // #1 overall, but NOT the single lowest for this one nutrient --
       // other factors on this product's profile made up the difference.
@@ -486,16 +486,16 @@ class FallbackAdvisoryGenerator {
                 ? ', pero pinakamataas pa rin ang ranggo nito kapag isinaalang-alang ang lahat ng kaugnay na salik.'
                 : ', but it remains highest-ranked when every relevant factor is considered.');
       return isTagalog
-          ? 'Ang produktong ito ay nangunguna ($rank sa $totalProducts) na may ${thisValueStr}$nutrientUnit na $nutrientName kada 100g$conditionClause. Hindi ito ang pinakamababa sa $nutrientName sa paghahambingang ito (ang pinakamababa ay ${bestValueStr}$nutrientUnit kada 100g)$tailClause'
-          : 'This product ranks $rank of $totalProducts with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause. It is not the single lowest in $nutrientName in this comparison (the lowest is ${bestValueStr}$nutrientUnit per 100g)$tailClause';
+          ? 'Ang produktong ito ay nangunguna ($rank sa $totalProducts) na may $thisValueStr$nutrientUnit na $nutrientName kada 100g$conditionClause. Hindi ito ang pinakamababa sa $nutrientName sa paghahambingang ito (ang pinakamababa ay $bestValueStr$nutrientUnit kada 100g)$tailClause'
+          : 'This product ranks $rank of $totalProducts with $thisValueStr$nutrientUnit $nutrientName per 100g$conditionClause. It is not the single lowest in $nutrientName in this comparison (the lowest is $bestValueStr$nutrientUnit per 100g)$tailClause';
     } else if (isWorstRank) {
       return isTagalog
-          ? 'Ang produktong ito ay pang-$rank sa $totalProducts (pinakakonting angkop) na may ${thisValueStr}$nutrientUnit na $nutrientName kada 100g$conditionClause$comparisonClause.'
-          : 'This product ranks $rank of $totalProducts (lowest-ranked) with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
+          ? 'Ang produktong ito ay pang-$rank sa $totalProducts (pinakakonting angkop) na may $thisValueStr$nutrientUnit na $nutrientName kada 100g$conditionClause$comparisonClause.'
+          : 'This product ranks $rank of $totalProducts (lowest-ranked) with $thisValueStr$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
     } else {
       return isTagalog
-          ? 'Ang produktong ito ay pang-$rank sa $totalProducts na may ${thisValueStr}$nutrientUnit na $nutrientName kada 100g$conditionClause$comparisonClause.'
-          : 'This product ranks $rank of $totalProducts with ${thisValueStr}$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
+          ? 'Ang produktong ito ay pang-$rank sa $totalProducts na may $thisValueStr$nutrientUnit na $nutrientName kada 100g$conditionClause$comparisonClause.'
+          : 'This product ranks $rank of $totalProducts with $thisValueStr$nutrientUnit $nutrientName per 100g$conditionClause$comparisonClause.';
     }
   }
 }

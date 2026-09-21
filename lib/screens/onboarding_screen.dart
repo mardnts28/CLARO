@@ -669,7 +669,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     imagePath,
                     height: 32,
                     width: 32,
-                    errorBuilder: (_, __, ___) => Icon(
+                    errorBuilder: (_, _, _) => Icon(
                         Icons.image_not_supported,
                         size: 28,
                         color: colorScheme.onSurfaceVariant),

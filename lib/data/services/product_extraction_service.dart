@@ -31,12 +31,10 @@ import '../models/product_extraction_result.dart';
 
 class ProductExtractionService {
   ProductExtractionService({
-    required String proxyUrl,
-    required String appSecret,
-    String model = 'gemini-3.5-flash',
-  })  : _proxyUrl = proxyUrl,
-        _appSecret = appSecret,
-        _model = model;
+    required this._proxyUrl,
+    required this._appSecret,
+    this._model = 'gemini-3.5-flash',
+  });
 
   final String _proxyUrl;
   final String _appSecret;

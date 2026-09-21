@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/home_tab_controller.dart';
@@ -331,13 +330,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return [
       BoxShadow(
-        color: Colors.black.withOpacity(isDark ? 0.50 : 0.14),
+        color: Colors.black.withValues(alpha: isDark ? 0.50 : 0.14),
         blurRadius: 18,
         spreadRadius: 0,
         offset: const Offset(0, 6),
       ),
       BoxShadow(
-        color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
+        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
         blurRadius: 5,
         spreadRadius: 0,
         offset: const Offset(0, 2),
@@ -353,6 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
 
       body: VoiceMicOverlay(
+        showMic: _selectedIndex != 1,
         child: Stack(
           children: [
             IndexedStack(
@@ -375,8 +375,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-
-        showMic: _selectedIndex != 1,
       ),
 
       bottomNavigationBar: _buildBottomNav(),
@@ -516,8 +514,8 @@ class _HomeScreenState extends State<HomeScreen> {
       height: 46,
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withOpacity(0.06)
-            : colorScheme.surfaceContainerHighest.withOpacity(0.6),
+            ? Colors.white.withValues(alpha: 0.06)
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(23),
       ),
       child: TextField(
@@ -547,12 +545,12 @@ class _HomeScreenState extends State<HomeScreen> {
           hintText: 'Search products or categories...',
           hintStyle: TextStyle(
             fontSize: 14,
-            color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
           ),
           prefixIcon: Icon(
             Icons.search_rounded,
             size: 20,
-            color: colorScheme.onSurfaceVariant.withOpacity(0.9),
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.9),
           ),
           prefixIconConstraints: const BoxConstraints(
             minWidth: 42,
@@ -597,7 +595,7 @@ class _HomeScreenState extends State<HomeScreen> {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(23),
             borderSide: BorderSide(
-              color: colorScheme.primary.withOpacity(0.45),
+              color: colorScheme.primary.withValues(alpha: 0.45),
               width: 1.3,
             ),
           ),
@@ -647,7 +645,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.symmetric(vertical: 6),
               itemCount:
                   visible.length + (_searchSuggestions.length > 8 ? 1 : 0),
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   Divider(height: 1, color: colorScheme.outlineVariant),
               itemBuilder: (context, index) {
                 if (index == visible.length) {
@@ -693,7 +691,7 @@ class _HomeScreenState extends State<HomeScreen> {
             : Image.network(
                 product.imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Container(
+                errorBuilder: (_, _, _) => Container(
                   color: colorScheme.surfaceContainerHighest,
                   child: Icon(
                     Icons.inventory_2_outlined,
@@ -728,8 +726,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
         boxShadow: [
           BoxShadow(
-            color: theme.colorScheme.primary.withOpacity(
-              theme.brightness == Brightness.dark ? 0.35 : 0.18,
+            color: theme.colorScheme.primary.withValues(
+              alpha: theme.brightness == Brightness.dark ? 0.35 : 0.18,
             ),
 
             blurRadius: 18,
@@ -1044,7 +1042,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 CircleAvatar(
                   radius: 18,
 
-                  backgroundColor: primaryColor.withOpacity(0.12),
+                  backgroundColor: primaryColor.withValues(alpha: 0.12),
 
                   child: Icon(icon, size: 18, color: primaryColor),
                 ),
@@ -1382,7 +1380,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 CircleAvatar(
                   radius: 18,
 
-                  backgroundColor: primaryColor.withOpacity(0.12),
+                  backgroundColor: primaryColor.withValues(alpha: 0.12),
 
                   child: Icon(
                     Icons.blender_outlined,
@@ -1699,15 +1697,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      debugPrint('Could not launch $url');
-    }
-  }
-
   // -------------------------------------------------------------------------
   // FDA / WHO IMAGE CARD
   // -------------------------------------------------------------------------
@@ -1831,7 +1820,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 28,
 
                     decoration: BoxDecoration(
-                      color: primaryColor.withOpacity(0.10),
+                      color: primaryColor.withValues(alpha: 0.10),
 
                       shape: BoxShape.circle,
                     ),
@@ -1888,7 +1877,7 @@ class _HomeScreenState extends State<HomeScreen> {
     // against the dark bottom bar background; the icon/text stay in
     // colorScheme.primary (a saturated red), which reads clearly on white.
     final navPillColor = theme.brightness == Brightness.dark
-        ? Colors.grey.withOpacity(0.3)
+        ? Colors.grey.withValues(alpha: 0.3)
         : const Color(0xFFF6CDCD);
 
     final items = [
@@ -1935,8 +1924,8 @@ class _HomeScreenState extends State<HomeScreen> {
         boxShadow: [
           BoxShadow(
             color: theme.brightness == Brightness.dark
-                ? Colors.black.withOpacity(0.25)
-                : Colors.black.withOpacity(0.05),
+                ? Colors.black.withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.05),
 
             blurRadius: 12,
 
@@ -2129,9 +2118,9 @@ class _ShineSweepButtonState extends State<_ShineSweepButton>
                                     begin: Alignment.centerLeft,
                                     end: Alignment.centerRight,
                                     colors: [
-                                      Colors.white.withOpacity(0.0),
-                                      Colors.white.withOpacity(0.65),
-                                      Colors.white.withOpacity(0.0),
+                                      Colors.white.withValues(alpha: 0.0),
+                                      Colors.white.withValues(alpha: 0.65),
+                                      Colors.white.withValues(alpha: 0.0),
                                     ],
                                     stops: const [0.0, 0.5, 1.0],
                                   ),

@@ -147,6 +147,7 @@ class VoiceCommandRouter {
       );
 
       if (handled) return;
+      if (!context.mounted) return;
     }
 
     // ============================================================

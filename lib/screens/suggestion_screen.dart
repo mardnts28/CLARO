@@ -75,16 +75,15 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
     }
 
     final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!mounted) return;
     if (!hasInternet) {
       setState(() => _submitting = false);
-      if (mounted) {
-        await SuccessFeedbackUtils.showOfflineNoticeDialog(
-          context,
-          title: loc.noInternetTitle,
-          message: loc.noInternetReviewMessage,
-          buttonText: loc.gotIt,
-        );
-      }
+      await SuccessFeedbackUtils.showOfflineNoticeDialog(
+        context,
+        title: loc.noInternetTitle,
+        message: loc.noInternetReviewMessage,
+        buttonText: loc.gotIt,
+      );
       return;
     }
 
@@ -225,7 +224,7 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                   color: theme.cardColor,
                   boxShadow: [
                     BoxShadow(
-                      color: theme.shadowColor.withOpacity(0.16),
+                      color: theme.shadowColor.withValues(alpha: 0.16),
                       blurRadius: 14,
                       offset: const Offset(0, 5),
                     ),
@@ -256,7 +255,7 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
                   color: theme.cardColor,
                   boxShadow: [
                     BoxShadow(
-                      color: theme.shadowColor.withOpacity(0.16),
+                      color: theme.shadowColor.withValues(alpha: 0.16),
                       blurRadius: 14,
                       offset: const Offset(0, 5),
                     ),

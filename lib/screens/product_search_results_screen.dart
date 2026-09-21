@@ -9,7 +9,7 @@ import 'product_detail_screen.dart';
 /// of the old outline.
 List<BoxShadow> _cardShadow(ColorScheme colorScheme) => [
   BoxShadow(
-    color: colorScheme.shadow.withOpacity(0.14),
+    color: colorScheme.shadow.withValues(alpha: 0.14),
     blurRadius: 14,
     offset: const Offset(0, 5),
   ),
@@ -43,7 +43,7 @@ class ProductSearchResultsScreen extends StatelessWidget {
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               itemCount: products.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 14),
+              separatorBuilder: (_, _) => const SizedBox(height: 14),
               itemBuilder: (context, index) {
                 final product = products[index];
                 return _ProductSearchResultCard(
@@ -104,7 +104,7 @@ class _ProductSearchResultCard extends StatelessWidget {
                         ? Image.network(
                             product.imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Icon(
+                            errorBuilder: (_, _, _) => Icon(
                               Icons.inventory_2_outlined,
                               color: colorScheme.primary,
                               size: 30,

@@ -258,8 +258,9 @@ class GroupAdvisoryBuilder {
     double? smallest;
     for (final f in facts) {
       if (f.suggestedGrams == null) continue;
-      if (smallest == null || f.suggestedGrams! < smallest)
+      if (smallest == null || f.suggestedGrams! < smallest) {
         smallest = f.suggestedGrams;
+      }
     }
     if (smallest == null) return null;
 

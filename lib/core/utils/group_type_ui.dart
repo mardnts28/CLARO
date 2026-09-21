@@ -4,7 +4,6 @@
 // Kept out of the generated l10n files (they're regenerated from .arb) --
 // move these into your .arb files later if you prefer.
 
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -122,7 +121,7 @@ class GroupTypeUi {
         width: size,
         height: size,
         fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => Icon(Icons.group_outlined, size: size, color: color),
+        errorBuilder: (_, _, _) => Icon(Icons.group_outlined, size: size, color: color),
       );
     }
 
@@ -135,7 +134,7 @@ class GroupTypeUi {
             width: inner,
             height: inner,
             fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => Icon(Icons.group_outlined, size: inner, color: Colors.grey.shade800),
+            errorBuilder: (_, _, _) => Icon(Icons.group_outlined, size: inner, color: Colors.grey.shade800),
           );
     return Container(
       width: size,

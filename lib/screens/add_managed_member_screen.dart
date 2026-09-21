@@ -474,7 +474,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                             child: Image.asset(
                               path,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
+                              errorBuilder: (_, _, _) => Container(
                                 color: colorScheme.surfaceContainerHighest,
                                 child: Icon(Icons.person_outline, color: colorScheme.onSurfaceVariant),
                               ),

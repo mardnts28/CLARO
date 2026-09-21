@@ -409,8 +409,8 @@ class _SelectLanguageScreenState
                 fit: BoxFit.contain,
                 errorBuilder: (
                   _,
-                  __,
-                  ___,
+                  _,
+                  _,
                 ) {
                   return Icon(
                     Icons.qr_code_scanner,

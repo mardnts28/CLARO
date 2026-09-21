@@ -274,7 +274,7 @@ class AuthGate extends StatelessWidget {
             if (isAuthenticating) {
               return ValueListenableBuilder<Map<String, dynamic>?>(
                 valueListenable: AuthService.pendingMfaChallenge,
-                builder: (context, challenge, __) {
+                builder: (context, challenge, _) {
                   if (challenge != null) {
                     return OtpVerificationScreen(
                       email: challenge['email'],

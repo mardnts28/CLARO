@@ -28,7 +28,7 @@ List<BoxShadow> _cardShadow(
   double dy = 5,
 }) => [
   BoxShadow(
-    color: colorScheme.shadow.withOpacity(opacity),
+    color: colorScheme.shadow.withValues(alpha: opacity),
     blurRadius: blur,
     offset: Offset(0, dy),
   ),
@@ -116,8 +116,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          if (conditions != null) 'conditions': conditions,
-          if (allergens != null) 'allergens': allergens,
+          'conditions': ?conditions,
+          'allergens': ?allergens,
         }),
       );
       if (res.statusCode != 200) {
@@ -357,11 +357,12 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         // away, rather than waiting on the Firestore round-trip below.
         AuthService.userNameNotifier.value = newName;
         await _loadUserData();
-        if (mounted)
+        if (mounted) {
           SuccessFeedbackUtils.showSuccessSnackBar(
             context,
             loc.profileUpdateSuccess,
           );
+        }
       } else {
         if (mounted) {
           final isNet = !(await SuccessFeedbackUtils.hasInternetConnection());
@@ -757,8 +758,9 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           ),
           const SizedBox(height: 12),
           ..._conditions.entries.map((entry) {
-            if (entry.key == 'Wala' || entry.key == 'None')
+            if (entry.key == 'Wala' || entry.key == 'None') {
               return const SizedBox.shrink();
+            }
             final conditionLabel = _getLocalizedConditionLabel(entry.key, loc);
             return Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -860,7 +862,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   // Opaque tint (not a translucent one) so the chip's
                   // shadow doesn't show through its own fill.
                   color: Color.alphaBlend(
-                    colorScheme.primary.withOpacity(0.12),
+                    colorScheme.primary.withValues(alpha: 0.12),
                     theme.cardColor,
                   ),
                   borderRadius: BorderRadius.circular(20),
@@ -1049,7 +1051,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                         color: isSelected
                             ? colorScheme.primary
                             : Color.alphaBlend(
-                                colorScheme.primary.withOpacity(0.12),
+                                colorScheme.primary.withValues(alpha: 0.12),
                                 sheetTheme.cardColor,
                               ),
                         borderRadius: BorderRadius.circular(20),

@@ -32,13 +32,13 @@ class NutritionGuideScreen extends StatelessWidget {
 
     return [
       BoxShadow(
-        color: Colors.black.withOpacity(isDark ? 0.50 : 0.14),
+        color: Colors.black.withValues(alpha: isDark ? 0.50 : 0.14),
         blurRadius: 14,
         spreadRadius: 0,
         offset: const Offset(0, 5),
       ),
       BoxShadow(
-        color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
+        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
         blurRadius: 4,
         spreadRadius: 0,
         offset: const Offset(0, 1.5),
@@ -759,7 +759,7 @@ class NutritionGuideScreen extends StatelessWidget {
     // translucent fill would let the shadow show through the inside of the
     // button, so the tint is pre-blended onto the card color instead.
     final solidTint = Color.alphaBlend(
-      theme.colorScheme.primary.withOpacity(0.08),
+      theme.colorScheme.primary.withValues(alpha: 0.08),
       theme.cardColor,
     );
 
@@ -918,7 +918,7 @@ class NutritionGuideScreen extends StatelessWidget {
             height: 44,
 
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.10),
+              color: theme.colorScheme.primary.withValues(alpha: 0.10),
 
               shape: BoxShape.circle,
             ),
@@ -1035,7 +1035,7 @@ class NutritionGuideScreen extends StatelessWidget {
             height: 44,
 
             decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withOpacity(0.10),
+              color: theme.colorScheme.primary.withValues(alpha: 0.10),
 
               shape: BoxShape.circle,
             ),
@@ -1092,7 +1092,7 @@ class NutritionGuideScreen extends StatelessWidget {
       padding: const EdgeInsets.all(14),
 
       decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withOpacity(0.06),
+        color: theme.colorScheme.primary.withValues(alpha: 0.06),
 
         borderRadius: BorderRadius.circular(14),
       ),

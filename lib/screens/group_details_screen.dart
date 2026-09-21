@@ -118,10 +118,11 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                   builder: (_) => AddManagedMemberScreen(group: _group),
                 ),
               );
-              if (mounted)
+              if (mounted) {
                 setState(
                   _refreshProfiles,
                 ); // re-fetch profiles for the new member
+              }
             },
             child: ListTile(
               leading: const Icon(Icons.person_add_alt_outlined),
@@ -492,7 +493,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
             _isOwner ? loc.groupOwnerLabel : loc.groupMemberLabel,
             style: TextStyle(
               fontSize: 13,
-              color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+              color: colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -569,7 +570,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                       width: 40,
                       height: 40,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Icon(
+                      errorBuilder: (_, _, _) => Icon(
                         Icons.person_pin_circle_outlined,
                         color: colorScheme.primary,
                         size: 28,
@@ -605,7 +606,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: colorScheme.secondary.withOpacity(0.12),
+                    color: colorScheme.secondary.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -783,7 +784,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
 
     // Determine colors based on state and theme
     final buttonColor = hasMembers
-        ? colorScheme.onSurfaceVariant.withOpacity(0.5) // Disabled: gray
+        ? colorScheme.onSurfaceVariant.withValues(alpha: 0.5) // Disabled: gray
         : (isDarkMode
               ? Colors.red.shade400
               : Colors
@@ -791,7 +792,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                     .shade700); // Available: primary red or bright red in dark mode
 
     final iconColor = hasMembers
-        ? colorScheme.onSurfaceVariant.withOpacity(0.5) // Disabled: gray
+        ? colorScheme.onSurfaceVariant.withValues(alpha: 0.5) // Disabled: gray
         : (isDarkMode
               ? Colors.red.shade400
               : Colors.red.shade700); // Available: same as button

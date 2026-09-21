@@ -367,11 +367,13 @@ class VoiceAssistantService {
             });
           }
         },
-        listenFor: const Duration(seconds: 25),
-        pauseFor: const Duration(seconds: 3),
-        localeId: locale,
-        partialResults: true,
-        listenMode: ListenMode.dictation,
+        listenOptions: SpeechListenOptions(
+          listenMode: ListenMode.dictation,
+          partialResults: true,
+          listenFor: const Duration(seconds: 25),
+          pauseFor: const Duration(seconds: 3),
+          localeId: locale,
+        ),
       );
 
       final transcript = await completer.future.timeout(

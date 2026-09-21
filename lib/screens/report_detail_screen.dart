@@ -36,13 +36,13 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
     final status = widget.report.status.toLowerCase();
 
     if (status == 'approved') {
-      statusBg = Colors.green.withOpacity(0.15);
+      statusBg = Colors.green.withValues(alpha: 0.15);
       statusText = Colors.green[700]!;
     } else if (status == 'rejected') {
-      statusBg = Colors.red.withOpacity(0.15);
+      statusBg = Colors.red.withValues(alpha: 0.15);
       statusText = Colors.red[700]!;
     } else { // pending
-      statusBg = Colors.orange.withOpacity(0.15);
+      statusBg = Colors.orange.withValues(alpha: 0.15);
       statusText = Colors.orange[800]!;
     }
 
@@ -102,6 +102,79 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                         ),
                       ),
                     ),
+
+                    // Highlighted Rejection Reason (Rejection only)
+                    if (status == 'rejected' &&
+                        widget.report.rejectionReason.trim().isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.brightness == Brightness.dark
+                              ? Colors.red.withValues(alpha: 0.12)
+                              : const Color(0xFFFFF5F5),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: theme.brightness == Brightness.dark
+                                ? Colors.red.withValues(alpha: 0.35)
+                                : const Color(0xFFFECACA),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withValues(alpha: 0.04),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(4),
+                                  decoration: BoxDecoration(
+                                    color: Colors.red.withValues(alpha: 0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.error_outline_rounded,
+                                    size: 16,
+                                    color: Colors.red[700],
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Reason for Rejection',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: theme.brightness == Brightness.dark
+                                        ? Colors.red[300]
+                                        : const Color(0xFFB91C1C),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              widget.report.rejectionReason.trim(),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                height: 1.4,
+                                color: theme.brightness == Brightness.dark
+                                    ? Colors.white.withValues(alpha: 0.9)
+                                    : const Color(0xFF991B1B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 24),
 
                     // Product Name
@@ -161,10 +234,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           widget.report.frontImageUrl,
                           fit: BoxFit.cover,
                           cacheWidth: 600,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             height: 200,
                             decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Center(
@@ -181,7 +254,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       Container(
                         height: 200,
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(
@@ -211,10 +284,10 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                           widget.report.backImageUrl,
                           fit: BoxFit.cover,
                           cacheWidth: 600,
-                          errorBuilder: (_, __, ___) => Container(
+                          errorBuilder: (_, _, _) => Container(
                             height: 200,
                             decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Center(
@@ -231,7 +304,7 @@ class _ReportDetailScreenState extends State<ReportDetailScreen> {
                       Container(
                         height: 200,
                         decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Center(

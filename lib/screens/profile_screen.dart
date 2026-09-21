@@ -327,7 +327,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (_isDeletingAccount)
           Positioned.fill(
             child: ColoredBox(
-              color: colorScheme.surface.withOpacity(0.7),
+              color: colorScheme.surface.withValues(alpha: 0.7),
               child: Center(
                 child: CircularProgressIndicator(
                   color: primaryColor,
@@ -432,13 +432,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Visible soft elevation instead of an outline.
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.18),
+            color: colorScheme.shadow.withValues(alpha: 0.18),
             blurRadius: 18,
             spreadRadius: 0,
             offset: const Offset(0, 7),
           ),
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.06),
+            color: colorScheme.shadow.withValues(alpha: 0.06),
             blurRadius: 5,
             spreadRadius: 0,
             offset: const Offset(0, 2),
@@ -464,7 +464,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ? AssetImage(_avatar!)
                             : null,
                     onBackgroundImageError:
-                        _avatar != null ? (_, __) {} : null,
+                        _avatar != null ? (_, _) {} : null,
                     child:
                         _avatar == null
                             ? Icon(
@@ -489,7 +489,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         // Replaced with a soft floating shadow.
                         boxShadow: [
                           BoxShadow(
-                            color: colorScheme.shadow.withOpacity(0.22),
+                            color: colorScheme.shadow.withValues(alpha: 0.22),
                             blurRadius: 7,
                             offset: const Offset(0, 3),
                           ),
@@ -525,7 +525,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             style: TextStyle(
               fontSize: 14,
               color:
-                  colorScheme.onPrimaryContainer.withOpacity(0.8),
+                  colorScheme.onPrimaryContainer.withValues(alpha: 0.8),
             ),
           ),
         ],
@@ -545,13 +545,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         // Soft visible elevation.
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.18),
+            color: colorScheme.shadow.withValues(alpha: 0.18),
             blurRadius: 18,
             spreadRadius: 0,
             offset: const Offset(0, 7),
           ),
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.06),
+            color: colorScheme.shadow.withValues(alpha: 0.06),
             blurRadius: 5,
             spreadRadius: 0,
             offset: const Offset(0, 2),
@@ -595,13 +595,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.18),
+            color: colorScheme.shadow.withValues(alpha: 0.18),
             blurRadius: 18,
             spreadRadius: 0,
             offset: const Offset(0, 7),
           ),
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.06),
+            color: colorScheme.shadow.withValues(alpha: 0.06),
             blurRadius: 5,
             spreadRadius: 0,
             offset: const Offset(0, 2),
@@ -735,13 +735,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.18),
+            color: colorScheme.shadow.withValues(alpha: 0.18),
             blurRadius: 18,
             spreadRadius: 0,
             offset: const Offset(0, 7),
           ),
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.06),
+            color: colorScheme.shadow.withValues(alpha: 0.06),
             blurRadius: 5,
             spreadRadius: 0,
             offset: const Offset(0, 2),
@@ -1155,7 +1155,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     'theme': theme,
                   });
                 },
-                activeColor: primaryColor,
+                activeThumbColor: primaryColor,
               );
             },
           ),
@@ -1204,35 +1204,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 12),
 
           ValueListenableBuilder<bool>(
-            valueListenable:
-                AuthService.mfaNotifier,
-            builder: (
-              context,
-              mfaEnabled,
-              _,
-            ) {
+            valueListenable: AuthService.mfaNotifier,
+            builder: (_, mfaEnabled, _) {
               return Switch(
                 value: mfaEnabled,
                 onChanged: (value) async {
                   HapticService().vibrate();
-
-                  final hasInternet =
-                      await SuccessFeedbackUtils
-                          .hasInternetConnection();
-
+                  final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+                  if (!mounted) return;
                   if (!hasInternet) {
-                    if (mounted) {
-                      await SuccessFeedbackUtils
-                          .showOfflineNoticeDialog(
-                        context,
-                        title:
-                            loc.noInternetTitle,
-                        message:
-                            loc.noInternetActionMessage,
-                        buttonText: loc.gotIt,
-                      );
-                    }
-
+                    await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                      context,
+                      title: loc.noInternetTitle,
+                      message: loc.noInternetActionMessage,
+                      buttonText: loc.gotIt,
+                    );
                     return;
                   }
 
@@ -1245,24 +1231,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       enabled: value,
                     );
                   } catch (_) {
-                    setState(() {
-                      _mfaEnabled = !value;
-                    });
-
-                    if (mounted) {
-                      await SuccessFeedbackUtils
-                          .showOfflineNoticeDialog(
-                        context,
-                        title:
-                            loc.noInternetTitle,
-                        message:
-                            loc.noInternetActionMessage,
-                        buttonText: loc.gotIt,
-                      );
-                    }
+                    if (!mounted) return;
+                    setState(() => _mfaEnabled = !value);
+                    await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                      context,
+                      title: loc.noInternetTitle,
+                      message: loc.noInternetActionMessage,
+                      buttonText: loc.gotIt,
+                    );
                   }
                 },
-                activeColor: primaryColor,
+                activeThumbColor: primaryColor,
               );
             },
           ),
@@ -1309,63 +1288,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 12),
 
           ValueListenableBuilder<bool>(
-            valueListenable:
-                VoiceAssistantService
-                    .isEnabledNotifier,
-            builder: (
-              context,
-              isVoiceEnabled,
-              _,
-            ) {
+            valueListenable: VoiceAssistantService.isEnabledNotifier,
+            builder: (_, isVoiceEnabled, _) {
               return Switch(
                 value: isVoiceEnabled,
                 onChanged: (value) async {
                   HapticService().vibrate();
-
-                  final previous =
-                      isVoiceEnabled;
-
-                  setState(() {
-                    _voiceAssistantEnabled =
-                        value;
-                  });
-
-                  await VoiceAssistantService
-                      .instance
-                      .updateEnabled(value);
-
-                  final ok =
-                      await _updateUserPreference(
-                    'voiceAssistant',
-                    value,
-                  );
-
+                  final previous = isVoiceEnabled;
+                  setState(() => _voiceAssistantEnabled = value);
+                  await VoiceAssistantService.instance.updateEnabled(value);
+                  final ok = await _updateUserPreference('voiceAssistant', value);
+                  if (!mounted) return;
                   if (!ok) {
-                    setState(() {
-                      _voiceAssistantEnabled =
-                          previous;
-                    });
-
-                    await VoiceAssistantService
-                        .instance
-                        .updateEnabled(
-                      previous,
-                    );
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(
-                        context,
-                      ).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            loc.preferenceSaveError,
-                          ),
-                        ),
-                      );
-                    }
+                    // revert and inform
+                    setState(() => _voiceAssistantEnabled = previous);
+                    await VoiceAssistantService.instance.updateEnabled(previous);
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
                   }
                 },
-                activeColor: primaryColor,
+                activeThumbColor: primaryColor,
               );
             },
           ),
@@ -1490,7 +1432,7 @@ class _DeleteAccountDialogContentState
               hintStyle: TextStyle(
                 color: colorScheme
                     .onSurfaceVariant
-                    .withOpacity(0.5),
+                    .withValues(alpha: 0.5),
               ),
               border: InputBorder.none,
               errorText: _errorMessage,
@@ -1735,7 +1677,7 @@ class _ReauthDialogContentState
                   // Visible shadow instead of an outline.
                   elevation: 3,
                   shadowColor: colorScheme.shadow
-                      .withOpacity(0.22),
+                      .withValues(alpha: 0.22),
 
                   shape:
                       RoundedRectangleBorder(
@@ -1769,7 +1711,7 @@ class _ReauthDialogContentState
                 hintStyle: TextStyle(
                   color: colorScheme
                       .onSurfaceVariant
-                      .withOpacity(0.5),
+                      .withValues(alpha: 0.5),
                 ),
                 border: InputBorder.none,
                 errorText: _errorMessage,

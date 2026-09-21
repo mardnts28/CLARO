@@ -160,13 +160,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return [
       BoxShadow(
-        color: Colors.black.withOpacity(isDark ? 0.50 : 0.14),
+        color: Colors.black.withValues(alpha: isDark ? 0.50 : 0.14),
         blurRadius: 14,
         spreadRadius: 0,
         offset: const Offset(0, 5),
       ),
       BoxShadow(
-        color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
+        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
         blurRadius: 4,
         spreadRadius: 0,
         offset: const Offset(0, 1.5),
@@ -514,7 +514,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                       ),
                                     );
                                   },
-                                  errorBuilder: (_, __, ___) => Icon(
+                                  errorBuilder: (_, _, _) => Icon(
                                       Icons.inventory_2_outlined,
                                       color: colorScheme.primary,
                                       size: 30),
@@ -556,7 +556,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       isFavorite ? Icons.favorite : Icons.favorite_border,
                       color: isFavorite
                           ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant.withOpacity(0.4),
+                          : colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
                       size: 22,
                     ),
                   ),
@@ -669,7 +669,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 child: Container(
                   width: 52,
                   height: 52,
-                  color: colorScheme.primary.withOpacity(0.12),
+                  color: colorScheme.primary.withValues(alpha: 0.12),
                   child: Center(
                     child: Icon(
                       Icons.compare_arrows_rounded,
@@ -721,14 +721,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final status = report.status.toLowerCase();
 
     if (status == 'approved') {
-      statusBg = Colors.green.withOpacity(0.15);
+      statusBg = Colors.green.withValues(alpha: 0.15);
       statusText = Colors.green[700]!;
     } else if (status == 'rejected') {
-      statusBg = Colors.red.withOpacity(0.15);
+      statusBg = Colors.red.withValues(alpha: 0.15);
       statusText = Colors.red[700]!;
     } else {
       // pending
-      statusBg = Colors.orange.withOpacity(0.15);
+      statusBg = Colors.orange.withValues(alpha: 0.15);
       statusText = Colors.orange[800]!;
     }
 
@@ -857,8 +857,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
         boxShadow: [
           BoxShadow(
             color: theme.brightness == Brightness.dark
-                ? Colors.black.withOpacity(0.25)
-                : Colors.black.withOpacity(0.05),
+                ? Colors.black.withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.05),
             blurRadius: 12,
             offset: const Offset(0, -2),
           ),
@@ -1056,7 +1056,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                     borderRadius: BorderRadius.circular(24),
                   ),
                   child: Row(
@@ -1123,8 +1123,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               boxShadow: isActive
                                   ? [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(
-                                          theme.brightness == Brightness.dark
+                                        color: Colors.black.withValues(
+                                          alpha: theme.brightness == Brightness.dark
                                               ? 0.45
                                               : 0.16,
                                         ),
@@ -1255,7 +1255,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.history,
-                color: colorScheme.primary.withOpacity(0.2), size: 72),
+                color: colorScheme.primary.withValues(alpha: 0.2), size: 72),
             const SizedBox(height: 20),
             Text(
               message,

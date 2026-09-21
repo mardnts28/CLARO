@@ -543,8 +543,9 @@ class AuthService {
       if (!otpDoc.exists) return 'This verification code has expired.';
       final data = otpDoc.data();
       if (data == null) return 'This verification code has expired.';
-      if ((data['attempts'] as int? ?? 0) >= 5)
+      if ((data['attempts'] as int? ?? 0) >= 5) {
         return 'Too many failed attempts. Please log in again.';
+      }
       final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate();
       if (expiresAt == null || expiresAt.isBefore(DateTime.now())) {
         await otpDoc.reference.delete();

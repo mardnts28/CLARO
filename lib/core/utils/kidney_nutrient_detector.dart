@@ -107,31 +107,31 @@ class KidneyNutrientDetector {
       final facts = product.nutritionalFacts;
 
       // Sodium
-      if (facts.sodiumMg != null && facts.sodiumMg! > 0) {
+      if (facts.sodiumMg > 0) {
         nutrients.add(
           KidneyNutrientMatch(
             type: KidneyNutrientType.sodium,
-            valuePerServing: facts.sodiumMg!,
+            valuePerServing: facts.sodiumMg,
           ),
         );
       }
 
       // Potassium
-      if (facts.potassiumMg != null && facts.potassiumMg! > 0) {
+      if (facts.potassiumMg > 0) {
         nutrients.add(
           KidneyNutrientMatch(
             type: KidneyNutrientType.potassium,
-            valuePerServing: facts.potassiumMg!,
+            valuePerServing: facts.potassiumMg,
           ),
         );
       }
 
       // Protein
-      if (facts.proteinG != null && facts.proteinG! > 0) {
+      if (facts.proteinG > 0) {
         nutrients.add(
           KidneyNutrientMatch(
             type: KidneyNutrientType.protein,
-            valuePerServing: facts.proteinG!,
+            valuePerServing: facts.proteinG,
           ),
         );
       }

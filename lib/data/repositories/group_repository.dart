@@ -155,9 +155,8 @@ abstract class GroupRepository {
 }
 
 class FirebaseGroupRepository implements GroupRepository {
-  FirebaseGroupRepository({FirebaseFirestore? firestore, UserRepository? userRepository})
-      : _firestore = firestore ?? FirebaseFirestore.instance,
-        _userRepository = userRepository;
+  FirebaseGroupRepository({FirebaseFirestore? firestore, this._userRepository})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
   // Injected lazily via BackendLocator (see backend_locator.dart patch) to
@@ -380,7 +379,7 @@ class FirebaseGroupRepository implements GroupRepository {
       _firestore.collection('users').doc(joiningUid),
       {
         'memberOfGroupIds': FieldValue.arrayUnion([groupId]),
-        if (avatar != null) 'avatar': avatar,
+        'avatar': ?avatar,
       },
       SetOptions(merge: true),
     );

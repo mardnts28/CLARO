@@ -22,13 +22,13 @@ List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) 
   final isDark = theme.brightness == Brightness.dark;
   return [
     BoxShadow(
-      color: Colors.black.withOpacity(isDark ? 0.48 : 0.16),
+      color: Colors.black.withValues(alpha: isDark ? 0.48 : 0.16),
       blurRadius: blur,
       spreadRadius: 0,
       offset: Offset(0, dy),
     ),
     BoxShadow(
-      color: Colors.black.withOpacity(isDark ? 0.24 : 0.07),
+      color: Colors.black.withValues(alpha: isDark ? 0.24 : 0.07),
       blurRadius: blur * 0.45,
       spreadRadius: 0,
       offset: Offset(0, dy * 0.35),
@@ -40,7 +40,7 @@ List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) 
 /// background). Needed because a BoxShadow shows through translucent fills,
 /// so tinted containers that now carry a shadow must have an opaque fill.
 Color _tint(ThemeData theme, Color tint, double opacity) =>
-    Color.alphaBlend(tint.withOpacity(opacity), theme.scaffoldBackgroundColor);
+    Color.alphaBlend(tint.withValues(alpha: opacity), theme.scaffoldBackgroundColor);
 
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
@@ -382,7 +382,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: products.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(height: 10),
                           itemBuilder: (context, i) {
                             final product = products[i];
@@ -415,9 +415,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                             backgroundColor: colorScheme.primary,
                             foregroundColor: colorScheme.onPrimary,
                             disabledBackgroundColor: colorScheme.primary
-                                .withOpacity(0.3),
+                                .withValues(alpha: 0.3),
                             disabledForegroundColor: colorScheme.onPrimary
-                                .withOpacity(0.7),
+                                .withValues(alpha: 0.7),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -764,7 +764,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         16 + MediaQuery.of(context).padding.bottom + 24,
                       ),
                       itemCount: _ranked.length + 1,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
+                      separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, i) {
                         if (i == _ranked.length) {
                           return _buildAddProductButton();
@@ -846,8 +846,8 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         boxShadow: [
           BoxShadow(
             color: theme.brightness == Brightness.dark
-                ? Colors.black.withOpacity(0.25)
-                : Colors.black.withOpacity(0.10),
+                ? Colors.black.withValues(alpha: 0.25)
+                : Colors.black.withValues(alpha: 0.10),
             blurRadius: 12,
             offset: const Offset(0, -2),
           ),

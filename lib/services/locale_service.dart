@@ -80,12 +80,10 @@ class LocaleService {
         explicitlySelected = prefs.getBool(_languageSelectedPrefKey) ?? false;
       }
 
-      if (code == null) {
-        code = prefs.getString(_prefKey);
-      }
+      code ??= prefs.getString(_prefKey);
 
       if (code == null) {
-        final sys = window.locale;
+        final sys = PlatformDispatcher.instance.locale;
         code = sys.languageCode == 'tl' ? 'tl' : 'en';
       }
 

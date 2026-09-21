@@ -79,11 +79,15 @@ class _ThemeScreenState extends State<ThemeScreen> {
         // reload server value to be sure
         await _load();
         setAppThemeMode(parseThemeMode(theme));
-        if (mounted) SuccessFeedbackUtils.showSuccessSnackBar(context, loc.themeSaved);
+        if (mounted) {
+          SuccessFeedbackUtils.showSuccessSnackBar(context, loc.themeSaved);
+        }
       } else {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.themeSaveError)),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(loc.themeSaveError)),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Error saving theme: $e');

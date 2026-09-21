@@ -125,6 +125,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         AuthService.pendingMfaChallenge.value = null;
         AuthService.isAuthenticating.value = false;
         await _authService.signOut();
+        if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -270,13 +271,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
                           color: _remainingSeconds <= 10
-                              ? Colors.red.withOpacity(0.1)
-                              : colorScheme.primary.withOpacity(0.1),
+                              ? Colors.red.withValues(alpha: 0.1)
+                              : colorScheme.primary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: _remainingSeconds <= 10
                                 ? Colors.red
-                                : colorScheme.primary.withOpacity(0.3),
+                                : colorScheme.primary.withValues(alpha: 0.3),
                             width: 1,
                           ),
                         ),
@@ -308,7 +309,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.1),
+                          color: Colors.red.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: Colors.red,

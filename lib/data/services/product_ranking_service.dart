@@ -24,8 +24,7 @@ import '../../core/constants/who_fda_thresholds.dart';
 const int kMaxProductsPerRanking = 5;
 
 class ProductRankingService {
-  ProductRankingService({required GeminiAdvisoryService geminiService})
-    : _geminiService = geminiService;
+  ProductRankingService({required this._geminiService});
 
   final GeminiAdvisoryService _geminiService;
 

@@ -162,7 +162,7 @@ class WhoCalculator {
 
         // If keyword doesn't end with 's', try with 's' added
         if (!keyword.toLowerCase().endsWith('s')) {
-          final plural = keyword.toLowerCase() + 's';
+          final plural = '${keyword.toLowerCase()}s';
           final pluralPattern = RegExp(
             r'(?<![a-z])' + RegExp.escape(plural) + r'(?![a-z])',
           );
@@ -541,10 +541,12 @@ class WhoCalculator {
 
   static AdvisoryLevel _worstLevel(List<AdvisoryLevel> evals) {
     if (evals.isEmpty) return AdvisoryLevel.suitable;
-    if (evals.any((e) => e == AdvisoryLevel.caution))
+    if (evals.any((e) => e == AdvisoryLevel.caution)) {
       return AdvisoryLevel.caution;
-    if (evals.any((e) => e == AdvisoryLevel.moderate))
+    }
+    if (evals.any((e) => e == AdvisoryLevel.moderate)) {
       return AdvisoryLevel.moderate;
+    }
     return AdvisoryLevel.suitable;
   }
 

@@ -17,9 +17,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   final _authService = AuthService();
   bool _isLoading = false;
+  bool _emailSent = false;
   String? _emailError;
 
-  Future<void> _requestCode() async {
+  Future<void> _handlePasswordReset() async {
     final loc = AppLocalizations.of(context)!;
     final email = _emailController.text.trim();
 
@@ -31,19 +32,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _emailError = null);
 
     setState(() => _isLoading = true);
-    final result = await _authService.requestPasswordResetOtp(email: email);
+    final error = await _authService.sendPasswordResetEmail(email: email);
     if (!mounted) return;
     setState(() => _isLoading = false);
-    if (result['error'] != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['error'] as String)));
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
 
-    SuccessFeedbackUtils.showSuccessSnackBar(
-      context,
-      'A password reset email has been sent to your inbox. Please follow the link to create a new password.',
-    );
-    if (mounted) Navigator.pop(context);
+    setState(() => _emailSent = true);
+    SuccessFeedbackUtils.showSuccessSnackBar(context, loc.emailSent);
   }
 
   @override
@@ -135,7 +133,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               ),
                             ),
                             Text(
-                              'Enter your email address and we will send a password reset link to your inbox.',
+                              'Enter your email address and we will send you a link to reset your password.',
                               style: TextStyle(
                                 fontSize: 13,
                                 color: colorScheme.onSurfaceVariant,
@@ -148,7 +146,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                               controller: _emailController,
                               hint: 'Email',
                               icon: Icons.email_outlined,
-                              errorText: _emailError,
+                              enabled: !_emailSent,
                             ),
                             const SizedBox(height: 20),
                             SizedBox(
@@ -161,7 +159,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                 ),
-                                onPressed: _isLoading ? null : _requestCode,
+                                onPressed: _isLoading || _emailSent
+                                  ? null
+                                  : _handlePasswordReset,
                                 child: _isLoading
                                     ? const SizedBox(
                                         height: 20,
@@ -171,9 +171,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Text(
-                                        'Send Reset Link',
-                                        style: TextStyle(
+                                    : Text(
+                                      _emailSent ? 'Email Sent' : 'Send Reset Link',
+                                      style: const TextStyle(
                                           fontSize: 16,
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
@@ -181,13 +181,49 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                                       ),
                               ),
                             ),
+                            if (_emailSent) ...[
+                              const SizedBox(height: 20),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.green.shade300),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(Icons.check_circle, color: Colors.green.shade700),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Check your email',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Follow the link in your email to reset your password.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.green.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                             const SizedBox(height: 20),
                             SizedBox(
                               width: double.infinity,
                               child: TextButton(
                                 onPressed: () => Navigator.pop(context),
                                 child: Text(
-                                    'Remember your password? Back to Login',
+                                  _emailSent
+                                      ? 'Back to Login'
+                                      : 'Remember your password? Back to Login',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 14,

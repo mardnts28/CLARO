@@ -286,7 +286,7 @@ class _GroupScreenState extends State<GroupScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 32),
       children: [
         const SizedBox(height: 60),
-        Icon(Icons.group_outlined, size: 56, color: colorScheme.onSurfaceVariant.withOpacity(0.5)),
+        Icon(Icons.group_outlined, size: 56, color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5)),
         const SizedBox(height: 16),
         Text(
           loc.noGroupYet,
@@ -355,6 +355,8 @@ class _GroupScreenState extends State<GroupScreen> {
               return;
             }
 
+            if (!mounted) return;
+
             // Show confirmation dialog
             final confirmed = await showDialog<bool>(
               context: context,
@@ -376,7 +378,7 @@ class _GroupScreenState extends State<GroupScreen> {
 
             if (confirmed == true) {
               try {
-                await _groupRepository.deleteGroup(groupId: group.id, requestingUid: uid!);
+                await _groupRepository.deleteGroup(groupId: group.id, requestingUid: uid);
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text(loc.deleteGroupSuccess)),
@@ -421,7 +423,7 @@ class _GroupScreenState extends State<GroupScreen> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.12),
+                      color: colorScheme.primary.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     // The group's chosen type icon replaces the placeholder;
