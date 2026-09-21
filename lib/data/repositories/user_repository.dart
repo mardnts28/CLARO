@@ -103,6 +103,15 @@ class FirebaseUserRepository implements UserRepository {
     if (idToken == null) {
       throw Exception('No authenticated user; cannot fetch health profile');
     }
+    // The Worker's /health-profile route returns the CALLER's decrypted data
+    // no matter which userId was asked for here. Using it for anyone else
+    // would cache the logged-in user's conditions under another user's id.
+    // Other members' profiles must come from GroupRepository (the group
+    // endpoint, keyed by that member's own uid).
+    if (FirebaseAuth.instance.currentUser?.uid != userId) {
+      throw Exception('getHealthProfile is only valid for the signed-in user; '
+          'use GroupRepository.getGroupHealthProfiles for other members');
+    }
 
     Map<String, dynamic> healthData = {};
     try {

@@ -8,6 +8,9 @@ import '../constants/who_fda_thresholds.dart';
 import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
 import '../../models/product_model.dart';
+import 'gerd_trigger_detector.dart';
+import 'kidney_nutrient_detector.dart';
+import 'nutrition_availability.dart';
 
 class WhoCalculator {
   // Classify nutrient based on WHO daily limit percentage per serving
@@ -54,7 +57,10 @@ class WhoCalculator {
     }
   }
 
-  static AllergenAssessment assessAllergens(Product product, UserHealthProfile user) {
+  static AllergenAssessment assessAllergens(
+    Product product,
+    UserHealthProfile user,
+  ) {
     final matchedAllergens = <AllergenType>[];
     final matchedIngredientStrings = <String>[];
     final ingredientSources = <AllergenIngredientMatch>[];
@@ -81,7 +87,8 @@ class WhoCalculator {
             )
           : null;
 
-      final hasIngredientEvidence = directIngredient != null || derivedIngredient != null;
+      final hasIngredientEvidence =
+          directIngredient != null || derivedIngredient != null;
 
       // Only flag allergens when there's explicit ingredient evidence.
       // Label declarations alone are not sufficient for a caution warning.
@@ -90,18 +97,22 @@ class WhoCalculator {
       matchedAllergens.add(allergy);
 
       if (directIngredient != null) {
-        ingredientSources.add(AllergenIngredientMatch(
-          allergen: allergy,
-          ingredient: directIngredient,
-          matchType: AllergenMatchType.direct,
-        ));
+        ingredientSources.add(
+          AllergenIngredientMatch(
+            allergen: allergy,
+            ingredient: directIngredient,
+            matchType: AllergenMatchType.direct,
+          ),
+        );
         matchedIngredientStrings.add(directIngredient);
       } else if (derivedIngredient != null) {
-        ingredientSources.add(AllergenIngredientMatch(
-          allergen: allergy,
-          ingredient: derivedIngredient,
-          matchType: AllergenMatchType.derived,
-        ));
+        ingredientSources.add(
+          AllergenIngredientMatch(
+            allergen: allergy,
+            ingredient: derivedIngredient,
+            matchType: AllergenMatchType.derived,
+          ),
+        );
         matchedIngredientStrings.add(derivedIngredient);
       }
     }
@@ -135,17 +146,20 @@ class WhoCalculator {
           r'(?<![a-z])' + RegExp.escape(keyword.toLowerCase()) + r'(?![a-z])',
         );
         if (pattern.hasMatch(lower)) return ingredient;
-        
+
         // Try plural/singular variations
         // If keyword ends with 's', try without 's'
         if (keyword.toLowerCase().endsWith('s')) {
-          final singular = keyword.toLowerCase().substring(0, keyword.length - 1);
+          final singular = keyword.toLowerCase().substring(
+            0,
+            keyword.length - 1,
+          );
           final singularPattern = RegExp(
             r'(?<![a-z])' + RegExp.escape(singular) + r'(?![a-z])',
           );
           if (singularPattern.hasMatch(lower)) return ingredient;
         }
-        
+
         // If keyword doesn't end with 's', try with 's' added
         if (!keyword.toLowerCase().endsWith('s')) {
           final plural = keyword.toLowerCase() + 's';
@@ -166,17 +180,88 @@ class WhoCalculator {
   static List<String> _getDirectAllergenKeywords(AllergenType allergen) {
     switch (allergen) {
       case AllergenType.shellfish:
-        return ['shellfish', 'shrimp', 'prawn', 'crab', 'lobster', 'squid', 'clams', 'mussels', 'oysters', 'scallops', 'octopus', 'abalone', 'snail', 'crustacean', 'lamang dagat', 'lamang-dagat'];
+        return [
+          'shellfish',
+          'shrimp',
+          'prawn',
+          'crab',
+          'lobster',
+          'squid',
+          'clams',
+          'mussels',
+          'oysters',
+          'scallops',
+          'octopus',
+          'abalone',
+          'snail',
+          'crustacean',
+          'lamang dagat',
+          'lamang-dagat',
+        ];
       case AllergenType.fish:
-        return ['fish', 'isda', 'anchovy', 'anchovies', 'mackerel', 'mackarel', 'tuna', 'salmon', 'cod', 'trout', 'sardine', 'sardines', 'bangus', 'tilapia'];
+        return [
+          'fish',
+          'isda',
+          'anchovy',
+          'anchovies',
+          'mackerel',
+          'mackarel',
+          'tuna',
+          'salmon',
+          'cod',
+          'trout',
+          'sardine',
+          'sardines',
+          'bangus',
+          'tilapia',
+        ];
       case AllergenType.peanuts:
-        return ['peanut', 'peanuts', 'mani', 'groundnut', 'arachis', 'mandelonas'];
+        return [
+          'peanut',
+          'peanuts',
+          'mani',
+          'groundnut',
+          'arachis',
+          'mandelonas',
+        ];
       case AllergenType.treeNuts:
-        return ['tree nut', 'tree nuts', 'almond', 'walnut', 'cashew', 'pecan', 'hazelnut', 'pistachio', 'macadamia', 'brazil nut', 'pine nut'];
+        return [
+          'tree nut',
+          'tree nuts',
+          'almond',
+          'walnut',
+          'cashew',
+          'pecan',
+          'hazelnut',
+          'pistachio',
+          'macadamia',
+          'brazil nut',
+          'pine nut',
+        ];
       case AllergenType.soy:
-        return ['soy', 'soya', 'soybean', 'tofu', 'tempeh', 'tamari', 'shoyu', 'edamame', 'miso', 'natto', 'okara'];
+        return [
+          'soy',
+          'soya',
+          'soybean',
+          'tofu',
+          'tempeh',
+          'tamari',
+          'shoyu',
+          'edamame',
+          'miso',
+          'natto',
+          'okara',
+        ];
       case AllergenType.dairy:
-        return ['milk', 'dairy', 'cream', 'cheese', 'yogurt', 'butter', 'gatas'];
+        return [
+          'milk',
+          'dairy',
+          'cream',
+          'cheese',
+          'yogurt',
+          'butter',
+          'gatas',
+        ];
       case AllergenType.eggs:
         return ['egg', 'eggs', 'itlog'];
       case AllergenType.wheatGluten:
@@ -199,7 +284,15 @@ class WhoCalculator {
       case AllergenType.shellfish:
         return [];
       case AllergenType.fish:
-        return ['surimi', 'bonito', 'katsuobushi', 'worcestershire', 'fish sauce', 'patis', 'fish oil'];
+        return [
+          'surimi',
+          'bonito',
+          'katsuobushi',
+          'worcestershire',
+          'fish sauce',
+          'patis',
+          'fish oil',
+        ];
       // Peanut-derived ingredients (e.g. "Peanut Oil") already contain the
       // word "peanut" and are caught by the DIRECT keyword list above, per
       // the module spec: an ingredient name that explicitly contains the
@@ -215,13 +308,28 @@ class WhoCalculator {
       case AllergenType.eggs:
         return ['albumin', 'ovalbumin', 'mayonnaise', 'meringue'];
       case AllergenType.wheatGluten:
-        return ['gluten', 'wheat flour', 'malt', 'semolina', 'durum', 'farina', 'seitan'];
+        return [
+          'gluten',
+          'wheat flour',
+          'malt',
+          'semolina',
+          'durum',
+          'farina',
+          'seitan',
+        ];
       case AllergenType.msg:
-        return ['yeast extract', 'autolyzed yeast', 'hydrolyzed vegetable protein'];
+        return [
+          'yeast extract',
+          'autolyzed yeast',
+          'hydrolyzed vegetable protein',
+        ];
     }
   }
 
-  static ProductEvaluation evaluateProduct(Product product, UserHealthProfile user) {
+  static ProductEvaluation evaluateProduct(
+    Product product,
+    UserHealthProfile user,
+  ) {
     final nutrientEvals = <NutrientEvaluation>[];
 
     // Ranking basis: per-100g. Kept separate from nutrientEvals/level above
@@ -233,41 +341,158 @@ class WhoCalculator {
     // product's rank and its red/green/neutral comparison cells are
     // always derived from the same numbers.
     int riskScore = 0;
+    final scoredFactors = <ScoredFactorEvaluation>[];
+    final evaluatedNutrientKeys = <String>{};
 
     for (final condition in user.conditions) {
-      final nutrientKeys = ConditionThresholds.thresholds[condition]?.keys ?? const <String>[];
+      final nutrientKeys =
+          ConditionThresholds.thresholds[condition]?.keys ?? const <String>[];
       for (final key in nutrientKeys) {
+        // Sodium is shared by hypertension and kidney disease; score it once.
+        if (!evaluatedNutrientKeys.add(key)) continue;
         final valuePer100g = readNutrientValue(product.nutritionPer100g, key);
-        
+
         // Calculate per-serving value
         final valuePerServing = (valuePer100g / 100) * product.servingSizeG;
-        
+
         // Get WHO daily limit for this nutrient
         final whoDailyLimit = getWhoDailyLimit(key);
-        
+
         // Calculate percentage of WHO daily limit per serving
         final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
-        
+
         // Classify based on WHO percentage, per serving -- this is the
         // health advisory basis: what a person actually eats in one
         // sitting is what should drive the advisory text/warning level
         // for a single product.
         final level = classifyByWhoPercentage(whoPercentage);
-        
-        nutrientEvals.add(NutrientEvaluation(
-          condition: condition,
-          nutrientKey: key,
-          valuePer100g: valuePer100g,
-          valuePerServing: valuePerServing,
-          whoDailyLimitPercentage: whoPercentage,
-          level: level,
-        ));
+
+        nutrientEvals.add(
+          NutrientEvaluation(
+            condition: condition,
+            nutrientKey: key,
+            valuePer100g: valuePer100g,
+            valuePerServing: valuePerServing,
+            whoDailyLimitPercentage: whoPercentage,
+            level: level,
+          ),
+        );
 
         // Ranking basis: per-100g band classification, independent of
         // this product's own serving size.
         final rankingLevel = classifyNutrient(condition, key, valuePer100g);
-        riskScore += RiskScoring.points[rankingLevel] ?? 0;
+        final nutritionKnown = NutritionAvailability.isAvailable(product);
+        final points = nutritionKnown
+            ? (RiskScoring.points[rankingLevel] ?? 2)
+            : 2;
+        riskScore += points;
+        scoredFactors.add(
+          ScoredFactorEvaluation(
+            factorKey: key,
+            conditions: user.conditions
+                .where(
+                  (c) =>
+                      ConditionThresholds.thresholds[c]?.containsKey(key) ??
+                      false,
+                )
+                .toList(),
+            status: nutritionKnown
+                ? ScoringStatus.known
+                : ScoringStatus.unknown,
+            level: nutritionKnown ? rankingLevel : AdvisoryLevel.moderate,
+            points: points,
+            explanation: nutritionKnown
+                ? 'Evaluated from the product nutrition facts.'
+                : 'Not enough nutrition information to evaluate this factor.',
+            valuePerServing: valuePerServing,
+          ),
+        );
       }
+    }
+
+    if (user.hasKidneyDisease) {
+      final kidney = KidneyNutrientDetector.detect(product);
+      final ingredientDataKnown = kidney.hasIngredientData;
+      final hasPhosphate = kidney.nutrients.any(
+        (n) => n.type == KidneyNutrientType.phosphorus,
+      );
+      final points = !ingredientDataKnown ? 2 : (hasPhosphate ? 3 : 1);
+      scoredFactors.add(
+        ScoredFactorEvaluation(
+          factorKey: 'phosphateAdditives',
+          conditions: const [HealthCondition.kidneyDisease],
+          status: ingredientDataKnown
+              ? ScoringStatus.known
+              : ScoringStatus.unknown,
+          level: !ingredientDataKnown
+              ? AdvisoryLevel.moderate
+              : (hasPhosphate ? AdvisoryLevel.caution : AdvisoryLevel.suitable),
+          points: points,
+          explanation: !ingredientDataKnown
+              ? 'Not enough information to determine whether phosphate additives are present.'
+              : hasPhosphate
+              ? 'Phosphate additive detected in the ingredient list.'
+              : 'No phosphate additive detected in the ingredient list.',
+        ),
+      );
+      riskScore += points;
+    }
+
+    if (user.hasGerd) {
+      final gerd = GerdTriggerDetector.detect(product);
+      final nutritionKnown = NutritionAvailability.isAvailable(product);
+      final fatDetected = gerd.triggers.any(
+        (t) => t.type == GerdTriggerType.highFat,
+      );
+      final fatPoints = !nutritionKnown ? 2 : (fatDetected ? 3 : 1);
+      scoredFactors.add(
+        ScoredFactorEvaluation(
+          factorKey: 'gerdTotalFat',
+          conditions: const [HealthCondition.gerd],
+          status: nutritionKnown ? ScoringStatus.known : ScoringStatus.unknown,
+          level: !nutritionKnown
+              ? AdvisoryLevel.moderate
+              : (fatDetected ? AdvisoryLevel.caution : AdvisoryLevel.suitable),
+          points: fatPoints,
+          explanation: !nutritionKnown
+              ? 'Not enough nutrition information to evaluate total fat for GERD.'
+              : fatDetected
+              ? 'Total fat meets the existing high-fat reference used by CLARO.'
+              : 'Total fat is below the existing high-fat reference used by CLARO.',
+          valuePerServing: nutritionKnown
+              ? product.nutritionalFacts.totalFatG
+              : null,
+        ),
+      );
+
+      final triggerMatches = gerd.triggers
+          .where((t) => t.type != GerdTriggerType.highFat)
+          .toList();
+      final triggerDataKnown = gerd.hasIngredientData;
+      final triggerPoints = !triggerDataKnown
+          ? 2
+          : (triggerMatches.isEmpty ? 1 : 3);
+      scoredFactors.add(
+        ScoredFactorEvaluation(
+          factorKey: 'gerdTriggers',
+          conditions: const [HealthCondition.gerd],
+          status: triggerDataKnown
+              ? ScoringStatus.known
+              : ScoringStatus.unknown,
+          level: !triggerDataKnown
+              ? AdvisoryLevel.moderate
+              : (triggerMatches.isEmpty
+                    ? AdvisoryLevel.suitable
+                    : AdvisoryLevel.caution),
+          points: triggerPoints,
+          explanation: !triggerDataKnown
+              ? 'Not enough ingredient information to determine whether potential GERD triggers are present.'
+              : triggerMatches.isEmpty
+              ? 'No approved GERD trigger category detected.'
+              : 'Potential GERD trigger detected; symptoms vary between people.',
+        ),
+      );
+      riskScore += fatPoints + triggerPoints;
     }
 
     final allergenAssessment = assessAllergens(product, user);
@@ -282,7 +507,10 @@ class WhoCalculator {
     // allergenOverride below).
     final overallLevel = allergenAssessment.hasDirectAllergen
         ? AdvisoryLevel.caution
-        : _worstLevel(nutrientEvals);
+        : _worstLevel([
+            ...nutrientEvals.map((e) => e.level),
+            ...scoredFactors.map((f) => f.level),
+          ]);
 
     return ProductEvaluation(
       product: product,
@@ -291,6 +519,7 @@ class WhoCalculator {
       riskScore: riskScore,
       overallLevel: overallLevel,
       allergenOverride: allergenAssessment.hasDirectAllergen,
+      scoredFactors: scoredFactors,
     );
   }
 
@@ -310,10 +539,12 @@ class WhoCalculator {
     }
   }
 
-  static AdvisoryLevel _worstLevel(List<NutrientEvaluation> evals) {
+  static AdvisoryLevel _worstLevel(List<AdvisoryLevel> evals) {
     if (evals.isEmpty) return AdvisoryLevel.suitable;
-    if (evals.any((e) => e.level == AdvisoryLevel.caution)) return AdvisoryLevel.caution;
-    if (evals.any((e) => e.level == AdvisoryLevel.moderate)) return AdvisoryLevel.moderate;
+    if (evals.any((e) => e == AdvisoryLevel.caution))
+      return AdvisoryLevel.caution;
+    if (evals.any((e) => e == AdvisoryLevel.moderate))
+      return AdvisoryLevel.moderate;
     return AdvisoryLevel.suitable;
   }
 
@@ -328,8 +559,8 @@ class WhoCalculator {
     // specifying which nutrient when multiple are evaluated -- summing all
     // evaluated nutrients is my interpretation; confirm with your adviser
     // if a single specific nutrient should be used instead.
-    double tieBreakValue(ProductEvaluation e) =>
-        e.nutrientEvaluations.fold<double>(0, (sum, ev) => sum + ev.valuePer100g);
+    double tieBreakValue(ProductEvaluation e) => e.nutrientEvaluations
+        .fold<double>(0, (sum, ev) => sum + ev.valuePer100g);
 
     evaluations.sort((a, b) {
       if (a.allergenOverride != b.allergenOverride) {

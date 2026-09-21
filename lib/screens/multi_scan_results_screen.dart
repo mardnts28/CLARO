@@ -20,13 +20,13 @@ import '../core/utils/success_feedback_utils.dart';
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
   final Map<String, int>? productCounts;
-  final bool initiallyShowTopFive;
+  final bool isSearchResult;
 
   const MultiScanResultsScreen({
     super.key,
     required this.detectedProducts,
     this.productCounts,
-    this.initiallyShowTopFive = false,
+    this.isSearchResult = false,
   });
 
   @override
@@ -35,13 +35,10 @@ class MultiScanResultsScreen extends StatefulWidget {
 
 class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   final _authService = AuthService();
-  final _searchController = TextEditingController();
 
   bool _loading = true;
-  bool _isSearching = false;
   bool _nutritionUnavailable = false;
   List<RankedProductResult> _ranked = [];
-  bool _showAllRanked = true;
 
   // Full profile (so the filter sheet knows every condition the user has)
   // and the fixed detected-products list (so re-ranking on filter change is
@@ -71,7 +68,6 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
       VoiceAssistantService.instance.announcePage('multi_scan_results');
     }
     _comparisonProducts = List.from(widget.detectedProducts);
-    _showAllRanked = !widget.initiallyShowTopFive;
     _rankProducts();
   }
 
@@ -87,7 +83,8 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
       // product's comparison too. Detect that up front and skip ranking
       // entirely rather than feed it bad data; WhoCalculator/
       // ProductRankingService themselves are untouched.
-      if (!NutritionAvailability.allAvailable(widget.detectedProducts)) {
+      if (!widget.isSearchResult &&
+          !NutritionAvailability.allAvailable(widget.detectedProducts)) {
         if (mounted) {
           setState(() {
             _nutritionUnavailable = true;
@@ -108,12 +105,11 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
               conditions: [],
               allergies: [],
             )
-          : await BackendLocator.userRepository.getHealthProfile(uid);
+          : await _loadProfileOrDefault(uid);
 
       final ranked = BackendLocator.productRankingService.rankProducts(
         products: _comparisonProducts,
         user: profile,
-        enforceMaxCap: !widget.initiallyShowTopFive,
       );
 
       if (!mounted) return;
@@ -128,82 +124,19 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     }
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _searchAnotherProduct(String rawQuery) async {
-    final query = rawQuery.trim();
-    if (query.isEmpty || _isSearching) return;
-
-    HapticService().vibrate();
-    FocusManager.instance.primaryFocus?.unfocus();
-    _searchController.clear();
-    setState(() => _isSearching = true);
-
+  Future<UserHealthProfile> _loadProfileOrDefault(String uid) async {
     try {
-      final products = await BackendLocator.productRepository.getAllProducts();
-      if (!mounted) return;
-
-      final normalizedQuery = query.toLowerCase();
-      final productMatches = products.where((product) {
-        final searchable = [
-          product.name,
-          product.brand,
-          product.variant,
-        ].join(' ').toLowerCase();
-        return searchable.contains(normalizedQuery);
-      }).toList();
-      final exactProduct = products.where((product) {
-        return [
-          product.name,
-          product.brand,
-          product.variant,
-        ].any((value) => value.trim().toLowerCase() == normalizedQuery);
-      }).toList();
-      final categoryMatches = products.where((product) {
-        return product.category.toLowerCase().contains(normalizedQuery);
-      }).toList();
-
-      if (exactProduct.length == 1) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductDetailScreen(product: exactProduct.single),
-          ),
-        );
-      } else {
-        final results = categoryMatches.isNotEmpty
-            ? categoryMatches
-            : productMatches;
-        if (results.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('No products found for "$query".')),
-          );
-        } else {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => MultiScanResultsScreen(
-                detectedProducts: results,
-                initiallyShowTopFive:
-                    categoryMatches.isNotEmpty || results.length > 5,
-              ),
-            ),
-          );
-        }
-      }
+      return await BackendLocator.userRepository.getHealthProfile(uid);
     } catch (e) {
-      debugPrint('Product search failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to search products right now.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSearching = false);
+      // Product search should still show matching products when health-profile
+      // data is temporarily unavailable; rank them without condition filters.
+      debugPrint('Health profile unavailable during product search: $e');
+      return UserHealthProfile(
+        userId: uid,
+        displayName: '',
+        conditions: const [],
+        allergies: const [],
+      );
     }
   }
 
@@ -229,7 +162,6 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     final reRanked = BackendLocator.productRankingService.rankProducts(
       products: _comparisonProducts,
       user: effectiveProfile,
-      enforceMaxCap: !widget.initiallyShowTopFive,
     );
 
     setState(() {
@@ -247,6 +179,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         return loc.conditionDiabetes;
       case HealthCondition.heartCondition:
         return loc.conditionHeartCondition;
+      case HealthCondition.gerd:
+        return loc.conditionGerd;
+      case HealthCondition.kidneyDisease:
+        return loc.conditionKidneyDisease;
     }
   }
 
@@ -291,7 +227,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                   _selectConditionFilter(value);
                 },
               ),
-              for (final condition in HealthCondition.values)
+              // Only deterministic scored conditions can re-rank products.
+              for (final condition in HealthCondition.values.where(
+                (c) => c.isScored,
+              ))
                 RadioListTile<HealthCondition?>(
                   value: condition,
                   groupValue: _selectedCondition,
@@ -575,23 +514,6 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     );
   }
 
-  Widget _buildMoreRankedButton() {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Center(
-      child: TextButton.icon(
-        onPressed: () => setState(() => _showAllRanked = true),
-        icon: const Icon(Icons.arrow_forward),
-        label: Text(
-          'More products',
-          style: GoogleFonts.outfit(
-            color: colorScheme.primary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
@@ -608,124 +530,69 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
             // ── Header bar: back, Resulta (perfectly centered Stack) ──
             Container(
               color: colorScheme.surface,
-              height: topPadding + 112,
+              height: topPadding + 56,
               padding: EdgeInsets.only(left: 16, right: 16, top: topPadding),
-              child: Column(
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  SizedBox(
-                    height: 56,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Text(
-                          loc.resultsTitle,
-                          style: GoogleFonts.outfit(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: colorScheme.primary,
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: GestureDetector(
-                            onTap: () {
-                              HapticService().vibrate();
-                              Navigator.pop(context);
-                            },
-                            child: Icon(
-                              Icons.arrow_back,
-                              color: colorScheme.primary,
-                              size: 24,
-                            ),
-                          ),
-                        ),
-                        if (_profile != null)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: GestureDetector(
-                              onTap: () {
-                                HapticService().vibrate();
-                                _showFilterSheet();
-                              },
-                              child: Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Icon(
-                                    Icons.filter_list,
-                                    color: colorScheme.primary,
-                                    size: 24,
-                                  ),
-                                  if (_selectedCondition != null)
-                                    Positioned(
-                                      top: -2,
-                                      right: -2,
-                                      child: Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: BoxDecoration(
-                                          color: colorScheme.secondary,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
+                  // Centered Title
+                  Text(
+                    loc.resultsTitle,
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.primary,
                     ),
                   ),
-                  SizedBox(
-                    height: 48,
-                    child: TextField(
-                      controller: _searchController,
-                      textInputAction: TextInputAction.search,
-                      onSubmitted: _searchAnotherProduct,
-                      onChanged: (_) => setState(() {}),
-                      decoration: InputDecoration(
-                        hintText: 'Search another product or category...',
-                        prefixIcon: const Icon(Icons.search),
-                        suffixIcon: _isSearching
-                            ? const Padding(
-                                padding: EdgeInsets.all(12),
-                                child: SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              )
-                            : _searchController.text.isEmpty
-                            ? null
-                            : IconButton(
-                                tooltip: 'Clear search',
-                                icon: const Icon(Icons.clear),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  setState(() {});
-                                },
-                              ),
-                        filled: true,
-                        fillColor: theme.scaffoldBackgroundColor,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: theme.dividerColor),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: colorScheme.primary),
-                        ),
+                  // Left Back Button
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticService().vibrate();
+                        Navigator.pop(context);
+                      },
+                      child: Icon(
+                        Icons.arrow_back,
+                        color: colorScheme.primary,
+                        size: 24,
                       ),
                     ),
                   ),
+                  // Right Filter Ranking Button (matches compare_products_screen)
+                  if (_profile != null)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticService().vibrate();
+                          _showFilterSheet();
+                        },
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.filter_list,
+                              color: colorScheme.primary,
+                              size: 24,
+                            ),
+                            if (_selectedCondition != null)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.secondary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -871,30 +738,17 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         16,
                         16 + MediaQuery.of(context).padding.bottom + 24,
                       ),
-                      itemCount:
-                          (_showAllRanked
-                              ? _ranked.length
-                              : _ranked.take(5).length) +
-                          1 +
-                          (!_showAllRanked && _ranked.length > 5 ? 1 : 0),
+                      itemCount: _ranked.length + 1,
                       separatorBuilder: (_, __) => const SizedBox(height: 10),
                       itemBuilder: (context, i) {
-                        final visibleCount = _showAllRanked
-                            ? _ranked.length
-                            : _ranked.take(5).length;
-                        if (i == visibleCount) {
-                          if (!_showAllRanked && _ranked.length > 5) {
-                            return _buildMoreRankedButton();
-                          }
-                          return _buildAddProductButton();
-                        }
-                        if (i == visibleCount + 1) {
+                        if (i == _ranked.length) {
                           return _buildAddProductButton();
                         }
 
                         final ranked = _ranked[i];
                         return RankedProductCard(
                           ranked: ranked,
+                          totalProducts: _ranked.length,
                           quantity: widget
                               .productCounts?[ranked.evaluation.product.id],
                           onTap: () {
@@ -947,6 +801,11 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         icon: Icons.history_outlined,
         activeIcon: Icons.history,
         label: loc.history,
+      ),
+      (
+        icon: Icons.group_outlined,
+        activeIcon: Icons.group,
+        label: loc.groupTab,
       ),
       (
         icon: Icons.person_outline,

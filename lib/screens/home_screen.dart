@@ -1,17 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
 import '../services/voice_assistant_service.dart';
+import '../models/product_model.dart';
 import '../widgets/voice_mic_overlay.dart';
 import 'profile_screen.dart';
 import 'camera_scanner_screen.dart';
 import 'history_screen.dart';
 import 'nutrition_guide_screen.dart';
-import 'multi_scan_results_screen.dart';
+import 'group_screen.dart';
 import 'product_detail_screen.dart';
+import 'product_search_results_screen.dart';
 import '../data/services/backend_locator.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -26,6 +31,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final _authService = AuthService();
   final _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  Timer? _searchOutsideTapTimer;
+  Future<List<Product>>? _searchCatalogFuture;
+  List<Product> _searchSuggestions = const [];
+  String _suggestionQuery = '';
+  bool _showSearchSuggestions = false;
+  bool _searchSuggestionsLoading = false;
   bool _isSearching = false;
 
   String _userName = 'User';
@@ -79,6 +91,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchOutsideTapTimer?.cancel();
     _searchController.dispose();
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
     AuthService.userNameNotifier.removeListener(_handleNameChanged);
@@ -134,82 +148,133 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _searchProducts(String rawQuery) async {
+    final query = rawQuery.trim();
+    if (query.isEmpty || _isSearching) return;
+    HapticService().vibrate();
+    setState(() => _showSearchSuggestions = false);
+    setState(() => _isSearching = true);
+    try {
+      final matches = await _findMatchingProducts(query);
+      if (!mounted) return;
+      final normalized = query.toLowerCase();
+      final exact = matches
+          .where(
+            (product) => [
+              product.name,
+              product.brand,
+              product.variant,
+            ].any((value) => value.trim().toLowerCase() == normalized),
+          )
+          .toList();
+      if (exact.length == 1) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProductDetailScreen(product: exact.single),
+          ),
+        );
+      } else if (matches.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No products found for "$query".')),
+        );
+      } else {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                ProductSearchResultsScreen(query: query, products: matches),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Product search failed: $e');
+    } finally {
+      if (mounted) setState(() => _isSearching = false);
+    }
+  }
+
+  Future<List<Product>> _findMatchingProducts(String rawQuery) async {
+    final query = rawQuery.trim().toLowerCase();
+    if (query.isEmpty) return const [];
+    final products = await (_searchCatalogFuture ??= BackendLocator
+        .productRepository
+        .getAllProducts());
+    return products.where((product) {
+      return '${product.name} ${product.brand} ${product.variant} ${product.category}'
+          .toLowerCase()
+          .contains(query);
+    }).toList();
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    final query = value.trim();
+    if (query.isEmpty) {
+      setState(() {
+        _suggestionQuery = '';
+        _searchSuggestions = const [];
+        _showSearchSuggestions = false;
+        _searchSuggestionsLoading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _suggestionQuery = query;
+      _showSearchSuggestions = true;
+      _searchSuggestionsLoading = true;
+    });
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () async {
+      try {
+        final matches = await _findMatchingProducts(query);
+        if (!mounted || _suggestionQuery != query) return;
+        setState(() {
+          _searchSuggestions = matches;
+          _searchSuggestionsLoading = false;
+        });
+      } catch (e) {
+        debugPrint('Product autocomplete failed: $e');
+        if (mounted && _suggestionQuery == query) {
+          setState(() {
+            _searchSuggestions = const [];
+            _searchSuggestionsLoading = false;
+          });
+        }
+      }
+    });
+  }
+
+  void _openSearchProduct(Product product) {
+    _searchOutsideTapTimer?.cancel();
+    HapticService().vibrate();
+    setState(() => _showSearchSuggestions = false);
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)),
+    );
+  }
+
+  Future<void> _viewAllSearchResults() async {
+    _searchOutsideTapTimer?.cancel();
+    final query = _suggestionQuery;
+    if (query.isEmpty) return;
+    setState(() => _showSearchSuggestions = false);
+    final matches = await _findMatchingProducts(query);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+            ProductSearchResultsScreen(query: query, products: matches),
+      ),
+    );
+  }
+
   /// Pull-to-refresh handler.
   Future<void> _onRefresh() async {
     HapticService().vibrate();
     await _loadUserName();
-  }
-
-  Future<void> _searchProducts(String rawQuery) async {
-    final query = rawQuery.trim();
-    if (query.isEmpty || _isSearching) return;
-
-    HapticService().vibrate();
-    FocusManager.instance.primaryFocus?.unfocus();
-    _searchController.clear();
-    setState(() => _isSearching = true);
-
-    try {
-      final products = await BackendLocator.productRepository.getAllProducts();
-      if (!mounted) return;
-      final normalizedQuery = query.toLowerCase();
-      final productMatches = products.where((product) {
-        final searchable = [
-          product.name,
-          product.brand,
-          product.variant,
-        ].join(' ').toLowerCase();
-        return searchable.contains(normalizedQuery);
-      }).toList();
-      final exactProduct = products.where((product) {
-        return [
-          product.name,
-          product.brand,
-          product.variant,
-        ].any((value) => value.trim().toLowerCase() == normalizedQuery);
-      }).toList();
-      final categoryMatches = products.where((product) {
-        return product.category.toLowerCase().contains(normalizedQuery);
-      }).toList();
-
-      if (exactProduct.length == 1) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ProductDetailScreen(product: exactProduct.single),
-          ),
-        );
-      } else {
-        final results = categoryMatches.isNotEmpty
-            ? categoryMatches
-            : productMatches;
-        if (results.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('No products found for "$query".')),
-          );
-        } else {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => MultiScanResultsScreen(
-                detectedProducts: results,
-                initiallyShowTopFive:
-                    categoryMatches.isNotEmpty || results.length > 5,
-              ),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Product search failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to search products right now.')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isSearching = false);
-    }
   }
 
   void _onNavTap(int index) {
@@ -241,6 +306,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 SafeArea(bottom: false, child: _buildHistoryPage()),
 
+                // NEW -- "Group" tab, inserted between History and
+                // Profile per the Health Group UI & Navigation Update.
+                // Replaces the old ProfileScreen-menu entry points for
+                // "Health Group" / "Join a Group".
+                const SafeArea(bottom: false, child: GroupScreen()),
+
                 const SafeArea(bottom: false, child: ProfileScreen()),
               ],
             ),
@@ -271,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: SingleChildScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
 
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -318,161 +389,171 @@ class _HomeScreenState extends State<HomeScreen> {
     final bodyLarge = theme.textTheme.bodyLarge;
     final bodyMedium = theme.textTheme.bodyMedium;
     final loc = AppLocalizations.of(context)!;
-    final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
-    final isDark = theme.brightness == Brightness.dark;
-    final primaryColor = isDark ? Colors.red.shade400 : theme.colorScheme.primary;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+
       children: [
-        // Greeting + logo
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Text(
-                loc.greeting(_userName),
-                style: bodyLarge?.copyWith(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  height: 1.15,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
-              width: 52,
-              height: 52,
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surface,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.18 : 0.07),
-                    blurRadius: 14,
-                    spreadRadius: -4,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: ClipOval(
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  fit: BoxFit.contain,
-                ),
-              ),
-            ),
-          ],
+        Image.asset('assets/images/logoII.png', height: 60),
+
+        const SizedBox(height: 12),
+
+        Text(
+          loc.greeting(_userName),
+
+          style: bodyLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.bold),
         ),
 
-        const SizedBox(height: 5),
+        const SizedBox(height: 4),
 
-        // Tagline directly below the greeting/logo row
         Text(
           loc.homeTagline,
-          style: bodyMedium?.copyWith(
-            fontSize: 13,
-            height: 1.5,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+
+          style: bodyMedium?.copyWith(fontSize: 13, height: 1.5),
         ),
 
-        const SizedBox(height: 18),
-
-        // Full-width search engine
-        Container(
-          height: 54,
-          decoration: BoxDecoration(
-            color: isDark
-                ? theme.colorScheme.surfaceContainerHighest
-                : theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: primaryColor.withOpacity(0.09),
-                blurRadius: 18,
-                spreadRadius: -5,
-                offset: const Offset(0, 7),
-              ),
-            ],
-          ),
-          child: TextField(
-            controller: _searchController,
-            textInputAction: TextInputAction.search,
-            textCapitalization: TextCapitalization.sentences,
-            onSubmitted: _searchProducts,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: theme.colorScheme.onSurface,
-            ),
-            cursorColor: primaryColor,
-            decoration: InputDecoration(
-              hintText: isTagalog
-                  ? 'Maghanap ng produkto o kategorya...'
-                  : 'Search products or categories...',
-              hintStyle: TextStyle(
-                color: theme.colorScheme.onSurfaceVariant.withOpacity(0.72),
-                fontSize: 13.5,
-                fontWeight: FontWeight.w400,
-              ),
-              prefixIcon: Padding(
-                padding: const EdgeInsets.only(left: 15, right: 9),
-                child: Icon(Icons.search_rounded, size: 23, color: primaryColor),
-              ),
-              prefixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 54),
-              suffixIcon: _isSearching
-                  ? Padding(
-                      padding: const EdgeInsets.only(right: 14),
-                      child: SizedBox(
-                        width: 19,
-                        height: 19,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.2,
-                          color: primaryColor,
-                        ),
-                      ),
-                    )
-                  : _searchController.text.isEmpty
+        const SizedBox(height: 16),
+        TextField(
+          controller: _searchController,
+          textInputAction: TextInputAction.search,
+          onSubmitted: _searchProducts,
+          onChanged: _onSearchChanged,
+          onTapOutside: (_) {
+            // TextField.onTapOutside fires on pointer-down, before a
+            // suggestion ListTile receives its onTap (pointer-up). Hiding
+            // the list immediately removes the tapped ListTile and prevents
+            // navigation. Delay dismissal briefly so suggestion taps can
+            // complete first.
+            _searchOutsideTapTimer?.cancel();
+            _searchOutsideTapTimer = Timer(
+              const Duration(milliseconds: 150),
+              () {
+                if (mounted) {
+                  setState(() => _showSearchSuggestions = false);
+                }
+              },
+            );
+          },
+          decoration: InputDecoration(
+            hintText: 'Search products or categories...',
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: _isSearching
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : (_searchController.text.isEmpty
                       ? null
                       : IconButton(
-                          tooltip: 'Clear search',
-                          splashRadius: 20,
-                          icon: Icon(
-                            Icons.close_rounded,
-                            size: 20,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
+                          icon: const Icon(Icons.close_rounded),
                           onPressed: () {
                             _searchController.clear();
-                            setState(() {});
+                            _onSearchChanged('');
                           },
-                        ),
-              suffixIconConstraints: const BoxConstraints(minWidth: 48, minHeight: 54),
-              filled: true,
-              fillColor: Colors.transparent,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide.none,
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(18),
-                borderSide: BorderSide(
-                  color: primaryColor.withOpacity(0.45),
-                  width: 1.2,
-                ),
-              ),
-            ),
-            onChanged: (_) => setState(() {}),
+                        )),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
           ),
         ),
+        if (_showSearchSuggestions) _buildSearchSuggestions(),
       ],
+    );
+  }
+
+  Widget _buildSearchSuggestions() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isLoading = _searchSuggestionsLoading;
+    final visible = _searchSuggestions.take(8).toList();
+
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      constraints: const BoxConstraints(maxHeight: 360),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.dividerColor),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.10),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: isLoading
+          ? const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          : visible.isEmpty
+          ? const Padding(
+              padding: EdgeInsets.all(16),
+              child: Text('No products found'),
+            )
+          : ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              itemCount:
+                  visible.length + (_searchSuggestions.length > 8 ? 1 : 0),
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: colorScheme.outlineVariant),
+              itemBuilder: (context, index) {
+                if (index == visible.length) {
+                  return ListTile(
+                    dense: true,
+                    title: const Text('View all results'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: _viewAllSearchResults,
+                  );
+                }
+                final product = visible[index];
+                return ListTile(
+                  dense: true,
+                  leading: _searchSuggestionImage(product),
+                  title: Text(
+                    product.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: product.brand.isEmpty ? null : Text(product.brand),
+                  onTap: () => _openSearchProduct(product),
+                );
+              },
+            ),
+    );
+  }
+
+  Widget _searchSuggestionImage(Product product) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 40,
+        height: 40,
+        child: product.imageUrl.isEmpty
+            ? Container(
+                color: colorScheme.surfaceContainerHighest,
+                child: Icon(
+                  Icons.inventory_2_outlined,
+                  color: colorScheme.primary,
+                ),
+              )
+            : Image.network(
+                product.imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  color: colorScheme.surfaceContainerHighest,
+                  child: Icon(
+                    Icons.inventory_2_outlined,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ),
+      ),
     );
   }
 
@@ -495,7 +576,7 @@ class _HomeScreenState extends State<HomeScreen> {
           colors: [Color(0xFFC62E2E), Color(0xFF6B0F0F)],
         ),
 
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(24),
 
         boxShadow: [
           BoxShadow(
@@ -503,11 +584,9 @@ class _HomeScreenState extends State<HomeScreen> {
               theme.brightness == Brightness.dark ? 0.35 : 0.18,
             ),
 
-            blurRadius: 26,
+            blurRadius: 18,
 
-            spreadRadius: -4,
-
-            offset: const Offset(0, 12),
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -793,19 +872,17 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
 
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
 
-        // Use a soft, visible shadow instead of a dark outline.
+        border: Border.all(color: theme.dividerColor),
+
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(
-              expanded
-                  ? (theme.brightness == Brightness.dark ? 0.34 : 0.20)
-                  : (theme.brightness == Brightness.dark ? 0.24 : 0.10),
-            ),
-            blurRadius: expanded ? 30 : 22,
-            spreadRadius: expanded ? 1 : -3,
-            offset: Offset(0, expanded ? 12 : 7),
+            color: Colors.black.withOpacity(0.03),
+
+            blurRadius: 10,
+
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1138,19 +1215,15 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
 
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
 
-        // Highlight the expanded card with a soft red-tinted shadow.
+        border: Border.all(color: theme.dividerColor),
+
         boxShadow: [
           BoxShadow(
-            color: primaryColor.withOpacity(
-              _processExpanded
-                  ? (theme.brightness == Brightness.dark ? 0.34 : 0.20)
-                  : (theme.brightness == Brightness.dark ? 0.24 : 0.10),
-            ),
-            blurRadius: _processExpanded ? 30 : 22,
-            spreadRadius: _processExpanded ? 1 : -3,
-            offset: Offset(0, _processExpanded ? 12 : 7),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -1381,7 +1454,7 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Expanded(
               child: _buildInformationCard(
-                imagePath: 'assets/images/fdaimg.png',
+                imagePath: 'assets/images/learn-more/fdaimg.png',
 
                 title: loc.fdaCardTitle,
 
@@ -1407,7 +1480,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             Expanded(
               child: _buildInformationCard(
-                imagePath: 'assets/images/whoimg.png',
+                imagePath: 'assets/images/learn-more/whoimg.png',
 
                 title: loc.whoCardTitle,
 
@@ -1430,8 +1503,77 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+
+        const SizedBox(height: 20),
+
+        // Health conditions section description
+        Text(
+          loc.healthConditionsSubtitle,
+          style: TextStyle(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 12.5,
+            height: 1.4,
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Kidney + GERD cards
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildInformationCard(
+                imagePath: 'assets/images/learn-more/niddkdimg.png',
+                title: loc.kidneyCardTitle,
+                source: loc.kidneyCardSource,
+                onTap: () {
+                  HapticService().vibrate();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NutritionGuideScreen(
+                        type: NutritionGuideType.kidney,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: _buildInformationCard(
+                imagePath: 'assets/images/learn-more/niddkdimg.png',
+                title: loc.gerdCardTitle,
+                source: loc.gerdCardSource,
+                onTap: () {
+                  HapticService().vibrate();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const NutritionGuideScreen(
+                        type: NutritionGuideType.gerd,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ],
     );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      debugPrint('Could not launch $url');
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1459,22 +1601,17 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: theme.cardColor,
 
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
 
-          border: Border.all(
-            color: theme.colorScheme.outline.withOpacity(
-              theme.brightness == Brightness.dark ? 0.16 : 0.07,
-            ),
-          ),
+          border: Border.all(color: theme.dividerColor),
 
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(
-                theme.brightness == Brightness.dark ? 0.20 : 0.055,
-              ),
-              blurRadius: 24,
-              spreadRadius: -5,
-              offset: const Offset(0, 8),
+              color: Colors.black.withOpacity(0.04),
+
+              blurRadius: 10,
+
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -1650,6 +1787,15 @@ class _HomeScreenState extends State<HomeScreen> {
         label: AppLocalizations.of(context)!.history,
       ),
 
+      // NEW -- "Group" tab, between History and Profile. Reuses the
+      // same icon the old ProfileScreen "Health Group" menu row used
+      // (Icons.group_outlined / Icons.group) for visual continuity.
+      (
+        icon: Icons.group_outlined,
+        activeIcon: Icons.group,
+        label: AppLocalizations.of(context)!.groupTab,
+      ),
+
       (
         icon: Icons.person_outline,
         activeIcon: Icons.person,
@@ -1662,9 +1808,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
       decoration: BoxDecoration(
         color: theme.cardColor,
-        border: Border(
-          top: BorderSide(color: theme.colorScheme.outline.withOpacity(0.08)),
-        ),
 
         boxShadow: [
           BoxShadow(
@@ -1672,9 +1815,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ? Colors.black.withOpacity(0.25)
                 : Colors.black.withOpacity(0.05),
 
-            blurRadius: 18,
-            spreadRadius: -6,
-            offset: const Offset(0, -5),
+            blurRadius: 12,
+
+            offset: const Offset(0, -2),
           ),
         ],
       ),

@@ -19,7 +19,7 @@ By using CLARO, you acknowledge that you have read and understood this Privacy P
         <div className="doc-card">
           <div className="doc-meta">
             <Clock size={16} />
-            <span>Last Updated: August 10, 2026</span>
+            <span>Last Updated: September 21, 2026</span>
             <span style={{ margin: '0 0.5rem' }}>•</span>
             <Shield size={16} />
             <span>Version 1.0</span>
@@ -37,14 +37,15 @@ By using CLARO, you acknowledge that you have read and understood this Privacy P
             <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
               <li>Display name</li>
               <li>Authentication information associated with your account</li>
-              <li>Health-related conditions selected by you, if applicable</li>
+              <li>Health-related conditions selected by you (such as Diabetes, Hypertension, Heart Condition, GERD, or Kidney Disease), if applicable</li>
               <li>Food allergies identified by you, if applicable</li>
+              <li>Health Group creation/membership details and profiles for manually added members entered by a group owner, if applicable</li>
             </ul>
             <p className="doc-section-text" style={{ marginTop: '1rem' }}>
-              Your display name is used as an identifier and may be displayed within your user dashboard.
+              Your display name is used as an identifier and may be displayed within your user dashboard and joined Health Groups.
             </p>
             <p className="doc-section-text">
-              Health conditions and food allergies are collected solely to provide personalized health assessments, warnings, and recommendations when you use the application's product scanning and nutritional analysis features.
+              Health conditions and food allergies are collected solely to provide personalized individual or group health assessments, warnings, and recommendations when you use the application's product scanning and nutritional analysis features.
             </p>
             <p className="doc-section-text">
               CLARO does not intentionally collect unnecessary personal information such as:
@@ -97,6 +98,7 @@ By using CLARO, you acknowledge that you have read and understood this Privacy P
               <li>Display warnings related to selected health conditions</li>
               <li>Display allergen warnings based on the allergies you provide</li>
               <li>Provide recommendations based on your selected health profile</li>
+              <li>Facilitate group product evaluations by allowing members of a Health Group to view member health conditions</li>
               <li>Improve the functionality and reliability of the application</li>
               <li>Maintain application security and authentication</li>
             </ul>
@@ -106,12 +108,12 @@ By using CLARO, you acknowledge that you have read and understood this Privacy P
           </div>
 
           <div className="doc-section">
-            <h2 className="doc-section-title">4. Health Information</h2>
+            <h2 className="doc-section-title">4. Health Information and Health Groups</h2>
             <p className="doc-section-text">
               CLARO allows users to voluntarily provide information about selected health conditions and food allergies.
             </p>
             <p className="doc-section-text">
-              This information is used specifically to personalize product-related advisories and warnings.
+              This information is used specifically to personalize product-related advisories, warnings, and group product evaluations.
             </p>
             <p className="doc-section-text">
               For example, information provided in your health profile may be used to display warnings or recommendations related to conditions such as:
@@ -120,13 +122,22 @@ By using CLARO, you acknowledge that you have read and understood this Privacy P
               <li>Diabetes</li>
               <li>Hypertension</li>
               <li>Heart or cardiovascular conditions</li>
-              <li>Kidney-related dietary considerations</li>
+              <li>GERD (Gastroesophageal Reflux Disease)</li>
+              <li>Kidney disease and related dietary considerations</li>
               <li>Food allergies</li>
             </ul>
             <p className="doc-section-text" style={{ marginTop: '1rem' }}>
-              You control the information included in your health profile and may update it when necessary.
+              When you join a Health Group, your selected health conditions become viewable to other members of that group to enable collective health-conscious product evaluations.
             </p>
             <p className="doc-section-text">
+              Health data management and privacy boundaries within Health Groups strictly follow these controls:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Only registered account holders can manage and modify their own health profile. Group members cannot edit invited members' health profiles.</li>
+              <li>Group owners can manage health conditions for manually added (unregistered) members created within their group.</li>
+              <li>Group owners possess management rights to remove members, and may delete a group only when no other members remain in the group besides the owner.</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
               Because health-related information may be sensitive, CLARO applies access controls and security measures intended to prevent unauthorized access.
             </p>
             <p className="doc-section-text">

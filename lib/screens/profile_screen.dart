@@ -13,6 +13,11 @@ import 'personal_info_screen.dart';
 import 'preference_screen.dart';
 import 'suggestion_screen.dart';
 import '../core/utils/success_feedback_utils.dart';
+import '../widgets/avatar_picker.dart';
+// NOTE: "Health Group" / "Join a Group" used to be entry points here
+// (Phase 3 / Phase 4). They've moved to their own "Group" bottom nav tab
+// (see home_screen.dart) so the group feature no longer routes through
+// this screen at all.
 
 const String claroWebsiteUrl = 'https://claro-52ia.onrender.com/';
 const String privacyPolicyUrl = 'https://claro-52ia.onrender.com/privacy-policy';
@@ -30,6 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
   String _userName = 'User';
   String _userEmail = '';
+  String? _avatar; // users/{uid}.avatar -- asset path picked in onboarding
   bool _voiceAssistantEnabled = false;
   bool _mfaEnabled = false;
   // True while an account-deletion request is in flight. Drives an
@@ -60,7 +66,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _announceIfVisible() {
-    if (HomeTabController.tabNotifier.value == 3 &&
+    // Profile moved from index 3 to index 4 when the "Group" tab was
+    // inserted between History and Profile -- see home_screen.dart.
+    if (HomeTabController.tabNotifier.value == 4 &&
         _authService.currentUser != null &&
         VoiceAssistantService.instance.isEnabled &&
         !VoiceAssistantService.isSpeakingNotifier.value) {
@@ -129,6 +137,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               setState(() {
                 _userName = data['name'] ?? 'User';
                 _userEmail = data['email'] ?? '';
+                _avatar = (data['avatar'] as String?)?.isNotEmpty == true ? data['avatar'] as String : null;
                 _voiceAssistantEnabled = voiceVal;
                 _mfaEnabled = mfaVal;
                 _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
@@ -155,6 +164,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             setState(() {
               _userName = data['name'] ?? 'User';
               _userEmail = data['email'] ?? '';
+              _avatar = (data['avatar'] as String?)?.isNotEmpty == true ? data['avatar'] as String : null;
               _voiceAssistantEnabled = voiceVal;
               _mfaEnabled = mfaVal;
               _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
@@ -263,6 +273,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _showAvatarDialog() async {
+    HapticService().vibrate();
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+    String? picked = _avatar;
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text(tl ? 'Pumili ng avatar' : 'Choose your avatar'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: AvatarPicker(
+                selected: picked,
+                allowClear: false,
+                onChanged: (a) => setDialogState(() => picked = a),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tl ? 'Kanselahin' : 'Cancel')),
+            TextButton(
+              onPressed: picked == null || picked == _avatar ? null : () => Navigator.pop(ctx, picked),
+              child: Text(tl ? 'I-save' : 'Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || result == _avatar || !mounted) return;
+
+    // Show the new avatar immediately; roll back if the save fails.
+    final previous = _avatar;
+    setState(() => _avatar = result);
+    final ok = await _authService.updateUserData({'avatar': result});
+    if (!ok && mounted) {
+      setState(() => _avatar = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tl ? 'Hindi na-save ang avatar. Subukan muli.' : "Couldn't save your avatar. Please try again.")),
+      );
+    }
+  }
+
   Widget _buildProfileCard() {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -276,6 +329,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Tappable avatar (above name + email) -> opens the picker dialog.
+          Semantics(
+            button: true,
+            label: 'Change avatar',
+            child: GestureDetector(
+              onTap: _showAvatarDialog,
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 36,
+                    backgroundColor: colorScheme.surface,
+                    backgroundImage: _avatar != null ? AssetImage(_avatar!) : null,
+                    onBackgroundImageError: _avatar != null ? (_, __) {} : null,
+                    child: _avatar == null
+                        ? Icon(Icons.person_outline, size: 36, color: colorScheme.onSurfaceVariant)
+                        : null,
+                  ),
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: colorScheme.primaryContainer, width: 2),
+                      ),
+                      child: Icon(Icons.edit, size: 12, color: colorScheme.onPrimary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           Text(
             _userName,
             style: TextStyle(

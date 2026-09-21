@@ -4,6 +4,7 @@ import '../services/auth_service.dart';
 import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
+import '../widgets/avatar_picker.dart';
 import '../widgets/date_of_birth_picker.dart';
 import 'home_screen.dart';
 
@@ -51,11 +52,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   DateTime? _dateOfBirth;
   String? _dobError;
 
+  // Avatar asset path chosen on the Basic Info page (required).
+  String? _avatar;
+  bool _avatarError = false;
+
   // Internal storage keys -- DO NOT translate these, see class doc above.
   final Map<String, bool> _conditions = {
     'Diabetes': false,
     'Alta-presyon': false,
     'Sakit sa puso': false,
+    'GERD': false,
+    'Sakit sa bato': false,
     'Mababang Paningin': false,
     'Wala': false,
   };
@@ -78,6 +85,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Wala': '',
   };
 
+  // Built-in Material icons for the conditions that have no PNG asset yet
+  // (GERD, Kidney Disease). If you later add assets/images/gerd.png /
+  // bato.png, move them into _conditionIcons above and delete these.
+  final Map<String, IconData> _conditionFallbackIcons = {
+    'GERD': Icons.local_fire_department_outlined,
+    'Sakit sa bato': Icons.water_drop_outlined,
+  };
+
   final Map<String, String> _allergenIcons = {
     'Isda': 'assets/images/isda.png',
     'Gatas': 'assets/images/gatas.png',
@@ -95,6 +110,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Diabetes': loc.conditionDiabetes,
     'Alta-presyon': loc.conditionHypertension,
     'Sakit sa puso': loc.conditionHeartCondition,
+    'GERD': loc.conditionGerd,
+    'Sakit sa bato': loc.conditionKidneyDisease,
     'Mababang Paningin': loc.conditionLowVision,
     'Wala': loc.conditionNone,
   };
@@ -148,27 +165,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       // than being blocked repeatedly one field at a time.
       final nameEmpty = _nameController.text.trim().isEmpty;
       final dobMissing = _dateOfBirth == null;
+      final avatarMissing = _avatar == null;
 
-      if (nameEmpty || dobMissing) {
+      if (nameEmpty || dobMissing || avatarMissing) {
+        final tl = Localizations.localeOf(context).languageCode == 'tl';
         setState(() {
           _nameError = nameEmpty ? loc.onboardingNameEmpty : null;
           _dobError = dobMissing ? loc.onboardingDobError : null;
+          _avatarError = avatarMissing;
         });
         HapticService().vibrate();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              nameEmpty && dobMissing
-                  ? loc.onboardingNameAndDobError
-                  : (nameEmpty ? loc.onboardingNameEmpty : loc.onboardingDobError),
-            ),
-          ),
-        );
+        // Name/DOB keep their existing messages; the avatar message is
+        // only shown alone or when it's the only thing missing.
+        final String message;
+        if (avatarMissing && !nameEmpty && !dobMissing) {
+          message = tl ? 'Pumili ng avatar.' : 'Please choose an avatar.';
+        } else if (nameEmpty && dobMissing) {
+          message = loc.onboardingNameAndDobError;
+        } else if (nameEmpty) {
+          message = loc.onboardingNameEmpty;
+        } else if (dobMissing) {
+          message = loc.onboardingDobError;
+        } else {
+          message = tl ? 'Pumili ng avatar.' : 'Please choose an avatar.';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
         return;
       } else {
         setState(() {
           _nameError = null;
           _dobError = null;
+          _avatarError = false;
         });
       }
 
@@ -206,6 +233,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         await _authService.saveOnboardingData(
           name: _nameController.text.trim(),
           dateOfBirth: _dateOfBirth,
+          avatar: _avatar,
           conditions: selectedConditions,
           allergens: selectedAllergens,
         );
@@ -397,6 +425,45 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ),
           ],
+          const SizedBox(height: 24),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Avatar',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+            ),
+          ),
+          const SizedBox(height: 12),
+          AvatarPicker(
+            selected: _avatar,
+            allowClear: false, // required: one avatar is always kept once chosen
+            onChanged: (a) => setState(() {
+              _avatar = a;
+              if (a != null) _avatarError = false;
+            }),
+          ),
+          if (_avatarError) ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.error_outline, size: 14, color: colorScheme.error),
+                    const SizedBox(width: 4),
+                    Text(
+                      Localizations.localeOf(context).languageCode == 'tl'
+                          ? 'Pumili ng avatar.'
+                          : 'Please choose an avatar.',
+                      style: TextStyle(color: colorScheme.error, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 32),
           _buildButton(
             loc.nextButton,
@@ -534,6 +601,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             selected: selected,
             isWala: isWala,
             imagePath: isWala ? null : _conditionIcons[key],
+            icon: isWala ? null : _conditionFallbackIcons[key],
             theme: theme,
           ),
         );
@@ -574,6 +642,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required bool selected,
     bool isWala = false,
     String? imagePath,
+    IconData? icon,
     required ThemeData theme,
   }) {
     final colorScheme = theme.colorScheme;
@@ -604,6 +673,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Icons.image_not_supported,
                         size: 28,
                         color: colorScheme.onSurfaceVariant),
+                  )
+                else if (icon != null)
+                  SizedBox(
+                    height: 32,
+                    width: 32,
+                    child: Icon(
+                      icon,
+                      size: 28,
+                      color: selected
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
                   )
                 else
                   const SizedBox(height: 32),
@@ -730,7 +811,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   bool isBasicInfoValid() {
-    return _nameController.text.trim().isNotEmpty && _dateOfBirth != null;
+    return _nameController.text.trim().isNotEmpty && _dateOfBirth != null && _avatar != null;
   }
 
   bool _isFormValid() {

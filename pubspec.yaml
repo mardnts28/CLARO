@@ -12,6 +12,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.2.3
   encrypt: ^5.0.3
   crypto: ^3.0.3
 
@@ -63,6 +65,9 @@ flutter:
   assets:
     - assets/
     - assets/images/
+    - assets/images/relations/
+    - assets/images/avatars/
+    - assets/images/learn-more/
     - assets/model/
     - .env
 

@@ -10,11 +10,13 @@ import 'haptic_service.dart';
 import 'home_tab_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../data/services/backend_locator.dart'; // Phase 8
 
 // Base URL for the Cloudflare Worker that performs server-side encryption
 // and decryption of health conditions/allergens. The key never lives on
 // the client -- see health-data-worker/ for the Worker implementation.
 const _workerUrl = 'https://health-data-worker.claro-app.workers.dev';
+
 /// Outcome of a [AuthService.deleteAccount] attempt.
 ///
 ///  - [success]: both the Firestore doc and the Firebase Auth user are
@@ -43,7 +45,11 @@ class DeleteAccountResult {
       const DeleteAccountResult._(DeleteAccountStatus.success, null, null);
 
   factory DeleteAccountResult.reauthRequired(List<String> providerIds) =>
-      DeleteAccountResult._(DeleteAccountStatus.reauthRequired, null, providerIds);
+      DeleteAccountResult._(
+        DeleteAccountStatus.reauthRequired,
+        null,
+        providerIds,
+      );
 
   factory DeleteAccountResult.error(String message) =>
       DeleteAccountResult._(DeleteAccountStatus.error, message, null);
@@ -60,7 +66,9 @@ class AuthService {
   static final pendingMfaChallenge = ValueNotifier<Map<String, dynamic>?>(null);
 
   /// Shared, app-wide notifier for the current user's display name.
-  static final ValueNotifier<String> userNameNotifier = ValueNotifier<String>('User');
+  static final ValueNotifier<String> userNameNotifier = ValueNotifier<String>(
+    'User',
+  );
 
   /// Shared notifier for MFA enabled state
   static final ValueNotifier<bool> mfaNotifier = ValueNotifier<bool>(false);
@@ -107,21 +115,25 @@ class AuthService {
         password: password,
       );
       final uid = credential.user!.uid;
-      
+
       try {
         await _firebaseDb.collection('users').doc(uid).set({
           'uid': uid,
           'email': email.trim().toLowerCase(),
           'createdAt': Timestamp.now(),
         });
-        debugPrint('Firestore user document created successfully for UID: $uid');
+        debugPrint(
+          'Firestore user document created successfully for UID: $uid',
+        );
       } on FirebaseException catch (e) {
-        debugPrint('Firestore write failed during signup for UID $uid: ${e.code} - ${e.message}');
+        debugPrint(
+          'Firestore write failed during signup for UID $uid: ${e.code} - ${e.message}',
+        );
         // Clean up the auth user since we couldn't create their document
         await credential.user?.delete();
         return 'Failed to create your account data. Please check your connection and try again.';
       }
-      
+
       await _updateSessionId(uid);
 
       return null;
@@ -246,16 +258,22 @@ class AuthService {
     final uid = _firebaseAuth.currentUser?.uid;
     if (uid != null) await _updateSessionId(uid);
 
-
     pendingMfaChallenge.value = null;
     isAuthenticating.value = false;
   }
 
   /// Internal helper to generate and store OTP without signing out yet.
-  Future<Map<String, dynamic>> _prepareAndSendOtp(String uid, String email) async {
-    final code = (100000 + DateTime.now().microsecondsSinceEpoch % 900000).toString().padLeft(6, '0');
+  Future<Map<String, dynamic>> _prepareAndSendOtp(
+    String uid,
+    String email,
+  ) async {
+    final code = (100000 + DateTime.now().microsecondsSinceEpoch % 900000)
+        .toString()
+        .padLeft(6, '0');
     final now = Timestamp.now();
-    final expiresAt = Timestamp.fromDate(now.toDate().add(const Duration(minutes: 5)));
+    final expiresAt = Timestamp.fromDate(
+      now.toDate().add(const Duration(minutes: 1)),
+    );
 
     await _firebaseDb.collection('login_otps').doc(uid).set({
       'uid': uid,
@@ -294,7 +312,9 @@ class AuthService {
         'currentSessionId': sessionId,
       });
     } on FirebaseException catch (e) {
-      debugPrint('Failed to update session ID for UID $uid: ${e.code} - ${e.message}');
+      debugPrint(
+        'Failed to update session ID for UID $uid: ${e.code} - ${e.message}',
+      );
       // If the document doesn't exist, try to create it
       if (e.code == 'not-found') {
         try {
@@ -316,7 +336,10 @@ class AuthService {
     while (retryCount < 3) {
       try {
         // Use Source.server to bypass local cache which might be stale immediately after login
-        final userDoc = await _firebaseDb.collection('users').doc(uid).get(const GetOptions(source: Source.server));
+        final userDoc = await _firebaseDb
+            .collection('users')
+            .doc(uid)
+            .get(const GetOptions(source: Source.server));
         if (!userDoc.exists) return false;
 
         final data = userDoc.data();
@@ -387,7 +410,9 @@ class AuthService {
     await _firebaseAuth.currentUser?.reload();
     final refreshedUid = _firebaseAuth.currentUser?.uid;
     if (refreshedUid == null) return;
-    await _firebaseDb.collection('users').doc(refreshedUid).set({'mfaEnabled': enabled}, SetOptions(merge: true));
+    await _firebaseDb.collection('users').doc(refreshedUid).set({
+      'mfaEnabled': enabled,
+    }, SetOptions(merge: true));
     mfaNotifier.value = enabled;
   }
 
@@ -408,10 +433,10 @@ class AuthService {
   /// AND you can see exactly why in the console instead of it failing
   /// silently.
   Future<void> _sendOtpEmail(
-      String email,
-      String code,
-      Timestamp expiresAt,
-      ) async {
+    String email,
+    String code,
+    Timestamp expiresAt,
+  ) async {
     final expiry = expiresAt.toDate();
 
     // Format as 12-hour time (e.g. 7:18 PM)
@@ -441,16 +466,14 @@ class AuthService {
       rethrow;
     }
 
-    debugPrint(
-      'OTP email response: ${response.statusCode} - ${response.body}',
-    );
+    debugPrint('OTP email response: ${response.statusCode} - ${response.body}');
 
     if (response.statusCode != 200) {
       throw Exception(
         'EmailJS rejected the request (${response.statusCode}): ${response.body}. '
-            'If this is a 403, enable "Allow EmailJS API calls from non-browser '
-            'applications" in EmailJS dashboard -> Account -> Security, or set '
-            '_emailJsPrivateKey if you have one.',
+        'If this is a 403, enable "Allow EmailJS API calls from non-browser '
+        'applications" in EmailJS dashboard -> Account -> Security, or set '
+        '_emailJsPrivateKey if you have one.',
       );
     }
   }
@@ -467,7 +490,10 @@ class AuthService {
   /// after this call, because the user is signed out by the time it
   /// returns.
   /// TEMPORARY: Re-runs the OTP challenge for resend functionality.
-  Future<Map<String, dynamic>?> buildOtpChallenge({required String email, required String password}) async {
+  Future<Map<String, dynamic>?> buildOtpChallenge({
+    required String email,
+    required String password,
+  }) async {
     isAuthenticating.value = true;
     try {
       final credential = await _firebaseAuth.signInWithEmailAndPassword(
@@ -477,10 +503,7 @@ class AuthService {
       final uid = credential.user!.uid;
       final challenge = await _prepareAndSendOtp(uid, email);
       await _firebaseAuth.signOut();
-      return {
-        ...challenge,
-        'recipientEmail': email,
-      };
+      return {...challenge, 'recipientEmail': email};
     } catch (e) {
       debugPrint('buildOtpChallenge failed: $e');
       isAuthenticating.value = false;
@@ -520,7 +543,8 @@ class AuthService {
       if (!otpDoc.exists) return 'This verification code has expired.';
       final data = otpDoc.data();
       if (data == null) return 'This verification code has expired.';
-      if ((data['attempts'] as int? ?? 0) >= 5) return 'Too many failed attempts. Please log in again.';
+      if ((data['attempts'] as int? ?? 0) >= 5)
+        return 'Too many failed attempts. Please log in again.';
       final expiresAt = (data['expiresAt'] as Timestamp?)?.toDate();
       if (expiresAt == null || expiresAt.isBefore(DateTime.now())) {
         await otpDoc.reference.delete();
@@ -570,20 +594,24 @@ class AuthService {
         await _firebaseGoogleSignIn.signOut();
       } catch (_) {}
 
-      final GoogleSignInAccount? googleUser = await _firebaseGoogleSignIn.signIn();
+      final GoogleSignInAccount? googleUser = await _firebaseGoogleSignIn
+          .signIn();
       if (googleUser == null) {
         isAuthenticating.value = false;
         return 'Google sign-in cancelled';
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final userCredential = await _firebaseAuth.signInWithCredential(credential);
+      final userCredential = await _firebaseAuth.signInWithCredential(
+        credential,
+      );
       final uid = userCredential.user!.uid;
       final email = userCredential.user!.email ?? '';
 
@@ -598,9 +626,13 @@ class AuthService {
             'name': displayName,
             'createdAt': Timestamp.now(),
           });
-          debugPrint('Firestore user document created for Google Sign-In UID: $uid');
+          debugPrint(
+            'Firestore user document created for Google Sign-In UID: $uid',
+          );
         } on FirebaseException catch (e) {
-          debugPrint('Firestore write failed during Google Sign-In for UID $uid: ${e.code} - ${e.message}');
+          debugPrint(
+            'Firestore write failed during Google Sign-In for UID $uid: ${e.code} - ${e.message}',
+          );
           // Clean up the auth user since we couldn't create their document
           await _firebaseAuth.signOut();
           return 'Failed to create your account data. Please check your connection and try again.';
@@ -661,7 +693,9 @@ class AuthService {
     try {
       final idToken = await _firebaseAuth.currentUser?.getIdToken();
       if (idToken == null) {
-        debugPrint('_pushHealthDataToWorker failed: no authenticated user / no ID token');
+        debugPrint(
+          '_pushHealthDataToWorker failed: no authenticated user / no ID token',
+        );
         return false;
       }
       final res = await http.post(
@@ -670,13 +704,12 @@ class AuthService {
           'Authorization': 'Bearer $idToken',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'conditions': conditions,
-          'allergens': allergens,
-        }),
+        body: jsonEncode({'conditions': conditions, 'allergens': allergens}),
       );
       if (res.statusCode != 200) {
-        debugPrint('_pushHealthDataToWorker failed: ${res.statusCode} ${res.body}');
+        debugPrint(
+          '_pushHealthDataToWorker failed: ${res.statusCode} ${res.body}',
+        );
         return false;
       }
       return true;
@@ -694,6 +727,11 @@ class AuthService {
     // wants to backfill them -- onboarding itself never passes these now.
     String? age,
     DateTime? dateOfBirth,
+    // Asset path chosen on the Basic Information screen, e.g.
+    // 'assets/images/avatars/female_1.png'. Stored as users/{uid}.avatar --
+    // the same field the Profile screen, the Join Group flow and
+    // GroupRepository.ensureOwnerMember() already read.
+    String? avatar,
     required List<String> conditions,
     required List<String> allergens,
   }) async {
@@ -717,6 +755,7 @@ class AuthService {
       final data = <String, dynamic>{
         'uid': uid,
         'onboardingComplete': true,
+        if (avatar != null && avatar.isNotEmpty) 'avatar': avatar,
       };
 
       final docData = userDoc.data();
@@ -727,18 +766,26 @@ class AuthService {
       if (!userDoc.exists || docData == null || !docData.containsKey('name')) {
         data['name'] = name;
       }
-      if (age != null && (!userDoc.exists || docData == null || !docData.containsKey('age'))) {
+      if (age != null &&
+          (!userDoc.exists || docData == null || !docData.containsKey('age'))) {
         data['age'] = age;
       }
       // Store dateOfBirth as Firestore Timestamp if provided
       if (dateOfBirth != null) {
-        if (!userDoc.exists || docData == null || !docData.containsKey('dateOfBirth')) {
+        if (!userDoc.exists ||
+            docData == null ||
+            !docData.containsKey('dateOfBirth')) {
           data['dateOfBirth'] = Timestamp.fromDate(dateOfBirth);
         }
       }
 
-      await _firebaseDb.collection('users').doc(uid).set(data, SetOptions(merge: true));
-      debugPrint('Onboarding data (plain fields) saved successfully for UID: $uid');
+      await _firebaseDb
+          .collection('users')
+          .doc(uid)
+          .set(data, SetOptions(merge: true));
+      debugPrint(
+        'Onboarding data (plain fields) saved successfully for UID: $uid',
+      );
 
       // Now send conditions/allergens to the Worker for server-side
       // encryption. This must succeed for onboarding to be considered
@@ -755,12 +802,16 @@ class AuthService {
           'Failed to save health conditions and allergens. Please check your connection and try again.',
         );
       }
-      debugPrint('Onboarding health data (encrypted) saved successfully for UID: $uid');
+      debugPrint(
+        'Onboarding health data (encrypted) saved successfully for UID: $uid',
+      );
 
       // Update the global name notifier so other screens can display the new name
       userNameNotifier.value = name;
     } on FirebaseException catch (e) {
-      debugPrint('Firestore write failed during onboarding for UID $uid: ${e.code} - ${e.message}');
+      debugPrint(
+        'Firestore write failed during onboarding for UID $uid: ${e.code} - ${e.message}',
+      );
       rethrow;
     } catch (e) {
       debugPrint('Unexpected error during onboarding data save: $e');
@@ -775,7 +826,9 @@ class AuthService {
 
       final userDoc = await _firebaseDb.collection('users').doc(uid).get();
       if (!userDoc.exists) {
-        debugPrint('hasCompletedOnboarding: user document does not exist for UID: $uid');
+        debugPrint(
+          'hasCompletedOnboarding: user document does not exist for UID: $uid',
+        );
         return false;
       }
 
@@ -784,17 +837,20 @@ class AuthService {
       // plaintext-checkable keys the way they used to -- they're still
       // present as encrypted strings, so containsKey(...) still works
       // the same as before; this check doesn't need to change.
-      final isComplete = data != null &&
+      final isComplete =
+          data != null &&
           data.containsKey('name') &&
           data['name'] != null &&
           data['name'].toString().isNotEmpty &&
           data.containsKey('conditions') &&
           data.containsKey('allergens');
-      
+
       debugPrint('hasCompletedOnboarding for UID $uid: $isComplete');
       return isComplete;
     } on FirebaseException catch (e) {
-      debugPrint('Firestore error in hasCompletedOnboarding: ${e.code} - ${e.message}');
+      debugPrint(
+        'Firestore error in hasCompletedOnboarding: ${e.code} - ${e.message}',
+      );
       return false;
     } catch (e) {
       debugPrint('Unexpected error in hasCompletedOnboarding: $e');
@@ -813,70 +869,48 @@ class AuthService {
       return {'error': getFriendlyAuthErrorMessage(e)};
     } catch (e) {
       debugPrint('requestPasswordResetOtp failed: $e');
-      return {'error': 'Unable to send the password reset email. Please try again.'};
+      return {
+        'error': 'Unable to send the password reset email. Please try again.',
+      };
     }
   }
 
-  Future<String?> verifyPasswordResetOtp({
-    required String challengeId,
-    required String code,
-  }) async {
+  Future<String?> sendPasswordResetEmail({required String email}) async {
     try {
       final response = await http.post(
-        Uri.parse('$_proxyBaseUrl/password-reset/verify'),
+        Uri.parse('$_proxyBaseUrl/password-reset'),
         headers: {
           'Content-Type': 'application/json',
           'X-App-Secret': _appSharedSecret,
         },
-        body: jsonEncode({'challengeId': challengeId, 'code': code.trim()}),
+        body: jsonEncode({'email': email}),
       );
-      if (response.statusCode >= 200 && response.statusCode < 300) return null;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return _passwordResetErrorMessage(data['error']?.toString());
-    } catch (e) {
-      debugPrint('verifyPasswordResetOtp failed: $e');
-      return 'Unable to verify the code. Please try again.';
-    }
-  }
 
-  Future<String?> completePasswordReset({
-    required String challengeId,
-    required String newPassword,
-  }) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_proxyBaseUrl/password-reset/update'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-Secret': _appSharedSecret,
-        },
-        body: jsonEncode({'challengeId': challengeId, 'newPassword': newPassword}),
+      debugPrint(
+        'Password reset response: ${response.statusCode} - ${response.body}',
       );
-      if (response.statusCode >= 200 && response.statusCode < 300) return null;
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return _passwordResetErrorMessage(data['error']?.toString());
-    } catch (e) {
-      debugPrint('completePasswordReset failed: $e');
-      return 'Unable to change your password. Please try again.';
-    }
-  }
 
-  String _passwordResetErrorMessage(String? code) {
-    switch (code) {
-      case 'user-not-found':
-        return 'No account found with this email address.';
-      case 'invalid-code':
-        return 'Invalid verification code.';
-      case 'expired-code':
-        return 'This verification code has expired.';
-      case 'weak-password':
-        return 'The new password does not meet the password requirements.';
-      case 'verification-required':
-        return 'Please verify the code before changing your password.';
-      case 'email-send-failed':
-        return 'Unable to send the verification code. Please try again.';
-      default:
-        return 'Something went wrong. Please try again.';
+      if (response.statusCode != 200) {
+        final errorData = jsonDecode(response.body) as Map<String, dynamic>;
+        final errorCode = errorData['error'] as String?;
+
+        // Map worker error codes to user-friendly messages
+        switch (errorCode) {
+          case 'user-not-found':
+            return 'No account found with this email address.';
+          case 'invalid-email':
+            return 'Please enter a valid email address.';
+          case 'email-send-failed':
+            return 'Failed to send password reset email. Please try again.';
+          default:
+            return 'An error occurred while sending the password reset email. Please try again.';
+        }
+      }
+
+      return null;
+    } catch (e) {
+      debugPrint('Password reset error: $e');
+      return 'An error occurred while sending the password reset email. Please try again.';
     }
   }
 
@@ -891,9 +925,13 @@ class AuthService {
       if (uid != null) {
         // Clear session ID in Firestore to prevent race conditions on next login
         try {
-          await _firebaseDb.collection('users').doc(uid).update({'currentSessionId': null});
+          await _firebaseDb.collection('users').doc(uid).update({
+            'currentSessionId': null,
+          });
         } on FirebaseException catch (e) {
-          debugPrint('Error clearing session ID on sign out for UID $uid: ${e.code} - ${e.message}');
+          debugPrint(
+            'Error clearing session ID on sign out for UID $uid: ${e.code} - ${e.message}',
+          );
           // Continue with sign out even if Firestore update fails
         }
       }
@@ -928,7 +966,9 @@ class AuthService {
   /// would silently recreate a bare-bones Firestore doc for the uid,
   /// undoing the deletion that had already happened and dropping the
   /// user into onboarding instead of actually finishing the deletion.
-  Future<DeleteAccountResult> deleteAccount({AuthCredential? credential}) async {
+  Future<DeleteAccountResult> deleteAccount({
+    AuthCredential? credential,
+  }) async {
     final user = _firebaseAuth.currentUser;
     if (user == null) {
       return DeleteAccountResult.error('No authenticated user found.');
@@ -948,6 +988,28 @@ class AuthService {
                 : getFriendlyAuthErrorMessage(e),
           );
         }
+      }
+
+      // Phase 8 -- clean up group membership BEFORE deleting anything else,
+      // while `uid` is still a valid authenticated caller (the cleanup
+      // reads users/{uid}.memberOfGroupIds and any groups/{id} this uid
+      // owns, both of which require an authenticated request under the
+      // Firestore Rules from Phase 1/6). If this fails, deliberately
+      // don't block account deletion on it -- a leftover group/membership
+      // record is recoverable manually; a user unable to delete their
+      // account at all is a worse outcome. See
+      // GroupRepository.cleanupMembershipsForDeletedAccount() in
+      // group_repository.dart for what this does: dissolves any group
+      // `uid` owns (deleting its managed members' health data with it),
+      // and marks `uid`'s membership "left" in any group they belong to
+      // as a linked member.
+      try {
+        await BackendLocator.groupRepository
+            .cleanupMembershipsForDeletedAccount(uid);
+      } catch (e) {
+        debugPrint(
+          'Group membership cleanup error (continuing with deletion): $e',
+        );
       }
 
       // Delete the Firestore user document FIRST, while the user is still
@@ -1003,9 +1065,7 @@ class AuthService {
       return DeleteAccountResult.success();
     } on FirebaseAuthException catch (e) {
       debugPrint('Firebase Auth deletion error: $e');
-      return DeleteAccountResult.error(
-        getFriendlyAuthErrorMessage(e),
-      );
+      return DeleteAccountResult.error(getFriendlyAuthErrorMessage(e));
     } catch (e) {
       debugPrint('Account deletion error: $e');
       return DeleteAccountResult.error(
@@ -1143,13 +1203,16 @@ class AuthService {
             lower.contains('incorrect')) {
           return 'Incorrect email or password. Please try again.';
         }
-        if (lower.contains('user-not-found') || lower.contains('no user record')) {
+        if (lower.contains('user-not-found') ||
+            lower.contains('no user record')) {
           return 'No account found with this email address.';
         }
         if (lower.contains('network')) {
           return 'No internet connection. Please check your network and try again.';
         }
-        return msg.isNotEmpty ? msg : 'Authentication failed. Please try again.';
+        return msg.isNotEmpty
+            ? msg
+            : 'Authentication failed. Please try again.';
     }
   }
 }

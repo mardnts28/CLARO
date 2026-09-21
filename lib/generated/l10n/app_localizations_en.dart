@@ -126,6 +126,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get whoCardSource => 'by WHO';
 
   @override
+  String get healthConditionsSubtitle =>
+      'Information about food and nutrients associated to GERD and Kidney diseases.';
+
+  @override
+  String get kidneyCardTitle => 'Healthy Eating for Kidney Disease';
+
+  @override
+  String get kidneyCardSource => 'by NIDDK';
+
+  @override
+  String get gerdCardTitle => 'Eating, Diet, & Nutrition for GERD';
+
+  @override
+  String get gerdCardSource => 'by NIDDK';
+
+  @override
   String get healthGradeTitle => 'Food health rating';
 
   @override
@@ -686,6 +702,88 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get conditionHeartCondition => 'Heart condition';
+
+  @override
+  String get conditionGerd => 'GERD (Gastroesophageal Reflux Disease)';
+
+  @override
+  String get conditionKidneyDisease => 'Kidney disease';
+
+  @override
+  String get gerdWarningTitle => 'GERD Warning';
+
+  @override
+  String get gerdWarningIntro =>
+      'This product contains ingredients that may trigger or worsen GERD symptoms. The detected ingredient(s) listed below are commonly associated with acid reflux.';
+
+  @override
+  String get gerdNoTriggersFound =>
+      'No common GERD triggers detected from the available product information.';
+
+  @override
+  String get gerdInsufficientData =>
+      'There isn\'t enough ingredient or nutrition information for this product to check for common GERD triggers.';
+
+  @override
+  String get gerdDisclaimer =>
+      'This is general information, not a diagnosis or medical advice. If you experience symptoms, consult your doctor.';
+
+  @override
+  String get gerdExpertAdvice =>
+      'Best to consult with an expert before consuming this product.';
+
+  @override
+  String get gerdTriggerTomatoAcidic => 'Tomato / acidic ingredient';
+
+  @override
+  String get gerdTriggerSpicy => 'Spicy ingredient';
+
+  @override
+  String get gerdTriggerCaffeine => 'Caffeine';
+
+  @override
+  String get gerdTriggerChocolate => 'Chocolate / cocoa';
+
+  @override
+  String get gerdTriggerHighFat => 'High fat content';
+
+  @override
+  String get kidneyWarningTitle => 'Kidney Disease Warning';
+
+  @override
+  String get kidneyWarningIntro =>
+      'These nutrients may be relevant to kidney health. Individual dietary needs vary depending on the person\'s kidney condition.';
+
+  @override
+  String get kidneyDisclaimer =>
+      'This is general information, not a diagnosis or medical advice. Consult your healthcare provider for personalized dietary guidance.';
+
+  @override
+  String get kidneyExpertAdvice =>
+      'Best to consult with an expert to identify the right amount of the mentioned nutrients of the product for you.';
+
+  @override
+  String get kidneyNoNutrientsFound =>
+      'No kidney-relevant nutrients detected from the available product information.';
+
+  @override
+  String get kidneyNutrientSodium => 'Sodium';
+
+  @override
+  String get kidneyNutrientPotassium => 'Potassium';
+
+  @override
+  String get kidneyNutrientProtein => 'Protein';
+
+  @override
+  String get kidneyNutrientPhosphorus => 'Phosphorus';
+
+  @override
+  String get combinedGerdKidneyWarningTitle => 'GERD and Kidney Disease Warning';
+
+  @override
+  String get combinedGerdKidneyIntro =>
+      'This product contains ingredients or nutrients that may be relevant to both GERD and kidney health. Individual dietary needs vary depending on the person\'s conditions.';
 
   @override
   String get conditionLowVision => 'Low vision';
@@ -1388,4 +1486,188 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get noInternetVoiceMessage =>
       'Please connect to mobile data or Wi-Fi to use the Voice Assistant.';
+
+  @override
+  String get groupTab => 'Group';
+
+  @override
+  String get noGroupYet => 'No group yet';
+
+  @override
+  String get groupEmptyStateTitle =>
+      'Evaluate products for your whole household';
+
+  @override
+  String get groupEmptyStateSubtitle =>
+      'Create a group to see a health evaluation for each family member, friend, or co-living partner every time you scan a product.';
+
+  @override
+  String get joinGroupButton => 'Join';
+
+  @override
+  String get createGroupButton => 'Create';
+
+  @override
+  String get nameYourGroup => 'Name your group';
+
+  @override
+  String get groupNameHint => 'e.g. My Family';
+
+  @override
+  String get defaultGroupName => 'My Health Group';
+
+  @override
+  String get groupOwnerLabel => 'You own this group';
+
+  @override
+  String get groupMemberLabel => 'You are a member';
+
+  @override
+  String get groupDetailsMembers => 'Members';
+
+  @override
+  String get groupDetailsNoMembers => 'No members yet.';
+
+  @override
+  String get memberStatusLinked => 'Linked';
+
+  @override
+  String get memberStatusManaged => 'Managed';
+
+  @override
+  String get removeFromGroupTooltip => 'Remove from group';
+
+  @override
+  String get deleteMemberTooltip => 'Delete member';
+
+  @override
+  String get removeFromGroupTitle => 'Remove from group?';
+
+  @override
+  String get deleteMemberTitle => 'Delete this member?';
+
+  @override
+  String get removeFromGroupMessage =>
+      'This removes them from the group. Their own health data is not affected.';
+
+  @override
+  String get deleteMemberMessage =>
+      'This permanently deletes this member\'s entry and their health data.';
+
+  @override
+  String get removeButton => 'Remove';
+
+  @override
+  String get addMemberButton => 'Add Member';
+
+  @override
+  String get addMemberChooserTitle => 'Add a member';
+
+  @override
+  String get inviteSomeoneTitle => 'Invite someone';
+
+  @override
+  String get inviteSomeoneSubtitle =>
+      'They install the app and manage their own profile';
+
+  @override
+  String get addManuallyTitle => 'Add manually';
+
+  @override
+  String get addManuallySubtitle => 'For someone without their own account';
+
+  @override
+  String get memberNameHint => 'Member\'s name';
+
+  @override
+  String get memberNameEmptyError => 'Enter this member\'s name';
+
+  @override
+  String memberAddedSuccess(Object name) {
+    return '$name added to your group';
+  }
+
+  @override
+  String memberAddedHealthDataFailed(Object name) {
+    return '$name was added, but health info failed to save. Edit them to retry.';
+  }
+
+  @override
+  String get viewOnlyHealthProfileNote =>
+      'You can view this member\'s health profile, but only they can edit it.';
+
+  @override
+  String get noHealthProfileYet => 'No health info added yet';
+
+  @override
+  String get editHealthProfile => 'Edit';
+
+  @override
+  String get deleteGroupButton => 'Delete Group';
+
+  @override
+  String get deleteGroupDisabledHint =>
+      'Remove all members before you can delete this group.';
+
+  @override
+  String get deleteGroupConfirmTitle => 'Delete this group?';
+
+  @override
+  String get deleteGroupConfirmMessage => 'This can\'t be undone.';
+
+  @override
+  String get deleteGroupSuccess => 'Group deleted';
+
+  @override
+  String get joinGroupDialogTitle => 'Join a Group';
+
+  @override
+  String get joinGroupDialogSubtitle =>
+      'Enter the code someone shared with you to join their health group.';
+
+  @override
+  String get inviteCodeHint => 'e.g. AB3D9F2KH';
+
+  @override
+  String get invalidCodeError => 'Enter a valid 9-character code';
+
+  @override
+  String get codeDidNotWorkError =>
+      'That code didn\'t work. Check it and try again.';
+
+  @override
+  String get joinGroupSubmit => 'Join Group';
+
+  @override
+  String get joinViaQr => 'Join via QR';
+
+  @override
+  String get scanQrTitle => 'Scan Invite QR';
+
+  @override
+  String get scanQrInstruction =>
+      'Point your camera at the QR code shared with you.';
+
+  @override
+  String get qrCameraPermissionDenied =>
+      'Camera permission is needed to scan a QR code.';
+
+  @override
+  String get inviteMemberTitle => 'Invite a Member';
+
+  @override
+  String get inviteMemberInstructions =>
+      'Share this code or QR with the person you want to add. It expires in 48 hours and can only be used once.';
+
+  @override
+  String get copyCode => 'Copy code';
+
+  @override
+  String get codeCopied => 'Code copied';
+
+  @override
+  String get revokeAndRegenerate => 'Revoke & Generate New Code';
+
+  @override
+  String get somethingWentWrong => 'Something went wrong. Please try again.';
 }

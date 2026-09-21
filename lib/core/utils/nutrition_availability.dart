@@ -30,14 +30,7 @@ class NutritionAvailability {
   /// ProductRankingService / ProductComparisonService.
   static bool isAvailable(Product product) {
     final facts = product.nutritionalFacts;
-    if (facts.hasNutritionData) return true;
-    return facts.caloriesKcal > 0 ||
-        facts.proteinG > 0 ||
-        facts.totalFatG > 0 ||
-        facts.sodiumMg > 0 ||
-        facts.carbsG > 0 ||
-        facts.sugarsG > 0 ||
-        facts.saturatedFatG > 0;
+    return facts.hasNutritionData;
   }
 
   /// True only if EVERY product in [products] has real nutrition data.

@@ -13,6 +13,41 @@ import '../../models/product_model.dart';
 class ServingSizeCalculator {
   static const int mealsPerDay = 3;
 
+  /// The same per-meal figure calculate() phrases, as a number of grams
+  /// (capped at [servingSizeG]). Null when the product has none of the
+  /// nutrient. Lets callers compare amounts across people -- e.g. the
+  /// group advisory picks the smallest one.
+  static double? suggestedGrams({
+    required String nutrientKey,
+    required double valuePer100g,
+    required double servingSizeG,
+  }) {
+    if (valuePer100g <= 0 || servingSizeG <= 0) return null;
+    final perMealLimit = WhoCalculator.getWhoDailyLimit(nutrientKey) / mealsPerDay;
+    final grams = (perMealLimit / valuePer100g) * 100;
+    return grams.clamp(0.0, servingSizeG).toDouble();
+  }
+
+  /// Grams form of calculateCombinedNutrients(): the most restrictive
+  /// per-meal amount across sodium, total sugars and saturated fat (capped
+  /// at [servingSizeG]). Null when the product has none of them.
+  static double? suggestedGramsCombined({
+    required NutritionInfo nutritionPer100g,
+    required double servingSizeG,
+  }) {
+    final values = {
+      'sodiumMg': nutritionPer100g.sodiumMg,
+      'sugarsG': nutritionPer100g.sugarsG,
+      'saturatedFatG': nutritionPer100g.saturatedFatG,
+    };
+    double? smallest;
+    values.forEach((key, value) {
+      final g = suggestedGrams(nutrientKey: key, valuePer100g: value, servingSizeG: servingSizeG);
+      if (g != null && (smallest == null || g < smallest!)) smallest = g;
+    });
+    return smallest;
+  }
+
   static String? calculate({
     required String nutrientKey,
     required double valuePer100g,

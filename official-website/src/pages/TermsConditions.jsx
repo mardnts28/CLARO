@@ -19,7 +19,7 @@ By creating an account or using CLARO, you agree to these Terms. If you do not a
         <div className="doc-card">
           <div className="doc-meta">
             <Clock size={16} />
-            <span>Last Updated: August 10, 2026</span>
+            <span>Last Updated: September 21, 2026</span>
             <span style={{ margin: '0 0.5rem' }}>•</span>
             <FileCheck size={16} />
             <span>Terms Version 1.0</span>
@@ -39,9 +39,10 @@ By creating an account or using CLARO, you agree to these Terms. If you do not a
               <li>Allergen information</li>
               <li>Health-related advisories</li>
               <li>Product comparisons and rankings</li>
+              <li>Group health evaluations and shared profile viewing</li>
             </ul>
             <p className="doc-section-text" style={{ marginTop: '1rem' }}>
-              The application may also provide personalized recommendations based on information voluntarily entered into the user's health profile.
+              The application may also provide personalized recommendations based on information voluntarily entered into the user's health profile or group health profiles.
             </p>
           </div>
 
@@ -66,18 +67,28 @@ By creating an account or using CLARO, you agree to these Terms. If you do not a
           </div>
 
           <div className="doc-section">
-            <h2 className="doc-section-title">3. Health Profile</h2>
+            <h2 className="doc-section-title">3. Health Profile and Health Groups</h2>
             <p className="doc-section-text">
-              CLARO allows users to provide information about their health conditions and food allergies.
+              CLARO allows users to provide information about their health conditions (such as Diabetes, Hypertension, Heart Condition, GERD, and Kidney Disease) and food allergies.
             </p>
             <p className="doc-section-text">
-              This information is used to personalize product advisories, warnings, and recommendations.
+              This information is used to personalize product advisories, warnings, and individual or group product evaluations.
             </p>
             <p className="doc-section-text">
-              You are responsible for ensuring that the information in your health profile is accurate and up to date.
+              Users may create or join Health Groups where members can view each other's health conditions to consider member health when evaluating products.
             </p>
             <p className="doc-section-text">
-              If your health information changes, you should update your profile accordingly.
+              Health profile management and permissions within groups strictly follow these rules:
+            </p>
+            <ul className="doc-section-text" style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+              <li>Only registered account holders can manage and update their own health profile.</li>
+              <li>Group members can view invited members' health profiles, but cannot modify or edit them.</li>
+              <li>Group owners can manage health conditions for manually added members created within their group.</li>
+              <li>Only group owners have authority to remove a member from a group.</li>
+              <li>Only group owners can delete a group, provided the group has no remaining members beside the group owner.</li>
+            </ul>
+            <p className="doc-section-text" style={{ marginTop: '1rem' }}>
+              You are responsible for ensuring that the information in your health profile or manually added member profiles is accurate and up to date.
             </p>
           </div>
 

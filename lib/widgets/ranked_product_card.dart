@@ -17,6 +17,7 @@ import '../core/utils/rank_label_helper.dart';
 
 class RankedProductCard extends StatelessWidget {
   final RankedProductResult ranked;
+  final int totalProducts;
   final bool isCurrent;
   final VoidCallback onTap;
   final int? quantity;
@@ -24,6 +25,7 @@ class RankedProductCard extends StatelessWidget {
   const RankedProductCard({
     super.key,
     required this.ranked,
+    required this.totalProducts,
     required this.onTap,
     this.isCurrent = false,
     this.quantity,
@@ -31,11 +33,13 @@ class RankedProductCard extends StatelessWidget {
 
   Color _labelColor() => RankLabelHelper.color(
         rank: ranked.rank,
+        totalProducts: totalProducts,
         suitabilityRankLabel: ranked.suitabilityRankLabel,
       );
 
   String _labelText() => RankLabelHelper.label(
         rank: ranked.rank,
+        totalProducts: totalProducts,
         suitabilityRankLabel: ranked.suitabilityRankLabel,
       );
 

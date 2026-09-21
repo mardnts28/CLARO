@@ -172,6 +172,129 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
+    // ─── Health Groups ───────────────────────────────────────────
+    // Groups allow users to share health data with family members.
+    // Each group has an owner (ownerUid) and members stored in a subcollection.
+    match /groups/{groupId} {
+      // Helper to check if request.auth.uid is the group owner
+      function isOwner() {
+        return request.auth != null && resource.data.ownerUid == request.auth.uid;
+      }
+      
+      // Helper to check if request.auth.uid is a member of this group
+      function isMember() {
+        return request.auth != null 
+               && exists(/databases/$(database)/documents/groups/$(groupId)/members/$(request.auth.uid));
+      }
+      
+      // For list operations, we can't use resource.data (it doesn't exist yet)
+      // So we allow listing if the user is authenticated - the client will filter
+      // This is safe because the query in getGroups() uses where('ownerUid', isEqualTo: uid)
+      // for owned groups and gets specific IDs for joined groups
+      allow list: if request.auth != null;
+      
+      // Allow read for owner or members
+      allow read: if request.auth != null && (isOwner() || isMember());
+      
+      // Allow get for owner or members
+      allow get: if request.auth != null && (isOwner() || isMember());
+      
+      // Allow create: owner creates the group with their uid as ownerUid
+      allow create: if request.auth != null 
+                    && request.resource.data.ownerUid == request.auth.uid;
+      
+      // Allow update: only owner can update group metadata
+      allow update: if request.auth != null && isOwner();
+      
+      // Allow delete: only owner can delete
+      // Note: The client-side validation in GroupRepository.deleteGroup() 
+      // ensures no active members remain before attempting deletion
+      allow delete: if request.auth != null && isOwner();
+      
+      // ─── Group Members ───────────────────────────────────────
+      match /members/{memberId} {
+        // Helper to check if request.auth.uid is the group owner
+        // Need to check the parent group document since member docs don't have ownerUid
+        function isGroupOwner() {
+          return request.auth != null 
+                 && exists(/databases/$(database)/documents/groups/$(groupId))
+                 && get(/databases/$(database)/documents/groups/$(groupId)).data.ownerUid == request.auth.uid;
+        }
+        
+        // Helper to check if this member is the authenticated user (linked member)
+        function isThisUser() {
+          return request.auth != null && request.auth.uid == memberId;
+        }
+        
+        // Helper to check if this member is a linked member (has linkedUid field)
+        function isLinkedMember() {
+          return resource.data.sourceType == 'linked';
+        }
+        
+        // Allow list/read for owner or members (needed for queries like watchMembers)
+        allow list, read: if request.auth != null && (isGroupOwner() || isMember());
+        
+        // Allow get for owner or the member themselves
+        allow get: if request.auth != null && (isGroupOwner() || isThisUser());
+        
+        // Allow create: owner can add members
+        allow create: if request.auth != null && isGroupOwner();
+        
+        // Allow update: owner can update any fields on managed members (including health data via Worker)
+        // Linked users can update their own display name or mark themselves
+        // as left. Health data and membership ownership remain protected.
+        allow update: if request.auth != null 
+                      && (isGroupOwner() 
+                          || (isThisUser() && isLinkedMember() 
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'displayName'])));
+        
+        // Allow delete: owner can delete managed members
+        allow delete: if request.auth != null && isGroupOwner();
+      }
+      
+      // ─── Group Invites ───────────────────────────────────────
+      match /invites/{inviteCode} {
+        // Helper to check if request.auth.uid is the group owner
+        function isGroupOwner() {
+          return request.auth != null 
+                 && exists(/databases/$(database)/documents/groups/$(groupId))
+                 && get(/databases/$(database)/documents/groups/$(groupId)).data.ownerUid == request.auth.uid;
+        }
+        
+        // Allow list for owner (to check invite status)
+        allow list: if request.auth != null && isGroupOwner();
+        
+        // Allow get for owner (to check invite status)
+        allow get: if request.auth != null && isGroupOwner();
+        
+        // Allow create: createdBy must match authenticated user (client validates group ownership)
+        allow create: if request.auth != null 
+                      && request.resource.data.createdBy == request.auth.uid;
+        
+        // Allow update: owner can revoke invites, or invite can be redeemed
+        allow update: if request.auth != null 
+                      && (isGroupOwner() 
+                          || (request.resource.data.status == 'redeemed' 
+                              && resource.data.status == 'pending'));
+        
+        // Allow delete: owner can delete invites
+        allow delete: if request.auth != null && isGroupOwner();
+      }
+    }
+    
+    // ─── Invite Codes Lookup ───────────────────────────────────
+    // Top-level collection for invite code lookup without knowing the group ID
+    match /inviteCodes/{code} {
+      // Allow read for authenticated users (to redeem invites)
+      allow read: if request.auth != null;
+      
+      // Allow create/delete: only through group operations (by owner)
+      allow create, delete: if false;
+      
+      // Allow update: only through group operations
+      allow update: if false;
+    }
+
     // ─── Deny everything else by default ─────────────────────────
     match /{document=**} {
       allow read, write: if false;

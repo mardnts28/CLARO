@@ -1,6 +1,10 @@
 import { verifyFirebaseToken } from "./verifyToken";
 import { encryptField, decryptField } from "./crypto";
 import { getUserDoc, patchUserDoc } from "./firestore";
+import {
+  handleGroupMemberHealthProfileGet,
+  handleGroupMemberHealthProfilePost,
+} from "./groupMemberHealthProfile"; // Phase 6
 
 import { Env } from "./env";
 
@@ -35,6 +39,17 @@ export default {
       if (body.allergens) update.allergens = await encryptField(env, body.allergens);
       await patchUserDoc(env, uid, update);
       return Response.json({ success: true });
+    }
+
+    // Phase 6 -- group-managed ("Option B") member health data. uid here
+    // is already verified above, same as every other route in this file;
+    // the group-ownership + sourceType==="managed" checks happen inside
+    // these handlers (see groupMemberHealthProfile.ts).
+    if (url.pathname === "/group-member-health-profile" && request.method === "POST") {
+      return handleGroupMemberHealthProfilePost(env, uid, request);
+    }
+    if (url.pathname === "/group-member-health-profile" && request.method === "GET") {
+      return handleGroupMemberHealthProfileGet(env, uid, url);
     }
 
     return new Response("Not found", { status: 404 });

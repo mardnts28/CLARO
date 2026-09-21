@@ -63,7 +63,7 @@ void main() {
 
       // Verify the advisory structure
       expect(advisory.overallLevel, AdvisoryLevel.suitable);
-      expect(advisory.warningText, 'Suitable');
+      expect(advisory.warningText, 'Suitable - No Flagged Nutrient or Ingredient');
       expect(advisory.source, AdvisorySource.fallbackRuleBased);
       
       // Verify the explanation is short and contains serving suggestion
@@ -140,7 +140,7 @@ void main() {
 
       // Verify the advisory structure
       expect(advisory.overallLevel, AdvisoryLevel.suitable);
-      expect(advisory.warningText, 'Angkop');
+      expect(advisory.warningText, 'Angkop - Walang Minarkahang Nutrient o Sangkap');
       expect(advisory.source, AdvisorySource.fallbackRuleBased);
       
       // Verify the explanation is in Tagalog and short

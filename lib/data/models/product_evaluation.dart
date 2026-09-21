@@ -14,13 +14,40 @@ import '../../core/constants/who_fda_thresholds.dart';
 import 'health_profile.dart';
 import '../../models/product_model.dart';
 
+enum ScoringStatus { known, unknown }
+
+/// A scored condition factor that is not necessarily a label nutrient row.
+class ScoredFactorEvaluation {
+  final String factorKey;
+  final List<HealthCondition> conditions;
+  final ScoringStatus status;
+  final AdvisoryLevel level;
+  final int points;
+  final String explanation;
+  final double? valuePerServing;
+
+  const ScoredFactorEvaluation({
+    required this.factorKey,
+    required this.conditions,
+    required this.status,
+    required this.level,
+    required this.points,
+    required this.explanation,
+    this.valuePerServing,
+  });
+
+  bool get isUnknown => status == ScoringStatus.unknown;
+}
+
 // Result of classifying ONE nutrient against ONE condition's threshold band.
 class NutrientEvaluation {
   final HealthCondition condition;
   final String nutrientKey; // e.g. 'sodiumMg', 'sugarsG', 'saturatedFatG'
-  final double valuePer100g; // For ranking/comparison (maintained for consistency)
+  final double
+  valuePer100g; // For ranking/comparison (maintained for consistency)
   final double valuePerServing; // For health advisory display
-  final double whoDailyLimitPercentage; // Percentage of WHO daily limit per serving
+  final double
+  whoDailyLimitPercentage; // Percentage of WHO daily limit per serving
   final AdvisoryLevel level; // Based on WHO daily limit percentage
 
   const NutrientEvaluation({
@@ -56,7 +83,8 @@ enum AllergenMatchType {
 // reliably explains it, and how confident that attribution is.
 class AllergenIngredientMatch {
   final AllergenType allergen;
-  final String? ingredient; // always non-null in current implementation (direct/derived matches only)
+  final String?
+  ingredient; // always non-null in current implementation (direct/derived matches only)
   final AllergenMatchType matchType;
 
   const AllergenIngredientMatch({
@@ -70,7 +98,8 @@ class AllergenIngredientMatch {
 class AllergenAssessment {
   final List<AllergenType> matchedContains; // definite match -> forced last
   final bool hasDirectAllergen;
-  final List<String> matchedIngredients; // specific ingredient strings that matched (direct + derived only)
+  final List<String>
+  matchedIngredients; // specific ingredient strings that matched (direct + derived only)
   // One entry per allergen in [matchedContains], describing exactly which
   // ingredient (if any) reliably explains that match and whether it's a
   // direct or derived source. See AllergenMatchType for the rules.
@@ -92,8 +121,10 @@ class ProductEvaluation {
   final List<NutrientEvaluation> nutrientEvaluations;
   final AllergenAssessment allergenAssessment;
   final int riskScore; // Table 3.15 summed points
-  final AdvisoryLevel overallLevel; // worst level across all evaluated nutrients
+  final AdvisoryLevel
+  overallLevel; // worst level across all evaluated nutrients
   final bool allergenOverride; // true -> forced last in ranking (Table 3.15)
+  final List<ScoredFactorEvaluation> scoredFactors;
 
   const ProductEvaluation({
     required this.product,
@@ -102,5 +133,6 @@ class ProductEvaluation {
     required this.riskScore,
     required this.overallLevel,
     required this.allergenOverride,
+    this.scoredFactors = const [],
   });
 }

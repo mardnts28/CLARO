@@ -21,7 +21,7 @@ class _TermsSection {
 /// Full text of CLARO's Terms & Conditions, reproduced verbatim from the
 /// source document and broken into sections/bullets purely for on-screen
 /// readability. No content is omitted or truncated.
-const _termsLastUpdated = 'Last Updated: August 10, 2026';
+const _termsLastUpdated = 'Last Updated: September 21, 2026';
 const _termsVersion = 'Terms Version 1.0';
 const _termsIntro =
     'These Terms and Conditions ("Terms") govern your access to and use of '
@@ -45,11 +45,12 @@ final List<_TermsSection> _termsSections = [
       'Allergen information',
       'Health-related advisories',
       'Product comparisons and rankings',
+      'Group health evaluations and shared profile viewing',
     ]),
     const _TermsBlock.paragraph(
       "The application may also provide personalized recommendations "
       "based on information voluntarily entered into the user's health "
-      "profile.",
+      "profile or group health profiles.",
     ),
   ]),
   _TermsSection('2. Eligibility and Account', [
@@ -72,22 +73,34 @@ final List<_TermsSection> _termsSections = [
       'or integrity of the system.',
     ),
   ]),
-  _TermsSection('3. Health Profile', [
+  _TermsSection('3. Health Profile and Health Groups', [
     const _TermsBlock.paragraph(
       'CLARO allows users to provide information about their health '
-      'conditions and food allergies.',
+      'conditions (such as Diabetes, Hypertension, Heart Condition, GERD, '
+      'and Kidney Disease) and food allergies.',
     ),
     const _TermsBlock.paragraph(
       'This information is used to personalize product advisories, '
-      'warnings, and recommendations.',
+      'warnings, and individual or group product evaluations.',
     ),
+    const _TermsBlock.paragraph(
+      'Users may create or join Health Groups where group members can view '
+      'each other\'s health conditions to consider member health when '
+      'evaluating products.',
+    ),
+    const _TermsBlock.paragraph(
+      'Health profile management and permissions within groups strictly follow these rules:',
+    ),
+    const _TermsBlock.bullets([
+      'Only registered account holders can manage and update their own health profile.',
+      'Group members can view invited members\' health profiles, but cannot modify or edit them.',
+      'Group owners can manage health conditions for manually added members created within their group.',
+      'Only group owners have authority to remove a member from a group.',
+      'Only group owners can delete a group, provided the group has no remaining members beside the group owner.',
+    ]),
     const _TermsBlock.paragraph(
       'You are responsible for ensuring that the information in your '
-      'health profile is accurate and up to date.',
-    ),
-    const _TermsBlock.paragraph(
-      'If your health information changes, you should update your profile '
-      'accordingly.',
+      'health profile or manually added member profiles is accurate and up to date.',
     ),
   ]),
   _TermsSection('4. Health and Medical Disclaimer', [

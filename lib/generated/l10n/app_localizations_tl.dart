@@ -127,6 +127,22 @@ class AppLocalizationsTl extends AppLocalizations {
   String get whoCardSource => 'ng WHO';
 
   @override
+  String get healthConditionsSubtitle =>
+      'Impormasyon tungkol sa pagkain at nutrients na may kaugnayan sa GERD at sakit sa bato.';
+
+  @override
+  String get kidneyCardTitle => 'Malusog na Pagkain para sa Sakit sa Bato';
+
+  @override
+  String get kidneyCardSource => 'ng NIDDK';
+
+  @override
+  String get gerdCardTitle => 'Pagkain, Diyeta, at Nutrisyon para sa GERD';
+
+  @override
+  String get gerdCardSource => 'ng NIDDK';
+
+  @override
   String get healthGradeTitle => 'Sukat ng kalusugan ng pagkain';
 
   @override
@@ -695,6 +711,88 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get conditionHeartCondition => 'Sakit sa puso';
+
+  @override
+  String get conditionGerd => 'GERD (Gastroesophageal Reflux Disease)';
+
+  @override
+  String get conditionKidneyDisease => 'Sakit sa bato';
+
+  @override
+  String get gerdWarningTitle => 'Babala sa GERD';
+
+  @override
+  String get gerdWarningIntro =>
+      'Ang produktong ito ay naglalaman ng mga sangkap na maaaring mag-trigger o magpalala ng sintomas ng GERD. Ang mga sangkap na nasa ibaba ay kadalasang nauugnay sa acid reflux.';
+
+  @override
+  String get gerdNoTriggersFound =>
+      'Walang karaniwang GERD trigger na natukoy mula sa available na impormasyon ng produkto.';
+
+  @override
+  String get gerdInsufficientData =>
+      'Hindi sapat ang impormasyon sa sangkap o nutrition ng produktong ito para masuri ang mga karaniwang GERD trigger.';
+
+  @override
+  String get gerdDisclaimer =>
+      'Pangkalahatang impormasyon lamang ito, hindi diagnosis o medical advice. Kung nakakaranas ka ng sintomas, kumonsulta sa iyong doktor.';
+
+  @override
+  String get gerdExpertAdvice =>
+      'Mainam na kumonsulta muna sa isang expert bago uminom ng produktong ito.';
+
+  @override
+  String get gerdTriggerTomatoAcidic => 'Tomato / maasim na sangkap';
+
+  @override
+  String get gerdTriggerSpicy => 'Maanghang na sangkap';
+
+  @override
+  String get gerdTriggerCaffeine => 'Caffeine';
+
+  @override
+  String get gerdTriggerChocolate => 'Chocolate / cacao';
+
+  @override
+  String get gerdTriggerHighFat => 'Mataas na taba (fat)';
+
+  @override
+  String get kidneyWarningTitle => 'Babala sa Sakit sa Bato';
+
+  @override
+  String get kidneyWarningIntro =>
+      'Ang mga nutrients na ito ay maaaring may kaugnayan sa kalusugan ng bato. Nagkakaiba-iba ang pangangailangan sa diyeta ng bawat tao depende sa kanilang kondisyon sa bato.';
+
+  @override
+  String get kidneyDisclaimer =>
+      'Pangkalahatang impormasyon lamang ito, hindi diagnosis o medical advice. Kumonsulta sa iyong healthcare provider para sa personalized na gabay sa diyeta.';
+
+  @override
+  String get kidneyExpertAdvice =>
+      'Pinakamainam na kumonsulta sa isang dalubhasa upang matukoy ang tamang dami ng mga nabanggit na nutrient ng produkto para sa iyo.';
+
+  @override
+  String get kidneyNoNutrientsFound =>
+      'Walang nutrients na may kaugnayan sa bato ang natukoy mula sa available na impormasyon ng produkto.';
+
+  @override
+  String get kidneyNutrientSodium => 'Sodium';
+
+  @override
+  String get kidneyNutrientPotassium => 'Potassium';
+
+  @override
+  String get kidneyNutrientProtein => 'Protein';
+
+  @override
+  String get kidneyNutrientPhosphorus => 'Phosphorus';
+
+  @override
+  String get combinedGerdKidneyWarningTitle => 'Babala sa GERD at Sakit sa Bato';
+
+  @override
+  String get combinedGerdKidneyIntro =>
+      'Ang produktong ito ay naglalaman ng mga sangkap o nutrients na maaaring may kaugnayan sa parehong GERD at kalusugan ng bato. Nagkakaiba-iba ang pangangailangan sa diyeta ng bawat tao depende sa kanilang mga kondisyon.';
 
   @override
   String get conditionLowVision => 'Mababang Paningin';
@@ -1409,4 +1507,188 @@ class AppLocalizationsTl extends AppLocalizations {
   @override
   String get noInternetVoiceMessage =>
       'Mangyaring kumonekta sa mobile data o Wi-Fi para gamitin ang Voice Assistant.';
+
+  @override
+  String get groupTab => 'Grupo';
+
+  @override
+  String get noGroupYet => 'Wala pang grupo';
+
+  @override
+  String get groupEmptyStateTitle =>
+      'I-evaluate ang mga produkto para sa buong sambahayan mo';
+
+  @override
+  String get groupEmptyStateSubtitle =>
+      'Gumawa ng grupo para makita ang health evaluation ng bawat miyembro ng pamilya, kaibigan, o kasama sa bahay tuwing mag-scan ka ng produkto.';
+
+  @override
+  String get joinGroupButton => 'Sumali';
+
+  @override
+  String get createGroupButton => 'Gumawa';
+
+  @override
+  String get nameYourGroup => 'Pangalanan ang iyong grupo';
+
+  @override
+  String get groupNameHint => 'hal. Ang Aking Pamilya';
+
+  @override
+  String get defaultGroupName => 'Aking Health Group';
+
+  @override
+  String get groupOwnerLabel => 'Ikaw ang may-ari ng grupong ito';
+
+  @override
+  String get groupMemberLabel => 'Ikaw ay isang miyembro';
+
+  @override
+  String get groupDetailsMembers => 'Mga Miyembro';
+
+  @override
+  String get groupDetailsNoMembers => 'Wala pang miyembro.';
+
+  @override
+  String get memberStatusLinked => 'Naka-link';
+
+  @override
+  String get memberStatusManaged => 'Pinamamahalaan';
+
+  @override
+  String get removeFromGroupTooltip => 'Alisin sa grupo';
+
+  @override
+  String get deleteMemberTooltip => 'Burahin ang miyembro';
+
+  @override
+  String get removeFromGroupTitle => 'Alisin sa grupo?';
+
+  @override
+  String get deleteMemberTitle => 'Burahin ang miyembrong ito?';
+
+  @override
+  String get removeFromGroupMessage =>
+      'Aalisin sila sa grupo. Hindi maaapektuhan ang kanilang sariling health data.';
+
+  @override
+  String get deleteMemberMessage =>
+      'Permanenteng mabubura ang entry at health data ng miyembrong ito.';
+
+  @override
+  String get removeButton => 'Alisin';
+
+  @override
+  String get addMemberButton => 'Magdagdag ng Miyembro';
+
+  @override
+  String get addMemberChooserTitle => 'Magdagdag ng miyembro';
+
+  @override
+  String get inviteSomeoneTitle => 'Mag-imbita ng tao';
+
+  @override
+  String get inviteSomeoneSubtitle =>
+      'I-install nila ang app at pamamahalaan ang sarili nilang profile';
+
+  @override
+  String get addManuallyTitle => 'Idagdag nang manu-mano';
+
+  @override
+  String get addManuallySubtitle => 'Para sa taong walang sariling account';
+
+  @override
+  String get memberNameHint => 'Pangalan ng miyembro';
+
+  @override
+  String get memberNameEmptyError => 'Ilagay ang pangalan ng miyembrong ito';
+
+  @override
+  String memberAddedSuccess(Object name) {
+    return 'Naidagdag si $name sa iyong grupo';
+  }
+
+  @override
+  String memberAddedHealthDataFailed(Object name) {
+    return 'Naidagdag si $name, pero hindi na-save ang health info. I-edit sila para subukan ulit.';
+  }
+
+  @override
+  String get viewOnlyHealthProfileNote =>
+      'Makikita mo ang health profile ng miyembrong ito, pero sila lang ang maaaring mag-edit nito.';
+
+  @override
+  String get noHealthProfileYet => 'Wala pang naidagdag na health info';
+
+  @override
+  String get editHealthProfile => 'I-edit';
+
+  @override
+  String get deleteGroupButton => 'Burahin ang Grupo';
+
+  @override
+  String get deleteGroupDisabledHint =>
+      'Alisin muna ang lahat ng miyembro bago mabura ang grupong ito.';
+
+  @override
+  String get deleteGroupConfirmTitle => 'Burahin ang grupong ito?';
+
+  @override
+  String get deleteGroupConfirmMessage => 'Hindi na ito maaaring bawiin.';
+
+  @override
+  String get deleteGroupSuccess => 'Nabura ang grupo';
+
+  @override
+  String get joinGroupDialogTitle => 'Sumali sa Grupo';
+
+  @override
+  String get joinGroupDialogSubtitle =>
+      'Ilagay ang code na ibinahagi sa iyo para sumali sa kanilang health group.';
+
+  @override
+  String get inviteCodeHint => 'hal. AB3D9F2KH';
+
+  @override
+  String get invalidCodeError => 'Maglagay ng wastong 9-karakter na code';
+
+  @override
+  String get codeDidNotWorkError =>
+      'Hindi gumana ang code na iyon. Tingnan at subukan ulit.';
+
+  @override
+  String get joinGroupSubmit => 'Sumali sa Grupo';
+
+  @override
+  String get joinViaQr => 'Sumali gamit ang QR';
+
+  @override
+  String get scanQrTitle => 'I-scan ang QR ng Imbitasyon';
+
+  @override
+  String get scanQrInstruction =>
+      'Itutok ang iyong camera sa QR code na ibinahagi sa iyo.';
+
+  @override
+  String get qrCameraPermissionDenied =>
+      'Kailangan ng pahintulot sa camera para i-scan ang QR code.';
+
+  @override
+  String get inviteMemberTitle => 'Mag-imbita ng Miyembro';
+
+  @override
+  String get inviteMemberInstructions =>
+      'Ibahagi ang code o QR na ito sa taong gusto mong idagdag. Mag-e-expire ito sa loob ng 48 oras at minsan lang magagamit.';
+
+  @override
+  String get copyCode => 'Kopyahin ang code';
+
+  @override
+  String get codeCopied => 'Nakopya ang code';
+
+  @override
+  String get revokeAndRegenerate => 'Bawiin at Gumawa ng Bagong Code';
+
+  @override
+  String get somethingWentWrong => 'May nangyaring mali. Pakisubukan ulit.';
 }

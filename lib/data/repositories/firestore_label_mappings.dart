@@ -41,6 +41,9 @@ final Map<String, HealthCondition> _conditionLabelMap = {
   _normalize('Hypertension'): HealthCondition.hypertension,
   _normalize('Sakit sa puso'): HealthCondition.heartCondition,
   _normalize('Heart Condition'): HealthCondition.heartCondition,
+  _normalize('GERD'): HealthCondition.gerd,
+  _normalize('Kidney Disease'): HealthCondition.kidneyDisease,
+  _normalize('Sakit sa bato'): HealthCondition.kidneyDisease,
 };
 
 final Map<String, AllergenType> _allergenLabelMap = {
@@ -58,6 +61,11 @@ final Map<String, AllergenType> _allergenLabelMap = {
   _normalize('Lamang-Dagat'): AllergenType.shellfish,
   _normalize('Peanut'): AllergenType.peanuts,
   _normalize('Mani'): AllergenType.peanuts,
+  // Labels used by the group "Add member" screen's allergen grid.
+  _normalize('Milk/Dairy'): AllergenType.dairy,
+  _normalize('Eggs'): AllergenType.eggs,
+  _normalize('Soy'): AllergenType.soy,
+  _normalize('Peanuts'): AllergenType.peanuts,
 };
 
 List<HealthCondition> mapConditionLabels(List<dynamic> raw) {
