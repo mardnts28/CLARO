@@ -232,7 +232,7 @@ class GeminiAdvisoryService {
 
     HealthAdvisory advisory;
     if (!needsAi) {
-      advisory = GroupAdvisoryBuilder.fallback(facts, languageCode: languageCode);
+      advisory = GroupAdvisoryBuilder.fallback(facts, servingSizeG: servingSizeG, languageCode: languageCode);
     } else {
       try {
         final text = await _callGemini(
@@ -244,11 +244,11 @@ class GeminiAdvisoryService {
           ),
           timeout: _timeout,
         );
-        advisory = _parseGroupResponse(text, facts, level, languageCode) ??
-            GroupAdvisoryBuilder.fallback(facts, languageCode: languageCode);
+        advisory = _parseGroupResponse(text, facts, level, servingSizeG, languageCode) ??
+            GroupAdvisoryBuilder.fallback(facts, servingSizeG: servingSizeG, languageCode: languageCode);
       } catch (e) {
         print('GEMINI GROUP ADVISORY ERROR: $e');
-        advisory = GroupAdvisoryBuilder.fallback(facts, languageCode: languageCode);
+        advisory = GroupAdvisoryBuilder.fallback(facts, servingSizeG: servingSizeG, languageCode: languageCode);
       }
     }
 
@@ -263,6 +263,7 @@ class GeminiAdvisoryService {
     String? text,
     List<GroupMemberFacts> facts,
     AdvisoryLevel level,
+    double servingSizeG,
     String languageCode,
   ) {
     if (text == null || text.trim().isEmpty) return null;
@@ -284,11 +285,25 @@ class GeminiAdvisoryService {
       final e = GroupAdvisoryBuilder.restoreNames(explanation, facts, languageCode);
       if (w == null || e == null) return null;
 
+      // The suggested amount is calculated by the app, never by Gemini. It
+      // was supplied to the prompt to be copied verbatim; if the reply lost
+      // or altered the figure, append the exact sentence so what's shown
+      // always matches the app's number.
+      final amount = GroupAdvisoryBuilder.groupAmount(
+        facts,
+        servingSizeG,
+        tl: languageCode == 'tl',
+      );
+      var explanationText = e;
+      if (amount != null && !explanationText.contains(amount.token)) {
+        explanationText = '${explanationText.trim()} ${amount.sentence}';
+      }
+
       return HealthAdvisory(
         overallLevel: level,
         warningText: w,
-        explanation: e,
-        safeServingSize: null,
+        explanation: explanationText,
+        safeServingSize: amount?.sentence,
         source: AdvisorySource.aiGenerated,
         generatedAt: DateTime.now(),
       );

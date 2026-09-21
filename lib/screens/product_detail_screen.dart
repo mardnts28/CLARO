@@ -17,7 +17,9 @@ import '../data/models/health_profile.dart';
 import '../data/models/health_advisory.dart';
 import '../data/models/product_evaluation.dart';
 import '../data/models/ranked_product_result.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../data/models/group_evaluation.dart';
+import '../data/models/health_group.dart' show HealthGroup;
 import '../data/repositories/group_repository.dart' show GroupMemberProfile;
 import '../core/utils/group_advisory_builder.dart';
 import '../data/models/comparison_matrix.dart';
@@ -30,6 +32,21 @@ import '../core/utils/nutri_score_calculator.dart';
 import '../core/utils/nova_score_calculator.dart';
 import '../data/services/backend_locator.dart';
 import '../data/services/favorites_service.dart';
+
+// One selectable health group on the product detail screen. `members` stays
+// null until that group's member profiles have been fetched and evaluated.
+class _GroupOption {
+  _GroupOption(this.group);
+  final HealthGroup group;
+  List<MemberEvaluation>? members;
+  bool get loading => members == null;
+}
+
+class _GroupContext {
+  const _GroupContext({required this.options, required this.selected});
+  final List<_GroupOption> options; // every group worth showing (>= 1 other member)
+  final _GroupOption selected;
+}
 
 class ProductDetailScreen extends StatefulWidget {
   final Product product;
@@ -95,10 +112,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // change to how those rows are built. The banner switches to the group
   // verdict.
   bool _groupChecking = true; // group lookup + group advisory still in flight
-  List<MemberEvaluation> _groupMembers = const [];
+  List<MemberEvaluation> _groupMembers = const []; // members of the SELECTED group
   String? _selectedMemberKey;
-  HealthAdvisory? _groupAdvisory;
-  double _groupAdvisorySizeG = 0; // serving size the Gemini text was written for
+  HealthAdvisory? _groupAdvisory; // for the selected group
+  bool _groupAdvisoryLoading = false; // true while a just-picked group's text is generated
+
+  // Multi-group: every group of the user that has at least one other
+  // member. The selector pill/sheet only appears when there are 2 or more.
+  List<_GroupOption> _groupOptions = const [];
+  String? _selectedGroupId;
+  final Map<String, HealthAdvisory> _groupAdvisoryCache = {};
+  // Lets the (possibly open) group sheet rebuild as background group loads
+  // finish.
+  final ValueNotifier<int> _groupOptionsTick = ValueNotifier<int>(0);
+
+  // The Gemini group text is always written for the product's labeled
+  // serving size; any other selected size gets the local rewrite.
+  double get _groupAdvisorySizeG =>
+      _currentProduct.servingSizeG > 0 ? _currentProduct.servingSizeG : 100.0;
+
+  String _lastGroupPrefKey(String uid) => 'product_detail_last_group_$uid';
 
   bool get _isGroupMode => _groupMembers.length > 1;
 
@@ -291,6 +324,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _reportToastTimer?.cancel();
     FavoritesService.favoriteActionNotifier.removeListener(_handleFavoriteActionChanged);
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
+    _groupOptionsTick.dispose();
     super.dispose();
   }
 
@@ -316,6 +350,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _groupMembers = const [];
       _selectedMemberKey = null;
       _groupAdvisory = null;
+      _groupAdvisoryLoading = false;
+      _groupOptions = const [];
+      _selectedGroupId = null;
+      _groupAdvisoryCache.clear();
       _isFavorite = false;
       _hasAutoAnnouncedSummary = false;
       _favoriteBusy = true; // Prevent interaction while loading new product's favorite status
@@ -466,9 +504,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       // any failure just means "solo"). The solo pipeline still runs for
       // everyone: it produces the primary user's own evaluation plus the
       // comparison matrix / ranking text, none of which are group-specific.
-      final groupFuture = _prepareGroupMembers(uid);
+      final groupFuture = _prepareGroups(uid);
       await _loadSoloAdvisory(uid);
-      await _finishGroup(groupFuture);
+      await _finishGroup(groupFuture, uid);
     } catch (e) {
       debugPrint('Error loading health advisory: $e');
       if (mounted) {
@@ -578,16 +616,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  /// Returns every member's evaluation of the current product (signed-in
-  /// user first), or null when this should stay a solo screen: no group,
-  /// a group with only the user in it, or any lookup failure.
-  Future<List<MemberEvaluation>?> _prepareGroupMembers(String uid) async {
+  /// Loads and evaluates ONE group's members for the current product
+  /// (signed-in user first). Returns null when the group has nobody else
+  /// whose profile could be read, or on any failure -- such a group simply
+  /// isn't offered, and a user with no such group stays a solo screen.
+  Future<List<MemberEvaluation>?> _loadGroupMembers(HealthGroup group, String uid) async {
     try {
-      final repo = BackendLocator.groupRepository;
-      final group = await repo.getActiveGroup(uid);
-      if (group == null) return null;
-
-      final entries = await repo.getGroupMemberProfiles(group.id);
+      final entries = await BackendLocator.groupRepository.getGroupMemberProfiles(group.id);
       bool isSelfEntry(GroupMemberProfile e) =>
           e.member.isLinked && e.member.linkedUid == uid;
       if (!entries.any((e) => !isSelfEntry(e))) return null; // nobody else
@@ -633,15 +668,61 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       }
       return members.length > 1 ? members : null;
     } catch (e) {
+      debugPrint('Group ${group.id} skipped: $e');
+      return null;
+    }
+  }
+
+  /// Finds the user's groups and loads the one to show first: the group
+  /// they last picked here, else their primary group, else the first one
+  /// that has other members. Every other group is only listed (still
+  /// loading) and is filled in later by _loadRemainingGroups(). Null means
+  /// "stay solo".
+  Future<_GroupContext?> _prepareGroups(String uid) async {
+    try {
+      final repo = BackendLocator.groupRepository;
+      final groups = await repo.getGroups(uid);
+      if (groups.isEmpty) return null;
+
+      String? lastId;
+      try {
+        lastId = (await SharedPreferences.getInstance()).getString(_lastGroupPrefKey(uid));
+      } catch (_) {}
+      HealthGroup? primary;
+      try {
+        primary = await repo.getActiveGroup(uid);
+      } catch (_) {}
+
+      int rank(HealthGroup g) => g.id == lastId ? 0 : (g.id == primary?.id ? 1 : 2);
+      final ordered = [...groups]..sort((a, b) {
+          final r = rank(a).compareTo(rank(b));
+          return r != 0 ? r : groups.indexOf(a).compareTo(groups.indexOf(b));
+        });
+
+      final options = ordered.map((g) => _GroupOption(g)).toList();
+      _GroupOption? selected;
+      final dropped = <_GroupOption>[];
+      for (final o in options) {
+        final members = await _loadGroupMembers(o.group, uid);
+        if (members != null) {
+          o.members = members;
+          selected = o;
+          break;
+        }
+        dropped.add(o); // solo / unreadable group -- not offered
+      }
+      if (selected == null) return null;
+      options.removeWhere(dropped.contains);
+      return _GroupContext(options: options, selected: selected);
+    } catch (e) {
       debugPrint('Group evaluation skipped: $e');
       return null;
     }
   }
 
   Future<HealthAdvisory> _generateGroupAdvisory(List<MemberEvaluation> members) {
-    final size = _currentProduct.servingSizeG > 0 ? _currentProduct.servingSizeG : 100.0;
+    final size = _groupAdvisorySizeG;
     final languageCode = mounted ? Localizations.localeOf(context).languageCode : 'en';
-    _groupAdvisorySizeG = size;
     return BackendLocator.geminiAdvisoryService.generateGroupAdvisory(
       productId: _currentProduct.id,
       productName: _currentProduct.name,
@@ -651,22 +732,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Future<void> _finishGroup(Future<List<MemberEvaluation>?> pending) async {
+  Future<void> _finishGroup(Future<_GroupContext?> pending, String uid) async {
     final token = _scanEventId; // detects a product switch mid-load
-    final members = await pending;
+    final ctx = await pending;
     if (!mounted || token != _scanEventId) return;
 
-    if (members == null) {
+    if (ctx == null) {
       setState(() => _groupChecking = false);
       _finishVoice();
       return;
     }
 
+    // Only the group being shown gets a Gemini call.
+    final members = ctx.selected.members!;
     final advisory = await _generateGroupAdvisory(members);
     if (!mounted || token != _scanEventId) return;
 
     final self = members.firstWhere((m) => m.isSelf);
+    _groupAdvisoryCache[ctx.selected.group.id] = advisory;
     setState(() {
+      _groupOptions = ctx.options;
+      _selectedGroupId = ctx.selected.group.id;
       _groupMembers = members;
       _groupAdvisory = advisory;
       _selectedMemberKey = self.key;
@@ -674,7 +760,72 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _evaluation = self.evaluation;
       _groupChecking = false;
     });
+    _groupOptionsTick.value++;
     _finishVoice();
+
+    _loadRemainingGroups(ctx, uid, token);
+  }
+
+  /// Evaluates the groups that were only listed so far, in parallel and in
+  /// the background, so the selector sheet can show each one's verdict. A
+  /// group with nobody else in it drops out of the list (and the selector
+  /// disappears if that leaves only one group).
+  void _loadRemainingGroups(_GroupContext ctx, String uid, String token) {
+    for (final o in ctx.options.where((o) => o.loading)) {
+      unawaited(() async {
+        final members = await _loadGroupMembers(o.group, uid);
+        if (!mounted || token != _scanEventId) return;
+        setState(() {
+          if (members == null) {
+            _groupOptions = _groupOptions.where((x) => x != o).toList();
+          } else {
+            o.members = members;
+          }
+        });
+        _groupOptionsTick.value++;
+      }());
+    }
+  }
+
+  /// Switches the banner + Health Analysis card to another group.
+  Future<void> _selectGroup(_GroupOption o) async {
+    final members = o.members;
+    if (members == null || o.group.id == _selectedGroupId) return;
+    HapticService().vibrate();
+
+    final self = members.firstWhere((m) => m.isSelf);
+    final cached = _groupAdvisoryCache[o.group.id];
+    setState(() {
+      _selectedGroupId = o.group.id;
+      _groupMembers = members;
+      _selectedMemberKey = self.key;
+      _userHealthProfile = self.profile;
+      _evaluation = self.evaluation;
+      _groupAdvisory = cached;
+      _groupAdvisoryLoading = cached == null;
+    });
+    _groupOptionsTick.value++;
+
+    final uid = _authService.currentUser?.uid;
+    if (uid != null) {
+      SharedPreferences.getInstance()
+          .then((p) => p.setString(_lastGroupPrefKey(uid), o.group.id))
+          .catchError((_) => false);
+    }
+
+    if (cached == null) {
+      final token = _scanEventId;
+      final advisory = await _generateGroupAdvisory(members);
+      if (!mounted || token != _scanEventId) return;
+      _groupAdvisoryCache[o.group.id] = advisory;
+      if (_selectedGroupId == o.group.id) {
+        setState(() {
+          _groupAdvisory = advisory;
+          _groupAdvisoryLoading = false;
+        });
+      }
+    }
+    if (mounted && _selectedGroupId == o.group.id) _refreshVoiceSummary();
   }
 
   void _selectMember(MemberEvaluation m) {
@@ -714,6 +865,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_selectedSizeG == _groupAdvisorySizeG) return _groupAdvisory;
     return GroupAdvisoryBuilder.fallback(
       GroupAdvisoryBuilder.buildFacts(_groupMembers, _selectedSizeG),
+      servingSizeG: _selectedSizeG,
       languageCode: Localizations.localeOf(context).languageCode,
     );
   }
@@ -2079,6 +2231,249 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  _GroupOption? get _selectedGroupOption {
+    for (final o in _groupOptions) {
+      if (o.group.id == _selectedGroupId) return o;
+    }
+    return null;
+  }
+
+  AdvisoryLevel _optionLevel(_GroupOption o) => GroupAdvisoryBuilder.groupLevel(
+        (o.members ?? const <MemberEvaluation>[])
+            .map((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG)),
+      );
+
+  int _optionFlagged(_GroupOption o) => (o.members ?? const <MemberEvaluation>[])
+      .where((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) != AdvisoryLevel.suitable)
+      .length;
+
+  // Another group that looks WORSE than the one being viewed, so a safe
+  // result for one group never hides a problem in another.
+  _GroupOption? get _worseOtherGroup {
+    final current = _selectedGroupOption;
+    if (current == null) return null;
+    final currentSeverity = GroupAdvisoryBuilder.severity(_optionLevel(current));
+    _GroupOption? worst;
+    var worstSeverity = currentSeverity;
+    for (final o in _groupOptions) {
+      if (o == current || o.loading) continue;
+      final sev = GroupAdvisoryBuilder.severity(_optionLevel(o));
+      if (sev > worstSeverity) {
+        worst = o;
+        worstSeverity = sev;
+      }
+    }
+    return worst;
+  }
+
+  // "Family v" pill at the top of the group banner (opens the group sheet),
+  // with a note on the right about other groups.
+  Widget _buildGroupSelectorRow(ColorScheme cs, bool tl) {
+    final current = _selectedGroupOption;
+    final warn = _worseOtherGroup;
+    final others = _groupOptions.length - 1;
+    final warnColor = warn == null ? null : _groupLevelColor(_optionLevel(warn));
+
+    return Row(
+      children: [
+        Semantics(
+          button: true,
+          label: tl ? 'Pumili ng grupo' : 'Choose group',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: _showGroupSheet,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 190),
+              padding: const EdgeInsets.fromLTRB(12, 6, 8, 6),
+              decoration: BoxDecoration(
+                color: cs.primary.withOpacity(0.10),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: cs.primary.withOpacity(0.6)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      current?.group.name ?? '',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: cs.primary),
+                  if (warnColor != null) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(color: warnColor, shape: BoxShape.circle),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            warn != null
+                ? '${_levelLabel(_optionLevel(warn))} ${tl ? "sa" : "in"} ${warn.group.name}'
+                : (tl
+                    ? '$others pang grupo'
+                    : (others == 1 ? '1 other group' : '$others other groups')),
+            textAlign: TextAlign.right,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              fontWeight: warn != null ? FontWeight.w700 : FontWeight.w500,
+              color: warnColor ?? cs.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showGroupSheet() {
+    HapticService().vibrate();
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return SafeArea(
+          child: ValueListenableBuilder<int>(
+            valueListenable: _groupOptionsTick,
+            builder: (ctx, _, __) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tl ? 'Suriin ang produktong ito para sa' : 'Check this product for',
+                      style: GoogleFonts.outfit(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ..._groupOptions.map((o) => _buildGroupSheetRow(ctx, o, cs, tl)),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGroupSheetRow(BuildContext ctx, _GroupOption o, ColorScheme cs, bool tl) {
+    final isSelected = o.group.id == _selectedGroupId;
+    final members = o.members;
+
+    String subtitle;
+    Widget trailing;
+    if (members == null) {
+      subtitle = tl ? 'Sinusuri...' : 'Checking...';
+      trailing = const SizedBox(
+        width: 16,
+        height: 16,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
+    } else {
+      final total = members.length;
+      final flagged = _optionFlagged(o);
+      subtitle = flagged == 0
+          ? (tl ? '$total miyembro, walang naka-flag' : '$total members, none flagged')
+          : (tl ? '$total miyembro, $flagged ang naka-flag' : '$total members, $flagged flagged');
+      final level = _optionLevel(o);
+      final color = _groupLevelColor(level);
+      trailing = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          _levelLabel(level),
+          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+        ),
+      );
+    }
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '${o.group.name}, $subtitle',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: members == null
+            ? null
+            : () {
+                Navigator.pop(ctx);
+                _selectGroup(o);
+              },
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? cs.primary.withOpacity(0.08) : null,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? cs.primary : cs.outlineVariant,
+              width: isSelected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      o.group.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              trailing,
+              if (isSelected) ...[
+                const SizedBox(width: 8),
+                Icon(Icons.check_rounded, size: 20, color: cs.primary),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // Group verdict banner: replaces the single-user advisory banner when the
   // user's health group has other members.
   Widget _buildGroupBanner(BuildContext context, AppLocalizations loc) {
@@ -2127,6 +2522,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Only shown when the user has 2+ groups with other members.
+          if (_groupOptions.length > 1) ...[
+            _buildGroupSelectorRow(cs, tl),
+            const SizedBox(height: 12),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2144,7 +2544,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         color: color,
                       ),
                     ),
-                    if (advisory != null && advisory.explanation.trim().isNotEmpty) ...[
+                    if (_groupAdvisoryLoading) ...[
+                      const SizedBox(height: 8),
+                      const LinearProgressIndicator(minHeight: 3),
+                    ] else if (advisory != null && advisory.explanation.trim().isNotEmpty) ...[
                       const SizedBox(height: 4),
                       _buildAdvisorySubtitle(advisory.explanation, cs, level),
                     ],
@@ -2220,6 +2623,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final conditions = selected.profile.conditions.isEmpty
         ? (tl ? 'Walang kondisyon sa kalusugan' : 'No health conditions')
         : selected.profile.conditions.map((c) => _groupConditionName(c, tl)).join(', ');
+    // Suggested per-meal amount for THIS member (null for Suitable members
+    // and allergen matches -- see GroupAdvisoryBuilder.memberAmountLine).
+    final amountLine = GroupAdvisoryBuilder.memberAmountLine(
+      GroupAdvisoryBuilder.memberFacts(selected, _selectedSizeG),
+      _selectedSizeG,
+      tl: tl,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -2320,6 +2730,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ],
         ),
+        if (amountLine != null) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: selectedColor.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.restaurant_outlined, size: 16, color: selectedColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    amountLine,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -2802,8 +3241,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final flaggedCount = _groupMembers
           .where((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) != AdvisoryLevel.suitable)
           .length;
+      final groupName = _groupOptions.length > 1 ? _selectedGroupOption?.group.name : null;
+      final groupLabel = groupName == null ? 'Group verdict' : 'Group $groupName verdict';
       sections.add(
-        'Group verdict: ${_levelLabel(_groupLevel)}. '
+        '$groupLabel: ${_levelLabel(_groupLevel)}. '
         '$flaggedCount of ${_groupMembers.length} members flagged.',
       );
       if (groupAdvisory != null) {

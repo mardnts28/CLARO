@@ -25,7 +25,7 @@ enum GroupMemberStatus { invited, active, left }
 
 enum GroupInviteStatus { pending, redeemed, revoked, expired }
 
-enum GroupType { family, friends, lovers, others }
+enum GroupType { family, friends, partners, work, others }
 
 /// Parses the string stored in Firestore back into a [GroupType]. Returns
 /// null when absent or unrecognised (groups created before group types
@@ -46,7 +46,7 @@ class HealthGroup {
   // present here (e.g. just added) is appended at render time -- this
   // list is a display hint, not a source of truth for membership.
   final List<String> memberOrder;
-  // Family / Friends / Lovers / Others. Null for older groups.
+  // Family / Friends / Partners / Work / Others. Null for older groups.
   final GroupType? groupType;
 
   const HealthGroup({

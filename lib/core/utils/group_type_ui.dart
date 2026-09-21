@@ -1,6 +1,6 @@
 // lib/core/utils/group_type_ui.dart
 //
-// Labels + icon widget for GroupType (Family / Friends / Lovers / Others).
+// Labels + icon widget for GroupType (Family / Friends / Partners / Work / Others).
 // Kept out of the generated l10n files (they're regenerated from .arb) --
 // move these into your .arb files later if you prefer.
 
@@ -16,22 +16,22 @@ class GroupTypeUi {
   static const String _folder = 'assets/images/relations/';
 
   // Keyword each group type's image filename is expected to contain
-  // (family.png, friends.png, lovers.png -- "lover.png" also matches).
+  // (family.png, friends.png, lover.png, work.png).
   static const Map<GroupType, String> _keywords = {
     GroupType.family: 'family',
     GroupType.friends: 'friend',
-    GroupType.lovers: 'lover',
+    GroupType.partners: 'lover',
+    GroupType.work: 'work',
   };
 
   static Map<GroupType, String>? _resolved;
   static Future<Map<GroupType, String>>? _resolving;
 
   /// Finds each type's image in the app's asset manifest instead of
-  /// trusting a hard-coded path, so a slightly different filename (e.g.
-  /// lover.png vs lovers.png) or folder still resolves. Prefers
-  /// assets/images/relations/, then falls back to any assets/images/**
-  /// file whose name contains the keyword. Call once at startup (optional)
-  /// to avoid a first-frame fallback icon.
+  /// trusting a hard-coded path, so a slightly different filename or
+  /// folder still resolves. Prefers assets/images/relations/, then falls
+  /// back to any assets/images/** file whose name contains the keyword.
+  /// Call once at startup (optional) to avoid a first-frame fallback icon.
   static Future<Map<GroupType, String>> ensureLoaded() {
     if (_resolved != null) return Future.value(_resolved!);
     return _resolving ??= _resolve();
@@ -77,8 +77,10 @@ class GroupTypeUi {
         return tl ? 'Pamilya' : 'Family';
       case GroupType.friends:
         return tl ? 'Kaibigan' : 'Friends';
-      case GroupType.lovers:
-        return tl ? 'Magkasintahan' : 'Lovers';
+      case GroupType.partners:
+        return tl ? 'Magkasintahan' : 'Partners';
+      case GroupType.work:
+        return tl ? 'Trabaho' : 'Work';
       case GroupType.others:
         return tl ? 'Iba pa' : 'Others';
     }

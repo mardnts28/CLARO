@@ -14,7 +14,9 @@ import '../../data/models/group_evaluation.dart';
 import '../../data/models/health_advisory.dart';
 import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
+import '../../models/product_model.dart'; // nutritionPer100g extension
 import '../constants/who_fda_thresholds.dart';
+import 'serving_size_calculator.dart';
 import 'who_calculator.dart';
 
 class GroupMemberFacts {
@@ -27,6 +29,14 @@ class GroupMemberFacts {
   final String? nutrientKey; // main nutrient of concern, null if none
   final double? amountPerServing;
   final double? percentOfDaily;
+  // App-calculated suggested grams PER MEAL (ServingSizeCalculator), for
+  // Suitable, Moderate and Caution members alike: the most restrictive
+  // nutrient tied to the member's conditions, or -- for a member with no
+  // conditions -- the combined sodium/sugars/saturated-fat amount, exactly
+  // like the single-user advisory. Null when an allergen match is present
+  // (a smaller portion doesn't make an allergen match acceptable) or the
+  // product has none of the relevant nutrients.
+  final double? suggestedGrams;
 
   const GroupMemberFacts({
     required this.alias,
@@ -38,6 +48,7 @@ class GroupMemberFacts {
     this.nutrientKey,
     this.amountPerServing,
     this.percentOfDaily,
+    this.suggestedGrams,
   });
 
   bool get isFlagged => level != AdvisoryLevel.suitable;
@@ -101,6 +112,11 @@ class GroupAdvisoryBuilder {
     }).toList();
   }
 
+  /// Facts for a single member (alias unused) -- for UI that needs one
+  /// member's suggested amount without building the whole group.
+  static GroupMemberFacts memberFacts(MemberEvaluation m, double servingSizeG) =>
+      _factsFor(m, '', servingSizeG);
+
   static GroupMemberFacts _factsFor(MemberEvaluation m, String alias, double size) {
     final ev = m.evaluation;
     final level = levelAt(ev, size);
@@ -141,7 +157,84 @@ class GroupAdvisoryBuilder {
       nutrientKey: worst?.nutrientKey,
       amountPerServing: worst == null ? null : (worst.valuePer100g / 100) * size,
       percentOfDaily: worst == null ? null : worstPct,
+      suggestedGrams: allergens.isNotEmpty ? null : _suggestedGramsFor(m, size),
     );
+  }
+
+  // ── Suggested amounts ───────────────────────────────────────────────
+
+  static double? _suggestedGramsFor(MemberEvaluation m, double size) {
+    final ev = m.evaluation;
+    if (m.profile.conditions.isEmpty || ev.nutrientEvaluations.isEmpty) {
+      return ServingSizeCalculator.suggestedGramsCombined(
+        nutritionPer100g: ev.product.nutritionPer100g,
+        servingSizeG: size,
+      );
+    }
+    double? smallest;
+    for (final n in ev.nutrientEvaluations) {
+      final g = ServingSizeCalculator.suggestedGrams(
+        nutrientKey: n.nutrientKey,
+        valuePer100g: n.valuePer100g,
+        servingSizeG: size,
+      );
+      if (g != null && (smallest == null || g < smallest)) smallest = g;
+    }
+    return smallest;
+  }
+
+  /// "up to 1 full serving (50g)" / "about half a serving (25g)" /
+  /// "no more than 20g" -- same three bands ServingSizeCalculator uses for
+  /// the single-user advisory.
+  static String amountPhrase(double grams, double servingSizeG, {bool tl = false}) {
+    final ratio = servingSizeG <= 0 ? 1.0 : grams / servingSizeG;
+    final g = grams < 1 ? '<1g' : '${grams.round()}g';
+    if (ratio >= 1.0) {
+      return tl
+          ? 'hanggang 1 buong serving (${servingSizeG.round()}g)'
+          : 'up to 1 full serving (${servingSizeG.round()}g)';
+    }
+    if (ratio >= 0.5) {
+      return tl ? 'mga kalahating serving ($g)' : 'about half a serving ($g)';
+    }
+    return tl ? 'hindi hihigit sa $g' : 'no more than $g';
+  }
+
+  /// One member's suggested amount at any level, or null when none applies
+  /// (allergen match, or the product has none of the relevant nutrients).
+  static String? memberAmountLine(GroupMemberFacts f, double servingSizeG, {bool tl = false}) {
+    if (f.suggestedGrams == null) return null;
+    final phrase = amountPhrase(f.suggestedGrams!, servingSizeG, tl: tl);
+    return tl
+        ? 'Iminumungkahi bawat kain: $phrase, para sa 3 kain sa isang araw'
+        : 'Suggested per meal: $phrase, for 3 meals a day';
+  }
+
+  /// The single amount that fits everyone in the group: the SMALLEST of
+  /// their suggested amounts (same strictest-member rule as the group
+  /// verdict). Null when nobody has one. [token] is the grams
+  /// figure as it appears in [sentence], used to check that Gemini kept it.
+  static ({String sentence, String token})? groupAmount(
+    List<GroupMemberFacts> facts,
+    double servingSizeG, {
+    bool tl = false,
+  }) {
+    double? smallest;
+    for (final f in facts) {
+      if (f.suggestedGrams == null) continue;
+      if (smallest == null || f.suggestedGrams! < smallest) smallest = f.suggestedGrams;
+    }
+    if (smallest == null) return null;
+
+    final phrase = amountPhrase(smallest, servingSizeG, tl: tl);
+    final sentence = tl
+        ? 'Para sa buong grupo: $phrase bawat kain, para sa 3 kain sa isang araw.'
+        : 'To fit everyone in the group: $phrase per meal, for 3 meals a day.';
+    final ratio = servingSizeG <= 0 ? 1.0 : smallest / servingSizeG;
+    final token = ratio >= 1.0
+        ? '${servingSizeG.round()}g'
+        : (smallest < 1 ? '<1g' : '${smallest.round()}g');
+    return (sentence: sentence, token: token);
   }
 
   // ── Gemini prompt ───────────────────────────────────────────────────
@@ -173,6 +266,14 @@ class GroupAdvisoryBuilder {
         ? 'Respond in simple, conversational Tagalog.'
         : 'Respond in simple, conversational English.';
 
+    final amount = groupAmount(facts, servingSizeG, tl: languageCode == 'tl');
+    final amountFacts = amount == null
+        ? ''
+        : '\nSuggested amount for the group (already calculated by the application): "${amount.sentence}"\n';
+    final amountRule = amount == null
+        ? '- Do not mention any serving amount; none was supplied.'
+        : '- After your sentences, end the explanation with the suggested-amount sentence above, copied EXACTLY as written. Do not change, convert, or restate any number in it, and do not mention any other serving amount.';
+
     return '''
 You are a wording assistant for the Group Health Advisory card in a Filipino grocery app called CLARO. Several people share one health group. Write ONE short advisory about the scanned product for the whole group, using ONLY the facts below.
 
@@ -182,7 +283,7 @@ Overall group level: ${_levelLabel(level)} ($flagged of ${facts.length} members 
 
 Members:
 $memberLines
-
+$amountFacts
 $language
 
 IMPORTANT:
@@ -201,6 +302,7 @@ EXPLANATION field -- at most 2 short sentences, about 30-45 words in total:
 - Sentence 1: say who is flagged (by tag) and the main reason for each, using only the supplied nutrient or allergen facts.
 - Sentence 2: one short line for everyone else (for example that the others are not flagged), or a general cautious suggestion. Do not invent serving amounts.
 - If nobody is flagged, write one short sentence saying the product looks suitable for the whole group.
+$amountRule
 
 Return ONLY valid JSON, no markdown, matching exactly this shape:
 {
@@ -226,19 +328,26 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
 
   // ── Fallback (no Gemini) ────────────────────────────────────────────
 
-  static HealthAdvisory fallback(List<GroupMemberFacts> facts, {String languageCode = 'en'}) {
+  static HealthAdvisory fallback(
+    List<GroupMemberFacts> facts, {
+    required double servingSizeG,
+    String languageCode = 'en',
+  }) {
     final tl = languageCode == 'tl';
     final level = groupLevel(facts.map((f) => f.level));
     final flagged = facts.where((f) => f.isFlagged).toList()
       ..sort((a, b) => severity(b.level).compareTo(severity(a.level)));
 
     if (flagged.isEmpty) {
+      final suitableAmount = groupAmount(facts, servingSizeG, tl: tl);
+      final base = tl
+          ? 'Mukhang angkop ang produktong ito para sa lahat ng miyembro ng grupo.'
+          : 'This product looks suitable for everyone in the group.';
       return _advisory(
         level,
         tl ? 'Angkop para sa buong grupo' : 'Suitable for the whole group',
-        tl
-            ? 'Mukhang angkop ang produktong ito para sa lahat ng miyembro ng grupo.'
-            : 'This product looks suitable for everyone in the group.',
+        suitableAmount == null ? base : '$base ${suitableAmount.sentence}',
+        safeServingSize: suitableAmount?.sentence,
       );
     }
 
@@ -267,20 +376,29 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
         ? (tl ? 'Mag-ingat: ' : 'Be careful: ')
         : (tl ? 'Bantayan: ' : 'Keep an eye on: ');
 
+    final amount = groupAmount(facts, servingSizeG, tl: tl);
+
     return _advisory(
       level,
       level == AdvisoryLevel.caution
           ? (tl ? 'May dapat mag-ingat sa grupo' : 'Some members need to be careful')
           : (tl ? 'May dapat magbantay sa grupo' : 'Some members should watch this'),
-      '$head$parts.$tail',
+      '$head$parts.$tail${amount == null ? '' : ' ${amount.sentence}'}',
+      safeServingSize: amount?.sentence,
     );
   }
 
-  static HealthAdvisory _advisory(AdvisoryLevel level, String title, String text) => HealthAdvisory(
+  static HealthAdvisory _advisory(
+    AdvisoryLevel level,
+    String title,
+    String text, {
+    String? safeServingSize,
+  }) =>
+      HealthAdvisory(
         overallLevel: level,
         warningText: title,
         explanation: text,
-        safeServingSize: null,
+        safeServingSize: safeServingSize,
         source: AdvisorySource.fallbackRuleBased,
         generatedAt: DateTime.now(),
       );
@@ -300,7 +418,7 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
     final sorted = [...facts]..sort((x, y) => x.name.compareTo(y.name));
     for (final f in sorted) {
       b.write('|${f.name}:${f.level.name}:${f.conditions.join(",")}:${f.allergens.join(",")}'
-          ':${f.nutrientKey}:${f.percentOfDaily?.toStringAsFixed(0)}');
+          ':${f.nutrientKey}:${f.percentOfDaily?.toStringAsFixed(0)}:${f.suggestedGrams?.toStringAsFixed(0)}');
     }
     var h = 0x811c9dc5;
     for (final c in b.toString().codeUnits) {
