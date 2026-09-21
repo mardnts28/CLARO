@@ -161,3 +161,65 @@
   margin-bottom: 12px;
   text-align: center;
 }
+
+.login-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 18px;
+  text-align: left;
+  line-height: 1.4;
+}
+
+.login-notice svg {
+  font-size: 18px;
+  flex-shrink: 0;
+  color: #3b82f6;
+}
+
+.lockout-banner {
+  background: #fef2f2;
+  border: 1.5px solid #ef4444;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+.lockout-banner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #b91c1c;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.lockout-banner-header svg {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.lockout-banner p {
+  font-size: 12.5px;
+  color: #7f1d1d;
+  margin: 0 0 6px 0;
+  line-height: 1.4;
+}
+
+.lockout-timer {
+  display: inline-block;
+  font-weight: 700;
+  color: #991b1b;
+  font-size: 13px;
+  background: #fee2e2;
+  padding: 2px 8px;
+  border-radius: 4px;
+}

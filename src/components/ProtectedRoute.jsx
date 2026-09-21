@@ -4,6 +4,8 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, db } from "../firebase/firebase";
 import { doc, getDoc, collection, query, where, getDocs, setDoc } from "firebase/firestore";
 
+import SessionTimeoutManager from "./SessionTimeoutManager";
+
 export default function ProtectedRoute({ children }) {
   const [checking, setChecking] = useState(true);
   const [isAuthed, setIsAuthed] = useState(false);
@@ -73,5 +75,5 @@ export default function ProtectedRoute({ children }) {
   if (checking) return <p>Loading...</p>;
   if (!isAuthed) return <Navigate to="/" replace />;
 
-  return children;
+  return <SessionTimeoutManager>{children}</SessionTimeoutManager>;
 }

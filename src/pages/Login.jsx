@@ -1,26 +1,84 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import logo from "../assets/images/logoll.png";
-import { loginAdmin, resetPassword, firebaseErrorMessages } from "../services/authService";
+import {
+  loginAdmin,
+  resetPassword,
+  checkAccountLockout,
+  firebaseErrorMessages,
+  MAX_FAILED_ATTEMPTS,
+} from "../services/authService";
 import { generateAndSendOTP } from "../services/otpService";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase/firebase";
-import { FiAlertCircle } from "react-icons/fi";
+import TurnstileWidget from "../components/TurnstileWidget";
+import { FiAlertCircle, FiClock, FiShield } from "react-icons/fi";
 import "./Login.css";
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
+  // Inactivity timeout notice from SessionTimeoutManager
+  const [timeoutNotice, setTimeoutNotice] = useState(
+    location.state?.timeoutNotice || ""
+  );
+
+  // Rate limiting / Account lockout state
+  const [lockoutState, setLockoutState] = useState({
+    isLocked: false,
+    remainingSeconds: 0,
+    lockedUntil: null,
+  });
+
+  // Bot Protection (Cloudflare Turnstile token)
+  const [turnstileToken, setTurnstileToken] = useState(null);
+
+  // Reset password form state
   const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
   const [resetError, setResetError] = useState("");
+
+  // Lockout countdown timer
+  useEffect(() => {
+    if (!lockoutState.isLocked || !lockoutState.lockedUntil) return;
+
+    const timer = setInterval(() => {
+      const remainingMs = lockoutState.lockedUntil - Date.now();
+      if (remainingMs <= 0) {
+        setLockoutState({ isLocked: false, remainingSeconds: 0, lockedUntil: null });
+        clearInterval(timer);
+      } else {
+        setLockoutState((prev) => ({
+          ...prev,
+          remainingSeconds: Math.ceil(remainingMs / 1000),
+        }));
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [lockoutState.isLocked, lockoutState.lockedUntil]);
+
+  // Check lockout on email blur/change
+  async function handleEmailBlur() {
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return;
+    const status = await checkAccountLockout(email.trim());
+    if (status.isLocked) {
+      setLockoutState({
+        isLocked: true,
+        remainingSeconds: status.remainingSeconds,
+        lockedUntil: status.lockedUntil,
+      });
+    }
+  }
 
   function validate() {
     const newErrors = {};
@@ -42,10 +100,12 @@ export default function Login() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (lockoutState.isLocked) return;
     if (!validate()) return;
 
     setLoading(true);
     setErrors({});
+    setTimeoutNotice("");
 
     try {
       const admin = await loginAdmin(email.trim(), password);
@@ -58,6 +118,7 @@ export default function Login() {
         await signOut(auth);
         throw err;
       }
+
       navigate("/verify-otp", {
         replace: true,
         state: {
@@ -69,10 +130,24 @@ export default function Login() {
       });
     } catch (err) {
       console.error("LOGIN ERROR:", err);
-      if (err.code === "not-admin") {
+
+      if (err.code === "auth/account-locked") {
+        const remainingMs = (err.lockedUntil || Date.now() + 15 * 60 * 1000) - Date.now();
+        setLockoutState({
+          isLocked: true,
+          remainingSeconds: Math.max(1, Math.ceil(remainingMs / 1000)),
+          lockedUntil: err.lockedUntil || Date.now() + 15 * 60 * 1000,
+        });
+      } else if (err.code === "not-admin") {
         setErrors({ form: "You are not authorized to access this dashboard." });
+      } else if (err.attempts !== undefined) {
+        const remaining = err.remainingAttempts;
+        setErrors({
+          form: `Incorrect email or password. Attempt ${err.attempts} of ${MAX_FAILED_ATTEMPTS}. (${remaining} attempt${remaining === 1 ? "" : "s"} before 15-minute lockout)`,
+        });
       } else {
-        const message = firebaseErrorMessages[err.code] || "Something went wrong. Please try again.";
+        const message =
+          firebaseErrorMessages[err.code] || "Something went wrong. Please try again.";
         setErrors({ form: message });
       }
     } finally {
@@ -103,10 +178,18 @@ export default function Login() {
       await resetPassword(trimmed);
       setResetMessage("Password reset link sent. Please check your inbox.");
     } catch (err) {
-      setResetError(firebaseErrorMessages[err.code] || "Failed to send reset email. Please try again.");
+      setResetError(
+        firebaseErrorMessages[err.code] || "Failed to send reset email. Please try again."
+      );
     } finally {
       setResetLoading(false);
     }
+  }
+
+  function formatRemainingTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs.toString().padStart(2, "0")}s`;
   }
 
   if (showResetForm) {
@@ -170,12 +253,37 @@ export default function Login() {
         <h2>Admin Login</h2>
         <p className="subtitle">Please sign in to your admin account</p>
 
+        {/* Inactivity Auto-Logout Notification Banner */}
+        {timeoutNotice && (
+          <div className="login-notice" role="alert">
+            <FiClock />
+            <span>{timeoutNotice}</span>
+          </div>
+        )}
+
+        {/* Rate Limiting / Lockout Alert Banner */}
+        {lockoutState.isLocked && (
+          <div className="lockout-banner" role="alert">
+            <div className="lockout-banner-header">
+              <FiShield />
+              <span>Account Temporarily Locked</span>
+            </div>
+            <p>
+              Too many consecutive failed login attempts. Try again in:{" "}
+              <span className="lockout-timer">
+                {formatRemainingTime(lockoutState.remainingSeconds)}
+              </span>
+            </p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} noValidate>
           <div className="input-group">
             <input
               type="email"
               placeholder="Email"
               value={email}
+              onBlur={handleEmailBlur}
               onChange={(e) => {
                 setEmail(e.target.value);
                 if (errors.email) setErrors((prev) => ({ ...prev, email: "" }));
@@ -221,8 +329,19 @@ export default function Login() {
             </div>
           )}
 
-          <button type="submit" className="login-btn" disabled={loading}>
-            {loading ? "Logging in..." : "Login"}
+          {/* Cloudflare Bot Protection Widget */}
+          <TurnstileWidget onVerify={(token) => setTurnstileToken(token)} />
+
+          <button
+            type="submit"
+            className="login-btn"
+            disabled={loading || lockoutState.isLocked}
+          >
+            {loading
+              ? "Logging in..."
+              : lockoutState.isLocked
+              ? "Account Locked"
+              : "Login"}
           </button>
         </form>
       </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
+import Pagination from "../components/Pagination";
 import { getAllReports } from "../services/reportService";
 import { FiSearch, FiChevronDown, FiEye } from "react-icons/fi";
 import "./Reports.css";
@@ -56,6 +57,15 @@ export default function Reports() {
   const [dateFilter, setDateFilter] = useState("All Dates");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+
+  // Pagination state (default: 20 per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, dateFilter]);
 
   useEffect(() => {
     async function load() {
@@ -124,6 +134,11 @@ export default function Reports() {
       return getDateValue(b) - getDateValue(a);
     });
   }, [reports, search, statusFilter, dateFilter]);
+
+  const paginatedReports = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredReports.slice(start, start + pageSize);
+  }, [filteredReports, currentPage, pageSize]);
 
   function formatDate(timestamp) {
     if (!timestamp) return "";
@@ -221,66 +236,79 @@ export default function Reports() {
         ) : filteredReports.length === 0 ? (
           <p className="table-empty">No reports found.</p>
         ) : (
-          <div className="reports-table-scroll">
-            <table className="reports-table">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th>Product Name</th>
-                  <th>Date</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filteredReports.map((r) => (
-                  <tr key={r.id}>
-                    <td>
-                      <div className="user-cell">
-                        <span className="user-name">
-                          {r.userName}
-                        </span>
-
-                        <span className="user-email">
-                          {r.userEmail}
-                        </span>
-                      </div>
-                    </td>
-
-                    <td className="product-cell">
-                      {r.productName}
-
-                      {r.productDescription && (
-                        <div className="product-desc">
-                          {r.productDescription}
-                        </div>
-                      )}
-                    </td>
-
-                    <td className="date-cell">
-                      {formatDate(r.dateSubmitted)}
-                    </td>
-
-                    <td>
-                      <StatusBadge status={r.status} reason={r.rejectionReason} />
-                    </td>
-
-                    <td>
-                      <button
-                        className="view-icon-btn"
-                        onClick={() =>
-                          navigate(`/reports/${r.id}`)
-                        }
-                      >
-                        <FiEye />
-                      </button>
-                    </td>
+          <>
+            <div className="reports-table-scroll">
+              <table className="reports-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Product Name</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+
+                <tbody>
+                  {paginatedReports.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <div className="user-cell">
+                          <span className="user-name">
+                            {r.userName}
+                          </span>
+
+                          <span className="user-email">
+                            {r.userEmail}
+                          </span>
+                        </div>
+                      </td>
+
+                      <td className="product-cell">
+                        {r.productName}
+
+                        {r.productDescription && (
+                          <div className="product-desc">
+                            {r.productDescription}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="date-cell">
+                        {formatDate(r.dateSubmitted)}
+                      </td>
+
+                      <td>
+                        <StatusBadge status={r.status} reason={r.rejectionReason} />
+                      </td>
+
+                      <td>
+                        <button
+                          className="view-icon-btn"
+                          onClick={() =>
+                            navigate(`/reports/${r.id}`)
+                          }
+                        >
+                          <FiEye />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <Pagination
+              currentPage={currentPage}
+              totalItems={filteredReports.length}
+              pageSize={pageSize}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(newSize) => {
+                setPageSize(newSize);
+                setCurrentPage(1);
+              }}
+            />
+          </>
         )}
       </div>
     </DashboardLayout>

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "../components/DashboardLayout";
 import StarRating from "../components/StarRating";
+import Pagination from "../components/Pagination";
 import { getAllReviews } from "../services/reviewService";
 import { FiEye, FiChevronDown, FiSearch } from "react-icons/fi";
 import "./AppReview.css";
@@ -52,6 +53,15 @@ export default function AppReview() {
 
   const [statusOpen, setStatusOpen] = useState(false);
   const [dateOpen, setDateOpen] = useState(false);
+
+  // Pagination state (default: 20 per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, statusFilter, dateFilter]);
 
   useEffect(() => {
     async function load() {
@@ -118,6 +128,11 @@ export default function AppReview() {
       return getDateValue(b) - getDateValue(a);
     });
   }, [reviews, search, statusFilter, dateFilter]);
+
+  const paginatedReviews = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredReviews.slice(start, start + pageSize);
+  }, [filteredReviews, currentPage, pageSize]);
 
   function formatDate(timestamp) {
     if (!timestamp?.toDate) return "—";
@@ -243,6 +258,7 @@ export default function AppReview() {
             No reviews found.
           </p>
         ) : (
+          <>
           <div className="app-review-table-scroll">
             <table className="reports-table">
               <thead>
@@ -257,7 +273,7 @@ export default function AppReview() {
               </thead>
 
               <tbody>
-                {filteredReviews.map((r) => (
+                {paginatedReviews.map((r) => (
                   <tr key={r.id}>
                     <td>
                       <div className="user-cell">
@@ -314,6 +330,18 @@ export default function AppReview() {
               </tbody>
             </table>
           </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredReviews.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+          />
+          </>
         )}
       </div>
     </DashboardLayout>

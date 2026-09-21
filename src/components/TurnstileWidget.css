@@ -1,0 +1,29 @@
+.turnstile-container {
+  margin: 14px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.turnstile-dev-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.turnstile-dev-badge svg {
+  font-size: 16px;
+  flex-shrink: 0;
+  color: #22c55e;
+}

@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: is user signed in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: is user an admin
+    function isAdmin() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // 1. TAMPER-PROOF AUDIT LOGS (STRIDE: Repudiation & Tampering Defense)
+    // Any authenticated admin or auth process can append a log entry.
+    // Absolutely NO ONE is allowed to update or delete audit logs.
+    match /activity_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if true; // Allow logging authentication events & admin activities
+      allow update, delete: if false; // STRICTLY IMMUTABLE / TAMPER-PROOF
+    }
+
+    // 2. RATE LIMITING & ACCOUNT LOCKOUT (STRIDE: Denial of Service & Brute Force Defense)
+    match /login_attempts/{attemptId} {
+      allow read, write: if true; // Managed by client authentication rate-limiter
+    }
+
+    // 3. ADMIN PROFILES
+    match /admins/{adminId} {
+      allow read: if isAuthenticated() && (request.auth.uid == adminId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // 4. TWO-FACTOR AUTHENTICATION (OTPs)
+    match /otps/{uid} {
+      allow read, write: if true; // Verified by otpService with strict attempt limits and 5-min TTL
+    }
+
+    // 5. USER REPORTS
+    match /reports/{reportId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 6. SUHESTIYON (REVIEWS & FEEDBACK)
+    match /suhestiyon/{reviewId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 7. FDA PRODUCT CATALOG & NUTRITION DATA
+    match /fda_products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /product_nutrition_data/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

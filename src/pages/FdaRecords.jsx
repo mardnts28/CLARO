@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "../components/DashboardLayout";
 import FdaVerificationModal from "../components/FdaVerificationModal";
+import Pagination from "../components/Pagination";
 import {
   getAllProducts,
   updateProductFdaRecord,
@@ -42,6 +43,15 @@ export default function FdaRecords() {
   const [lightbox, setLightbox] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [bannerDismissed, setBannerDismissed] = useState(false);
+
+  // Pagination state (default 20 records per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, activeTab]);
 
   useEffect(() => {
     async function load() {
@@ -121,6 +131,11 @@ export default function FdaRecords() {
         return 0;
       });
   }, [products, search, activeTab]);
+
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredProducts.slice(start, start + pageSize);
+  }, [filteredProducts, currentPage, pageSize]);
 
   // Handle updating FDA status with OCR/screenshot
   async function handleConfirmFdaUpdate({
@@ -302,6 +317,7 @@ export default function FdaRecords() {
             </p>
           </div>
         ) : (
+          <>
           <div className="reports-table-scroll">
             <table className="reports-table">
               <thead>
@@ -316,7 +332,7 @@ export default function FdaRecords() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map((p) => {
+                {paginatedProducts.map((p) => {
                   const productName = p.product_name || p.name || "—";
                   const brand = p.brand || "";
                   const category = formatCategoryName(
@@ -471,6 +487,18 @@ export default function FdaRecords() {
               </tbody>
             </table>
           </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalItems={filteredProducts.length}
+            pageSize={pageSize}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setCurrentPage(1);
+            }}
+          />
+          </>
         )}
       </div>
 
