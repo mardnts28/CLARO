@@ -140,6 +140,13 @@ abstract class GroupRepository {
   /// existed.
   Future<void> ensureOwnerMember(HealthGroup group);
 
+  /// Synchronizes a linked user's display name onto every active membership
+  /// record so group member cards use the same name as their user profile.
+  Future<void> syncLinkedMemberDisplayName({
+    required String uid,
+    required String displayName,
+  });
+
   /// Phase 8: cleans up group membership when an account is deleted.
   /// If [uid] owns a group, dissolves it. If they're a linked member of
   /// any groups, marks those memberships "left". Called from
@@ -534,11 +541,17 @@ class FirebaseGroupRepository implements GroupRepository {
       // Backfill / re-sync: the owner may have picked or changed their
       // avatar after this record was first written.
       final currentAvatar = existing.data()?['avatar']?.toString();
+      final currentName = existing.data()?['displayName']?.toString();
+      final updates = <String, dynamic>{};
+      if (name != null && name != currentName) updates['displayName'] = name;
       if (avatar != null && avatar != currentAvatar) {
+        updates['avatar'] = avatar;
+      }
+      if (updates.isNotEmpty) {
         try {
-          await memberRef.update({'avatar': avatar});
+          await memberRef.update(updates);
         } catch (e) {
-          debugPrint('ensureOwnerMember: avatar sync failed: $e');
+          debugPrint('ensureOwnerMember: profile sync failed: $e');
         }
       }
       return;
@@ -555,6 +568,34 @@ class FirebaseGroupRepository implements GroupRepository {
       avatar: avatar,
     );
     await memberRef.set(member.toFirestore());
+  }
+
+  @override
+  Future<void> syncLinkedMemberDisplayName({
+    required String uid,
+    required String displayName,
+  }) async {
+    final userDoc = await _firestore.collection('users').doc(uid).get();
+    final data = userDoc.data();
+    if (data == null) return;
+
+    final groupIds = <String>{};
+    final primaryGroupId = data['primaryGroupId']?.toString();
+    if (primaryGroupId != null && primaryGroupId.isNotEmpty) {
+      groupIds.add(primaryGroupId);
+    }
+    groupIds.addAll(
+      (data['memberOfGroupIds'] as List<dynamic>? ?? const [])
+          .map((id) => id.toString())
+          .where((id) => id.isNotEmpty),
+    );
+
+    await Future.wait(groupIds.map((groupId) async {
+      final memberRef = _groups.doc(groupId).collection('members').doc(uid);
+      final member = await memberRef.get();
+      if (!member.exists || member.data()?['sourceType'] != 'linked') return;
+      await memberRef.update({'displayName': displayName});
+    }));
   }
 
   @override

@@ -1544,6 +1544,12 @@ abstract class AppLocalizations {
   /// **'Protein'**
   String get kidneyNutrientProtein;
 
+  /// Label for phosphorus (detected from phosphate additives) in the Kidney Disease Warning card.
+  ///
+  /// In en, this message translates to:
+  /// **'Phosphorus'**
+  String get kidneyNutrientPhosphorus;
+
   /// Title of the combined GERD and Kidney Disease Warning card.
   ///
   /// In en, this message translates to:

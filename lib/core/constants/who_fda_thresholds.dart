@@ -8,7 +8,6 @@
 // planned structure.
 //
 
-
 import '../../data/models/health_profile.dart';
 
 // A single nutrient's three-band threshold, all evaluated per 100g.
@@ -33,21 +32,35 @@ class WhoDailyLimits {
 }
 
 class ConditionThresholds {
-  static const Map<HealthCondition, Map<String, NutrientThreshold>> thresholds = {
-    HealthCondition.hypertension: {
-      'sodiumMg': NutrientThreshold(suitableMaxInclusive: 100, cautionMinInclusive: 400),
-      // unchanged
-    },
-    HealthCondition.diabetes: {
-      'sugarsG': NutrientThreshold(suitableMaxInclusive: 2.5, cautionMinInclusive: 10),
-      // 9.5 → 10
-    },
-    HealthCondition.heartCondition: {
-      'saturatedFatG': NutrientThreshold(suitableMaxInclusive: 1.11, cautionMinInclusive: 4.44),
-      // 2.2/4.4 → 1.11/4.44
-    },
-  };
+  static const NutrientThreshold _sodiumThreshold = NutrientThreshold(
+    suitableMaxInclusive: 100,
+    cautionMinInclusive: 400,
+  );
+
+  static const Map<HealthCondition, Map<String, NutrientThreshold>> thresholds =
+      {
+        HealthCondition.hypertension: {
+          'sodiumMg': _sodiumThreshold,
+          // unchanged
+        },
+        HealthCondition.kidneyDisease: {'sodiumMg': _sodiumThreshold},
+        HealthCondition.diabetes: {
+          'sugarsG': NutrientThreshold(
+            suitableMaxInclusive: 2.5,
+            cautionMinInclusive: 10,
+          ),
+          // 9.5 -> 10
+        },
+        HealthCondition.heartCondition: {
+          'saturatedFatG': NutrientThreshold(
+            suitableMaxInclusive: 1.11,
+            cautionMinInclusive: 4.44,
+          ),
+          // 2.2/4.4 -> 1.11/4.44
+        },
+      };
 }
+
 // Table 3.15 risk scoring: Suitable=1, Moderate=2, Caution=3 points
 class RiskScoring {
   static const Map<AdvisoryLevel, int> points = {

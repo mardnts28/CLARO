@@ -61,6 +61,7 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
   @override
   void initState() {
     super.initState();
+    AuthService.userNameNotifier.addListener(_onCurrentUserNameChanged);
     _group = widget.group;
     final uid = _authService.currentUser?.uid;
     _isOwner = uid != null && uid == _group.ownerUid;
@@ -72,6 +73,16 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         debugPrint('ensureOwnerMember failed: $e');
       });
     }
+  }
+
+  void _onCurrentUserNameChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    AuthService.userNameNotifier.removeListener(_onCurrentUserNameChanged);
+    super.dispose();
   }
 
   void _showAddMemberChooser() {
@@ -87,7 +98,9 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
               Navigator.pop(ctx);
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => InviteMemberScreen(group: _group)),
+                MaterialPageRoute(
+                  builder: (_) => InviteMemberScreen(group: _group),
+                ),
               );
             },
             child: ListTile(
@@ -101,9 +114,14 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
               Navigator.pop(ctx);
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => AddManagedMemberScreen(group: _group)),
+                MaterialPageRoute(
+                  builder: (_) => AddManagedMemberScreen(group: _group),
+                ),
               );
-              if (mounted) setState(_refreshProfiles); // re-fetch profiles for the new member
+              if (mounted)
+                setState(
+                  _refreshProfiles,
+                ); // re-fetch profiles for the new member
             },
             child: ListTile(
               leading: const Icon(Icons.person_add_alt_outlined),
@@ -126,20 +144,35 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(member.isLinked ? loc.removeFromGroupTitle : loc.deleteMemberTitle),
-        content: Text(member.isLinked ? loc.removeFromGroupMessage : loc.deleteMemberMessage),
+        title: Text(
+          member.isLinked ? loc.removeFromGroupTitle : loc.deleteMemberTitle,
+        ),
+        content: Text(
+          member.isLinked
+              ? loc.removeFromGroupMessage
+              : loc.deleteMemberMessage,
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.cancel),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.removeButton, style: TextStyle(color: colorScheme.error)),
+            child: Text(
+              loc.removeButton,
+              style: TextStyle(color: colorScheme.error),
+            ),
           ),
         ],
       ),
     );
     if (confirmed == true) {
       HapticService().vibrate();
-      await _groupRepository.removeMember(groupId: _group.id, memberId: member.id);
+      await _groupRepository.removeMember(
+        groupId: _group.id,
+        memberId: member.id,
+      );
       if (mounted) setState(_refreshProfiles);
     }
   }
@@ -158,14 +191,22 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         backgroundColor: colorScheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(tl ? 'Umalis sa grupo?' : 'Leave group?'),
-        content: Text(tl
-            ? 'Hindi mo na makikita ang grupong ito at ang mga miyembro nito. Maaari kang sumali muli gamit ang bagong imbitasyon.'
-            : "You won't be able to see this group or its members anymore. You can rejoin later with a new invitation."),
+        content: Text(
+          tl
+              ? 'Hindi mo na makikita ang grupong ito at ang mga miyembro nito. Maaari kang sumali muli gamit ang bagong imbitasyon.'
+              : "You won't be able to see this group or its members anymore. You can rejoin later with a new invitation.",
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.cancel),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(tl ? 'Umalis' : 'Leave', style: TextStyle(color: colorScheme.error)),
+            child: Text(
+              tl ? 'Umalis' : 'Leave',
+              style: TextStyle(color: colorScheme.error),
+            ),
           ),
         ],
       ),
@@ -181,7 +222,9 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _deleting = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -200,10 +243,16 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         title: Text(loc.deleteGroupConfirmTitle),
         content: Text(loc.deleteGroupConfirmMessage),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(loc.cancel)),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.cancel),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(loc.deleteGroupButton, style: TextStyle(color: colorScheme.error)),
+            child: Text(
+              loc.deleteGroupButton,
+              style: TextStyle(color: colorScheme.error),
+            ),
           ),
         ],
       ),
@@ -213,14 +262,19 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     HapticService().vibrate();
     setState(() => _deleting = true);
     try {
-      await _groupRepository.deleteGroup(groupId: _group.id, requestingUid: uid);
+      await _groupRepository.deleteGroup(
+        groupId: _group.id,
+        requestingUid: uid,
+      );
       if (!mounted) return;
       SuccessFeedbackUtils.showSuccessSnackBar(context, loc.deleteGroupSuccess);
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       setState(() => _deleting = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString())));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
     }
   }
 
@@ -282,16 +336,23 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
 
             // Re-fetch profiles only when the SET of active members changes
             // (e.g. a QR-invited member joins), not on every rebuild.
-            final signature = (members.map((m) => '${m.id}:${m.linkedUid}').toList()..sort()).join('|');
-            if (!membersLoading && !membersError && signature != _memberSignature) {
+            final signature =
+                (members.map((m) => '${m.id}:${m.linkedUid}').toList()..sort())
+                    .join('|');
+            if (!membersLoading &&
+                !membersError &&
+                signature != _memberSignature) {
               _memberSignature = signature;
-              _profilesFuture = _groupRepository.getGroupHealthProfiles(_group.id);
+              _profilesFuture = _groupRepository.getGroupHealthProfiles(
+                _group.id,
+              );
             }
 
             return FutureBuilder<List<UserHealthProfile>>(
               future: _profilesFuture,
               builder: (context, profileSnap) {
-                final profiles = profileSnap.data ?? const <UserHealthProfile>[];
+                final profiles =
+                    profileSnap.data ?? const <UserHealthProfile>[];
                 final profileByKey = <String, UserHealthProfile>{
                   for (final p in profiles) p.userId: p,
                 };
@@ -306,7 +367,11 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                           const SizedBox(height: 20),
                           Text(
                             loc.groupDetailsMembers,
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.onSurface,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           if (membersLoading)
@@ -322,9 +387,12 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                                 // removed them) surfaces here as a stream error.
                                 _isOwner
                                     ? loc.somethingWentWrong
-                                    : (Localizations.localeOf(context).languageCode == 'tl'
-                                        ? 'Hindi ka na miyembro ng grupong ito.'
-                                        : "You're no longer a member of this group."),
+                                    : (Localizations.localeOf(
+                                                context,
+                                              ).languageCode ==
+                                              'tl'
+                                          ? 'Hindi ka na miyembro ng grupong ito.'
+                                          : "You're no longer a member of this group."),
                                 style: TextStyle(color: colorScheme.error),
                               ),
                             )
@@ -333,32 +401,52 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               child: Text(
                                 loc.groupDetailsNoMembers,
-                                style: TextStyle(color: colorScheme.onSurfaceVariant),
+                                style: TextStyle(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             )
                           else
                             // Owner's card first, then everyone else in the
                             // order they were added.
                             ...(([...members]..sort((a, b) {
-                              final ao = a.linkedUid == _group.ownerUid ? 0 : 1;
-                              final bo = b.linkedUid == _group.ownerUid ? 0 : 1;
-                              if (ao != bo) return ao.compareTo(bo);
-                              return a.addedAt.compareTo(b.addedAt);
-                            })))
-                                .map((m) => _buildMemberCard(theme, colorScheme, loc, m, profileByKey)),
+                                  final ao = a.linkedUid == _group.ownerUid
+                                      ? 0
+                                      : 1;
+                                  final bo = b.linkedUid == _group.ownerUid
+                                      ? 0
+                                      : 1;
+                                  if (ao != bo) return ao.compareTo(bo);
+                                  return a.addedAt.compareTo(b.addedAt);
+                                })))
+                                .map(
+                                  (m) => _buildMemberCard(
+                                    theme,
+                                    colorScheme,
+                                    loc,
+                                    m,
+                                    profileByKey,
+                                  ),
+                                ),
                           if (_isOwner) ...[
                             const SizedBox(height: 4),
                             SizedBox(
                               width: double.infinity,
                               child: OutlinedButton.icon(
                                 onPressed: _showAddMemberChooser,
-                                icon: const Icon(Icons.person_add_alt_1_outlined),
+                                icon: const Icon(
+                                  Icons.person_add_alt_1_outlined,
+                                ),
                                 label: Text(loc.addMemberButton),
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: colorScheme.primary,
                                   side: BorderSide(color: colorScheme.primary),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
                                 ),
                               ),
                             ),
@@ -384,18 +472,28 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: colorScheme.primaryContainer, borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             _group.name,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: colorScheme.onPrimaryContainer),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onPrimaryContainer,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             _isOwner ? loc.groupOwnerLabel : loc.groupMemberLabel,
-            style: TextStyle(fontSize: 13, color: colorScheme.onPrimaryContainer.withOpacity(0.8)),
+            style: TextStyle(
+              fontSize: 13,
+              color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+            ),
           ),
         ],
       ),
@@ -418,7 +516,8 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     // Owner can VIEW + MANAGE (edit/remove) a "managed" member's health
     // profile -- the owner entered it. Owner can only VIEW a "linked"
     // member's profile; that member's own account owns their data.
-    final isOwnerMember = member.linkedUid != null && member.linkedUid == _group.ownerUid;
+    final isOwnerMember =
+        member.linkedUid != null && member.linkedUid == _group.ownerUid;
     final tl = Localizations.localeOf(context).languageCode == 'tl';
     final canManageHealthProfile = _isOwner && member.isManaged;
     // The owner's own card can't be removed (delete the group instead).
@@ -429,12 +528,24 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     // Both member kinds now carry a display name (linked members choose
     // theirs in the Join Group modal); older linked members without one
     // fall back to the generic label.
-    final hasName = member.displayName != null && member.displayName!.trim().isNotEmpty;
+    final currentUid = _authService.currentUser?.uid;
+    final isCurrentUserMember =
+        member.isLinked && member.linkedUid == currentUid;
+    final liveUserName = AuthService.userNameNotifier.value.trim();
+    final hasLiveUserName =
+        isCurrentUserMember &&
+        liveUserName.isNotEmpty &&
+        liveUserName != 'User';
+    final hasName =
+        hasLiveUserName ||
+        (member.displayName != null && member.displayName!.trim().isNotEmpty);
     final name = hasName
-        ? member.displayName!
+        ? (hasLiveUserName ? liveUserName : member.displayName!)
         : (isOwnerMember
-            ? (tl ? 'May-ari' : 'Owner')
-            : (member.isManaged ? loc.memberStatusManaged : loc.groupMemberLabel));
+              ? (tl ? 'May-ari' : 'Owner')
+              : (member.isManaged
+                    ? loc.memberStatusManaged
+                    : loc.groupMemberLabel));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -467,7 +578,9 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                   )
                 else
                   Icon(
-                    member.isLinked ? Icons.person_outline : Icons.person_pin_circle_outlined,
+                    member.isLinked
+                        ? Icons.person_outline
+                        : Icons.person_pin_circle_outlined,
                     color: colorScheme.primary,
                     size: 20,
                   ),
@@ -476,30 +589,50 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(name, style: TextStyle(fontSize: 15, color: colorScheme.onSurface)),
+                      Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.secondary.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     statusLabel,
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: colorScheme.secondary),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.secondary,
+                    ),
                   ),
                 ),
                 if (canManageHealthProfile)
                   IconButton(
-                    icon: Icon(Icons.edit_outlined, color: colorScheme.outline, size: 20),
+                    icon: Icon(
+                      Icons.edit_outlined,
+                      color: colorScheme.outline,
+                      size: 20,
+                    ),
                     tooltip: loc.editHealthProfile,
                     onPressed: () async {
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => AddManagedMemberScreen(group: _group, existingMember: member),
+                          builder: (_) => AddManagedMemberScreen(
+                            group: _group,
+                            existingMember: member,
+                          ),
                         ),
                       );
                       if (mounted) setState(_refreshProfiles);
@@ -507,8 +640,14 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                   ),
                 if (canRemove)
                   IconButton(
-                    icon: Icon(Icons.remove_circle_outline, color: colorScheme.outline, size: 20),
-                    tooltip: member.isLinked ? loc.removeFromGroupTooltip : loc.deleteMemberTooltip,
+                    icon: Icon(
+                      Icons.remove_circle_outline,
+                      color: colorScheme.outline,
+                      size: 20,
+                    ),
+                    tooltip: member.isLinked
+                        ? loc.removeFromGroupTooltip
+                        : loc.deleteMemberTooltip,
                     onPressed: () => _confirmRemove(member),
                   ),
               ],
@@ -517,7 +656,12 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
           Divider(height: 0, color: colorScheme.outlineVariant),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-            child: _buildHealthProfileSummary(colorScheme, loc, member, profile),
+            child: _buildHealthProfileSummary(
+              colorScheme,
+              loc,
+              member,
+              profile,
+            ),
           ),
         ],
       ),
@@ -530,12 +674,20 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     GroupMember member,
     UserHealthProfile? profile,
   ) {
-    if (profile == null || (profile.conditions.isEmpty && profile.allergies.isEmpty)) {
-      return Text(loc.noHealthProfileYet, style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant));
+    if (profile == null ||
+        (profile.conditions.isEmpty && profile.allergies.isEmpty)) {
+      return Text(
+        loc.noHealthProfileYet,
+        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+      );
     }
 
-    final conditionLabels = profile.conditions.map((c) => _conditionLabel(c, loc)).join(', ');
-    final allergenLabels = profile.allergies.map((a) => _allergenLabel(a, loc)).join(', ');
+    final conditionLabels = profile.conditions
+        .map((c) => _conditionLabel(c, loc))
+        .join(', ');
+    final allergenLabels = profile.allergies
+        .map((a) => _allergenLabel(a, loc))
+        .join(', ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -550,7 +702,10 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               '${loc.allergensLabel}: $allergenLabels',
-              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         // Only the "view-only" note is shown for linked members -- a
@@ -567,7 +722,11 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               loc.viewOnlyHealthProfileNote,
-              style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
       ],
@@ -575,7 +734,10 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
   }
 
   // Invited (non-owner) members get a Leave Group button instead of Delete.
-  Widget _buildLeaveGroupSection(ColorScheme colorScheme, AppLocalizations loc) {
+  Widget _buildLeaveGroupSection(
+    ColorScheme colorScheme,
+    AppLocalizations loc,
+  ) {
     final tl = Localizations.localeOf(context).languageCode == 'tl';
     final isDarkMode = colorScheme.brightness == Brightness.dark;
     final color = isDarkMode ? Colors.red.shade400 : Colors.red.shade700;
@@ -586,35 +748,54 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         child: OutlinedButton.icon(
           onPressed: _deleting ? null : _leaveGroup,
           icon: _deleting
-              ? SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2, color: color))
+              ? SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: color,
+                  ),
+                )
               : Icon(Icons.logout, color: color),
           label: Text(tl ? 'Umalis sa Grupo' : 'Leave Group'),
           style: OutlinedButton.styleFrom(
             foregroundColor: color,
             side: BorderSide(color: color),
             padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildDeleteGroupSection(ColorScheme colorScheme, AppLocalizations loc, List<GroupMember> members) {
+  Widget _buildDeleteGroupSection(
+    ColorScheme colorScheme,
+    AppLocalizations loc,
+    List<GroupMember> members,
+  ) {
     // Delete is available only when the owner is the sole remaining member.
     final hasMembers = members.any((m) => m.linkedUid != _group.ownerUid);
     final tl = Localizations.localeOf(context).languageCode == 'tl';
     final isDarkMode = colorScheme.brightness == Brightness.dark;
-    
+
     // Determine colors based on state and theme
-    final buttonColor = hasMembers 
+    final buttonColor = hasMembers
         ? colorScheme.onSurfaceVariant.withOpacity(0.5) // Disabled: gray
-        : (isDarkMode ? Colors.red.shade400 : Colors.red.shade700); // Available: primary red or bright red in dark mode
-    
-    final iconColor = hasMembers 
+        : (isDarkMode
+              ? Colors.red.shade400
+              : Colors
+                    .red
+                    .shade700); // Available: primary red or bright red in dark mode
+
+    final iconColor = hasMembers
         ? colorScheme.onSurfaceVariant.withOpacity(0.5) // Disabled: gray
-        : (isDarkMode ? Colors.red.shade400 : Colors.red.shade700); // Available: same as button
-    
+        : (isDarkMode
+              ? Colors.red.shade400
+              : Colors.red.shade700); // Available: same as button
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Column(
@@ -627,7 +808,10 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                     ? 'Alisin muna ang lahat ng iba pang miyembro bago mabura ang grupong ito.'
                     : 'Remove all other members before you can delete this group.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           SizedBox(
@@ -638,7 +822,10 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                   ? SizedBox(
                       height: 16,
                       width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: buttonColor),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: buttonColor,
+                      ),
                     )
                   : Icon(Icons.delete_outline, color: iconColor),
               label: Text(loc.deleteGroupButton),
@@ -646,7 +833,9 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
                 foregroundColor: buttonColor,
                 side: BorderSide(color: buttonColor),
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),

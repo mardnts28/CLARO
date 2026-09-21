@@ -25,7 +25,7 @@ const int kMaxProductsPerRanking = 5;
 
 class ProductRankingService {
   ProductRankingService({required GeminiAdvisoryService geminiService})
-      : _geminiService = geminiService;
+    : _geminiService = geminiService;
 
   final GeminiAdvisoryService _geminiService;
 
@@ -145,10 +145,7 @@ class ProductRankingService {
     String scanEventId = 'prefetch',
   }) async {
     try {
-      final ranked = rankProducts(
-        products: [product],
-        user: user,
-      );
+      final ranked = rankProducts(products: [product], user: user);
       if (ranked.isEmpty) return;
       final target = ranked.first;
 
@@ -173,8 +170,9 @@ class ProductRankingService {
     // explanation always ties back to *why* the nutrient matters to this
     // user, not just the raw numbers/rank.
     final conditionName = _getConditionName(user);
-    final conditionSuffix =
-        conditionName.isNotEmpty ? ' for your $conditionName' : '';
+    final conditionSuffix = conditionName.isNotEmpty
+        ? ' for your $conditionName'
+        : '';
     final totalProducts = comparisonSet.length;
 
     // Allergen override is a HARD rule in WhoCalculator.rankProducts --
@@ -192,12 +190,40 @@ class ProductRankingService {
           .join(', ');
       return 'This product ranks ${target.rank} of $totalProducts because it '
           'contains $allergens, which matches an allergy on your profile. '
-          'We recommend avoiding it regardless of its other nutrients.';
+          'Review the ingredient information before consuming it.';
     }
 
     // Skip Gemini if product is suitable - use default explanation
     if (target.evaluation.overallLevel == AdvisoryLevel.suitable) {
       return 'This product ranks ${target.rank} of $totalProducts and is suitable for your health profile${conditionName.isNotEmpty ? " ($conditionName)" : ""}.';
+    }
+
+    // Prefer a differentiating *scored factor* (GERD trigger ingredients,
+    // GERD high-fat check, kidney disease's phosphate-additive check) over
+    // a numeric nutrient fact, when one actually varies across the
+    // compared set. These conditions contribute real weight to the
+    // overall rank via WhoCalculator.evaluateProduct's scoredFactors, but
+    // ConditionThresholds only defines numeric per-100g bands for
+    // hypertension/diabetes/heartCondition/kidneyDisease -- GERD has no
+    // entry there at all. Without this step: (a) GERD-only users got no
+    // nutrient/factor-specific explanation whatsoever (always fell to the
+    // generic "ranks X of Y" line below), and (b) GERD + kidney-disease
+    // users' explanations always cited sodium (kidney disease's only
+    // numeric key) even when sodium wasn't what actually drove the rank --
+    // which is also what made the numeric fallback below prone to the
+    // "top choice ... but X% more than the best option" contradiction in
+    // the first place.
+    final factorFact = _primaryComparisonFactorFact(
+      target: target,
+      comparisonSet: comparisonSet,
+    );
+    if (factorFact != null) {
+      return _describeFactorFact(
+        target: target,
+        totalProducts: totalProducts,
+        conditionSuffix: conditionSuffix,
+        factorFact: factorFact,
+      );
     }
 
     // Get the nutrient that best explains THIS product's position, across
@@ -213,6 +239,25 @@ class ProductRankingService {
       return 'This product ranks ${target.rank} of $totalProducts$conditionSuffix.';
     }
 
+    // Only computed when it's actually needed: target ranks #1 overall
+    // but isn't the single lowest for the nutrient we're about to
+    // narrate. Gives the "still ranks #1" claim a concrete number to
+    // point to instead of a vague "every relevant factor" phrase.
+    String? supportingReason;
+    if (target.rank == 1 && !fact.thisIsBest) {
+      final supporting = _supportingBestFact(
+        target: target,
+        comparisonSet: comparisonSet,
+        user: user,
+        excludeNutrientKey: fact.nutrientKey,
+      );
+      if (supporting != null) {
+        supportingReason =
+            'it has the lowest ${supporting.name} in this comparison '
+            '(${supporting.thisValue.toStringAsFixed(1)}${supporting.unit} per 100g)';
+      }
+    }
+
     final resultData = await _geminiService.generateRankingExplanation(
       nutrientName: fact.name,
       nutrientUnit: fact.unit,
@@ -221,12 +266,53 @@ class ProductRankingService {
       worstValue: fact.worstValue,
       rank: target.rank,
       totalProducts: totalProducts,
+      thisIsBestNutrient: fact.thisIsBest,
+      supportingReason: supportingReason,
       healthCondition: conditionName,
       languageCode: languageCode,
     );
 
     return resultData['explanation'] ??
         'This product ranks ${target.rank} of $totalProducts$conditionSuffix.';
+  }
+
+  /// Finds the scored factor (see [ComparisonCalculator.computeFactorFacts])
+  /// that best explains [target]'s position among [comparisonSet] -- one
+  /// where target is clearly the best or clearly the worst in the set, and
+  /// the set actually disagrees on it (an all-tied factor explains
+  /// nothing about why THIS product differs from the others).
+  ComparisonFactorFact? _primaryComparisonFactorFact({
+    required RankedProductResult target,
+    required List<RankedProductResult> comparisonSet,
+  }) {
+    final facts = ComparisonCalculator.computeFactorFacts(
+      target: target.evaluation,
+      comparisonSet: comparisonSet.map((r) => r.evaluation).toList(),
+    );
+    return ComparisonCalculator.primaryFactorFact(facts);
+  }
+
+  /// Builds the ranking-explanation sentence for a [factorFact] hit.
+  /// Deterministic, no Gemini call -- [factorFact.explanation] is already
+  /// human-readable text written by WhoCalculator (e.g. "No phosphate
+  /// additive detected in the ingredient list."), so this just frames it
+  /// with the same rank language used everywhere else in this file.
+  String _describeFactorFact({
+    required RankedProductResult target,
+    required int totalProducts,
+    required String conditionSuffix,
+    required ComparisonFactorFact factorFact,
+  }) {
+    final isBestRank = target.rank == 1;
+    final isWorstRank = target.rank == totalProducts;
+
+    final positionPhrase = isBestRank
+        ? 'ranks ${target.rank} of $totalProducts (highest-ranked)'
+        : isWorstRank
+        ? 'ranks ${target.rank} of $totalProducts (lowest-ranked)'
+        : 'ranks ${target.rank} of $totalProducts';
+
+    return 'This product $positionPhrase$conditionSuffix. ${factorFact.explanation}';
   }
 
   /// Picks the single most decision-useful nutrient fact to narrate for
@@ -237,8 +323,16 @@ class ProductRankingService {
   /// wording says "best"/"worst"/"middle" -- that comes from [target.rank]
   /// itself inside generateRankingExplanation, so the sentence can never
   /// contradict the numbered badge shown on the ranking list.
-  ({String name, String unit, double thisValue, double bestValue, double worstValue})?
-      _primaryComparisonFact({
+  ({
+    String nutrientKey,
+    String name,
+    String unit,
+    double thisValue,
+    double bestValue,
+    double worstValue,
+    bool thisIsBest,
+  })?
+  _primaryComparisonFact({
     required RankedProductResult target,
     required List<RankedProductResult> comparisonSet,
     required UserHealthProfile user,
@@ -252,12 +346,49 @@ class ProductRankingService {
     if (fact == null) return null;
 
     return (
+      nutrientKey: fact.nutrientKey,
       name: _getNutrientName(fact.nutrientKey),
       unit: _getNutrientUnit(fact.nutrientKey),
       thisValue: fact.thisValue,
       bestValue: fact.bestValueInSet,
       worstValue: fact.worstValueInSet,
+      thisIsBest: fact.thisIsBest,
     );
+  }
+
+  /// Only relevant when [target] ranks #1 overall but isn't the single
+  /// lowest for the nutrient being narrated (see [_primaryComparisonFact]).
+  /// Looks for ANOTHER nutrient, still relevant to [user]'s conditions,
+  /// where [target] genuinely IS the lowest in [comparisonSet] -- so the
+  /// "still ranks #1 overall" claim can point to a concrete number
+  /// instead of a vague "every relevant factor" phrase. A nutrient where
+  /// the whole set is tied doesn't count -- a tie can't be *why* this
+  /// product beat the others. Returns null when no such nutrient exists,
+  /// in which case callers fall back to the generic combined-factors
+  /// phrasing.
+  ({String name, String unit, double thisValue})? _supportingBestFact({
+    required RankedProductResult target,
+    required List<RankedProductResult> comparisonSet,
+    required UserHealthProfile user,
+    required String excludeNutrientKey,
+  }) {
+    final facts = ComparisonCalculator.computeFacts(
+      target: target.evaluation,
+      comparisonSet: comparisonSet.map((r) => r.evaluation).toList(),
+      user: user,
+    );
+    for (final f in facts) {
+      if (f.nutrientKey == excludeNutrientKey) continue;
+      if (f.bestValueInSet == f.worstValueInSet) continue; // tied
+      if (f.thisIsBest) {
+        return (
+          name: _getNutrientName(f.nutrientKey),
+          unit: _getNutrientUnit(f.nutrientKey),
+          thisValue: f.thisValue,
+        );
+      }
+    }
+    return null;
   }
 
   String _allergenLabel(AllergenType a) {
@@ -309,9 +440,7 @@ class ProductRankingService {
   }
 
   String _getConditionName(UserHealthProfile user) {
-    // Only scored conditions are named in ranking explanations -- GERD /
-    // Kidney Disease are awareness-only, so a sentence like "suitable for
-    // your GERD" must never be produced.
+    // All deterministic scored conditions are named in ranking explanations.
     final scored = user.conditions.where((c) => c.isScored).toList();
     if (scored.isEmpty) return '';
 

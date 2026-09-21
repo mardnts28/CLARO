@@ -18,6 +18,7 @@ class AdvisoryPromptBuilder {
   }) {
     final product = evaluation.product;
     final allergen = evaluation.allergenAssessment;
+    final scoredFactors = evaluation.scoredFactors;
 
     final flagged = evaluation.nutrientEvaluations
         .where((e) => e.level != AdvisoryLevel.suitable)
@@ -31,20 +32,21 @@ class AdvisoryPromptBuilder {
     }
 
     // For users with no health conditions and no allergens, use combined nutrient calculation
-    final hasNoConditionsAndNoAllergens = user.conditions.isEmpty && !allergen.hasDirectAllergen;
-    
+    final hasNoConditionsAndNoAllergens =
+        user.conditions.isEmpty && !allergen.hasDirectAllergen;
+
     final safeServing = hasNoConditionsAndNoAllergens
         ? ServingSizeCalculator.calculateCombinedNutrients(
             nutritionPer100g: product.nutritionPer100g,
             servingSizeG: product.servingSizeG,
           )
         : (worst == null
-            ? null
-            : ServingSizeCalculator.calculate(
-                nutrientKey: worst.nutrientKey,
-                valuePer100g: worst.valuePer100g,
-                servingSizeG: product.servingSizeG,
-              ));
+              ? null
+              : ServingSizeCalculator.calculate(
+                  nutrientKey: worst.nutrientKey,
+                  valuePer100g: worst.valuePer100g,
+                  servingSizeG: product.servingSizeG,
+                ));
 
     final decisionWord = allergen.hasDirectAllergen
         ? 'Caution'
@@ -56,23 +58,27 @@ class AdvisoryPromptBuilder {
 
     String factsBlock;
     if (allergen.hasDirectAllergen) {
-      final allergenLabels = allergen.matchedContains.map(_allergenLabel).join(', ');
+      final allergenLabels = allergen.matchedContains
+          .map(_allergenLabel)
+          .join(', ');
       // Per-allergen ingredient attribution, using ONLY what
       // WhoCalculator.assessAllergens reliably established -- direct
       // or derived. Never invent or guess an ingredient beyond this.
-      final sourceLines = allergen.ingredientSources.map((m) {
-        final label = _allergenLabel(m.allergen);
-        switch (m.matchType) {
-          case AllergenMatchType.direct:
-            return '- $label: the ingredient "${m.ingredient}" directly IS/contains $label.';
-          case AllergenMatchType.derived:
-            return '- $label: the ingredient "${m.ingredient}" is a confirmed $label derivative (not literally named "$label").';
-          case AllergenMatchType.undetermined:
-            // This case should no longer occur since we removed undetermined matches
-            // from allergen assessment. Kept for safety but should never be hit.
-            return '- $label: flagged on the product, but NO specific ingredient in the list could be reliably confirmed as the source (e.g. only a generic "flavors"-type entry with no confirmed derivation). Do not guess or name any ingredient for this one.';
-        }
-      }).join('\n');
+      final sourceLines = allergen.ingredientSources
+          .map((m) {
+            final label = _allergenLabel(m.allergen);
+            switch (m.matchType) {
+              case AllergenMatchType.direct:
+                return '- $label: the ingredient "${m.ingredient}" directly IS/contains $label.';
+              case AllergenMatchType.derived:
+                return '- $label: the ingredient "${m.ingredient}" is a confirmed $label derivative (not literally named "$label").';
+              case AllergenMatchType.undetermined:
+                // This case should no longer occur since we removed undetermined matches
+                // from allergen assessment. Kept for safety but should never be hit.
+                return '- $label: flagged on the product, but NO specific ingredient in the list could be reliably confirmed as the source (e.g. only a generic "flavors"-type entry with no confirmed derivation). Do not guess or name any ingredient for this one.';
+            }
+          })
+          .join('\n');
       factsBlock =
           'This product CONTAINS an allergen the user is allergic to: $allergenLabels.\n'
           'Ingredient attribution (use exactly this, do not add, guess, or invent beyond it):\n$sourceLines';
@@ -80,22 +86,35 @@ class AdvisoryPromptBuilder {
       factsBlock =
           'User has no health conditions and no allergens.\n'
           'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".';
-    } else if (worst == null) {
+    } else if (worst == null && scoredFactors.isEmpty) {
       factsBlock =
           'All evaluated nutrients are within the suitable range for this user\'s condition(s).';
+    } else if (scoredFactors.isNotEmpty) {
+      final factorLines = scoredFactors
+          .map((factor) {
+            final status = factor.isUnknown ? 'UNKNOWN' : 'KNOWN';
+            return '- ${_factorLabel(factor.factorKey)}: $status, ${factor.points} points. ${factor.explanation}';
+          })
+          .join('\n');
+      factsBlock =
+          '${worst == null ? '' : 'Legacy nutrient facts are included above.\n'}'
+          'Deterministic condition-factor results (source of truth):\n$factorLines\n'
+          'The risk score and classification have already been calculated by the application. '
+          'Do not change them or interpret unknown as clean.';
     } else {
-      final sugarsNote = worst.nutrientKey == 'sugarsG'
+      final nutrient = worst!;
+      final sugarsNote = nutrient.nutrientKey == 'sugarsG'
           ? '\nData limitation: This app only records TOTAL sugars -- it cannot distinguish free/added sugars from naturally occurring sugars. '
-              'The WHO daily reference used here (50g/day) is the WHO reference for free sugars, but the percentage above was calculated using total sugars as a stand-in. '
-              'Never call this value "free sugars" or "added sugars" -- always call it "total sugars", and phrase the amount/percentage sentence using the wording given in the instructions below.'
+                'The WHO daily reference used here (50g/day) is the WHO reference for free sugars, but the percentage above was calculated using total sugars as a stand-in. '
+                'Never call this value "free sugars" or "added sugars" -- always call it "total sugars", and phrase the amount/percentage sentence using the wording given in the instructions below.'
           : '';
       factsBlock =
-          'Nutrient of concern: ${_nutrientLabel(worst.nutrientKey)}.\n'
-          'Exact amount per serving: ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)}.\n'
+          'Nutrient of concern: ${_nutrientLabel(nutrient.nutrientKey)}.\n'
+          'Exact amount per serving: ${nutrient.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(nutrient.nutrientKey)}.\n'
           'Serving size: ${product.servingSizeG.toStringAsFixed(0)}g.\n'
-          'Supplied percentage of the daily reference amount from one serving: ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}%.\n'
-          'Classification level for this nutrient: ${_levelLabel(worst.level)}.\n'
-          'Relevant health condition: ${_conditionLabel(worst.condition)}.\n'
+          'Supplied percentage of the daily reference amount from one serving: ${nutrient.whoDailyLimitPercentage.toStringAsFixed(1)}%.\n'
+          'Classification level for this nutrient: ${_levelLabel(nutrient.level)}.\n'
+          'Relevant health condition: ${_conditionLabel(nutrient.condition)}.\n'
           '${safeServing != null ? 'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".' : 'No suggested serving amount was supplied for this nutrient.'}'
           '$sugarsNote';
     }
@@ -106,13 +125,14 @@ class AdvisoryPromptBuilder {
       final nutrientName = _nutrientLabel(comparisonFact.nutrientKey);
       final unit = _nutrientUnit(comparisonFact.nutrientKey);
 
-      comparisonBlock = '''
+      comparisonBlock =
+          '''
 
 Comparison context: This product is ranked "$rankText" among the products the user compared.
 Exact comparison numbers to cite: this product has ${comparisonFact.thisValue}$unit of $nutrientName per 100g.
-The best value in the compared set is ${comparisonFact.bestValueInSet}$unit. The worst value in the compared set is ${comparisonFact.worstValueInSet}$unit.
-${comparisonFact.thisIsBest ? 'This product has the BEST (lowest) $nutrientName among all compared products.' : ''}
-${comparisonFact.thisIsWorst ? 'This product has the WORST (highest) $nutrientName among all compared products.' : ''}
+The lowest value in the compared set is ${comparisonFact.bestValueInSet}$unit. The highest value in the compared set is ${comparisonFact.worstValueInSet}$unit.
+${comparisonFact.thisIsBest ? 'This product has the LOWEST $nutrientName among all compared products.' : ''}
+${comparisonFact.thisIsWorst ? 'This product has the HIGHEST $nutrientName among all compared products.' : ''}
 Note: Product rankings are standardized using nutrient content per 100g to ensure fair comparisons regardless of serving size.
 
 Also write a "comparisonExplanation" field: ONE short sentence explaining why this product is ranked "$rankText" compared to the others, citing the EXACT numbers above. Example style:
@@ -145,8 +165,16 @@ Also write a "comparisonExplanation" field: ONE short sentence explaining why th
 IMPORTANT: For the "warningText" field, do NOT include the decision word ("Caution") at the beginning. The UI already displays the decision separately. The warningText should only describe the allergen, e.g. "Fish allergen detected" not "Caution: Fish allergen detected".
 
 Do NOT mention: calculations, algorithms, risk scores, WHO, "recommended maximum daily intake"'''
-        : (hasNoConditionsAndNoAllergens
-            ? '''IMPORTANT:
+        : (scoredFactors.isNotEmpty
+              ? '''IMPORTANT:
+    - Explain the supplied deterministic condition-factor results only.
+    - Do not invent thresholds, medical limits, points, classifications, or safety claims.
+    - Unknown factors must be described as insufficient information, never as clean or absent.
+    - For GERD triggers, say "potential GERD trigger detected" and explain that symptoms vary between people; never claim a guaranteed effect.
+    - Potassium, protein, natural phosphorus, and potassium chloride are informational only and are not scored risks.
+    - Keep the explanation concise and user-facing.'''
+              : (hasNoConditionsAndNoAllergens
+                    ? '''IMPORTANT:
 - The application has already calculated the suggested serving amount.
 - You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
 - The suggested serving amount is for up to 3 meals per day.
@@ -165,7 +193,7 @@ EXPLANATION field -- write EXACTLY ONE short sentence:
 - Do not explain the mathematical calculation.
 - Do not repeat nutrient amounts or WHO percentages.
 - Keep it very short and user-friendly.'''
-            : '''IMPORTANT:
+                    : '''IMPORTANT:
 - The application has already calculated all nutrient amounts, percentages, classification levels, and suitable/recommended serving amounts.
 - You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
 - Every number in the advisory must come directly from the supplied facts above.
@@ -202,12 +230,12 @@ WORDING:
 - Never invent or calculate numbers -- use only the supplied facts.
 - Avoid repetition and unnecessary disclaimers.
 - For sugars specifically: always say "total sugars", never "free sugars" or "added sugars" as a standalone label.
-- Keep the advisory concise.''');
+- Keep the advisory concise.'''));
 
     final introBlock = allergen.hasDirectAllergen
         ? 'You are a friendly grocery assistant inside a Filipino grocery app called CLARO, writing a quick health tip for a scanned product.'
         : 'You are a wording assistant for the non-allergen Health Advisory card in a Filipino grocery app called CLARO. '
-            'Generate a short, clear, cautious, user-friendly health advisory using ONLY the nutrient and health facts supplied below.';
+              'Generate a short, clear, cautious, user-friendly health advisory using ONLY the nutrient and health facts supplied below.';
 
     return '''
 $introBlock
@@ -230,11 +258,11 @@ $jsonFields
   static String _rankLabelText(SuitabilityRankLabel label) {
     switch (label) {
       case SuitabilityRankLabel.mostSuitable:
-        return 'most suitable';
+        return 'highest-ranked';
       case SuitabilityRankLabel.middle:
         return 'middle';
       case SuitabilityRankLabel.leastSuitable:
-        return 'least suitable';
+        return 'lowest-ranked';
       case SuitabilityRankLabel.forcedLast:
         return 'not recommended due to an allergen match';
     }
@@ -263,6 +291,21 @@ $jsonFields
         return 'GERD';
       case HealthCondition.kidneyDisease:
         return 'kidney disease';
+    }
+  }
+
+  static String _factorLabel(String key) {
+    switch (key) {
+      case 'sodiumMg':
+        return 'Sodium';
+      case 'phosphateAdditives':
+        return 'Phosphate additives';
+      case 'gerdTotalFat':
+        return 'GERD total fat';
+      case 'gerdTriggers':
+        return 'GERD trigger categories';
+      default:
+        return key;
     }
   }
 
@@ -340,6 +383,8 @@ $jsonFields
     required double worstValue,
     required int rank,
     required int totalProducts,
+    required bool thisIsBestNutrient,
+    String? supportingReason,
     String healthCondition = '',
     String languageCode = 'en',
   }) {
@@ -355,16 +400,34 @@ $jsonFields
         ? '7. Briefly connect the $nutrientName level to the user\'s $healthCondition (e.g. why it matters for that condition), without sounding clinical'
         : '';
 
-    // Derived from rank/totalProducts ONLY -- this is the same numbered
-    // position shown on the ranking list the user already saw, so the
-    // wording below can never contradict it. Do NOT pass a separately
-    // computed "is this the best nutrient value" flag into this prompt:
-    // that was the original bug -- a product can win on rank overall
-    // (across every condition + allergens) while not having the single
-    // best value for just one nutrient, which produced explanations that
-    // flatly contradicted the badge the user was looking at.
+    // isBestRank/isWorstRank are derived from rank/totalProducts ONLY --
+    // this is the same numbered position shown on the ranking list the
+    // user already saw, so the wording below can never contradict the
+    // badge itself.
+    //
+    // thisIsBestNutrient IS the separately-computed "is this the best
+    // nutrient value" flag -- and unlike the rank badge, this one WE DO
+    // pass in, explicitly, so the model can tell the two concepts apart.
+    // The original bug was exactly this gap: a product can win on rank
+    // overall (across every condition + allergens) while not having the
+    // single best value for just one nutrient. Instruction 4 below used
+    // to say "include the percentage difference from the best option
+    // when applicable" with no gate on this, so the model would produce
+    // sentences like "ranks 1 of 4 (top choice) ... which is 31% more
+    // than the best option" -- contradicting the very rank it just
+    // stated. Instruction 4 is now gated on thisIsBestNutrient.
     final isBestRank = rank == 1;
     final isWorstRank = rank == totalProducts;
+
+    // Only meaningful when isBestRank is true and thisIsBestNutrient is
+    // false -- an already-worded fact about a DIFFERENT nutrient where
+    // this product genuinely is the lowest in the set, so instruction 4
+    // below can point to something concrete instead of hand-waving.
+    final supportingReasonLine = supportingReason != null
+        ? 'A concrete reason this product still ranks #1 overall despite not being the lowest in $nutrientName: $supportingReason.'
+        : (isBestRank && !thisIsBestNutrient
+              ? 'No single other nutrient explains the #1 rank on its own -- if you need to say why it still wins, speak generally about its combined nutrient profile for the user\'s conditions, without inventing a specific number.'
+              : '');
 
     return '''
 You are a nutrition assistant inside a Filipino grocery app called CLARO, writing a short ranking explanation for a product.
@@ -372,11 +435,14 @@ You are a nutrition assistant inside a Filipino grocery app called CLARO, writin
 Nutrient: $nutrientName
 Unit: $nutrientUnit
 This product value: $thisValue
-Best value in comparison: $bestValue
-Worst value in comparison: $worstValue
-This product's overall rank: $rank of $totalProducts (based on the user's full health profile, not on this nutrient alone)
+Lowest (best) value in comparison: $bestValue
+Highest (worst) value in comparison: $worstValue
+This product's overall rank: $rank of $totalProducts (based on the user's full health profile -- every relevant condition, nutrient, and factor together -- not on this one nutrient alone)
 Is this product ranked #1 overall: $isBestRank
 Is this product ranked last overall: $isWorstRank
+Does this product ALSO happen to have the single lowest $nutrientName value in this comparison: $thisIsBestNutrient
+$supportingReasonLine
+
 $conditionLine
 
 $languageInstruction
@@ -385,10 +451,13 @@ Write a concise ranking explanation (1-2 sentences, maximum 50 words) that:
 1. States the product's overall rank ($rank of $totalProducts) and explains it primarily through the $nutrientName content as the most relevant contributing nutrient
 2. Compares this product against others using per 100g values only
 3. States whether this product contains more or less of $nutrientName than other products
-4. Includes the percentage difference from the best option when applicable
+4. Only mentions a percentage/amount difference from the lowest value in this comparison when thisIsBestNutrient is false OR when this product is not ranked #1 overall. If this product IS ranked #1 overall (isBestRank is true) but thisIsBestNutrient is false, you MUST NOT phrase this as the product losing, lacking, or being worse -- instead explain, in one clause, that it is not the single lowest in $nutrientName but still ranks #1. If a concrete reason is given above, use that specific reason (name the other nutrient and its value); otherwise speak generally about the combined profile, per the note above -- do not invent a specific number. Never call a #1-ranked product "more than the best option" or similar -- there is no other "best option" to lose to when this product IS the top overall choice.
 5. Uses clear, natural, user-friendly language
 6. Does not mention risk scores, internal calculations, variable names, or implementation details
-7. Must never describe this product as "top choice", "best", "first place", etc. unless rank is 1, and never as "worst" or "least recommended" unless rank equals $totalProducts -- always stay consistent with rank $rank of $totalProducts
+7. Must never describe this product as "top choice", "best", "first place", etc. unless rank is 1, and never as "worst" or "least recommended" unless rank equals $totalProducts -- always stay consistent with rank $rank of $totalProducts, and never let the $nutrientName comparison in this explanation contradict that rank
+8. Do not say or imply that the product is dangerous, harmful, unsafe, toxic, or medically contraindicated.
+9. Do not say or imply that the product will cause, worsen, aggravate, or trigger a health condition. State only that the nutrient level is relevant to or worth monitoring for the user's condition.
+10. Do not diagnose, prescribe, or claim a guaranteed medical outcome. Use neutral wording such as "has a higher sodium value in this comparison" or "this amount may be worth monitoring."
 $conditionInstruction
 
 Return ONLY valid JSON, no markdown, matching exactly this shape:

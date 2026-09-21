@@ -241,11 +241,12 @@ service cloud.firestore {
         allow create: if request.auth != null && isGroupOwner();
         
         // Allow update: owner can update any fields on managed members (including health data via Worker)
-        // Linked users can only mark themselves as left (status change only)
+        // Linked users can update their own display name or mark themselves
+        // as left. Health data and membership ownership remain protected.
         allow update: if request.auth != null 
                       && (isGroupOwner() 
                           || (isThisUser() && isLinkedMember() 
-                              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])));
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'displayName'])));
         
         // Allow delete: owner can delete managed members
         allow delete: if request.auth != null && isGroupOwner();

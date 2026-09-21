@@ -47,7 +47,8 @@ class _GroupOption {
 
 class _GroupContext {
   const _GroupContext({required this.options, required this.selected});
-  final List<_GroupOption> options; // every group worth showing (>= 1 other member)
+  final List<_GroupOption>
+  options; // every group worth showing (>= 1 other member)
   final _GroupOption selected;
 }
 
@@ -115,10 +116,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // change to how those rows are built. The banner switches to the group
   // verdict.
   bool _groupChecking = true; // group lookup + group advisory still in flight
-  List<MemberEvaluation> _groupMembers = const []; // members of the SELECTED group
+  List<MemberEvaluation> _groupMembers =
+      const []; // members of the SELECTED group
   String? _selectedMemberKey;
   HealthAdvisory? _groupAdvisory; // for the selected group
-  bool _groupAdvisoryLoading = false; // true while a just-picked group's text is generated
+  bool _groupAdvisoryLoading =
+      false; // true while a just-picked group's text is generated
 
   // Multi-group: every group of the user that has at least one other
   // member. The selector pill/sheet only appears when there are 2 or more.
@@ -174,14 +177,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     VoiceAssistantService.activeResultProductNotifier.value = widget.product;
     _currentProduct = widget.product;
     _currentComparisonSet = widget.comparisonSet;
-    _scanEventId = '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}';
+    _scanEventId =
+        '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}';
     _initSizes(_currentProduct);
-    if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
+    if (_authService.currentUser != null &&
+        VoiceAssistantService.instance.isEnabled) {
       VoiceAssistantService.instance.announcePage('product_detail');
     }
     _loadFdaVerification();
     _loadFavoriteStatus();
-    FavoritesService.favoriteActionNotifier.addListener(_handleFavoriteActionChanged);
+    FavoritesService.favoriteActionNotifier.addListener(
+      _handleFavoriteActionChanged,
+    );
   }
 
   void _handleFavoriteActionChanged() {
@@ -208,7 +215,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (_) => const UnknownProductSubmissionScreen(
-          capturedImagePath: null, // No pre-captured image when reporting from detail screen
+          capturedImagePath:
+              null, // No pre-captured image when reporting from detail screen
         ),
       ),
     );
@@ -257,15 +265,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 right: 50,
                 child: CustomPaint(
                   size: const Size(12, 6),
-                  painter: _TrianglePainter(
-                    color: Colors.grey[800]!,
-                  ),
+                  painter: _TrianglePainter(color: Colors.grey[800]!),
                 ),
               ),
               // Speech bubble body
               Container(
                 width: 210,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.grey[800],
                   borderRadius: BorderRadius.circular(8),
@@ -321,11 +330,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   @override
   void dispose() {
-    if (VoiceAssistantService.activeResultProductNotifier.value?.id == _currentProduct.id) {
+    if (VoiceAssistantService.activeResultProductNotifier.value?.id ==
+        _currentProduct.id) {
       VoiceAssistantService.activeResultProductNotifier.value = null;
     }
     _reportToastTimer?.cancel();
-    FavoritesService.favoriteActionNotifier.removeListener(_handleFavoriteActionChanged);
+    FavoritesService.favoriteActionNotifier.removeListener(
+      _handleFavoriteActionChanged,
+    );
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
     _groupOptionsTick.dispose();
     super.dispose();
@@ -333,13 +345,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   /// Updates the currently displayed product and reloads all associated data.
   /// Called when returning from Compare with a selected product.
-  void _updateProduct(Product newProduct, List<RankedProductResult>? newComparisonSet) {
+  void _updateProduct(
+    Product newProduct,
+    List<RankedProductResult>? newComparisonSet,
+  ) {
     VoiceAssistantService.setLatestScanProduct(newProduct);
     VoiceAssistantService.activeResultProductNotifier.value = newProduct;
     setState(() {
       _currentProduct = newProduct;
       _currentComparisonSet = newComparisonSet;
-      _scanEventId = '${newProduct.id}_${DateTime.now().millisecondsSinceEpoch}';
+      _scanEventId =
+          '${newProduct.id}_${DateTime.now().millisecondsSinceEpoch}';
       _initSizes(newProduct);
       _advisoryLoading = true;
       _nutritionUnavailable = false;
@@ -359,7 +375,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _groupAdvisoryCache.clear();
       _isFavorite = false;
       _hasAutoAnnouncedSummary = false;
-      _favoriteBusy = true; // Prevent interaction while loading new product's favorite status
+      _favoriteBusy =
+          true; // Prevent interaction while loading new product's favorite status
     });
     _loadFdaVerification();
     _loadFavoriteStatus();
@@ -373,7 +390,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _advisoryStarted = true;
       _loadAdvisory();
     }
-    
+
     // Show report toast notification after a short delay to help users discover the feature
     // Only show it once per screen instance to avoid repetition
     if (!_hasShownReportToast) {
@@ -391,8 +408,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         .verifyByCprNumber(_currentProduct.fdaRegistrationNumber);
 
     if (result.isUnverified) {
-      result = await FdaVerificationService()
-          .verifyByProductName(_currentProduct.name);
+      result = await FdaVerificationService().verifyByProductName(
+        _currentProduct.name,
+      );
     }
 
     if (mounted) {
@@ -554,8 +572,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       orElse: () => ranked.first,
     );
 
-    final languageCode =
-        mounted ? Localizations.localeOf(context).languageCode : 'en';
+    final languageCode = mounted
+        ? Localizations.localeOf(context).languageCode
+        : 'en';
 
     final detail = await BackendLocator.productRankingService.getProductDetail(
       target: target,
@@ -623,9 +642,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   /// (signed-in user first). Returns null when the group has nobody else
   /// whose profile could be read, or on any failure -- such a group simply
   /// isn't offered, and a user with no such group stays a solo screen.
-  Future<List<MemberEvaluation>?> _loadGroupMembers(HealthGroup group, String uid) async {
+  Future<List<MemberEvaluation>?> _loadGroupMembers(
+    HealthGroup group,
+    String uid,
+  ) async {
     try {
-      final entries = await BackendLocator.groupRepository.getGroupMemberProfiles(group.id);
+      final entries = await BackendLocator.groupRepository
+          .getGroupMemberProfiles(group.id);
       bool isSelfEntry(GroupMemberProfile e) =>
           e.member.isLinked && e.member.linkedUid == uid;
       if (!entries.any((e) => !isSelfEntry(e))) return null; // nobody else
@@ -634,24 +657,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       for (final e in entries) {
         final self = isSelfEntry(e);
         final memberName = e.member.displayName?.trim();
-        members.add(_evaluateMember(
-          // Same identity the profile was fetched under: uid for linked
-          // members, member id for managed ones.
-          key: e.profile.userId,
-          name: (memberName != null && memberName.isNotEmpty)
-              ? memberName
-              : (e.profile.displayName.isNotEmpty ? e.profile.displayName : 'Member'),
-          avatar: e.member.avatar,
-          isSelf: self,
-          profile: e.profile,
-        ));
+        members.add(
+          _evaluateMember(
+            // Same identity the profile was fetched under: uid for linked
+            // members, member id for managed ones.
+            key: e.profile.userId,
+            name: (memberName != null && memberName.isNotEmpty)
+                ? memberName
+                : (e.profile.displayName.isNotEmpty
+                      ? e.profile.displayName
+                      : 'Member'),
+            avatar: e.member.avatar,
+            isSelf: self,
+            profile: e.profile,
+          ),
+        );
       }
 
       // The user's own member record can be missing on older groups (it is
       // created when the owner first opens Group Details). Their own card
       // must always be part of the group view, so add it from their profile.
       if (!members.any((m) => m.isSelf)) {
-        final profile = await BackendLocator.userRepository.getHealthProfile(uid);
+        final profile = await BackendLocator.userRepository.getHealthProfile(
+          uid,
+        );
         String? avatar;
         try {
           final doc = await _authService.db.collection('users').doc(uid).get();
@@ -689,15 +718,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
       String? lastId;
       try {
-        lastId = (await SharedPreferences.getInstance()).getString(_lastGroupPrefKey(uid));
+        lastId = (await SharedPreferences.getInstance()).getString(
+          _lastGroupPrefKey(uid),
+        );
       } catch (_) {}
       HealthGroup? primary;
       try {
         primary = await repo.getActiveGroup(uid);
       } catch (_) {}
 
-      int rank(HealthGroup g) => g.id == lastId ? 0 : (g.id == primary?.id ? 1 : 2);
-      final ordered = [...groups]..sort((a, b) {
+      int rank(HealthGroup g) =>
+          g.id == lastId ? 0 : (g.id == primary?.id ? 1 : 2);
+      final ordered = [...groups]
+        ..sort((a, b) {
           final r = rank(a).compareTo(rank(b));
           return r != 0 ? r : groups.indexOf(a).compareTo(groups.indexOf(b));
         });
@@ -723,9 +756,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  Future<HealthAdvisory> _generateGroupAdvisory(List<MemberEvaluation> members) {
+  Future<HealthAdvisory> _generateGroupAdvisory(
+    List<MemberEvaluation> members,
+  ) {
     final size = _groupAdvisorySizeG;
-    final languageCode = mounted ? Localizations.localeOf(context).languageCode : 'en';
+    final languageCode = mounted
+        ? Localizations.localeOf(context).languageCode
+        : 'en';
     return BackendLocator.geminiAdvisoryService.generateGroupAdvisory(
       productId: _currentProduct.id,
       productName: _currentProduct.name,
@@ -846,8 +883,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   List<MemberEvaluation> get _sortedGroupMembers {
     final list = [..._groupMembers];
     list.sort((a, b) {
-      final la = GroupAdvisoryBuilder.severity(GroupAdvisoryBuilder.levelAt(a.evaluation, _selectedSizeG));
-      final lb = GroupAdvisoryBuilder.severity(GroupAdvisoryBuilder.levelAt(b.evaluation, _selectedSizeG));
+      final la = GroupAdvisoryBuilder.severity(
+        GroupAdvisoryBuilder.levelAt(a.evaluation, _selectedSizeG),
+      );
+      final lb = GroupAdvisoryBuilder.severity(
+        GroupAdvisoryBuilder.levelAt(b.evaluation, _selectedSizeG),
+      );
       if (la != lb) return lb.compareTo(la);
       if (a.isSelf != b.isSelf) return a.isSelf ? -1 : 1;
       return a.name.toLowerCase().compareTo(b.name.toLowerCase());
@@ -856,8 +897,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   AdvisoryLevel get _groupLevel => GroupAdvisoryBuilder.groupLevel(
-        _groupMembers.map((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG)),
-      );
+    _groupMembers.map(
+      (m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG),
+    ),
+  );
 
   /// The Gemini group text while the pack size is still the one it was
   /// written for; a deterministic rewrite for any other size (same idea as
@@ -891,11 +934,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               Container(
                 color: colorScheme.surface,
                 height: topPadding + 56,
-                padding: EdgeInsets.only(
-                  left: 16,
-                  right: 16,
-                  top: topPadding,
-                ),
+                padding: EdgeInsets.only(left: 16, right: 16, top: topPadding),
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -917,769 +956,940 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           _dismissReportTooltip();
                           Navigator.pop(context);
                         },
-                        child: Icon(Icons.arrow_back,
-                            color: colorScheme.primary, size: 24),
-                      ),
-                    ),
-                // Right Heart Button + Report Button
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Report button
-                      Semantics(
-                        button: true,
-                        label: loc.reportProductButton,
-                        child: GestureDetector(
-                          onTap: () {
-                            HapticService().vibrate();
-                            _navigateToReport();
-                          },
-                          child: Icon(
-                            Icons.report_problem_outlined,
-                            color: colorScheme.onSurfaceVariant,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      // Favorite button
-                      Semantics(
-                        button: true,
-                        label: _isFavorite ? 'Remove from favorites' : 'Add to favorites',
-                        child: GestureDetector(
-                          onTap: () {
-                            HapticService().vibrate();
-                            _toggleFavorite();
-                          },
-                          child: Icon(
-                            _isFavorite ? Icons.favorite : Icons.favorite_border,
-                            color: _isFavorite ? const Color(0xFFD32F2F) : colorScheme.onSurfaceVariant,
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: theme.dividerColor),
-
-          // ── Scrollable content ────────────────────────────────────
-          Expanded(
-            child: SingleChildScrollView(
-              key: const PageStorageKey<String>('product_detail_scroll'),
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const SizedBox(height: 12),
-
-                  if (p.isOfflineFallback)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: theme.brightness == Brightness.dark
-                              ? const Color(0xFFE65100).withValues(alpha: 0.15)
-                              : const Color(0xFFFFF3E0),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: theme.brightness == Brightness.dark
-                                ? const Color(0xFFFFB74D).withValues(alpha: 0.4)
-                                : const Color(0xFFFFB74D).withValues(alpha: 0.8),
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.wifi_off_rounded,
-                              size: 18,
-                              color: theme.brightness == Brightness.dark
-                                  ? const Color(0xFFFFB74D)
-                                  : const Color(0xFFE65100),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                loc.offlineBasicRecognitionBanner,
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w500,
-                                  color: theme.brightness == Brightness.dark
-                                      ? const Color(0xFFFFB74D)
-                                      : const Color(0xFFE65100),
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: Icon(
+                          Icons.arrow_back,
+                          color: colorScheme.primary,
+                          size: 24,
                         ),
                       ),
                     ),
-
-                  // ── 1. Main Product Info Card ──────────────────────
-                  _buildCard(
-                    context: context,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Product image (Cloudinary-hosted, via imageURL from
-                        // Firestore) with graceful placeholder fallback for
-                        // missing/invalid URLs.
-                        Column(
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                width: 80,
-                                height: 80,
-                                color: theme.cardColor.withOpacity(0.5),
-                                child: _displayedImageUrl.isEmpty
-                                    ? Icon(Icons.dining_outlined,
-                                        size: 40, color: colorScheme.outline)
-                                    : Image.network(
-                                        _displayedImageUrl,
-                                        key: ValueKey(_displayedImageUrl),
-                                        width: 80,
-                                        height: 80,
-                                        fit: BoxFit.cover,
-                                        loadingBuilder: (context, child, progress) {
-                                          if (progress == null) return child;
-                                          return Center(
-                                            child: SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: colorScheme.outline,
-                                              ),
-                                            ),
-                                          );
-                                        },
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Icon(Icons.dining_outlined,
-                                              size: 40, color: colorScheme.outline);
-                                        },
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            // ── Size dropdown ──
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: theme.dividerColor),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<double>(
-                                  value: _selectedSizeG,
-                                  isDense: true,
-                                  icon: Icon(Icons.arrow_drop_down,
-                                      size: 18, color: colorScheme.onSurfaceVariant),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                  items: _availableSizes.map((size) {
-                                    final label = size == size.roundToDouble()
-                                        ? '${size.toInt()}g'
-                                        : '${size.toStringAsFixed(1)}g';
-                                    return DropdownMenuItem(
-                                      value: size,
-                                      child: Text(label),
-                                    );
-                                  }).toList(),
-                                  onChanged: (newSize) {
-                                    if (newSize != null) {
-                                      setState(() {
-                                        _selectedSizeG = newSize;
-                                        _displayedImageUrl = p.imageUrlForSize(newSize);
-                                      });
-                                      _refreshVoiceSummary();
-                                    }
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                widget.productCounts != null && (widget.productCounts![p.id] ?? 1) > 1
-                                    ? '${p.name} (x${widget.productCounts![p.id]})'
-                                    : p.name,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                p.nutritionalFacts.servingSize,
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              // FDA badge
-                              _buildFdaBadge(),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ── FDA Warning Banner (only shown if expired or unverified) ────
-                  if (_fdaResult != null && !_fdaResult!.isActive)
-                    Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: _fdaResult!.isExpired
-                            ? Colors.red.withOpacity(0.1)
-                            : Colors.amber.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: _fdaResult!.isExpired
-                              ? Colors.red.withOpacity(0.5)
-                              : Colors.amber.withOpacity(0.5),
-                        ),
-                      ),
+                    // Right Heart Button + Report Button
+                    Align(
+                      alignment: Alignment.centerRight,
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.warning_amber_rounded,
-                            color: _fdaResult!.isExpired ? Colors.red : Colors.amber[800],
-                            size: 22,
+                          // Report button
+                          Semantics(
+                            button: true,
+                            label: loc.reportProductButton,
+                            child: GestureDetector(
+                              onTap: () {
+                                HapticService().vibrate();
+                                _navigateToReport();
+                              },
+                              child: Icon(
+                                Icons.report_problem_outlined,
+                                color: colorScheme.onSurfaceVariant,
+                                size: 24,
+                              ),
+                            ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _fdaResult!.isExpired
-                                  ? loc.fdaExpiredWarning
-                                  : loc.fdaUnverifiedWarning,
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.onSurface,
-                                height: 1.4,
+                          const SizedBox(width: 16),
+                          // Favorite button
+                          Semantics(
+                            button: true,
+                            label: _isFavorite
+                                ? 'Remove from favorites'
+                                : 'Add to favorites',
+                            child: GestureDetector(
+                              onTap: () {
+                                HapticService().vibrate();
+                                _toggleFavorite();
+                              },
+                              child: Icon(
+                                _isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: _isFavorite
+                                    ? const Color(0xFFD32F2F)
+                                    : colorScheme.onSurfaceVariant,
+                                size: 24,
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: theme.dividerColor),
 
-                  const SizedBox(height: 16),
-                  _buildAdvisoryBanner(context, loc),
+              // ── Scrollable content ────────────────────────────────────
+              Expanded(
+                child: SingleChildScrollView(
+                  key: const PageStorageKey<String>('product_detail_scroll'),
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 12),
 
-                  const SizedBox(height: 12),
-
-                  // ── 3b. GERD/Kidney Disease Warning card (awareness-only) ─
-                  // Positioned above Health Analysis card but below Health Advisory banner
-                  // Follows the profile currently driving the Health Analysis card below
-                  _buildAwarenessWarningCards(context, loc, p),
-
-                  const SizedBox(height: 12),
-
-                  // ── 3. Batayan ng Pagsusuri (Reminders Box) ───────
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFFE5D5C5), width: 1.5),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFB71C1C),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.bookmark,
-                                  color: Colors.white,
-                                  size: 24,
-                                ),
+                      if (p.isOfflineFallback)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: theme.brightness == Brightness.dark
+                                  ? const Color(
+                                      0xFFE65100,
+                                    ).withValues(alpha: 0.15)
+                                  : const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: theme.brightness == Brightness.dark
+                                    ? const Color(
+                                        0xFFFFB74D,
+                                      ).withValues(alpha: 0.4)
+                                    : const Color(
+                                        0xFFFFB74D,
+                                      ).withValues(alpha: 0.8),
                               ),
                             ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    loc.analysisBasisTitle,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    loc.analysisBasisSubtitle('${_selectedSizeG == _selectedSizeG.roundToDouble() ? _selectedSizeG.toInt().toString() : _selectedSizeG.toStringAsFixed(1)}g'),
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      color: colorScheme.onSurface.withValues(alpha: 0.85),
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        // Group mode: pick whose health profile the rows below
-                        // are evaluated for. Solo users keep the original spacing.
-                        if (_isGroupMode) ...[
-                          const SizedBox(height: 16),
-                          _buildMemberSwitcher(context, colorScheme),
-                          const Divider(height: 28),
-                        ] else
-                          const SizedBox(height: 20),
-
-                        if (!p.nutritionalFacts.hasNutritionData)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
                             child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.info_outline,
-                                    size: 18, color: colorScheme.onSurfaceVariant),
-                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.wifi_off_rounded,
+                                  size: 18,
+                                  color: theme.brightness == Brightness.dark
+                                      ? const Color(0xFFFFB74D)
+                                      : const Color(0xFFE65100),
+                                ),
+                                const SizedBox(width: 10),
                                 Expanded(
                                   child: Text(
-                                    loc.nutritionDataUnavailable,
+                                    loc.offlineBasicRecognitionBanner,
                                     style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      color: colorScheme.onSurfaceVariant,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: theme.brightness == Brightness.dark
+                                          ? const Color(0xFFFFB74D)
+                                          : const Color(0xFFE65100),
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                          )
-                        else ...[
-                        // Nutrient + allergy rows, combined into a single
-                        // ordered list. Ranking: a direct allergen match is
-                        // the strongest signal this card can show -- it's
-                        // the one thing that forces the overall verdict to
-                        // Caution regardless of any nutrient level (see
-                        // `_currentOverallLevel`) -- so it now goes through
-                        // the same "user-related comes first" ranking as
-                        // the health-condition rows below, instead of
-                        // always being pinned to the bottom of the card
-                        // regardless of relevance.
-                        ...(() {
-                          final evals = <DisplayNutrientEval>[
-                            // 1. Sodium (Hypertension)
-                            (() {
-                              final val100g = p.nutritionPer100g.sodiumMg;
-                              final valServing = (val100g / 100) * _selectedSizeG;
-                              final limit = 2000.0;
-                              final pct = (valServing / limit) * 100;
-                              return DisplayNutrientEval(
-                                label: loc.bpSodiumLabel,
-                                shortLabel: loc.bpSodiumShortLabel,
-                                nutrientKey: 'sodiumMg',
-                                valuePerServing: valServing,
-                                limit: limit,
-                                percentage: pct,
-                                level: WhoCalculator.classifyByWhoPercentage(pct),
-                                unit: 'mg',
-                              );
-                            })(),
-                            // 2. Sugars (Diabetes)
-                            (() {
-                              final val100g = p.nutritionPer100g.sugarsG;
-                              final valServing = (val100g / 100) * _selectedSizeG;
-                              final limit = 50.0;
-                              final pct = (valServing / limit) * 100;
-                              return DisplayNutrientEval(
-                                label: loc.diabetesSugarsLabel,
-                                shortLabel: loc.diabetesSugarsShortLabel,
-                                nutrientKey: 'sugarsG',
-                                valuePerServing: valServing,
-                                limit: limit,
-                                percentage: pct,
-                                level: WhoCalculator.classifyByWhoPercentage(pct),
-                                unit: 'g',
-                              );
-                            })(),
-                            // 3. Saturated Fats (Heart disease)
-                            (() {
-                              final val100g = p.nutritionPer100g.saturatedFatG;
-                              final valServing = (val100g / 100) * _selectedSizeG;
-                              final limit = 22.2;
-                              final pct = (valServing / limit) * 100;
-                              return DisplayNutrientEval(
-                                label: loc.heartSatFatLabel,
-                                shortLabel: loc.heartSatFatShortLabel,
-                                nutrientKey: 'saturatedFatG',
-                                valuePerServing: valServing,
-                                limit: limit,
-                                percentage: pct,
-                                level: WhoCalculator.classifyByWhoPercentage(pct),
-                                unit: 'g',
-                              );
-                            })(),
-                          ];
+                          ),
+                        ),
 
-                          // Reorder evaluations based on user's health profile
-                          final orderedEvals = _reorderNutrientEvaluations(evals);
-
-                          // Allergens that are both (a) present in this
-                          // product AND (b) saved in the user's own health
-                          // profile. `p.allergens` alone is every allergen
-                          // the PRODUCT contains, not the ones relevant to
-                          // this user; cross-reference against
-                          // `_evaluation.allergenAssessment.matchedContains`
-                          // (computed by WhoCalculator.assessAllergens
-                          // against the signed-in user's saved allergies)
-                          // so a user who only lists "milk" doesn't see
-                          // unrelated allergens like crustaceans/fish/soy
-                          // that simply happen to be in the product.
-                          //
-                          // -- consolidated into ONE row listing every
-                          // matched allergen together, rather than
-                          // repeating the full title/badge/note layout per
-                          // allergen. With 2+ allergens that per-item
-                          // layout stacked duplicate "may cause allergic
-                          // reaction" notes and made the card grow
-                          // unbounded; grouping them still surfaces every
-                          // allergen while keeping the card a fixed height
-                          // regardless of how many are detected.
-                          final matchedAllergenLabels = _matchedUserAllergenLabels(
-                            p,
-                            Localizations.localeOf(context).languageCode,
-                          );
-
-                          return [
-                            if (matchedAllergenLabels.isNotEmpty)
-                              _buildAllergyRow(matchedAllergenLabels, colorScheme, loc),
-                            ...orderedEvals.map((e) => _buildConditionRow(e, colorScheme, loc)),
-                          ];
-                        })(),
-
-                        // Legend section - How to understand
-                        Column(
+                      // ── 1. Main Product Info Card ──────────────────────
+                      _buildCard(
+                        context: context,
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Divider(height: 24, thickness: 1),
-                            Text(
-                              loc.howToUnderstandTitle,
-                              style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.onSurface,
-                              ),
+                            // Product image (Cloudinary-hosted, via imageURL from
+                            // Firestore) with graceful placeholder fallback for
+                            // missing/invalid URLs.
+                            Column(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    width: 80,
+                                    height: 80,
+                                    color: theme.cardColor.withOpacity(0.5),
+                                    child: _displayedImageUrl.isEmpty
+                                        ? Icon(
+                                            Icons.dining_outlined,
+                                            size: 40,
+                                            color: colorScheme.outline,
+                                          )
+                                        : Image.network(
+                                            _displayedImageUrl,
+                                            key: ValueKey(_displayedImageUrl),
+                                            width: 80,
+                                            height: 80,
+                                            fit: BoxFit.cover,
+                                            loadingBuilder:
+                                                (context, child, progress) {
+                                                  if (progress == null)
+                                                    return child;
+                                                  return Center(
+                                                    child: SizedBox(
+                                                      width: 20,
+                                                      height: 20,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            color: colorScheme
+                                                                .outline,
+                                                          ),
+                                                    ),
+                                                  );
+                                                },
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                                  return Icon(
+                                                    Icons.dining_outlined,
+                                                    size: 40,
+                                                    color: colorScheme.outline,
+                                                  );
+                                                },
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                // ── Size dropdown ──
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerHighest
+                                        .withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: theme.dividerColor,
+                                    ),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<double>(
+                                      value: _selectedSizeG,
+                                      isDense: true,
+                                      icon: Icon(
+                                        Icons.arrow_drop_down,
+                                        size: 18,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: colorScheme.onSurface,
+                                      ),
+                                      items: _availableSizes.map((size) {
+                                        final label =
+                                            size == size.roundToDouble()
+                                            ? '${size.toInt()}g'
+                                            : '${size.toStringAsFixed(1)}g';
+                                        return DropdownMenuItem(
+                                          value: size,
+                                          child: Text(label),
+                                        );
+                                      }).toList(),
+                                      onChanged: (newSize) {
+                                        if (newSize != null) {
+                                          setState(() {
+                                            _selectedSizeG = newSize;
+                                            _displayedImageUrl = p
+                                                .imageUrlForSize(newSize);
+                                          });
+                                          _refreshVoiceSummary();
+                                        }
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 10),
-                            _buildLegendItem(
-                              dotColor: const Color(0xFF2E7D32),
-                              label: loc.suitableLegend,
-                              description: loc.legendSuitableDesc,
-                              colorScheme: colorScheme,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildLegendItem(
-                              dotColor: const Color(0xFFE65100),
-                              label: loc.moderateLegend,
-                              description: loc.legendModerateDesc,
-                              colorScheme: colorScheme,
-                            ),
-                            const SizedBox(height: 8),
-                            _buildLegendItem(
-                              dotColor: const Color(0xFFC62828),
-                              label: loc.cautionLegend,
-                              description: loc.legendCautionDesc,
-                              colorScheme: colorScheme,
-                            ),
-                          ],
-                        ),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  // ── 4. For more details link ──────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 12, left: 24, right: 24),
-                    child: InkWell(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) => MoreDetailsScreen(
-                              product: p,
-                              matchedAllergens: _evaluation?.allergenAssessment.matchedContains ?? const [],
-                              healthProfile: _userHealthProfile,
-                              // Same conditions WhoCalculator.evaluateProduct() iterated
-                              // over for this user (i.e. the ones on their saved health
-                              // profile) -- lets the "How CLARO Calculates" guide only
-                              // badge a nutrient card with a condition the user actually
-                              // has.
-                              userConditions: _evaluation
-                                      ?.nutrientEvaluations
-                                      .map((e) => e.condition)
-                                      .toSet()
-                                      .toList() ??
-                                  const [],
-                            ),
-                          ),
-                        );
-                      },
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.keyboard_return_rounded,
-                              size: 20,
-                              color: colorScheme.onSurface,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              loc.forMoreDetails,
-                              style: GoogleFonts.outfit(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: colorScheme.onSurface,
-                                decoration: TextDecoration.underline,
-                                decorationColor: colorScheme.onSurface,
-                                decorationThickness: 1.5,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.productCounts != null &&
+                                            (widget.productCounts![p.id] ?? 1) >
+                                                1
+                                        ? '${p.name} (x${widget.productCounts![p.id]})'
+                                        : p.name,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    p.nutritionalFacts.servingSize,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  // FDA badge
+                                  _buildFdaBadge(),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                  ),
 
-                  // ── 6. Kabuuang Nutrisyon Card ────────────────────
-                  _buildCard(
-                    context: context,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          loc.totalNutritionTitle,
-                          style: GoogleFonts.outfit(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: colorScheme.onSurface,
+                      // ── FDA Warning Banner (only shown if expired or unverified) ────
+                      if (_fdaResult != null && !_fdaResult!.isActive)
+                        Container(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                        ),
-                        const SizedBox(height: 14),
-                        if (!p.nutritionalFacts.hasNutritionData)
-                          Row(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: _fdaResult!.isExpired
+                                ? Colors.red.withOpacity(0.1)
+                                : Colors.amber.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: _fdaResult!.isExpired
+                                  ? Colors.red.withOpacity(0.5)
+                                  : Colors.amber.withOpacity(0.5),
+                            ),
+                          ),
+                          child: Row(
                             children: [
-                              Icon(Icons.info_outline,
-                                  size: 18, color: colorScheme.onSurfaceVariant),
-                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.warning_amber_rounded,
+                                color: _fdaResult!.isExpired
+                                    ? Colors.red
+                                    : Colors.amber[800],
+                                size: 22,
+                              ),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  loc.nutritionDataUnavailable,
+                                  _fdaResult!.isExpired
+                                      ? loc.fdaExpiredWarning
+                                      : loc.fdaUnverifiedWarning,
                                   style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: colorScheme.onSurface,
+                                    height: 1.4,
                                   ),
                                 ),
                               ),
                             ],
-                          )
-                        else ...[
-                        (() {
-                          final caloriesVal = p.nutritionalFacts.caloriesKcal * _sizeScale;
-                          final carbsVal = p.nutritionalFacts.carbsG * _sizeScale;
-                          final sugarVal = p.nutritionalFacts.sugarsG * _sizeScale;
-                          final sodiumVal = p.nutritionalFacts.sodiumMg * _sizeScale;
-                          final proteinVal = p.nutritionalFacts.proteinG * _sizeScale;
-                          final totalFatVal = p.nutritionalFacts.totalFatG * _sizeScale;
-                          final satFatVal = p.nutritionalFacts.saturatedFatG * _sizeScale;
-                          final transFatVal = p.nutritionalFacts.transFatG * _sizeScale;
-                          final fiberVal = p.nutritionalFacts.fiberG * _sizeScale;
-                          final potassiumVal = p.nutritionalFacts.potassiumMg * _sizeScale;
-                          final calciumVal = p.nutritionalFacts.calciumMg * _sizeScale;
-                          final ironVal = p.nutritionalFacts.ironMg * _sizeScale;
+                          ),
+                        ),
 
-                          // Only show nutrients with an actual non-zero
-                          // value, so the list doesn't pad itself out with
-                          // rows reading "0g" / "0mg" for facts the
-                          // product simply doesn't have.
-                          final entries = <_NutrientEntry>[
-                            _NutrientEntry(loc.nutriCalories, caloriesVal, '${caloriesVal.toStringAsFixed(0)} kcal'),
-                            _NutrientEntry(loc.nutriCarbs, carbsVal, '${carbsVal.toStringAsFixed(1)}g'),
-                            _NutrientEntry(loc.nutriSugar, sugarVal, '${sugarVal.toStringAsFixed(1)}g'),
-                            _NutrientEntry(loc.nutriSodium, sodiumVal, '${sodiumVal.toStringAsFixed(0)}mg'),
-                            _NutrientEntry(loc.nutriProtein, proteinVal, '${proteinVal.toStringAsFixed(1)}g'),
-                            _NutrientEntry(loc.nutriTotalFat, totalFatVal, '${totalFatVal.toStringAsFixed(1)}g'),
-                            _NutrientEntry(loc.nutriSatFat, satFatVal, '${satFatVal.toStringAsFixed(1)}g'),
-                            _NutrientEntry(loc.nutriTransFat, transFatVal, '${transFatVal.toStringAsFixed(1)}g'),
-                            _NutrientEntry(loc.nutriFiber, fiberVal, '${fiberVal.toStringAsFixed(1)}g'),
-                            _NutrientEntry(loc.nutriPotassium, potassiumVal, '${potassiumVal.toStringAsFixed(0)}mg'),
-                            _NutrientEntry(loc.nutriCalcium, calciumVal, '${calciumVal.toStringAsFixed(0)}mg'),
-                            _NutrientEntry(loc.nutriIron, ironVal, '${ironVal.toStringAsFixed(1)}mg'),
-                          ].where((entry) => entry.value != 0).toList();
+                      const SizedBox(height: 16),
+                      _buildAdvisoryBanner(context, loc),
 
-                          return Column(
-                            children: [
-                              for (int i = 0; i < entries.length; i++)
-                                _nutriListRow(
-                                  context,
-                                  entries[i].label,
-                                  entries[i].formatted,
-                                  showDivider: i != entries.length - 1,
+                      const SizedBox(height: 12),
+
+                      // ── 3b. GERD/Kidney Disease Warning card (awareness-only) ─
+                      // Positioned above Health Analysis card but below Health Advisory banner
+                      // Follows the profile currently driving the Health Analysis card below
+                      _buildAwarenessWarningCards(context, loc, p),
+
+                      const SizedBox(height: 12),
+
+                      // ── 3. Batayan ng Pagsusuri (Reminders Box) ───────
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: theme.cardColor,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: const Color(0xFFE5D5C5),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFB71C1C),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.bookmark,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
                                 ),
-                            ],
-                          );
-                        })(),
-                        ],
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // ── 7. Scores (Individual White Cards: Nutri-Score & NOVA) ─
-                  (() {
-                    final langCode = Localizations.localeOf(context).languageCode;
-                    final nutriResult = NutriScoreCalculator.computeFromProduct(
-                      _currentProduct,
-                      customServingSizeG: _selectedSizeG,
-                    );
-                    final novaResult = NovaScoreCalculator.computeFromProduct(_currentProduct);
-
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Text(
-                            loc.scoresTitle,
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.onSurface,
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        loc.analysisBasisTitle,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        loc.analysisBasisSubtitle(
+                                          '${_selectedSizeG == _selectedSizeG.roundToDouble() ? _selectedSizeG.toInt().toString() : _selectedSizeG.toStringAsFixed(1)}g',
+                                        ),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          color: colorScheme.onSurface
+                                              .withValues(alpha: 0.85),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
+                            // Group mode: pick whose health profile the rows below
+                            // are evaluated for. Solo users keep the original spacing.
+                            if (_isGroupMode) ...[
+                              const SizedBox(height: 16),
+                              _buildMemberSwitcher(context, colorScheme),
+                              const Divider(height: 28),
+                            ] else
+                              const SizedBox(height: 20),
 
-                        _scoreCard(
-                          context: context,
-                          label: loc.scoreNutrition,
-                          badge: nutriResult.gradeLetter,
-                          badgeColor: Color(nutriResult.gradeColorHex),
-                          description: nutriResult.description(langCode),
-                        ),
-                        const SizedBox(height: 8),
-                        _scoreCard(
-                          context: context,
-                          label: loc.scoreProcess,
-                          badge: novaResult.groupString,
-                          badgeColor: Color(novaResult.colorHex),
-                          isCircle: true,
-                          description: novaResult.description(langCode),
-                        ),
-                      ],
-                    );
-                  })(),
+                            if (!p.nutritionalFacts.hasNutritionData)
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 18,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        loc.nutritionDataUnavailable,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            else ...[
+                              // Nutrient + allergy rows, combined into a single
+                              // ordered list. Ranking: a direct allergen match is
+                              // the strongest signal this card can show -- it's
+                              // the one thing that forces the overall verdict to
+                              // Caution regardless of any nutrient level (see
+                              // `_currentOverallLevel`) -- so it now goes through
+                              // the same "user-related comes first" ranking as
+                              // the health-condition rows below, instead of
+                              // always being pinned to the bottom of the card
+                              // regardless of relevance.
+                              ...(() {
+                                final evals = <DisplayNutrientEval>[
+                                  // 1. Sodium (Hypertension)
+                                  (() {
+                                    final val100g = p.nutritionPer100g.sodiumMg;
+                                    final valServing =
+                                        (val100g / 100) * _selectedSizeG;
+                                    final limit = 2000.0;
+                                    final pct = (valServing / limit) * 100;
+                                    return DisplayNutrientEval(
+                                      label: loc.bpSodiumLabel,
+                                      shortLabel: loc.bpSodiumShortLabel,
+                                      nutrientKey: 'sodiumMg',
+                                      valuePerServing: valServing,
+                                      limit: limit,
+                                      percentage: pct,
+                                      level:
+                                          WhoCalculator.classifyByWhoPercentage(
+                                            pct,
+                                          ),
+                                      unit: 'mg',
+                                    );
+                                  })(),
+                                  // 2. Sugars (Diabetes)
+                                  (() {
+                                    final val100g = p.nutritionPer100g.sugarsG;
+                                    final valServing =
+                                        (val100g / 100) * _selectedSizeG;
+                                    final limit = 50.0;
+                                    final pct = (valServing / limit) * 100;
+                                    return DisplayNutrientEval(
+                                      label: loc.diabetesSugarsLabel,
+                                      shortLabel: loc.diabetesSugarsShortLabel,
+                                      nutrientKey: 'sugarsG',
+                                      valuePerServing: valServing,
+                                      limit: limit,
+                                      percentage: pct,
+                                      level:
+                                          WhoCalculator.classifyByWhoPercentage(
+                                            pct,
+                                          ),
+                                      unit: 'g',
+                                    );
+                                  })(),
+                                  // 3. Saturated Fats (Heart disease)
+                                  (() {
+                                    final val100g =
+                                        p.nutritionPer100g.saturatedFatG;
+                                    final valServing =
+                                        (val100g / 100) * _selectedSizeG;
+                                    final limit = 22.2;
+                                    final pct = (valServing / limit) * 100;
+                                    return DisplayNutrientEval(
+                                      label: loc.heartSatFatLabel,
+                                      shortLabel: loc.heartSatFatShortLabel,
+                                      nutrientKey: 'saturatedFatG',
+                                      valuePerServing: valServing,
+                                      limit: limit,
+                                      percentage: pct,
+                                      level:
+                                          WhoCalculator.classifyByWhoPercentage(
+                                            pct,
+                                          ),
+                                      unit: 'g',
+                                    );
+                                  })(),
+                                ];
 
-                  const SizedBox(height: 16),
+                                // Reorder evaluations based on user's health profile
+                                final orderedEvals =
+                                    _reorderNutrientEvaluations(evals);
 
-                  // ── 8. Product Ranking Card ─────────────────────────
-                  // Only rendered when this product was viewed as part of
-                  // a comparison set (Compare button / multi-scan), per
-                  // ProductDetailResult.hasComparison.
-                  if (_comparisonMatrix != null && !_comparisonMatrix!.isEmpty)
-                    _buildComparisonCard(context, loc),
+                                // Allergens that are both (a) present in this
+                                // product AND (b) saved in the user's own health
+                                // profile. `p.allergens` alone is every allergen
+                                // the PRODUCT contains, not the ones relevant to
+                                // this user; cross-reference against
+                                // `_evaluation.allergenAssessment.matchedContains`
+                                // (computed by WhoCalculator.assessAllergens
+                                // against the signed-in user's saved allergies)
+                                // so a user who only lists "milk" doesn't see
+                                // unrelated allergens like crustaceans/fish/soy
+                                // that simply happen to be in the product.
+                                //
+                                // -- consolidated into ONE row listing every
+                                // matched allergen together, rather than
+                                // repeating the full title/badge/note layout per
+                                // allergen. With 2+ allergens that per-item
+                                // layout stacked duplicate "may cause allergic
+                                // reaction" notes and made the card grow
+                                // unbounded; grouping them still surfaces every
+                                // allergen while keeping the card a fixed height
+                                // regardless of how many are detected.
+                                final matchedAllergenLabels =
+                                    _matchedUserAllergenLabels(
+                                      p,
+                                      Localizations.localeOf(
+                                        context,
+                                      ).languageCode,
+                                    );
 
-                  if (_comparisonMatrix != null && !_comparisonMatrix!.isEmpty)
-                    const SizedBox(height: 16),
+                                return [
+                                  if (matchedAllergenLabels.isNotEmpty)
+                                    _buildAllergyRow(
+                                      matchedAllergenLabels,
+                                      colorScheme,
+                                      loc,
+                                    ),
+                                  ...orderedEvals.map(
+                                    (e) =>
+                                        _buildConditionRow(e, colorScheme, loc),
+                                  ),
+                                ];
+                              })(),
 
-                  // ── 9. Ihambing Button ─────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          _dismissReportTooltip();
-                          final result = await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CompareProductsScreen(
-                                sourceProduct: p,
+                              // Legend section - How to understand
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Divider(height: 24, thickness: 1),
+                                  Text(
+                                    loc.howToUnderstandTitle,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _buildLegendItem(
+                                    dotColor: const Color(0xFF2E7D32),
+                                    label: loc.suitableLegend,
+                                    description: loc.legendSuitableDesc,
+                                    colorScheme: colorScheme,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _buildLegendItem(
+                                    dotColor: const Color(0xFFE65100),
+                                    label: loc.moderateLegend,
+                                    description: loc.legendModerateDesc,
+                                    colorScheme: colorScheme,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  _buildLegendItem(
+                                    dotColor: const Color(0xFFC62828),
+                                    label: loc.cautionLegend,
+                                    description: loc.legendCautionDesc,
+                                    colorScheme: colorScheme,
+                                  ),
+                                ],
                               ),
-                            ),
-                          );
-                          if (result != null && result is Map<String, dynamic>) {
-                            final newProduct = result['product'] as Product;
-                            final newComparisonSet = result['comparisonSet'] as List<RankedProductResult>?;
-                            _updateProduct(newProduct, newComparisonSet);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          foregroundColor: colorScheme.onPrimary,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
+                            ],
+                          ],
                         ),
-                        child: Text(
-                          loc.compareButton,
-                          style: GoogleFonts.outfit(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                      ),
+
+                      // ── 4. For more details link ──────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: 8,
+                          bottom: 12,
+                          left: 24,
+                          right: 24,
+                        ),
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => MoreDetailsScreen(
+                                  product: p,
+                                  matchedAllergens:
+                                      _evaluation
+                                          ?.allergenAssessment
+                                          .matchedContains ??
+                                      const [],
+                                  healthProfile: _userHealthProfile,
+                                  // Same conditions WhoCalculator.evaluateProduct() iterated
+                                  // over for this user (i.e. the ones on their saved health
+                                  // profile) -- lets the "How CLARO Calculates" guide only
+                                  // badge a nutrient card with a condition the user actually
+                                  // has.
+                                  userConditions:
+                                      _evaluation?.nutrientEvaluations
+                                          .map((e) => e.condition)
+                                          .toSet()
+                                          .toList() ??
+                                      const [],
+                                ),
+                              ),
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              vertical: 8,
+                              horizontal: 8,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.keyboard_return_rounded,
+                                  size: 20,
+                                  color: colorScheme.onSurface,
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  loc.forMoreDetails,
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                    color: colorScheme.onSurface,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: colorScheme.onSurface,
+                                    decorationThickness: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
 
-                  // Clean trailing bottom space (no huge excessive spacing)
-                  const SizedBox(height: 24),
-                ],
+                      // ── 6. Kabuuang Nutrisyon Card ────────────────────
+                      _buildCard(
+                        context: context,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              loc.totalNutritionTitle,
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            if (!p.nutritionalFacts.hasNutritionData)
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 18,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      loc.nutritionDataUnavailable,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 13,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else ...[
+                              (() {
+                                final caloriesVal =
+                                    p.nutritionalFacts.caloriesKcal *
+                                    _sizeScale;
+                                final carbsVal =
+                                    p.nutritionalFacts.carbsG * _sizeScale;
+                                final sugarVal =
+                                    p.nutritionalFacts.sugarsG * _sizeScale;
+                                final sodiumVal =
+                                    p.nutritionalFacts.sodiumMg * _sizeScale;
+                                final proteinVal =
+                                    p.nutritionalFacts.proteinG * _sizeScale;
+                                final totalFatVal =
+                                    p.nutritionalFacts.totalFatG * _sizeScale;
+                                final satFatVal =
+                                    p.nutritionalFacts.saturatedFatG *
+                                    _sizeScale;
+                                final transFatVal =
+                                    p.nutritionalFacts.transFatG * _sizeScale;
+                                final fiberVal =
+                                    p.nutritionalFacts.fiberG * _sizeScale;
+                                final potassiumVal =
+                                    p.nutritionalFacts.potassiumMg * _sizeScale;
+                                final calciumVal =
+                                    p.nutritionalFacts.calciumMg * _sizeScale;
+                                final ironVal =
+                                    p.nutritionalFacts.ironMg * _sizeScale;
+
+                                // Only show nutrients with an actual non-zero
+                                // value, so the list doesn't pad itself out with
+                                // rows reading "0g" / "0mg" for facts the
+                                // product simply doesn't have.
+                                final entries = <_NutrientEntry>[
+                                  _NutrientEntry(
+                                    loc.nutriCalories,
+                                    caloriesVal,
+                                    '${caloriesVal.toStringAsFixed(0)} kcal',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriCarbs,
+                                    carbsVal,
+                                    '${carbsVal.toStringAsFixed(1)}g',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriSugar,
+                                    sugarVal,
+                                    '${sugarVal.toStringAsFixed(1)}g',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriSodium,
+                                    sodiumVal,
+                                    '${sodiumVal.toStringAsFixed(0)}mg',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriProtein,
+                                    proteinVal,
+                                    '${proteinVal.toStringAsFixed(1)}g',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriTotalFat,
+                                    totalFatVal,
+                                    '${totalFatVal.toStringAsFixed(1)}g',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriSatFat,
+                                    satFatVal,
+                                    '${satFatVal.toStringAsFixed(1)}g',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriTransFat,
+                                    transFatVal,
+                                    '${transFatVal.toStringAsFixed(1)}g',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriFiber,
+                                    fiberVal,
+                                    '${fiberVal.toStringAsFixed(1)}g',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriPotassium,
+                                    potassiumVal,
+                                    '${potassiumVal.toStringAsFixed(0)}mg',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriCalcium,
+                                    calciumVal,
+                                    '${calciumVal.toStringAsFixed(0)}mg',
+                                  ),
+                                  _NutrientEntry(
+                                    loc.nutriIron,
+                                    ironVal,
+                                    '${ironVal.toStringAsFixed(1)}mg',
+                                  ),
+                                ].where((entry) => entry.value != 0).toList();
+
+                                return Column(
+                                  children: [
+                                    for (int i = 0; i < entries.length; i++)
+                                      _nutriListRow(
+                                        context,
+                                        entries[i].label,
+                                        entries[i].formatted,
+                                        showDivider: i != entries.length - 1,
+                                      ),
+                                  ],
+                                );
+                              })(),
+                            ],
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      // ── 7. Scores (Individual White Cards: Nutri-Score & NOVA) ─
+                      (() {
+                        final langCode = Localizations.localeOf(
+                          context,
+                        ).languageCode;
+                        final nutriResult =
+                            NutriScoreCalculator.computeFromProduct(
+                              _currentProduct,
+                              customServingSizeG: _selectedSizeG,
+                            );
+                        final novaResult =
+                            NovaScoreCalculator.computeFromProduct(
+                              _currentProduct,
+                            );
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              child: Text(
+                                loc.scoresTitle,
+                                style: GoogleFonts.outfit(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+
+                            _scoreCard(
+                              context: context,
+                              label: loc.scoreNutrition,
+                              badge: nutriResult.gradeLetter,
+                              badgeColor: Color(nutriResult.gradeColorHex),
+                              description: nutriResult.description(langCode),
+                            ),
+                            const SizedBox(height: 8),
+                            _scoreCard(
+                              context: context,
+                              label: loc.scoreProcess,
+                              badge: novaResult.groupString,
+                              badgeColor: Color(novaResult.colorHex),
+                              isCircle: true,
+                              description: novaResult.description(langCode),
+                            ),
+                          ],
+                        );
+                      })(),
+
+                      const SizedBox(height: 16),
+
+                      // ── 8. Product Ranking Card ─────────────────────────
+                      // Only rendered when this product was viewed as part of
+                      // a comparison set (Compare button / multi-scan), per
+                      // ProductDetailResult.hasComparison.
+                      if (_comparisonMatrix != null &&
+                          !_comparisonMatrix!.isEmpty)
+                        _buildComparisonCard(context, loc),
+
+                      if (_comparisonMatrix != null &&
+                          !_comparisonMatrix!.isEmpty)
+                        const SizedBox(height: 16),
+
+                      // ── 9. Ihambing Button ─────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 50,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              _dismissReportTooltip();
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      CompareProductsScreen(sourceProduct: p),
+                                ),
+                              );
+                              if (result != null &&
+                                  result is Map<String, dynamic>) {
+                                final newProduct = result['product'] as Product;
+                                final newComparisonSet =
+                                    result['comparisonSet']
+                                        as List<RankedProductResult>?;
+                                _updateProduct(newProduct, newComparisonSet);
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorScheme.primary,
+                              foregroundColor: colorScheme.onPrimary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: Text(
+                              loc.compareButton,
+                              style: GoogleFonts.outfit(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Clean trailing bottom space (no huge excessive spacing)
+                      const SizedBox(height: 24),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
+          if (_isReportTooltipVisible) _buildReportTooltip(topPadding, loc),
         ],
       ),
-      if (_isReportTooltipVisible)
-        _buildReportTooltip(topPadding, loc),
-    ],
-  ),
-  floatingActionButton: const VoiceAssistantFab(),
-);
+      floatingActionButton: const VoiceAssistantFab(),
+    );
   }
 
   // Returns true if `nutrientKey` corresponds to one of the conditions
@@ -1702,8 +1912,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           if (nutrientKey == 'saturatedFatG') return true;
           break;
         case HealthCondition.gerd:
+          break;
         case HealthCondition.kidneyDisease:
-          // Awareness-only: no row in the scored Health Analysis list.
+          if (nutrientKey == 'sodiumMg') return true;
           break;
       }
     }
@@ -1711,7 +1922,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // ── Helper method to reorder nutrient evaluations based on user's health profile ──────
-  List<DisplayNutrientEval> _reorderNutrientEvaluations(List<DisplayNutrientEval> evals) {
+  List<DisplayNutrientEval> _reorderNutrientEvaluations(
+    List<DisplayNutrientEval> evals,
+  ) {
     if (_userHealthProfile == null || _userHealthProfile!.conditions.isEmpty) {
       return evals;
     }
@@ -1749,7 +1962,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // isn't relevant to them. That same related row also gets a tinted,
   // bordered background and a bolded percentage so it reads as the
   // priority concern rather than one of several equal rows.
-  Widget _buildConditionRow(DisplayNutrientEval e, ColorScheme colorScheme, AppLocalizations loc) {
+  Widget _buildConditionRow(
+    DisplayNutrientEval e,
+    ColorScheme colorScheme,
+    AppLocalizations loc,
+  ) {
     final isDark = colorScheme.brightness == Brightness.dark;
     Color progressColor;
     Color badgeBgColor;
@@ -1770,20 +1987,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     switch (e.level) {
       case AdvisoryLevel.suitable:
         progressColor = const Color(0xFF2E7D32);
-        badgeBgColor = isDark ? const Color(0xFF1B3320) : const Color(0xFFE8F5E9);
-        badgeTextColor = isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32);
+        badgeBgColor = isDark
+            ? const Color(0xFF1B3320)
+            : const Color(0xFFE8F5E9);
+        badgeTextColor = isDark
+            ? const Color(0xFF81C784)
+            : const Color(0xFF2E7D32);
         badgeLabel = capitalize(loc.levelLow);
         break;
       case AdvisoryLevel.moderate:
         progressColor = const Color(0xFFE65100);
-        badgeBgColor = isDark ? const Color(0xFF3A2A12) : const Color(0xFFFFF3E0);
-        badgeTextColor = isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100);
+        badgeBgColor = isDark
+            ? const Color(0xFF3A2A12)
+            : const Color(0xFFFFF3E0);
+        badgeTextColor = isDark
+            ? const Color(0xFFFFB74D)
+            : const Color(0xFFE65100);
         badgeLabel = capitalize(loc.levelMedium);
         break;
       case AdvisoryLevel.caution:
         progressColor = const Color(0xFFC62828);
-        badgeBgColor = isDark ? const Color(0xFF3A1414) : const Color(0xFFFFEBEE);
-        badgeTextColor = isDark ? const Color(0xFFEF9A9A) : const Color(0xFFC62828);
+        badgeBgColor = isDark
+            ? const Color(0xFF3A1414)
+            : const Color(0xFFFFEBEE);
+        badgeTextColor = isDark
+            ? const Color(0xFFEF9A9A)
+            : const Color(0xFFC62828);
         badgeLabel = capitalize(loc.levelHigh);
         break;
     }
@@ -1795,7 +2024,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // counterpart. colorScheme.secondary is already brightness-aware
     // (a brighter red in dark mode), so use that instead for the bold
     // highlighted percentage when in dark mode.
-    final highlightAccentColor = isDark ? colorScheme.secondary : colorScheme.primary;
+    final highlightAccentColor = isDark
+        ? colorScheme.secondary
+        : colorScheme.primary;
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1846,7 +2077,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           TextSpan(
             children: [
               TextSpan(
-                text: '${_formatValue(e.valuePerServing)}${e.unit} / ${_formatValue(e.limit)}${e.unit} ${loc.dailySuffix} · ',
+                text:
+                    '${_formatValue(e.valuePerServing)}${e.unit} / ${_formatValue(e.limit)}${e.unit} ${loc.dailySuffix} · ',
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: colorScheme.onSurfaceVariant,
@@ -1854,10 +2086,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
               ),
               TextSpan(
-                text: '${e.percentage.toStringAsFixed(0)}% ${e.nutrientKey == 'sugarsG' ? loc.ofWhoFreeSugarReference : loc.ofWhoLimit}',
+                text:
+                    '${e.percentage.toStringAsFixed(0)}% ${e.nutrientKey == 'sugarsG' ? loc.ofWhoFreeSugarReference : loc.ofWhoLimit}',
                 style: GoogleFonts.inter(
                   fontSize: 12,
-                  color: isRelated ? highlightAccentColor : colorScheme.onSurfaceVariant,
+                  color: isRelated
+                      ? highlightAccentColor
+                      : colorScheme.onSurfaceVariant,
                   fontWeight: isRelated ? FontWeight.bold : FontWeight.w500,
                 ),
               ),
@@ -1895,7 +2130,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // A direct allergen match forces the overall verdict to Caution
   // regardless of any nutrient level, so this row always gets the same
   // "priority concern" tinted background as a matched health condition.
-  Widget _buildAllergyRow(List<String> matchedAllergenLabels, ColorScheme colorScheme, AppLocalizations loc) {
+  Widget _buildAllergyRow(
+    List<String> matchedAllergenLabels,
+    ColorScheme colorScheme,
+    AppLocalizations loc,
+  ) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -1946,7 +2185,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // long words wrap onto new lines instead of overflowing -- no fixed
   // width/height is applied here, intentionally, so this keeps working
   // regardless of text length or screen size.
-  Widget _buildAdvisorySubtitle(String subtitle, ColorScheme colorScheme, AdvisoryLevel level) {
+  Widget _buildAdvisorySubtitle(
+    String subtitle,
+    ColorScheme colorScheme,
+    AdvisoryLevel level,
+  ) {
     final trimmedSubtitle = subtitle.trim();
 
     // Don't apply emphasis when suitability level is Suitable
@@ -1997,33 +2240,34 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     // Add all sentences except the last one normally
     for (int i = 0; i < sentences.length - 1; i++) {
-      textSpans.add(TextSpan(
-        text: sentences[i] + ' ',
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          color: colorScheme.onSurface,
-          height: 1.4,
+      textSpans.add(
+        TextSpan(
+          text: sentences[i] + ' ',
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            color: colorScheme.onSurface,
+            height: 1.4,
+          ),
         ),
-      ));
+      );
     }
 
     // Add the last sentence -- the recommended serving/intake amount --
     // with emphasis (bold and italic, no underline).
-    textSpans.add(TextSpan(
-      text: sentences.last,
-      style: GoogleFonts.inter(
-        fontSize: 13,
-        color: colorScheme.onSurface,
-        height: 1.4,
-        fontWeight: FontWeight.bold,
-        fontStyle: FontStyle.italic,
+    textSpans.add(
+      TextSpan(
+        text: sentences.last,
+        style: GoogleFonts.inter(
+          fontSize: 13,
+          color: colorScheme.onSurface,
+          height: 1.4,
+          fontWeight: FontWeight.bold,
+          fontStyle: FontStyle.italic,
+        ),
       ),
-    ));
-
-    return Text.rich(
-      TextSpan(children: textSpans),
-      softWrap: true,
     );
+
+    return Text.rich(TextSpan(children: textSpans), softWrap: true);
   }
 
   // ── Health advisory banner (WhoCalculator + GeminiAdvisoryService) ──────
@@ -2039,10 +2283,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: const SizedBox(
-          height: 20,
-          child: LinearProgressIndicator(),
-        ),
+        child: const SizedBox(height: 20, child: LinearProgressIndicator()),
       );
     }
 
@@ -2058,7 +2299,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.info_outline, color: colorScheme.onSurfaceVariant, size: 28),
+            Icon(
+              Icons.info_outline,
+              color: colorScheme.onSurfaceVariant,
+              size: 28,
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -2093,7 +2338,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // suppress a direct-allergen Caution, which is independent of
     // condition scoring.
     final profile = _userHealthProfile;
-    final hasOnlyAwarenessConditions = profile != null &&
+    final hasOnlyAwarenessConditions =
+        profile != null &&
         profile.conditions.isNotEmpty &&
         profile.scoredConditions.isEmpty;
     if (hasOnlyAwarenessConditions &&
@@ -2129,36 +2375,51 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final levelLabel = _levelLabel(level);
     final effectiveAdvisory = _effectiveAdvisory(context);
     final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
-    final hasNoConditionsAndNoAllergens = (profile == null || profile.conditions.isEmpty) &&
+    final hasNoConditionsAndNoAllergens =
+        (profile == null || profile.conditions.isEmpty) &&
         (profile == null || profile.allergies.isEmpty) &&
         !(_evaluation?.allergenAssessment.hasDirectAllergen ?? false);
-    final hasNoFlaggedNutrients = _evaluation == null ||
-        _evaluation!.nutrientEvaluations.every((e) => e.level == AdvisoryLevel.suitable);
+    final hasNoFlaggedNutrients =
+        _evaluation == null ||
+        _evaluation!.nutrientEvaluations.every(
+          (e) => e.level == AdvisoryLevel.suitable,
+        );
 
     String title;
-    if (level == AdvisoryLevel.suitable && hasNoConditionsAndNoAllergens && hasNoFlaggedNutrients) {
+    if (level == AdvisoryLevel.suitable &&
+        hasNoConditionsAndNoAllergens &&
+        hasNoFlaggedNutrients) {
       title = isTagalog
           ? '$levelLabel - Walang Minarkahang Nutrient o Sangkap'
           : '$levelLabel - No Flagged Nutrient or Ingredient';
     } else {
-      final advisoryTitle = effectiveAdvisory?.warningText ??
-          (level == AdvisoryLevel.suitable ? loc.safeToConsume : loc.reminderLabel);
-      
+      final advisoryTitle =
+          effectiveAdvisory?.warningText ??
+          (level == AdvisoryLevel.suitable
+              ? loc.safeToConsume
+              : loc.reminderLabel);
+
       // Remove decision word from advisoryTitle if it's duplicated at the start
       // This handles cases where AI might include "Caution" in warningText despite instructions
       String cleanAdvisoryTitle = advisoryTitle;
       if (advisoryTitle.toLowerCase().startsWith('$levelLabel'.toLowerCase()) ||
-          advisoryTitle.toLowerCase().startsWith('${levelLabel.toLowerCase()}:')) {
+          advisoryTitle.toLowerCase().startsWith(
+            '${levelLabel.toLowerCase()}:',
+          )) {
         cleanAdvisoryTitle = advisoryTitle.substring(levelLabel.length).trim();
-        if (cleanAdvisoryTitle.startsWith(':') || cleanAdvisoryTitle.startsWith('-')) {
+        if (cleanAdvisoryTitle.startsWith(':') ||
+            cleanAdvisoryTitle.startsWith('-')) {
           cleanAdvisoryTitle = cleanAdvisoryTitle.substring(1).trim();
         }
       }
-      
-      title = cleanAdvisoryTitle.isEmpty ? levelLabel : '$levelLabel - $cleanAdvisoryTitle';
+
+      title = cleanAdvisoryTitle.isEmpty
+          ? levelLabel
+          : '$levelLabel - $cleanAdvisoryTitle';
     }
-    
-    final subtitle = effectiveAdvisory?.explanation ?? loc.safeToConsumeSubtitle;
+
+    final subtitle =
+        effectiveAdvisory?.explanation ?? loc.safeToConsumeSubtitle;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -2210,7 +2471,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // - If both conditions present but only one has detection, show only that condition's warning
   // - If neither has detection, show no warning card
   // - If both have detections, combine into one card
-  Widget _buildAwarenessWarningCards(BuildContext context, AppLocalizations loc, Product p) {
+  Widget _buildAwarenessWarningCards(
+    BuildContext context,
+    AppLocalizations loc,
+    Product p,
+  ) {
     final profile = _userHealthProfile;
     final hasGerd = profile?.hasGerd ?? false;
     final hasKidney = profile?.hasKidneyDisease ?? false;
@@ -2224,39 +2489,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final gerdResult = GerdTriggerDetector.detect(p);
     final kidneyResult = KidneyNutrientDetector.detect(p);
 
-    // Check if each has actual detections
-    final gerdHasDetection = gerdResult.hasTriggers;
-    final kidneyHasDetection = kidneyResult.hasAnyNutrients;
-
-    // If neither has detection, show nothing
-    if (!gerdHasDetection && !kidneyHasDetection) {
-      return const SizedBox.shrink();
-    }
-
-    // If only GERD has detection, show GERD card
-    if (hasGerd && !hasKidney && gerdHasDetection) {
-      return _buildGerdWarningCard(context, loc, p);
-    }
-
-    // If only Kidney has detection, show Kidney card
-    if (!hasGerd && hasKidney && kidneyHasDetection) {
-      return _buildKidneyWarningCard(context, loc, p);
-    }
-
-    // If both conditions present but only one has detection, show only that condition's warning
+    // These cards explain clean and unknown states too; absence of a match
+    // is not a reason to hide the scored condition's explanation.
     if (hasGerd && hasKidney) {
-      if (gerdHasDetection && !kidneyHasDetection) {
-        return _buildGerdWarningCard(context, loc, p);
-      }
-      if (!gerdHasDetection && kidneyHasDetection) {
-        return _buildKidneyWarningCard(context, loc, p);
-      }
+      return _buildCombinedGerdKidneyWarningCard(
+        context,
+        loc,
+        p,
+        gerdResult,
+        kidneyResult,
+      );
     }
-
-    // If both have detections, show combined card
-    if (gerdHasDetection && kidneyHasDetection) {
-      return _buildCombinedGerdKidneyWarningCard(context, loc, p, gerdResult, kidneyResult);
-    }
+    if (hasGerd) return _buildGerdWarningCard(context, loc, p);
+    if (hasKidney) return _buildKidneyWarningCard(context, loc, p);
 
     return const SizedBox.shrink();
   }
@@ -2273,22 +2518,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     // Combine GERD triggers
     final gerdItems = gerdResult.triggers
-        .map((t) => HealthInfoWarningItem(
-              label: _gerdTriggerLabel(t, loc, p.name),
-              detail: t.type == GerdTriggerType.highFat
-                  ? (tl
+        .map(
+          (t) => HealthInfoWarningItem(
+            label: _gerdTriggerLabel(t, loc, p.name),
+            detail: t.type == GerdTriggerType.highFat
+                ? (tl
                       ? '${NumberFormatUtils.formatValue(t.matchedValue!)}g na taba bawat serving'
                       : '${NumberFormatUtils.formatValue(t.matchedValue!)}g fat per serving')
-                  : t.matchedIngredient,
-            ))
+                : t.matchedIngredient,
+          ),
+        )
         .toList();
 
     // Combine kidney nutrients
     final kidneyItems = kidneyResult.nutrients
-        .map((n) => HealthInfoWarningItem(
-              label: _kidneyNutrientLabel(n.type, loc),
-              detail: _kidneyNutrientDetail(n.type, n.valuePerServing, tl),
-            ))
+        .map(
+          (n) => HealthInfoWarningItem(
+            label: _kidneyNutrientLabel(n.type, loc),
+            detail: _kidneyNutrientDetail(
+              n.type,
+              n.valuePerServing,
+              tl,
+              matchedIngredient: n.matchedIngredient,
+            ),
+          ),
+        )
         .toList();
 
     // Combine all items
@@ -2299,7 +2553,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       icon: Icons.info_outline, // Information icon as requested
       intro: loc.combinedGerdKidneyIntro,
       items: allItems,
-      neutralMessage: null, // No neutral message for combined card when both have detections
+      neutralMessage: allItems.isEmpty
+          ? ((!gerdResult.hasIngredientData || !kidneyResult.hasIngredientData)
+                ? loc.gerdInsufficientData
+                : loc.gerdNoTriggersFound)
+          : null,
       expertAdvice: loc.gerdExpertAdvice,
     );
   }
@@ -2319,23 +2577,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   //      just silently skipped.
   //   3. No ingredient data AND no nutrition data at all -> a neutral
   //      "not enough information" note.
-  Widget _buildGerdWarningCard(BuildContext context, AppLocalizations loc, Product p) {
+  Widget _buildGerdWarningCard(
+    BuildContext context,
+    AppLocalizations loc,
+    Product p,
+  ) {
     final result = GerdTriggerDetector.detect(p);
     final tl = Localizations.localeOf(context).languageCode == 'tl';
 
     final items = result.triggers
-        .map((t) => HealthInfoWarningItem(
-              label: _gerdTriggerLabel(t, loc, p.name),
-              detail: t.type == GerdTriggerType.highFat
-                  ? (tl
+        .map(
+          (t) => HealthInfoWarningItem(
+            label: _gerdTriggerLabel(t, loc, p.name),
+            detail: t.type == GerdTriggerType.highFat
+                ? (tl
                       ? '${NumberFormatUtils.formatValue(t.matchedValue!)}g na taba bawat serving'
                       : '${NumberFormatUtils.formatValue(t.matchedValue!)}g fat per serving')
-                  : t.matchedIngredient,
-            ))
+                : t.matchedIngredient,
+          ),
+        )
         .toList();
 
     String? neutralMessage;
-    if (!result.hasAnyData) {
+    if (!result.hasIngredientData) {
       neutralMessage = loc.gerdInsufficientData;
     } else if (!result.hasTriggers) {
       neutralMessage = loc.gerdNoTriggersFound;
@@ -2351,7 +2615,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  String _gerdTriggerLabel(GerdTriggerMatch trigger, AppLocalizations loc, String productName) {
+  String _gerdTriggerLabel(
+    GerdTriggerMatch trigger,
+    AppLocalizations loc,
+    String productName,
+  ) {
     switch (trigger.type) {
       case GerdTriggerType.tomatoAcidic:
         return loc.gerdTriggerTomatoAcidic;
@@ -2372,21 +2640,35 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // Never uses Suitable/Moderate/Caution language and never says a
   // product is unsafe/safe/should-be-avoided. Shows one of two states:
   //   1. Kidney-relevant nutrients detected -> lists them with per-serving
-  //      values (sodium, potassium, phosphorus, protein).
-  //   2. No nutrition data at all -> a neutral "not enough information" note.
-  Widget _buildKidneyWarningCard(BuildContext context, AppLocalizations loc, Product p) {
+  //      values (sodium, potassium, protein) plus phosphorus when phosphate
+  //      additives are found in the ingredient list (the matched ingredient
+  //      text is shown instead of a per-serving value).
+  //   2. No nutrition data AND no ingredient data -> a neutral "not enough
+  //      information" note.
+  Widget _buildKidneyWarningCard(
+    BuildContext context,
+    AppLocalizations loc,
+    Product p,
+  ) {
     final result = KidneyNutrientDetector.detect(p);
     final tl = Localizations.localeOf(context).languageCode == 'tl';
 
     final items = result.nutrients
-        .map((n) => HealthInfoWarningItem(
-              label: _kidneyNutrientLabel(n.type, loc),
-              detail: _kidneyNutrientDetail(n.type, n.valuePerServing, tl),
-            ))
+        .map(
+          (n) => HealthInfoWarningItem(
+            label: _kidneyNutrientLabel(n.type, loc),
+            detail: _kidneyNutrientDetail(
+              n.type,
+              n.valuePerServing,
+              tl,
+              matchedIngredient: n.matchedIngredient,
+            ),
+          ),
+        )
         .toList();
 
     String? neutralMessage;
-    if (!result.hasNutritionData) {
+    if (!result.hasIngredientData) {
       neutralMessage = loc.gerdInsufficientData;
     } else if (!result.hasAnyNutrients) {
       neutralMessage = loc.gerdNoTriggersFound;
@@ -2404,8 +2686,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           case KidneyNutrientType.potassium:
             stressNutrientNames.add(tl ? 'potassium' : 'potassium');
             break;
+          case KidneyNutrientType.phosphorus:
+            stressNutrientNames.add(tl ? 'phosphorus' : 'phosphorus');
+            break;
           case KidneyNutrientType.protein:
             hasProtein = true;
+            break;
+          case KidneyNutrientType.potassiumChloride:
+            stressNutrientNames.add('potassium chloride');
             break;
         }
       }
@@ -2421,25 +2709,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               : '${stressNutrientNames[0]} and ${stressNutrientNames[1]}';
         } else {
           final last = stressNutrientNames.last;
-          final head = stressNutrientNames.sublist(0, stressNutrientNames.length - 1).join(', ');
-          formattedList = tl
-              ? '$head, at $last'
-              : '$head, and $last';
+          final head = stressNutrientNames
+              .sublist(0, stressNutrientNames.length - 1)
+              .join(', ');
+          formattedList = tl ? '$head, at $last' : '$head, and $last';
         }
-        parts.add(tl
-            ? 'Ang mataas na pagkonsumo ng $formattedList ay maaaring magdulot ng stress sa kalusugan ng bato'
-            : 'High consumption of $formattedList may place stress on kidney health');
+        parts.add(
+          tl
+              ? 'Ang mataas na pagkonsumo ng $formattedList ay maaaring magdulot ng stress sa kalusugan ng bato'
+              : 'High consumption of $formattedList may place stress on kidney health',
+        );
       }
 
       if (hasProtein) {
         if (stressNutrientNames.isNotEmpty) {
-          parts.add(tl
-              ? ', samantalang ang protina ay dapat ikonsumo sa katamtamang dami.'
-              : ', while protein should be consumed in moderate amounts.');
+          parts.add(
+            tl
+                ? ', samantalang ang protina ay dapat ikonsumo sa katamtamang dami.'
+                : ', while protein should be consumed in moderate amounts.',
+          );
         } else {
-          parts.add(tl
-              ? 'Ang protina ay dapat ikonsumo sa katamtamang dami.'
-              : 'Protein should be consumed in moderate amounts.');
+          parts.add(
+            tl
+                ? 'Ang protina ay dapat ikonsumo sa katamtamang dami.'
+                : 'Protein should be consumed in moderate amounts.',
+          );
         }
       } else {
         parts.add('.');
@@ -2465,12 +2759,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return loc.kidneyNutrientPotassium;
       case KidneyNutrientType.protein:
         return loc.kidneyNutrientProtein;
+      case KidneyNutrientType.phosphorus:
+        return loc.kidneyNutrientPhosphorus;
+      case KidneyNutrientType.potassiumChloride:
+        return 'Potassium chloride';
     }
   }
 
-  String _kidneyNutrientDetail(KidneyNutrientType type, double value, bool isTagalog) {
+  String? _kidneyNutrientDetail(
+    KidneyNutrientType type,
+    double value,
+    bool isTagalog, {
+    String? matchedIngredient,
+  }) {
     final formattedValue = NumberFormatUtils.formatValue(value);
     switch (type) {
+      case KidneyNutrientType.phosphorus:
+        // Detected from phosphate additives in the ingredients: show the
+        // matched ingredient text (no per-serving amount on the label).
+        return matchedIngredient;
       case KidneyNutrientType.sodium:
       case KidneyNutrientType.potassium:
         return isTagalog
@@ -2480,6 +2787,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return isTagalog
             ? '${formattedValue}g bawat serving'
             : '${formattedValue}g per serving';
+      case KidneyNutrientType.potassiumChloride:
+        return matchedIngredient;
     }
   }
 
@@ -2516,26 +2825,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   // Member avatar (their chosen image, or initials) with an optional
   // status dot showing their verdict for the product.
-  Widget _memberAvatar(MemberEvaluation m, ColorScheme cs,
-      {double size = 32, bool showDot = true}) {
+  Widget _memberAvatar(
+    MemberEvaluation m,
+    ColorScheme cs, {
+    double size = 32,
+    bool showDot = true,
+  }) {
     final level = GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG);
     final trimmed = m.name.trim();
-    final initials = trimmed.isEmpty ? '?' : trimmed.substring(0, 1).toUpperCase();
+    final initials = trimmed.isEmpty
+        ? '?'
+        : trimmed.substring(0, 1).toUpperCase();
 
     Widget initialsCircle() => Container(
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          color: cs.primaryContainer,
-          child: Text(
-            initials,
-            style: GoogleFonts.inter(
-              fontSize: size * 0.42,
-              fontWeight: FontWeight.w700,
-              color: cs.onPrimaryContainer,
-            ),
-          ),
-        );
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      color: cs.primaryContainer,
+      child: Text(
+        initials,
+        style: GoogleFonts.inter(
+          fontSize: size * 0.42,
+          fontWeight: FontWeight.w700,
+          color: cs.onPrimaryContainer,
+        ),
+      ),
+    );
 
     return Stack(
       clipBehavior: Clip.none,
@@ -2579,20 +2894,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   AdvisoryLevel _optionLevel(_GroupOption o) => GroupAdvisoryBuilder.groupLevel(
-        (o.members ?? const <MemberEvaluation>[])
-            .map((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG)),
-      );
+    (o.members ?? const <MemberEvaluation>[]).map(
+      (m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG),
+    ),
+  );
 
-  int _optionFlagged(_GroupOption o) => (o.members ?? const <MemberEvaluation>[])
-      .where((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) != AdvisoryLevel.suitable)
-      .length;
+  int _optionFlagged(_GroupOption o) =>
+      (o.members ?? const <MemberEvaluation>[])
+          .where(
+            (m) =>
+                GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) !=
+                AdvisoryLevel.suitable,
+          )
+          .length;
 
   // Another group that looks WORSE than the one being viewed, so a safe
   // result for one group never hides a problem in another.
   _GroupOption? get _worseOtherGroup {
     final current = _selectedGroupOption;
     if (current == null) return null;
-    final currentSeverity = GroupAdvisoryBuilder.severity(_optionLevel(current));
+    final currentSeverity = GroupAdvisoryBuilder.severity(
+      _optionLevel(current),
+    );
     _GroupOption? worst;
     var worstSeverity = currentSeverity;
     for (final o in _groupOptions) {
@@ -2612,7 +2935,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final current = _selectedGroupOption;
     final warn = _worseOtherGroup;
     final others = _groupOptions.length - 1;
-    final warnColor = warn == null ? null : _groupLevelColor(_optionLevel(warn));
+    final warnColor = warn == null
+        ? null
+        : _groupLevelColor(_optionLevel(warn));
 
     return Row(
       children: [
@@ -2646,13 +2971,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     ),
                   ),
                   const SizedBox(width: 2),
-                  Icon(Icons.keyboard_arrow_down_rounded, size: 18, color: cs.primary),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 18,
+                    color: cs.primary,
+                  ),
                   if (warnColor != null) ...[
                     const SizedBox(width: 4),
                     Container(
                       width: 8,
                       height: 8,
-                      decoration: BoxDecoration(color: warnColor, shape: BoxShape.circle),
+                      decoration: BoxDecoration(
+                        color: warnColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
                   ],
                 ],
@@ -2666,8 +2998,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             warn != null
                 ? '${_levelLabel(_optionLevel(warn))} ${tl ? "sa" : "in"} ${warn.group.name}'
                 : (tl
-                    ? '$others pang grupo'
-                    : (others == 1 ? '1 other group' : '$others other groups')),
+                      ? '$others pang grupo'
+                      : (others == 1
+                            ? '1 other group'
+                            : '$others other groups')),
             textAlign: TextAlign.right,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -2701,7 +3035,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      tl ? 'Suriin ang produktong ito para sa' : 'Check this product for',
+                      tl
+                          ? 'Suriin ang produktong ito para sa'
+                          : 'Check this product for',
                       style: GoogleFonts.outfit(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -2709,7 +3045,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ..._groupOptions.map((o) => _buildGroupSheetRow(ctx, o, cs, tl)),
+                    ..._groupOptions.map(
+                      (o) => _buildGroupSheetRow(ctx, o, cs, tl),
+                    ),
                   ],
                 ),
               );
@@ -2720,7 +3058,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildGroupSheetRow(BuildContext ctx, _GroupOption o, ColorScheme cs, bool tl) {
+  Widget _buildGroupSheetRow(
+    BuildContext ctx,
+    _GroupOption o,
+    ColorScheme cs,
+    bool tl,
+  ) {
     final isSelected = o.group.id == _selectedGroupId;
     final members = o.members;
 
@@ -2737,8 +3080,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final total = members.length;
       final flagged = _optionFlagged(o);
       subtitle = flagged == 0
-          ? (tl ? '$total miyembro, walang naka-flag' : '$total members, none flagged')
-          : (tl ? '$total miyembro, $flagged ang naka-flag' : '$total members, $flagged flagged');
+          ? (tl
+                ? '$total miyembro, walang naka-flag'
+                : '$total members, none flagged')
+          : (tl
+                ? '$total miyembro, $flagged ang naka-flag'
+                : '$total members, $flagged flagged');
       final level = _optionLevel(o);
       final color = _groupLevelColor(level);
       trailing = Container(
@@ -2749,7 +3096,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         ),
         child: Text(
           _levelLabel(level),
-          style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: color),
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
         ),
       );
     }
@@ -2796,7 +3147,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -2829,7 +3183,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     };
 
     final flaggedCount = members
-        .where((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) != AdvisoryLevel.suitable)
+        .where(
+          (m) =>
+              GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) !=
+              AdvisoryLevel.suitable,
+        )
         .length;
     final levelLabel = _levelLabel(level);
     final advisory = _effectiveGroupAdvisory(context);
@@ -2848,8 +3206,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final caption = flaggedCount == 0
         ? (tl ? 'Walang naka-flag na miyembro' : 'No members flagged')
         : (tl
-            ? '$flaggedCount sa ${members.length} miyembro ang naka-flag'
-            : '$flaggedCount of ${members.length} members flagged');
+              ? '$flaggedCount sa ${members.length} miyembro ang naka-flag'
+              : '$flaggedCount of ${members.length} members flagged');
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -2887,7 +3245,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     if (_groupAdvisoryLoading) ...[
                       const SizedBox(height: 8),
                       const LinearProgressIndicator(minHeight: 3),
-                    ] else if (advisory != null && advisory.explanation.trim().isNotEmpty) ...[
+                    ] else if (advisory != null &&
+                        advisory.explanation.trim().isNotEmpty) ...[
                       const SizedBox(height: 4),
                       _buildAdvisorySubtitle(advisory.explanation, cs, level),
                     ],
@@ -2911,7 +3270,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             clipBehavior: Clip.none,
             child: Row(
               children: members.map((m) {
-                final memberLevel = GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG);
+                final memberLevel = GroupAdvisoryBuilder.levelAt(
+                  m.evaluation,
+                  _selectedSizeG,
+                );
                 return Semantics(
                   button: true,
                   label: '${_memberLabel(m, tl)}, ${_levelLabel(memberLevel)}',
@@ -2932,7 +3294,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(fontSize: 11, color: cs.onSurface),
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: cs.onSurface,
+                              ),
                             ),
                           ),
                         ],
@@ -2958,11 +3323,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       (m) => m.key == _selectedMemberKey,
       orElse: () => _groupMembers.first,
     );
-    final selectedLevel = GroupAdvisoryBuilder.levelAt(selected.evaluation, _selectedSizeG);
+    final selectedLevel = GroupAdvisoryBuilder.levelAt(
+      selected.evaluation,
+      _selectedSizeG,
+    );
     final selectedColor = _groupLevelColor(selectedLevel);
     final conditions = selected.profile.conditions.isEmpty
         ? (tl ? 'Walang kondisyon sa kalusugan' : 'No health conditions')
-        : selected.profile.conditions.map((c) => _groupConditionName(c, tl)).join(', ');
+        : selected.profile.conditions
+              .map((c) => _groupConditionName(c, tl))
+              .join(', ');
     // Suggested per-meal amount for THIS member (null for Suitable members
     // and allergen matches -- see GroupAdvisoryBuilder.memberAmountLine).
     final amountLine = GroupAdvisoryBuilder.memberAmountLine(
@@ -2979,7 +3349,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           child: Row(
             children: members.map((m) {
               final isSel = m.key == selected.key;
-              final level = GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG);
+              final level = GroupAdvisoryBuilder.levelAt(
+                m.evaluation,
+                _selectedSizeG,
+              );
               return Semantics(
                 button: true,
                 selected: isSel,
@@ -3007,7 +3380,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           _memberLabel(m, tl),
                           style: GoogleFonts.inter(
                             fontSize: 12,
-                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: isSel
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             color: cs.onSurface,
                           ),
                         ),
@@ -3048,7 +3423,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   const SizedBox(height: 2),
                   Text(
                     conditions,
-                    style: GoogleFonts.inter(fontSize: 12, color: cs.onSurfaceVariant),
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -3178,7 +3556,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   Container(
                     width: 10,
                     height: 10,
-                    decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                      color: dotColor,
+                      shape: BoxShape.circle,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -3189,7 +3570,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   Text(
                     '${cell.value.toStringAsFixed(1)}${row.nutrient.unit} / 100g',
-                    style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600),
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -3207,18 +3591,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           // showed a warning here while every other card on the same screen
           // correctly stayed silent about it.
           for (final row in matrix.allergenRows)
-            if ((_evaluation?.allergenAssessment.matchedContains.contains(row.allergen) ?? false) &&
-                row.cells.any((c) =>
-                    c.productId == productId && c.presence != AllergenPresence.none))
+            if ((_evaluation?.allergenAssessment.matchedContains.contains(
+                      row.allergen,
+                    ) ??
+                    false) &&
+                row.cells.any(
+                  (c) =>
+                      c.productId == productId &&
+                      c.presence != AllergenPresence.none,
+                ))
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
-                    const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 16),
+                    const Icon(
+                      Icons.warning_amber_rounded,
+                      color: Colors.redAccent,
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       row.allergen.displayLabel,
-                      style: GoogleFonts.inter(fontSize: 13, color: Colors.redAccent),
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: Colors.redAccent,
+                      ),
                     ),
                   ],
                 ),
@@ -3227,8 +3624,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
     );
   }
-
-
 
   String _levelLabel(AdvisoryLevel level) {
     switch (level) {
@@ -3259,6 +3654,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return RankLabelHelper.label(
       rank: currentProduct.rank,
+      totalProducts: comparisonSet.length,
       suitabilityRankLabel: currentProduct.suitabilityRankLabel,
       includeChoiceSuffix: true,
     );
@@ -3277,6 +3673,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     return RankLabelHelper.color(
       rank: currentProduct.rank,
+      totalProducts: comparisonSet.length,
       suitabilityRankLabel: currentProduct.suitabilityRankLabel,
     );
   }
@@ -3310,7 +3707,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // old grid-card hierarchy, where the value was bold and the label was
   // small and gray -- for a list read top-to-bottom, the label is what
   // the eye should anchor on first.
-  Widget _nutriListRow(BuildContext context, String label, String value, {bool showDivider = true}) {
+  Widget _nutriListRow(
+    BuildContext context,
+    String label,
+    String value, {
+    bool showDivider = true,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return Column(
@@ -3342,7 +3744,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
         ),
         if (showDivider)
-          Divider(height: 1, thickness: 1, color: theme.dividerColor.withOpacity(0.5)),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: theme.dividerColor.withOpacity(0.5),
+          ),
       ],
     );
   }
@@ -3382,9 +3788,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               Text(
                 label,
                 style: GoogleFonts.inter(
-                    fontSize: 10,
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600),
+                  fontSize: 10,
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               const SizedBox(height: 4),
               Container(
@@ -3414,7 +3821,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Text(
               description,
               style: GoogleFonts.inter(
-                  fontSize: 13, color: colorScheme.onSurface, height: 1.4),
+                fontSize: 13,
+                color: colorScheme.onSurface,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -3495,7 +3905,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           const SizedBox(height: 4),
           Text(
             'CPR: ${fda.cprNumber}',
-            style: GoogleFonts.inter(fontSize: 10, color: fdaMetaColor, fontWeight: FontWeight.bold),
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: fdaMetaColor,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           if (fda.validityDate.isNotEmpty)
             Text(
@@ -3532,7 +3946,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final matchedTypes = _evaluation?.allergenAssessment.matchedContains;
     if (matchedTypes == null || matchedTypes.isEmpty) return const [];
 
-    final productAllergenTypes = product.containsAllergens; // parallel to product.allergens
+    final productAllergenTypes =
+        product.containsAllergens; // parallel to product.allergens
     final labels = <String>[];
     for (final type in matchedTypes) {
       final rawIndex = productAllergenTypes.indexOf(type);
@@ -3579,10 +3994,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_isGroupMode) {
       final groupAdvisory = _effectiveGroupAdvisory(context);
       final flaggedCount = _groupMembers
-          .where((m) => GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) != AdvisoryLevel.suitable)
+          .where(
+            (m) =>
+                GroupAdvisoryBuilder.levelAt(m.evaluation, _selectedSizeG) !=
+                AdvisoryLevel.suitable,
+          )
           .length;
-      final groupName = _groupOptions.length > 1 ? _selectedGroupOption?.group.name : null;
-      final groupLabel = groupName == null ? 'Group verdict' : 'Group $groupName verdict';
+      final groupName = _groupOptions.length > 1
+          ? _selectedGroupOption?.group.name
+          : null;
+      final groupLabel = groupName == null
+          ? 'Group verdict'
+          : 'Group $groupName verdict';
       sections.add(
         '$groupLabel: ${_levelLabel(_groupLevel)}. '
         '$flaggedCount of ${_groupMembers.length} members flagged.',
@@ -3609,7 +4032,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     if (flaggedNutrients.isNotEmpty && !_isGroupMode) {
-      sections.add('Nutrients driving this verdict: ${flaggedNutrients.join(', ')}.');
+      sections.add(
+        'Nutrients driving this verdict: ${flaggedNutrients.join(', ')}.',
+      );
     }
 
     final fda = _fdaResult;
@@ -3618,8 +4043,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         fda.isActive
             ? 'FDA status: active.'
             : fda.isExpired
-                ? 'FDA status: expired.'
-                : 'FDA status: unverified.',
+            ? 'FDA status: expired.'
+            : 'FDA status: unverified.',
       );
     }
 
@@ -3631,10 +4056,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       );
       final rankLabel = RankLabelHelper.label(
         rank: currentRank.rank,
+        totalProducts: comparisonSet.length,
         suitabilityRankLabel: currentRank.suitabilityRankLabel,
       );
-      if (_rankingExplanation != null && _rankingExplanation!.trim().isNotEmpty) {
-        sections.add('Comparison ranking: $rankLabel. ${_rankingExplanation!.trim()}');
+      if (_rankingExplanation != null &&
+          _rankingExplanation!.trim().isNotEmpty) {
+        sections.add(
+          'Comparison ranking: $rankLabel. ${_rankingExplanation!.trim()}',
+        );
       } else {
         sections.add('Comparison ranking: $rankLabel.');
       }
@@ -3693,20 +4122,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return AdvisoryLevel.caution;
     }
 
-    if (evaluation.nutrientEvaluations.isEmpty) {
-      return evaluation.overallLevel;
-    }
-
-    var worst = AdvisoryLevel.suitable;
+    var worst = evaluation.scoredFactors.fold<AdvisoryLevel>(
+      AdvisoryLevel.suitable,
+      (current, factor) => _worseLevel(current, factor.level),
+    );
     for (final nutrientEval in evaluation.nutrientEvaluations) {
-      final valuePerServing = (nutrientEval.valuePer100g / 100) * _selectedSizeG;
-      final whoDailyLimit = WhoCalculator.getWhoDailyLimit(nutrientEval.nutrientKey);
+      final valuePerServing =
+          (nutrientEval.valuePer100g / 100) * _selectedSizeG;
+      final whoDailyLimit = WhoCalculator.getWhoDailyLimit(
+        nutrientEval.nutrientKey,
+      );
       final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
       final level = WhoCalculator.classifyByWhoPercentage(whoPercentage);
-      if (level == AdvisoryLevel.caution) return AdvisoryLevel.caution;
-      if (level == AdvisoryLevel.moderate) worst = AdvisoryLevel.moderate;
+      worst = _worseLevel(worst, level);
     }
     return worst;
+  }
+
+  AdvisoryLevel _worseLevel(AdvisoryLevel first, AdvisoryLevel second) {
+    if (first == AdvisoryLevel.caution || second == AdvisoryLevel.caution) {
+      return AdvisoryLevel.caution;
+    }
+    if (first == AdvisoryLevel.moderate || second == AdvisoryLevel.moderate) {
+      return AdvisoryLevel.moderate;
+    }
+    return AdvisoryLevel.suitable;
   }
 
   // Returns the advisory text (title + explanation) to show alongside the
@@ -3731,8 +4171,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_selectedSizeG == labelServingSizeG) return _advisory;
 
     // Use combined nutrient calculation for users without health conditions
-    final useCombinedNutrients = _userHealthProfile?.conditions.isEmpty ?? false;
-    final hasNoConditionsAndNoAllergens = (_userHealthProfile?.conditions.isEmpty ?? false) && !evaluation.allergenAssessment.hasDirectAllergen;
+    final useCombinedNutrients =
+        _userHealthProfile?.conditions.isEmpty ?? false;
+    final hasNoConditionsAndNoAllergens =
+        (_userHealthProfile?.conditions.isEmpty ?? false) &&
+        !evaluation.allergenAssessment.hasDirectAllergen;
 
     return FallbackAdvisoryGenerator.generate(
       evaluation,
@@ -3823,10 +4266,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           child: Container(
             width: 10,
             height: 10,
-            decoration: BoxDecoration(
-              color: dotColor,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
           ),
         ),
         Expanded(
@@ -3856,8 +4296,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ],
     );
   }
-
-
 }
 
 // Pairs a Total Nutrition row's label with its raw scaled value (used to

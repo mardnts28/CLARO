@@ -27,9 +27,9 @@ class GeminiAdvisoryService {
     required String proxyUrl,
     required String appSecret,
     String model = 'gemini-3.5-flash',
-  })  : _proxyUrl = proxyUrl,
-        _appSecret = appSecret,
-        _model = model;
+  }) : _proxyUrl = proxyUrl,
+       _appSecret = appSecret,
+       _model = model;
 
   final String _proxyUrl;
   final String _appSecret;
@@ -163,11 +163,19 @@ class GeminiAdvisoryService {
     HealthAdvisory advisory;
     // Use combined nutrient calculation for users without health conditions
     final useCombinedNutrients = user.conditions.isEmpty;
-    final hasNoConditionsAndNoAllergens = user.conditions.isEmpty && !evaluation.allergenAssessment.hasDirectAllergen;
+    final hasNoConditionsAndNoAllergens =
+        user.conditions.isEmpty &&
+        !evaluation.allergenAssessment.hasDirectAllergen;
     try {
       final text = await _callGemini(prompt, timeout: _timeout);
 
-      advisory = _parseResponse(text, evaluation, languageCode, useCombinedNutrients, hasNoConditionsAndNoAllergens);
+      advisory = _parseResponse(
+        text,
+        evaluation,
+        languageCode,
+        useCombinedNutrients,
+        hasNoConditionsAndNoAllergens,
+      );
     } on TimeoutException catch (e) {
       print('GEMINI TIMEOUT: $e');
       advisory = FallbackAdvisoryGenerator.generate(
@@ -219,7 +227,9 @@ class GeminiAdvisoryService {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(key);
       if (raw != null && raw.isNotEmpty) {
-        final advisory = HealthAdvisory.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        final advisory = HealthAdvisory.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>,
+        );
         _cache[key] = advisory;
         return advisory;
       }
@@ -228,11 +238,17 @@ class GeminiAdvisoryService {
     }
 
     final level = GroupAdvisoryBuilder.groupLevel(facts.map((f) => f.level));
-    final needsAi = level != AdvisoryLevel.suitable || facts.any((f) => f.allergens.isNotEmpty);
+    final needsAi =
+        level != AdvisoryLevel.suitable ||
+        facts.any((f) => f.allergens.isNotEmpty);
 
     HealthAdvisory advisory;
     if (!needsAi) {
-      advisory = GroupAdvisoryBuilder.fallback(facts, servingSizeG: servingSizeG, languageCode: languageCode);
+      advisory = GroupAdvisoryBuilder.fallback(
+        facts,
+        servingSizeG: servingSizeG,
+        languageCode: languageCode,
+      );
     } else {
       try {
         final text = await _callGemini(
@@ -244,11 +260,26 @@ class GeminiAdvisoryService {
           ),
           timeout: _timeout,
         );
-        advisory = _parseGroupResponse(text, facts, level, servingSizeG, languageCode) ??
-            GroupAdvisoryBuilder.fallback(facts, servingSizeG: servingSizeG, languageCode: languageCode);
+        advisory =
+            _parseGroupResponse(
+              text,
+              facts,
+              level,
+              servingSizeG,
+              languageCode,
+            ) ??
+            GroupAdvisoryBuilder.fallback(
+              facts,
+              servingSizeG: servingSizeG,
+              languageCode: languageCode,
+            );
       } catch (e) {
         print('GEMINI GROUP ADVISORY ERROR: $e');
-        advisory = GroupAdvisoryBuilder.fallback(facts, servingSizeG: servingSizeG, languageCode: languageCode);
+        advisory = GroupAdvisoryBuilder.fallback(
+          facts,
+          servingSizeG: servingSizeG,
+          languageCode: languageCode,
+        );
       }
     }
 
@@ -274,7 +305,8 @@ class GeminiAdvisoryService {
       } else if (cleaned.startsWith('```')) {
         cleaned = cleaned.substring(3);
       }
-      if (cleaned.endsWith('```')) cleaned = cleaned.substring(0, cleaned.length - 3);
+      if (cleaned.endsWith('```'))
+        cleaned = cleaned.substring(0, cleaned.length - 3);
 
       final json = jsonDecode(cleaned.trim()) as Map<String, dynamic>;
       final warning = json['warningText'] as String?;
@@ -282,7 +314,11 @@ class GeminiAdvisoryService {
       if (warning == null || explanation == null) return null;
 
       final w = GroupAdvisoryBuilder.restoreNames(warning, facts, languageCode);
-      final e = GroupAdvisoryBuilder.restoreNames(explanation, facts, languageCode);
+      final e = GroupAdvisoryBuilder.restoreNames(
+        explanation,
+        facts,
+        languageCode,
+      );
       if (w == null || e == null) return null;
 
       // The suggested amount is calculated by the app, never by Gemini. It
@@ -314,14 +350,22 @@ class GeminiAdvisoryService {
   }
 
   void _persistAdvisory(String key, HealthAdvisory advisory) {
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString(key, jsonEncode(advisory.toJson()));
-    }).catchError((e) {
-      print('Failed to persist advisory to cache: $e');
-    });
+    SharedPreferences.getInstance()
+        .then((prefs) {
+          prefs.setString(key, jsonEncode(advisory.toJson()));
+        })
+        .catchError((e) {
+          print('Failed to persist advisory to cache: $e');
+        });
   }
 
-  HealthAdvisory _parseResponse(String? text, ProductEvaluation evaluation, String languageCode, bool useCombinedNutrients, bool hasNoConditionsAndNoAllergens) {
+  HealthAdvisory _parseResponse(
+    String? text,
+    ProductEvaluation evaluation,
+    String languageCode,
+    bool useCombinedNutrients,
+    bool hasNoConditionsAndNoAllergens,
+  ) {
     if (text == null || text.trim().isEmpty) {
       print('EMPTY RESPONSE from Gemini');
       return FallbackAdvisoryGenerator.generate(
@@ -393,6 +437,8 @@ class GeminiAdvisoryService {
     required double worstValue,
     required int rank,
     required int totalProducts,
+    required bool thisIsBestNutrient,
+    String? supportingReason,
     String healthCondition = '',
     String languageCode = 'en',
   }) async {
@@ -404,6 +450,8 @@ class GeminiAdvisoryService {
       worstValue: worstValue,
       rank: rank,
       totalProducts: totalProducts,
+      thisIsBestNutrient: thisIsBestNutrient,
+      supportingReason: supportingReason,
       healthCondition: healthCondition,
       languageCode: languageCode,
     );
@@ -412,6 +460,11 @@ class GeminiAdvisoryService {
       final text = await _callGemini(prompt, timeout: _timeout);
 
       final explanation = _parseRankingExplanation(text);
+      if (_containsProhibitedRankingMedicalClaim(explanation)) {
+        throw const FormatException(
+          'Ranking explanation contains prohibited medical wording',
+        );
+      }
       return {'explanation': explanation, 'source': 'Gemini'};
     } on TimeoutException catch (_) {
       final explanation = FallbackAdvisoryGenerator.generateRankingExplanation(
@@ -422,6 +475,8 @@ class GeminiAdvisoryService {
         worstValue: worstValue,
         rank: rank,
         totalProducts: totalProducts,
+        thisIsBestNutrient: thisIsBestNutrient,
+        supportingReason: supportingReason,
         healthCondition: healthCondition,
         languageCode: languageCode,
       );
@@ -435,6 +490,8 @@ class GeminiAdvisoryService {
         worstValue: worstValue,
         rank: rank,
         totalProducts: totalProducts,
+        thisIsBestNutrient: thisIsBestNutrient,
+        supportingReason: supportingReason,
         healthCondition: healthCondition,
         languageCode: languageCode,
       );
@@ -472,5 +529,12 @@ class GeminiAdvisoryService {
       print('RAW RESPONSE: $text');
       rethrow;
     }
+  }
+
+  bool _containsProhibitedRankingMedicalClaim(String explanation) {
+    return RegExp(
+      r'\b(?:dangerous|harmful|unsafe|toxic|contraindicated|worsen(?:s|ed|ing)?|aggravat(?:e|es|ed|ing)?|cause(?:s|d)?|trigger(?:s|ed|ing)?)\b',
+      caseSensitive: false,
+    ).hasMatch(explanation);
   }
 }

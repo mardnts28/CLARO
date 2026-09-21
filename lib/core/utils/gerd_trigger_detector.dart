@@ -94,6 +94,8 @@ class GerdTriggerDetector {
     'hot sauce',
     'curry',
     'spicy',
+    'labuyo',
+    'hot',
   ];
 
   static const List<String> _caffeineKeywords = [
@@ -129,7 +131,11 @@ class GerdTriggerDetector {
     // Also check product name for spicy-related keywords (for type/flavor info)
     final productNameTriggers = _detectSpicyInProductName(product.name);
     if (productNameTriggers != null) {
-      triggers.add(productNameTriggers);
+      // Avoid duplicate spicy trigger if ingredients already flagged spicy
+      final alreadyHasSpicy = triggers.any((t) => t.type == GerdTriggerType.spicy);
+      if (!alreadyHasSpicy) {
+        triggers.add(productNameTriggers);
+      }
     }
 
     if (hasNutritionData) {
@@ -161,7 +167,11 @@ class GerdTriggerDetector {
     };
 
     for (final entry in categories.entries) {
-      final matched = _findFirstMatchingIngredient(ingredients, entry.value);
+      final matched = _findFirstMatchingIngredient(
+        ingredients,
+        entry.value,
+        triggerType: entry.key,
+      );
       if (matched != null) {
         matches.add(GerdTriggerMatch(type: entry.key, matchedIngredient: matched));
       }
@@ -171,22 +181,68 @@ class GerdTriggerDetector {
 
   /// Returns the first ingredient string (in label order) whose text
   /// contains any of [keywords] as a whole word/phrase -- e.g. "tea"
-  /// matches "Iced Tea Powder" but NOT "Steak Seasoning"; "lemon" matches
+  /// matches "Iced Tea Powder" but NOT "Steak Seasoning" or
+  /// "Vegetable Oil (Palm Oil with Green Tea Extract)"; "lemon" matches
   /// "Lemon Juice" but NOT "Lemongrass". Case-insensitive.
   static String? _findFirstMatchingIngredient(
     List<String> ingredients,
-    List<String> keywords,
-  ) {
+    List<String> keywords, {
+    GerdTriggerType? triggerType,
+  }) {
     for (final ingredient in ingredients) {
       final lower = ingredient.toLowerCase();
       for (final keyword in keywords) {
         final pattern = RegExp(
           r'(?<![a-z])' + RegExp.escape(keyword.toLowerCase()) + r'(?![a-z])',
         );
-        if (pattern.hasMatch(lower)) return ingredient;
+        if (pattern.hasMatch(lower)) {
+          if (!_isExcludedMatch(lower, keyword.toLowerCase(), triggerType)) {
+            return ingredient;
+          }
+        }
       }
     }
     return null;
+  }
+
+  /// Excludes known false positives for specific trigger types.
+  static bool _isExcludedMatch(
+    String ingredientLower,
+    String keywordLower,
+    GerdTriggerType? triggerType,
+  ) {
+    if (triggerType == GerdTriggerType.caffeine) {
+      // "tea" keyword: green tea extract / tea extract in ingredients (such as
+      // "Vegetable Oil (Palm Oil with Green Tea Extract)") is used as a food
+      // antioxidant additive, not a caffeinated tea beverage/ingredient.
+      if (keywordLower == 'tea') {
+        if (ingredientLower.contains('green tea extract') ||
+            ingredientLower.contains('tea extract')) {
+          if (!ingredientLower.contains('caffeine')) {
+            return true;
+          }
+        }
+      }
+      // "tea" or "coffee" keyword: decaffeinated / decaf items
+      if (keywordLower == 'tea' || keywordLower == 'coffee') {
+        if (ingredientLower.contains('decaf') ||
+            ingredientLower.contains('decaffeinated')) {
+          if (!ingredientLower.contains('caffeine')) {
+            return true;
+          }
+        }
+      }
+    } else if (triggerType == GerdTriggerType.spicy) {
+      if (keywordLower == 'hot') {
+        if (ingredientLower.contains('hot water') ||
+            ingredientLower.contains('hot break') ||
+            ingredientLower.contains('hot pack') ||
+            ingredientLower.contains('hot process')) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /// Detects spicy-related keywords in the product name (for type/flavor info).
@@ -198,13 +254,15 @@ class GerdTriggerDetector {
         r'(?<![a-z])' + RegExp.escape(keyword.toLowerCase()) + r'(?![a-z])',
       );
       if (pattern.hasMatch(lower)) {
-        // Return the actual matched keyword, not the full product name
-        return GerdTriggerMatch(
-          type: GerdTriggerType.spicy,
-          matchedIngredient: keyword, // Use the actual keyword (e.g., "spicy", "chili")
-        );
+        if (!_isExcludedMatch(lower, keyword.toLowerCase(), GerdTriggerType.spicy)) {
+          return GerdTriggerMatch(
+            type: GerdTriggerType.spicy,
+            matchedIngredient: keyword,
+          );
+        }
       }
     }
     return null;
   }
 }
+

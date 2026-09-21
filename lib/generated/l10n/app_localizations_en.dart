@@ -776,6 +776,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get kidneyNutrientProtein => 'Protein';
 
   @override
+  String get kidneyNutrientPhosphorus => 'Phosphorus';
+
+  @override
   String get combinedGerdKidneyWarningTitle => 'GERD and Kidney Disease Warning';
 
   @override

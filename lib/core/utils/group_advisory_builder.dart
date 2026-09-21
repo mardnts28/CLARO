@@ -25,7 +25,8 @@ class GroupMemberFacts {
   final bool isSelf;
   final AdvisoryLevel level;
   final List<String> conditions; // english names
-  final List<String> allergens; // e.g. 'Dairy/Milk (ingredient "Whey", derived)'
+  final List<String>
+  allergens; // e.g. 'Dairy/Milk (ingredient "Whey", derived)'
   final String? nutrientKey; // main nutrient of concern, null if none
   final double? amountPerServing;
   final double? percentOfDaily;
@@ -64,15 +65,26 @@ class GroupAdvisoryBuilder {
   /// nutrient level recomputed for the chosen size.
   static AdvisoryLevel levelAt(ProductEvaluation ev, double servingSizeG) {
     if (ev.allergenAssessment.hasDirectAllergen) return AdvisoryLevel.caution;
-    if (ev.nutrientEvaluations.isEmpty) return ev.overallLevel;
 
-    var worst = AdvisoryLevel.suitable;
+    var worst = ev.scoredFactors.fold<AdvisoryLevel>(
+      AdvisoryLevel.suitable,
+      (current, factor) => _worseLevel(current, factor.level),
+    );
     for (final n in ev.nutrientEvaluations) {
       final level = _nutrientLevelAt(n, servingSizeG);
-      if (level == AdvisoryLevel.caution) return AdvisoryLevel.caution;
-      if (level == AdvisoryLevel.moderate) worst = AdvisoryLevel.moderate;
+      worst = _worseLevel(worst, level);
     }
     return worst;
+  }
+
+  static AdvisoryLevel _worseLevel(AdvisoryLevel first, AdvisoryLevel second) {
+    if (first == AdvisoryLevel.caution || second == AdvisoryLevel.caution) {
+      return AdvisoryLevel.caution;
+    }
+    if (first == AdvisoryLevel.moderate || second == AdvisoryLevel.moderate) {
+      return AdvisoryLevel.moderate;
+    }
+    return AdvisoryLevel.suitable;
   }
 
   static AdvisoryLevel groupLevel(Iterable<AdvisoryLevel> levels) {
@@ -85,18 +97,20 @@ class GroupAdvisoryBuilder {
   }
 
   static int severity(AdvisoryLevel l) => switch (l) {
-        AdvisoryLevel.suitable => 0,
-        AdvisoryLevel.moderate => 1,
-        AdvisoryLevel.caution => 2,
-      };
+    AdvisoryLevel.suitable => 0,
+    AdvisoryLevel.moderate => 1,
+    AdvisoryLevel.caution => 2,
+  };
 
   static double _percentAt(NutrientEvaluation n, double servingSizeG) {
     final value = (n.valuePer100g / 100) * servingSizeG;
     return (value / WhoCalculator.getWhoDailyLimit(n.nutrientKey)) * 100;
   }
 
-  static AdvisoryLevel _nutrientLevelAt(NutrientEvaluation n, double servingSizeG) =>
-      WhoCalculator.classifyByWhoPercentage(_percentAt(n, servingSizeG));
+  static AdvisoryLevel _nutrientLevelAt(
+    NutrientEvaluation n,
+    double servingSizeG,
+  ) => WhoCalculator.classifyByWhoPercentage(_percentAt(n, servingSizeG));
 
   // ── Facts ───────────────────────────────────────────────────────────
 
@@ -114,10 +128,16 @@ class GroupAdvisoryBuilder {
 
   /// Facts for a single member (alias unused) -- for UI that needs one
   /// member's suggested amount without building the whole group.
-  static GroupMemberFacts memberFacts(MemberEvaluation m, double servingSizeG) =>
-      _factsFor(m, '', servingSizeG);
+  static GroupMemberFacts memberFacts(
+    MemberEvaluation m,
+    double servingSizeG,
+  ) => _factsFor(m, '', servingSizeG);
 
-  static GroupMemberFacts _factsFor(MemberEvaluation m, String alias, double size) {
+  static GroupMemberFacts _factsFor(
+    MemberEvaluation m,
+    String alias,
+    double size,
+  ) {
     final ev = m.evaluation;
     final level = levelAt(ev, size);
 
@@ -138,13 +158,19 @@ class GroupAdvisoryBuilder {
 
     final allergens = <String>[];
     for (final src in ev.allergenAssessment.ingredientSources) {
-      final how = src.matchType == AllergenMatchType.direct ? 'direct' : 'derived';
-      allergens.add(src.ingredient == null
-          ? src.allergen.displayLabel
-          : '${src.allergen.displayLabel} (ingredient "${src.ingredient}", $how)');
+      final how = src.matchType == AllergenMatchType.direct
+          ? 'direct'
+          : 'derived';
+      allergens.add(
+        src.ingredient == null
+            ? src.allergen.displayLabel
+            : '${src.allergen.displayLabel} (ingredient "${src.ingredient}", $how)',
+      );
     }
     if (allergens.isEmpty) {
-      allergens.addAll(ev.allergenAssessment.matchedContains.map((a) => a.displayLabel));
+      allergens.addAll(
+        ev.allergenAssessment.matchedContains.map((a) => a.displayLabel),
+      );
     }
 
     return GroupMemberFacts(
@@ -155,7 +181,9 @@ class GroupAdvisoryBuilder {
       conditions: m.profile.conditions.map(_conditionName).toList(),
       allergens: allergens,
       nutrientKey: worst?.nutrientKey,
-      amountPerServing: worst == null ? null : (worst.valuePer100g / 100) * size,
+      amountPerServing: worst == null
+          ? null
+          : (worst.valuePer100g / 100) * size,
       percentOfDaily: worst == null ? null : worstPct,
       suggestedGrams: allergens.isNotEmpty ? null : _suggestedGramsFor(m, size),
     );
@@ -186,7 +214,11 @@ class GroupAdvisoryBuilder {
   /// "up to 1 full serving (50g)" / "about half a serving (25g)" /
   /// "no more than 20g" -- same three bands ServingSizeCalculator uses for
   /// the single-user advisory.
-  static String amountPhrase(double grams, double servingSizeG, {bool tl = false}) {
+  static String amountPhrase(
+    double grams,
+    double servingSizeG, {
+    bool tl = false,
+  }) {
     final ratio = servingSizeG <= 0 ? 1.0 : grams / servingSizeG;
     final g = grams < 1 ? '<1g' : '${grams.round()}g';
     if (ratio >= 1.0) {
@@ -202,7 +234,11 @@ class GroupAdvisoryBuilder {
 
   /// One member's suggested amount at any level, or null when none applies
   /// (allergen match, or the product has none of the relevant nutrients).
-  static String? memberAmountLine(GroupMemberFacts f, double servingSizeG, {bool tl = false}) {
+  static String? memberAmountLine(
+    GroupMemberFacts f,
+    double servingSizeG, {
+    bool tl = false,
+  }) {
     if (f.suggestedGrams == null) return null;
     final phrase = amountPhrase(f.suggestedGrams!, servingSizeG, tl: tl);
     return tl
@@ -222,7 +258,8 @@ class GroupAdvisoryBuilder {
     double? smallest;
     for (final f in facts) {
       if (f.suggestedGrams == null) continue;
-      if (smallest == null || f.suggestedGrams! < smallest) smallest = f.suggestedGrams;
+      if (smallest == null || f.suggestedGrams! < smallest)
+        smallest = f.suggestedGrams;
     }
     if (smallest == null) return null;
 
@@ -248,19 +285,29 @@ class GroupAdvisoryBuilder {
     final level = groupLevel(facts.map((f) => f.level));
     final flagged = facts.where((f) => f.isFlagged).length;
 
-    final memberLines = facts.map((f) {
-      final b = StringBuffer('${f.alias}${f.isSelf ? " (the person using the app)" : ""} - Level: ${_levelLabel(f.level)}.');
-      b.write(' Health conditions: ${f.conditions.isEmpty ? "none" : f.conditions.join(", ")}.');
-      if (f.allergens.isNotEmpty) {
-        b.write(' Contains an allergen this member is allergic to: ${f.allergens.join("; ")}.');
-      }
-      if (f.nutrientKey != null) {
-        b.write(' Main nutrient of concern: ${_nutrientLabel(f.nutrientKey!)}, '
-            '${f.amountPerServing!.toStringAsFixed(1)}${_nutrientUnit(f.nutrientKey!)} per serving '
-            '(${f.percentOfDaily!.toStringAsFixed(1)}% of the WHO daily reference amount).');
-      }
-      return '- ${b.toString()}';
-    }).join('\n');
+    final memberLines = facts
+        .map((f) {
+          final b = StringBuffer(
+            '${f.alias}${f.isSelf ? " (the person using the app)" : ""} - Level: ${_levelLabel(f.level)}.',
+          );
+          b.write(
+            ' Health conditions: ${f.conditions.isEmpty ? "none" : f.conditions.join(", ")}.',
+          );
+          if (f.allergens.isNotEmpty) {
+            b.write(
+              ' Contains an allergen this member is allergic to: ${f.allergens.join("; ")}.',
+            );
+          }
+          if (f.nutrientKey != null) {
+            b.write(
+              ' Main nutrient of concern: ${_nutrientLabel(f.nutrientKey!)}, '
+              '${f.amountPerServing!.toStringAsFixed(1)}${_nutrientUnit(f.nutrientKey!)} per serving '
+              '(${f.percentOfDaily!.toStringAsFixed(1)}% of the WHO daily reference amount).',
+            );
+          }
+          return '- ${b.toString()}';
+        })
+        .join('\n');
 
     final language = languageCode == 'tl'
         ? 'Respond in simple, conversational Tagalog.'
@@ -315,7 +362,11 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
   /// Swaps the privacy tags back to display names. Returns null if any tag
   /// (or a tag-like leftover such as "M2") survives, so the caller can fall
   /// back to the deterministic text instead of showing a broken sentence.
-  static String? restoreNames(String text, List<GroupMemberFacts> facts, String languageCode) {
+  static String? restoreNames(
+    String text,
+    List<GroupMemberFacts> facts,
+    String languageCode,
+  ) {
     var out = text;
     for (final f in facts) {
       if (f.isSelf) continue;
@@ -351,26 +402,30 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
       );
     }
 
-    final parts = flagged.map((f) {
-      final who = f.isSelf ? (tl ? 'Ikaw' : 'You') : f.name;
-      final String why;
-      if (f.allergens.isNotEmpty) {
-        why = tl
-            ? 'may allergen (${f.allergens.map(_stripDetail).join(", ")})'
-            : 'contains an allergen (${f.allergens.map(_stripDetail).join(", ")})';
-      } else if (f.nutrientKey != null) {
-        why = tl
-            ? '${_nutrientLabelTl(f.nutrientKey!)} - ${f.percentOfDaily!.toStringAsFixed(0)}% ng daily reference'
-            : '${_nutrientLabel(f.nutrientKey!)} - ${f.percentOfDaily!.toStringAsFixed(0)}% of the daily reference';
-      } else {
-        why = tl ? 'kailangang bantayan' : 'worth watching';
-      }
-      return '$who ($why)';
-    }).join('; ');
+    final parts = flagged
+        .map((f) {
+          final who = f.isSelf ? (tl ? 'Ikaw' : 'You') : f.name;
+          final String why;
+          if (f.allergens.isNotEmpty) {
+            why = tl
+                ? 'may allergen (${f.allergens.map(_stripDetail).join(", ")})'
+                : 'contains an allergen (${f.allergens.map(_stripDetail).join(", ")})';
+          } else if (f.nutrientKey != null) {
+            why = tl
+                ? '${_nutrientLabelTl(f.nutrientKey!)} - ${f.percentOfDaily!.toStringAsFixed(0)}% ng daily reference'
+                : '${_nutrientLabel(f.nutrientKey!)} - ${f.percentOfDaily!.toStringAsFixed(0)}% of the daily reference';
+          } else {
+            why = tl ? 'kailangang bantayan' : 'worth watching';
+          }
+          return '$who ($why)';
+        })
+        .join('; ');
 
     final others = facts.length - flagged.length;
     final tail = others > 0
-        ? (tl ? ' Hindi naman naka-flag ang iba pa.' : ' The others are not flagged.')
+        ? (tl
+              ? ' Hindi naman naka-flag ang iba pa.'
+              : ' The others are not flagged.')
         : '';
     final head = level == AdvisoryLevel.caution
         ? (tl ? 'Mag-ingat: ' : 'Be careful: ')
@@ -381,8 +436,12 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
     return _advisory(
       level,
       level == AdvisoryLevel.caution
-          ? (tl ? 'May dapat mag-ingat sa grupo' : 'Some members need to be careful')
-          : (tl ? 'May dapat magbantay sa grupo' : 'Some members should watch this'),
+          ? (tl
+                ? 'May dapat mag-ingat sa grupo'
+                : 'Some members need to be careful')
+          : (tl
+                ? 'May dapat magbantay sa grupo'
+                : 'Some members should watch this'),
       '$head$parts.$tail${amount == null ? '' : ' ${amount.sentence}'}',
       safeServingSize: amount?.sentence,
     );
@@ -393,15 +452,14 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
     String title,
     String text, {
     String? safeServingSize,
-  }) =>
-      HealthAdvisory(
-        overallLevel: level,
-        warningText: title,
-        explanation: text,
-        safeServingSize: safeServingSize,
-        source: AdvisorySource.fallbackRuleBased,
-        generatedAt: DateTime.now(),
-      );
+  }) => HealthAdvisory(
+    overallLevel: level,
+    warningText: title,
+    explanation: text,
+    safeServingSize: safeServingSize,
+    source: AdvisorySource.fallbackRuleBased,
+    generatedAt: DateTime.now(),
+  );
 
   static String _stripDetail(String allergen) {
     final i = allergen.indexOf(' (');
@@ -413,12 +471,18 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
   /// Stable across runs (unlike String.hashCode), changes whenever the
   /// product, serving size, member names, levels, conditions, or allergens
   /// change -- so a cached group advisory can never describe an old group.
-  static String fingerprint(String productId, double servingSizeG, List<GroupMemberFacts> facts) {
+  static String fingerprint(
+    String productId,
+    double servingSizeG,
+    List<GroupMemberFacts> facts,
+  ) {
     final b = StringBuffer('$productId|${servingSizeG.toStringAsFixed(1)}');
     final sorted = [...facts]..sort((x, y) => x.name.compareTo(y.name));
     for (final f in sorted) {
-      b.write('|${f.name}:${f.level.name}:${f.conditions.join(",")}:${f.allergens.join(",")}'
-          ':${f.nutrientKey}:${f.percentOfDaily?.toStringAsFixed(0)}:${f.suggestedGrams?.toStringAsFixed(0)}');
+      b.write(
+        '|${f.name}:${f.level.name}:${f.conditions.join(",")}:${f.allergens.join(",")}'
+        ':${f.nutrientKey}:${f.percentOfDaily?.toStringAsFixed(0)}:${f.suggestedGrams?.toStringAsFixed(0)}',
+      );
     }
     var h = 0x811c9dc5;
     for (final c in b.toString().codeUnits) {
@@ -431,32 +495,32 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
   // ── Labels ──────────────────────────────────────────────────────────
 
   static String _levelLabel(AdvisoryLevel l) => switch (l) {
-        AdvisoryLevel.suitable => 'Suitable',
-        AdvisoryLevel.moderate => 'Moderate',
-        AdvisoryLevel.caution => 'Caution',
-      };
+    AdvisoryLevel.suitable => 'Suitable',
+    AdvisoryLevel.moderate => 'Moderate',
+    AdvisoryLevel.caution => 'Caution',
+  };
 
   static String _conditionName(HealthCondition c) => switch (c) {
-        HealthCondition.hypertension => 'hypertension',
-        HealthCondition.diabetes => 'diabetes',
-        HealthCondition.heartCondition => 'heart condition',
-        HealthCondition.gerd => 'GERD',
-        HealthCondition.kidneyDisease => 'kidney disease',
-      };
+    HealthCondition.hypertension => 'hypertension',
+    HealthCondition.diabetes => 'diabetes',
+    HealthCondition.heartCondition => 'heart condition',
+    HealthCondition.gerd => 'GERD',
+    HealthCondition.kidneyDisease => 'kidney disease',
+  };
 
   static String _nutrientLabel(String key) => switch (key) {
-        'sodiumMg' => 'sodium',
-        'sugarsG' => 'total sugars',
-        'saturatedFatG' => 'saturated fat',
-        _ => key,
-      };
+    'sodiumMg' => 'sodium',
+    'sugarsG' => 'total sugars',
+    'saturatedFatG' => 'saturated fat',
+    _ => key,
+  };
 
   static String _nutrientLabelTl(String key) => switch (key) {
-        'sodiumMg' => 'sodium',
-        'sugarsG' => 'kabuuang asukal',
-        'saturatedFatG' => 'saturated fat',
-        _ => key,
-      };
+    'sodiumMg' => 'sodium',
+    'sugarsG' => 'kabuuang asukal',
+    'saturatedFatG' => 'saturated fat',
+    _ => key,
+  };
 
   static String _nutrientUnit(String key) => key == 'sodiumMg' ? 'mg' : 'g';
 }

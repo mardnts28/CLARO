@@ -7,9 +7,8 @@ enum HealthCondition {
   hypertension,
   diabetes,
   heartCondition,
-  // Awareness-only conditions: these are NOT part of the Suitable /
-  // Moderate / Caution scoring (see [HealthConditionKind.isScored]). They
-  // only drive their own informational warning cards. New values are
+  // Conditions with deterministic scoring factors. They may also drive
+  // informational warning cards. New values are
   // appended at the end and (de)serialized by name, so existing saved
   // profiles keep loading exactly as before.
   gerd,
@@ -17,19 +16,15 @@ enum HealthCondition {
 }
 
 extension HealthConditionKind on HealthCondition {
-  /// True for the conditions evaluated by the existing
-  /// Suitable/Moderate/Caution scoring (ConditionThresholds). GERD and
-  /// Kidney Disease return false: they are health-information/awareness
-  /// evaluations only, never suitability scores.
+  /// True for conditions that participate in deterministic scoring/ranking.
   bool get isScored {
     switch (this) {
       case HealthCondition.hypertension:
       case HealthCondition.diabetes:
       case HealthCondition.heartCondition:
-        return true;
       case HealthCondition.gerd:
       case HealthCondition.kidneyDisease:
-        return false;
+        return true;
     }
   }
 
@@ -98,9 +93,11 @@ class UserHealthProfile {
 
   bool get hasHypertension => conditions.contains(HealthCondition.hypertension);
   bool get hasDiabetes => conditions.contains(HealthCondition.diabetes);
-  bool get hasHeartCondition => conditions.contains(HealthCondition.heartCondition);
+  bool get hasHeartCondition =>
+      conditions.contains(HealthCondition.heartCondition);
   bool get hasGerd => conditions.contains(HealthCondition.gerd);
-  bool get hasKidneyDisease => conditions.contains(HealthCondition.kidneyDisease);
+  bool get hasKidneyDisease =>
+      conditions.contains(HealthCondition.kidneyDisease);
 
   /// Conditions that feed the existing Suitable/Moderate/Caution scoring.
   List<HealthCondition> get scoredConditions =>
@@ -121,17 +118,21 @@ class UserHealthProfile {
       userId: json['userId']?.toString() ?? '',
       displayName: json['displayName']?.toString() ?? '',
       conditions: (json['conditions'] as List<dynamic>? ?? [])
-          .map((c) => HealthCondition.values.cast<HealthCondition?>().firstWhere(
-                (e) => e?.name == c?.toString(),
-                orElse: () => null,
-              ))
+          .map(
+            (c) => HealthCondition.values.cast<HealthCondition?>().firstWhere(
+              (e) => e?.name == c?.toString(),
+              orElse: () => null,
+            ),
+          )
           .whereType<HealthCondition>()
           .toList(),
       allergies: (json['allergies'] as List<dynamic>? ?? [])
-          .map((a) => AllergenType.values.cast<AllergenType?>().firstWhere(
-                (e) => e?.name == a?.toString(),
-                orElse: () => null,
-              ))
+          .map(
+            (a) => AllergenType.values.cast<AllergenType?>().firstWhere(
+              (e) => e?.name == a?.toString(),
+              orElse: () => null,
+            ),
+          )
           .whereType<AllergenType>()
           .toList(),
       voiceAssistant: json['voiceAssistant'] as bool? ?? false,
@@ -139,10 +140,10 @@ class UserHealthProfile {
   }
 
   Map<String, dynamic> toJson() => {
-        'userId': userId,
-        'displayName': displayName,
-        'conditions': conditions.map((c) => c.name).toList(),
-        'allergies': allergies.map((a) => a.name).toList(),
-        'voiceAssistant': voiceAssistant,
-      };
+    'userId': userId,
+    'displayName': displayName,
+    'conditions': conditions.map((c) => c.name).toList(),
+    'allergies': allergies.map((a) => a.name).toList(),
+    'voiceAssistant': voiceAssistant,
+  };
 }

@@ -61,7 +61,8 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     if (widget.detectedProducts.isNotEmpty) {
       VoiceAssistantService.setLatestScanProduct(widget.detectedProducts.first);
     }
-    if (_authService.currentUser != null && VoiceAssistantService.instance.isEnabled) {
+    if (_authService.currentUser != null &&
+        VoiceAssistantService.instance.isEnabled) {
       VoiceAssistantService.instance.announcePage('multi_scan_results');
     }
     _comparisonProducts = List.from(widget.detectedProducts);
@@ -207,10 +208,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                   _selectConditionFilter(value);
                 },
               ),
-              // Only scored conditions can re-rank products; GERD / Kidney
-              // Disease are awareness-only and are not offered here.
-              for (final condition
-                  in HealthCondition.values.where((c) => c.isScored))
+              // Only deterministic scored conditions can re-rank products.
+              for (final condition in HealthCondition.values.where(
+                (c) => c.isScored,
+              ))
                 RadioListTile<HealthCondition?>(
                   value: condition,
                   groupValue: _selectedCondition,
@@ -251,9 +252,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     final products = recognized.whereType<Product>().toList();
     if (products.isEmpty) {
       final loc = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.noNewProductsDetected)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.noNewProductsDetected)));
       return;
     }
 
@@ -337,10 +338,13 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         child: ListView.separated(
                           shrinkWrap: true,
                           itemCount: products.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
                           itemBuilder: (context, i) {
                             final product = products[i];
-                            final alreadyRanked = existingIds.contains(product.id);
+                            final alreadyRanked = existingIds.contains(
+                              product.id,
+                            );
                             return SelectableScannedProductCard(
                               product: product,
                               selected: selectedIds.contains(product.id),
@@ -366,10 +370,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: colorScheme.primary,
                             foregroundColor: colorScheme.onPrimary,
-                            disabledBackgroundColor:
-                                colorScheme.primary.withOpacity(0.3),
-                            disabledForegroundColor:
-                                colorScheme.onPrimary.withOpacity(0.7),
+                            disabledBackgroundColor: colorScheme.primary
+                                .withOpacity(0.3),
+                            disabledForegroundColor: colorScheme.onPrimary
+                                .withOpacity(0.7),
                             padding: const EdgeInsets.symmetric(vertical: 14),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -471,7 +475,11 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.add_circle_outline, size: 18, color: colorScheme.primary),
+            Icon(
+              Icons.add_circle_outline,
+              size: 18,
+              color: colorScheme.primary,
+            ),
             const SizedBox(width: 6),
             Text(
               loc.addProductButton,
@@ -500,228 +508,249 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          // ── Header bar: back, Resulta (perfectly centered Stack) ──
-          Container(
-            color: colorScheme.surface,
-            height: topPadding + 56,
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: topPadding,
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Centered Title
-                Text(
-                  loc.resultsTitle,
-                  style: GoogleFonts.outfit(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: colorScheme.primary,
+            // ── Header bar: back, Resulta (perfectly centered Stack) ──
+            Container(
+              color: colorScheme.surface,
+              height: topPadding + 56,
+              padding: EdgeInsets.only(left: 16, right: 16, top: topPadding),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Centered Title
+                  Text(
+                    loc.resultsTitle,
+                    style: GoogleFonts.outfit(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.primary,
+                    ),
                   ),
-                ),
-                // Left Back Button
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticService().vibrate();
-                      Navigator.pop(context);
-                    },
-                    child: Icon(Icons.arrow_back,
-                        color: colorScheme.primary, size: 24),
-                  ),
-                ),
-                // Right Filter Ranking Button (matches compare_products_screen)
-                if (_profile != null)
+                  // Left Back Button
                   Align(
-                    alignment: Alignment.centerRight,
+                    alignment: Alignment.centerLeft,
                     child: GestureDetector(
                       onTap: () {
                         HapticService().vibrate();
-                        _showFilterSheet();
+                        Navigator.pop(context);
                       },
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Icon(Icons.filter_list,
-                              color: colorScheme.primary, size: 24),
-                          if (_selectedCondition != null)
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.secondary,
-                                  shape: BoxShape.circle,
+                      child: Icon(
+                        Icons.arrow_back,
+                        color: colorScheme.primary,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  // Right Filter Ranking Button (matches compare_products_screen)
+                  if (_profile != null)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticService().vibrate();
+                          _showFilterSheet();
+                        },
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.filter_list,
+                              color: colorScheme.primary,
+                              size: 24,
+                            ),
+                            if (_selectedCondition != null)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.secondary,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: theme.dividerColor),
-
-          // ── Ranked description label ────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: Row(
-              children: [
-                Text(
-                  loc.rankedBySuitability,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (_selectedCondition != null) ...[
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () {
-                      HapticService().vibrate();
-                      _selectConditionFilter(null);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: colorScheme.secondary.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                            color: colorScheme.secondary.withOpacity(0.4)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            _conditionLabel(_selectedCondition!),
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: colorScheme.secondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(Icons.close,
-                              size: 14, color: colorScheme.secondary),
-                        ],
-                      ),
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
-          ),
+            Divider(height: 1, color: theme.dividerColor),
 
-          if (widget.detectedProducts.any((p) => p.isOfflineFallback))
+            // ── Ranked description label ────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                decoration: BoxDecoration(
-                  color: theme.brightness == Brightness.dark
-                      ? const Color(0xFFE65100).withValues(alpha: 0.15)
-                      : const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: theme.brightness == Brightness.dark
-                        ? const Color(0xFFFFB74D).withValues(alpha: 0.4)
-                        : const Color(0xFFFFB74D).withValues(alpha: 0.8),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.wifi_off_rounded,
-                      size: 18,
-                      color: theme.brightness == Brightness.dark
-                          ? const Color(0xFFFFB74D)
-                          : const Color(0xFFE65100),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              child: Row(
+                children: [
+                  Text(
+                    loc.rankedBySuitability,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        loc.offlineBasicRecognitionBanner,
-                        style: GoogleFonts.inter(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w500,
-                          color: theme.brightness == Brightness.dark
-                              ? const Color(0xFFFFB74D)
-                              : const Color(0xFFE65100),
+                  ),
+                  if (_selectedCondition != null) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: () {
+                        HapticService().vibrate();
+                        _selectConditionFilter(null);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondary.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: colorScheme.secondary.withOpacity(0.4),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              _conditionLabel(_selectedCondition!),
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: colorScheme.secondary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.close,
+                              size: 14,
+                              color: colorScheme.secondary,
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ],
-                ),
+                ],
               ),
             ),
 
-          // ── Product list ──────────────────────────────────────────
-          Expanded(
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _nutritionUnavailable
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 32),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.info_outline,
-                                  size: 40, color: colorScheme.onSurfaceVariant),
-                              const SizedBox(height: 12),
-                              Text(
-                                loc.nutritionDataUnavailable,
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
+            if (widget.detectedProducts.any((p) => p.isOfflineFallback))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.brightness == Brightness.dark
+                        ? const Color(0xFFE65100).withValues(alpha: 0.15)
+                        : const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: theme.brightness == Brightness.dark
+                          ? const Color(0xFFFFB74D).withValues(alpha: 0.4)
+                          : const Color(0xFFFFB74D).withValues(alpha: 0.8),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.wifi_off_rounded,
+                        size: 18,
+                        color: theme.brightness == Brightness.dark
+                            ? const Color(0xFFFFB74D)
+                            : const Color(0xFFE65100),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          loc.offlineBasicRecognitionBanner,
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: theme.brightness == Brightness.dark
+                                ? const Color(0xFFFFB74D)
+                                : const Color(0xFFE65100),
                           ),
                         ),
-                      )
-                    : ListView.separated(
-                    padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + MediaQuery.of(context).padding.bottom + 24),
-                    itemCount: _ranked.length + 1,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (context, i) {
-                      if (i == _ranked.length) {
-                        return _buildAddProductButton();
-                      }
+                      ),
+                    ],
+                  ),
+                ),
+              ),
 
-                      final ranked = _ranked[i];
-                      return RankedProductCard(
-                        ranked: ranked,
-                        quantity: widget.productCounts?[ranked.evaluation.product.id],
-                        onTap: () {
-                          // Navigate to the individual detail screen, passing
-                          // the full ranked set so the detail screen can show
-                          // the comparison matrix and ranking explanation for
-                          // this scan event too.
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ProductDetailScreen(
-                                product: ranked.evaluation.product,
-                                comparisonSet: _ranked,
+            // ── Product list ──────────────────────────────────────────
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _nutritionUnavailable
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 40,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              loc.nutritionDataUnavailable,
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: colorScheme.onSurfaceVariant,
                               ),
                             ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-          ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        8,
+                        16,
+                        16 + MediaQuery.of(context).padding.bottom + 24,
+                      ),
+                      itemCount: _ranked.length + 1,
+                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      itemBuilder: (context, i) {
+                        if (i == _ranked.length) {
+                          return _buildAddProductButton();
+                        }
+
+                        final ranked = _ranked[i];
+                        return RankedProductCard(
+                          ranked: ranked,
+                          totalProducts: _ranked.length,
+                          quantity: widget
+                              .productCounts?[ranked.evaluation.product.id],
+                          onTap: () {
+                            // Navigate to the individual detail screen, passing
+                            // the full ranked set so the detail screen can show
+                            // the comparison matrix and ranking explanation for
+                            // this scan event too.
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ProductDetailScreen(
+                                  product: ranked.evaluation.product,
+                                  comparisonSet: _ranked,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+            ),
           ],
         ),
       ),
@@ -744,10 +773,26 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
 
     final items = [
       (icon: Icons.home_outlined, activeIcon: Icons.home, label: loc.home),
-      (icon: Icons.qr_code_scanner_outlined, activeIcon: Icons.qr_code_scanner, label: loc.scan),
-      (icon: Icons.history_outlined, activeIcon: Icons.history, label: loc.history),
-      (icon: Icons.group_outlined, activeIcon: Icons.group, label: loc.groupTab),
-      (icon: Icons.person_outline, activeIcon: Icons.person, label: loc.profile),
+      (
+        icon: Icons.qr_code_scanner_outlined,
+        activeIcon: Icons.qr_code_scanner,
+        label: loc.scan,
+      ),
+      (
+        icon: Icons.history_outlined,
+        activeIcon: Icons.history,
+        label: loc.history,
+      ),
+      (
+        icon: Icons.group_outlined,
+        activeIcon: Icons.group,
+        label: loc.groupTab,
+      ),
+      (
+        icon: Icons.person_outline,
+        activeIcon: Icons.person,
+        label: loc.profile,
+      ),
     ];
 
     return Container(
@@ -756,7 +801,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         color: theme.cardColor,
         boxShadow: [
           BoxShadow(
-            color: theme.brightness == Brightness.dark ? Colors.black.withOpacity(0.25) : Colors.black.withOpacity(0.05),
+            color: theme.brightness == Brightness.dark
+                ? Colors.black.withOpacity(0.25)
+                : Colors.black.withOpacity(0.05),
             blurRadius: 12,
             offset: const Offset(0, -2),
           ),
@@ -800,7 +847,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         style: TextStyle(
                           fontSize: 11,
                           color: colorScheme.primary,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          fontWeight: isSelected
+                              ? FontWeight.bold
+                              : FontWeight.w500,
                         ),
                       ),
                     ],
