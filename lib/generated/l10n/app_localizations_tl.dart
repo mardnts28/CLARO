@@ -713,7 +713,7 @@ class AppLocalizationsTl extends AppLocalizations {
   String get conditionHeartCondition => 'Sakit sa puso';
 
   @override
-  String get conditionGerd => 'GERD';
+  String get conditionGerd => 'GERD (Gastroesophageal Reflux Disease)';
 
   @override
   String get conditionKidneyDisease => 'Sakit sa bato';
@@ -769,7 +769,7 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get kidneyExpertAdvice =>
-      'Mainam na kumonsulta muna sa isang expert bago uminom ng produktong ito.';
+      'Pinakamainam na kumonsulta sa isang dalubhasa upang matukoy ang tamang dami ng mga nabanggit na nutrient ng produkto para sa iyo.';
 
   @override
   String get kidneyNoNutrientsFound =>

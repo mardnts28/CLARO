@@ -704,7 +704,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get conditionHeartCondition => 'Heart condition';
 
   @override
-  String get conditionGerd => 'GERD';
+  String get conditionGerd => 'GERD (Gastroesophageal Reflux Disease)';
 
   @override
   String get conditionKidneyDisease => 'Kidney disease';
@@ -760,7 +760,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get kidneyExpertAdvice =>
-      'Best to consult with an expert before consuming this product.';
+      'Best to consult with an expert to identify the right amount of the mentioned nutrients of the product for you.';
 
   @override
   String get kidneyNoNutrientsFound =>

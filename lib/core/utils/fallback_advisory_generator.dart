@@ -73,7 +73,9 @@ class FallbackAdvisoryGenerator {
 
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.suitable,
-        warningText: isTagalog ? 'Angkop' : 'Suitable',
+        warningText: isTagalog
+            ? 'Angkop - Walang Minarkahang Nutrient o Sangkap'
+            : 'Suitable - No Flagged Nutrient or Ingredient',
         explanation: explanation,
         safeServingSize: safeServing,
         source: AdvisorySource.fallbackRuleBased,

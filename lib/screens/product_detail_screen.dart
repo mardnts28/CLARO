@@ -1764,24 +1764,27 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // sat on a light background with poor contrast. Swapping in a dark
     // tinted background + lighter accent text in dark mode keeps the
     // same "priority concern" highlighting while staying readable.
+    String capitalize(String s) =>
+        s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : s;
+
     switch (e.level) {
       case AdvisoryLevel.suitable:
         progressColor = const Color(0xFF2E7D32);
         badgeBgColor = isDark ? const Color(0xFF1B3320) : const Color(0xFFE8F5E9);
         badgeTextColor = isDark ? const Color(0xFF81C784) : const Color(0xFF2E7D32);
-        badgeLabel = 'Suitable';
+        badgeLabel = capitalize(loc.levelLow);
         break;
       case AdvisoryLevel.moderate:
         progressColor = const Color(0xFFE65100);
         badgeBgColor = isDark ? const Color(0xFF3A2A12) : const Color(0xFFFFF3E0);
         badgeTextColor = isDark ? const Color(0xFFFFB74D) : const Color(0xFFE65100);
-        badgeLabel = 'Moderate';
+        badgeLabel = capitalize(loc.levelMedium);
         break;
       case AdvisoryLevel.caution:
         progressColor = const Color(0xFFC62828);
         badgeBgColor = isDark ? const Color(0xFF3A1414) : const Color(0xFFFFEBEE);
         badgeTextColor = isDark ? const Color(0xFFEF9A9A) : const Color(0xFFC62828);
-        badgeLabel = 'Caution';
+        badgeLabel = capitalize(loc.levelHigh);
         break;
     }
 
@@ -2125,21 +2128,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     final levelLabel = _levelLabel(level);
     final effectiveAdvisory = _effectiveAdvisory(context);
-    final advisoryTitle = effectiveAdvisory?.warningText ??
-        (level == AdvisoryLevel.suitable ? loc.safeToConsume : loc.reminderLabel);
-    
-    // Remove decision word from advisoryTitle if it's duplicated at the start
-    // This handles cases where AI might include "Caution" in warningText despite instructions
-    String cleanAdvisoryTitle = advisoryTitle;
-    if (advisoryTitle.toLowerCase().startsWith('$levelLabel'.toLowerCase()) ||
-        advisoryTitle.toLowerCase().startsWith('${levelLabel.toLowerCase()}:')) {
-      cleanAdvisoryTitle = advisoryTitle.substring(levelLabel.length).trim();
-      if (cleanAdvisoryTitle.startsWith(':') || cleanAdvisoryTitle.startsWith('-')) {
-        cleanAdvisoryTitle = cleanAdvisoryTitle.substring(1).trim();
+    final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
+    final hasNoConditionsAndNoAllergens = (profile == null || profile.conditions.isEmpty) &&
+        (profile == null || profile.allergies.isEmpty) &&
+        !(_evaluation?.allergenAssessment.hasDirectAllergen ?? false);
+    final hasNoFlaggedNutrients = _evaluation == null ||
+        _evaluation!.nutrientEvaluations.every((e) => e.level == AdvisoryLevel.suitable);
+
+    String title;
+    if (level == AdvisoryLevel.suitable && hasNoConditionsAndNoAllergens && hasNoFlaggedNutrients) {
+      title = isTagalog
+          ? '$levelLabel - Walang Minarkahang Nutrient o Sangkap'
+          : '$levelLabel - No Flagged Nutrient or Ingredient';
+    } else {
+      final advisoryTitle = effectiveAdvisory?.warningText ??
+          (level == AdvisoryLevel.suitable ? loc.safeToConsume : loc.reminderLabel);
+      
+      // Remove decision word from advisoryTitle if it's duplicated at the start
+      // This handles cases where AI might include "Caution" in warningText despite instructions
+      String cleanAdvisoryTitle = advisoryTitle;
+      if (advisoryTitle.toLowerCase().startsWith('$levelLabel'.toLowerCase()) ||
+          advisoryTitle.toLowerCase().startsWith('${levelLabel.toLowerCase()}:')) {
+        cleanAdvisoryTitle = advisoryTitle.substring(levelLabel.length).trim();
+        if (cleanAdvisoryTitle.startsWith(':') || cleanAdvisoryTitle.startsWith('-')) {
+          cleanAdvisoryTitle = cleanAdvisoryTitle.substring(1).trim();
+        }
       }
+      
+      title = cleanAdvisoryTitle.isEmpty ? levelLabel : '$levelLabel - $cleanAdvisoryTitle';
     }
     
-    final title = '$levelLabel - $cleanAdvisoryTitle';
     final subtitle = effectiveAdvisory?.explanation ?? loc.safeToConsumeSubtitle;
 
     return Container(
@@ -2374,10 +2392,65 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       neutralMessage = loc.gerdNoTriggersFound;
     }
 
+    String? customIntro;
+    if (result.hasAnyNutrients) {
+      final stressNutrientNames = <String>[];
+      bool hasProtein = false;
+      for (final n in result.nutrients) {
+        switch (n.type) {
+          case KidneyNutrientType.sodium:
+            stressNutrientNames.add(tl ? 'sodium' : 'sodium');
+            break;
+          case KidneyNutrientType.potassium:
+            stressNutrientNames.add(tl ? 'potassium' : 'potassium');
+            break;
+          case KidneyNutrientType.protein:
+            hasProtein = true;
+            break;
+        }
+      }
+
+      final List<String> parts = [];
+      if (stressNutrientNames.isNotEmpty) {
+        String formattedList;
+        if (stressNutrientNames.length == 1) {
+          formattedList = stressNutrientNames[0];
+        } else if (stressNutrientNames.length == 2) {
+          formattedList = tl
+              ? '${stressNutrientNames[0]} at ${stressNutrientNames[1]}'
+              : '${stressNutrientNames[0]} and ${stressNutrientNames[1]}';
+        } else {
+          final last = stressNutrientNames.last;
+          final head = stressNutrientNames.sublist(0, stressNutrientNames.length - 1).join(', ');
+          formattedList = tl
+              ? '$head, at $last'
+              : '$head, and $last';
+        }
+        parts.add(tl
+            ? 'Ang mataas na pagkonsumo ng $formattedList ay maaaring magdulot ng stress sa kalusugan ng bato'
+            : 'High consumption of $formattedList may place stress on kidney health');
+      }
+
+      if (hasProtein) {
+        if (stressNutrientNames.isNotEmpty) {
+          parts.add(tl
+              ? ', samantalang ang protina ay dapat ikonsumo sa katamtamang dami.'
+              : ', while protein should be consumed in moderate amounts.');
+        } else {
+          parts.add(tl
+              ? 'Ang protina ay dapat ikonsumo sa katamtamang dami.'
+              : 'Protein should be consumed in moderate amounts.');
+        }
+      } else {
+        parts.add('.');
+      }
+      customIntro = parts.join('');
+    }
+
     return HealthInfoWarningCard(
       title: loc.kidneyWarningTitle,
       icon: Icons.info_outline, // Information icon as requested
-      intro: loc.kidneyWarningIntro,
+      intro: customIntro ?? loc.kidneyWarningIntro,
       items: items,
       neutralMessage: neutralMessage,
       expertAdvice: loc.kidneyExpertAdvice,

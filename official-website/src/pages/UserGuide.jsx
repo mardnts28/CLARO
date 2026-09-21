@@ -9,90 +9,90 @@ export default function UserGuide() {
     setExpandedCard(expandedCard === cardId ? null : cardId);
   };
 
-  // Products currently supported by the CLARO recognition model, as of August 14, 2026.
-  // Each category's product list is sorted alphabetically.
+  // Products currently supported by the CLARO recognition model, as of September 21, 2026.
   // Product data sourced from Ever Plus Superstore Inc., Dela Fuente St., Sampaloc, Manila
   // in early week of August 2026 with the consent and supervision of the store branch's supervisor and manager.
   const supportedProducts = [
     {
-      category: 'Canned Fish',
+      category: 'Instant Noodles',
       products: [
-        '555 Flakes in Oil Tuna',
-        '555 Fried Sardines Hot and Spicy',
-        '555 Hot and Spicy Tuna',
-        '555 Sardines Escabeche',
-        '555 Spicy Bicol Express',
-        '555 Tomato Sauce',
-        '555 Tuna Adobo',
-        '555 Tuna Caldereta',
-        'Blue Bay Corned Tuna Hot and Spicy',
-        'Blue Bay Original',
-        'Century Tuna Flakes and Oil',
-        'Century Tuna Hot and Spicy',
-        'Century Tuna with Calamansi',
-        'Golden Town Tomato Sauce',
-        'Ligo Sardines Tomato Sauce',
-        'Ligo Sardines Tomato Sauce Chili Added',
-        'Mega Sardines Tomato Sauce',
-        'Mega Sardines Tomato Sauce Chili Added',
-        'Mega Tuna Hot and Spicy'
+        'Lucky Me! Instant Mami Beef Chili Mansi',
+        'Lucky Me! Instant Mami Beef na Beef',
+        'Lucky Me! Instant Mami Chicken Chilimansi',
+        'Lucky Me! Instant Mami Chicken na Chicken',
+        'Lucky Me! Pancit Canton Chilimansi',
+        'Lucky Me! Pancit Canton Chilimansi - KASALO',
+        'Lucky Me! Pancit Canton Extra Hot Chili',
+        'Lucky Me! Pancit Canton Extra Hot Chili - KASALO',
+        'Lucky Me! Pancit Canton Kalamansi',
+        'Lucky Me! Pancit Canton Original',
+        'Lucky Me! Pancit Canton Sweet & Spicy',
+        'Lucky Me! Instant Mami Spicy Labuyo Beef',
+        'Lucky Me! Instant Mami Spicy Labuyo Chicken',
       ]
     },
     {
       category: 'Canned Meat',
       products: [
+        'Lucky 7 Carne Norte',
+        'Purefoods Chicken Luncheon Meat',
+        'Purefoods Corned Beef Hot & Spicy',
+        'Purefoods Corned Beef with Chunks',
+        'Purefoods Liver Spread',
+        "Suy Foods Chick N' De Lata Chicken Pastil",
+        "Suy Foods Chick N' De Lata Chicken Sisig",
+        "Suy Foods Chick N' De Lata Chicken Giniling",
         'Argentina Beef Loaf',
         'Argentina Corned Beef',
         'CDO Home Styled Corned Beef',
         'CDO Karne Norte Classic',
-        'LM Beef Chili Mansi',
-        'LM Beef Na Beef',
-        'LM Chicken Chili Mansi',
-        'LM Chicken Na Chicken',
-        'LM PC Chili Mansi',
-        'LM PC Chili Mansi Kasalo PCK',
-        'LM PC Extra Hot Chili',
-        'LM PC Extra Hot Chili Kasalo PCK',
-        'LM PC Kalamansi',
-        'LM PC Original',
-        'LM PC Sweet and Spicy',
-        'Lucky 7 Carne Norte',
-        'Purefoods Chicken Luncheon Meat',
-        'Purefoods Corned Beef Hot and Spicy',
-        'Purefoods Corned Beef with Chunks',
-        'Purefoods Liver Spread',
-        'San Marino Corned',
-        'San Marino Corned Chili',
-        'Spicy Labuyo Beef',
-        'Spicy Labuyo Chicken'
+      ]
+    },
+    {
+      category: 'Canned Fish',
+      products: [
+        '555 Fried Sardines Hot & Spicy',
+        '555 Fried Sardines Escabeche',
+        '555 Sardines in Tomato Sauce',
+        'Mega Sardines in Tomato Sauce with Chili Added',
+        'Golden Town Sardines in Tomato Sauce with Chili',
+        '555 Tuna Flakes in Oil',
+        '555 Hot & Spicy Tuna',
+        '555 Tuna Spicy Bicol Express',
+        '555 Tuna Adobo',
+        '555 Tuna Caldereta',
+        'Blue Bay Corned Tuna Hot & Spicy',
+        'Blue Bay Tuna Original',
+        'Century Tuna Flakes in Oil',
+        'Century Tuna Hot & Spicy',
+        'Century Tuna with Calamansi',
+        'Golden Town Sardines in Tomato Sauce',
+        'Ligo Sardines in Tomato Sauce',
+        'Ligo Sardines in Tomato Sauce with Chili Added',
+        'Mega Sardines in Tomato Sauce',
+        'Mega Tuna Hot & Spicy',
+        'San Marino Corned Tuna',
+        'San Marino Corned Tuna Chili',
       ]
     },
     {
       category: 'Canned Seafood',
       products: [
-        'Unipack Squid'
+        'Uni-Pack Squid',
+        'Saba Squid in Soy Sauce',
+        'Saba Squid in Soy Sauce with Chili',
       ]
     },
     {
       category: 'Canned Vegetables',
       products: [
-        'DM Fiesta Fruit Cocktail',
-        'DM Fruit Cocktail Heavy Syrup',
-        'DM Pineapple Tidbits',
-        'Jolly Mushroom',
         'Mega Prime Green Peas',
-        'Ram Green Peas',
-        'Saba Soy Sauce',
-        'Saba Soy Sauce with Chili',
-        'UFC Green Peas'
-      ]
-    },
-    {
-      category: 'Instant Noodles',
-      products: [
-        'Suy Foods Chick-N-De-Lata Chicken Giniling',
-        'Suy Foods Chick-N-De-Lata Chicken Pastil',
-        'Suy Foods Chick-N-De-Lata Chicken Sisig'
+        'RAM Green Peas',
+        'Jolly Mushrooms',
+        'UFC Green Peas',
+        'Del Monte Fiesta Fruit Cocktail',
+        'Del Monte Fruit Cocktail in Heavy Syrup',
+        'Del Monte Pineapple Tidbits',
       ]
     }
   ];
@@ -120,7 +120,7 @@ export default function UserGuide() {
             </li>
             <li>
               <strong>Capture</strong>
-              <p>Let the auto-capture trigger when the product is steadily within the frame.</p>
+              <p>Tap anywhere on the camera screen when the product is properly positioned to confirm capture</p>
             </li>
             <li>
               <strong>Get Results</strong>
@@ -368,9 +368,9 @@ export default function UserGuide() {
           </div>
 
           <div className="result-section">
-            <h5>Products Currently Supported by the Recognition Model — As of August 14, 2026</h5>
+            <h5>Products Currently Supported by the Recognition Model — As of September 21, 2026</h5>
             <p className="supported-products-date">
-              The list below reflects the products CLARO's recognition model can currently identify, as of <strong>August 14, 2026</strong>. These products were sourced from <strong>Ever Plus Superstore Inc., Dela Fuente St., Sampaloc, Manila</strong> in the early week of August 2026 with the consent and supervision of the store branch's supervisor and manager. If a product isn't listed here, please submit a report so we can add it.
+              The list below reflects the products CLARO's recognition model can currently identify, as of <strong>September 21, 2026</strong>. These products were sourced from <strong>Ever Plus Superstore Inc., Dela Fuente St., Sampaloc, Manila</strong> in the early week of August 2026 with the consent and supervision of the store branch's supervisor and manager. If a product isn't listed here, please submit a report so we can add it.
             </p>
             <div className="supported-products-grid">
               {supportedProducts.map((group) => (
