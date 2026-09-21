@@ -295,7 +295,8 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                           HapticService().vibrate();
                           setState(() => _vibrationFeedback = v);
                           final ok = await _savePref('vibrationFeedback', v);
-                          if (!ok && mounted) {
+                          if (!context.mounted) return;
+                          if (!ok) {
                             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
                           }
                         },
@@ -334,9 +335,10 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                             setState(() => _textSize = v);
                             // Use TextSizeService to update and sync in real-time
                             await TextSizeService.instance.updateTextSize(v);
-                            if (!mounted) return;
+                            if (!context.mounted) return;
                             final ok = await _savePref('textSize', v);
-                            if (!ok && mounted) {
+                            if (!context.mounted) return;
+                            if (!ok) {
                               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
                             }
                           },

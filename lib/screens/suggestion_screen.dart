@@ -75,16 +75,15 @@ class _SuggestionScreenState extends State<SuggestionScreen> {
     }
 
     final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!mounted) return;
     if (!hasInternet) {
       setState(() => _submitting = false);
-      if (mounted) {
-        await SuccessFeedbackUtils.showOfflineNoticeDialog(
-          context,
-          title: loc.noInternetTitle,
-          message: loc.noInternetReviewMessage,
-          buttonText: loc.gotIt,
-        );
-      }
+      await SuccessFeedbackUtils.showOfflineNoticeDialog(
+        context,
+        title: loc.noInternetTitle,
+        message: loc.noInternetReviewMessage,
+        buttonText: loc.gotIt,
+      );
       return;
     }
 

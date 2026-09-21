@@ -765,7 +765,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   await setAppThemeMode(parseThemeMode(theme));
                   await _authService.updateUserData({'theme': theme});
                 },
-                activeColor: primaryColor,
+                activeThumbColor: primaryColor,
               );
             },
           ),
@@ -802,39 +802,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 12),
           ValueListenableBuilder<bool>(
             valueListenable: AuthService.mfaNotifier,
-            builder: (context, mfaEnabled, _) {
+            builder: (_, mfaEnabled, __) {
               return Switch(
                 value: mfaEnabled,
                 onChanged: (value) async {
                   HapticService().vibrate();
                   final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+                  if (!mounted) return;
                   if (!hasInternet) {
-                    if (mounted) {
-                      await SuccessFeedbackUtils.showOfflineNoticeDialog(
-                        context,
-                        title: loc.noInternetTitle,
-                        message: loc.noInternetActionMessage,
-                        buttonText: loc.gotIt,
-                      );
-                    }
+                    await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                      context,
+                      title: loc.noInternetTitle,
+                      message: loc.noInternetActionMessage,
+                      buttonText: loc.gotIt,
+                    );
                     return;
                   }
                   setState(() => _mfaEnabled = value);
                   try {
                     await _authService.setMfaEnabled(enabled: value);
                   } catch (_) {
+                    if (!mounted) return;
                     setState(() => _mfaEnabled = !value);
-                    if (mounted) {
-                      await SuccessFeedbackUtils.showOfflineNoticeDialog(
-                        context,
-                        title: loc.noInternetTitle,
-                        message: loc.noInternetActionMessage,
-                        buttonText: loc.gotIt,
-                      );
-                    }
+                    await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                      context,
+                      title: loc.noInternetTitle,
+                      message: loc.noInternetActionMessage,
+                      buttonText: loc.gotIt,
+                    );
                   }
                 },
-                activeColor: primaryColor,
+                activeThumbColor: primaryColor,
               );
             },
           ),
@@ -869,7 +867,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(width: 12),
           ValueListenableBuilder<bool>(
             valueListenable: VoiceAssistantService.isEnabledNotifier,
-            builder: (context, isVoiceEnabled, _) {
+            builder: (_, isVoiceEnabled, __) {
               return Switch(
                 value: isVoiceEnabled,
                 onChanged: (value) async {
@@ -878,16 +876,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   setState(() => _voiceAssistantEnabled = value);
                   await VoiceAssistantService.instance.updateEnabled(value);
                   final ok = await _updateUserPreference('voiceAssistant', value);
+                  if (!mounted) return;
                   if (!ok) {
                     // revert and inform
                     setState(() => _voiceAssistantEnabled = previous);
                     await VoiceAssistantService.instance.updateEnabled(previous);
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
-                    }
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
                   }
                 },
-                activeColor: primaryColor,
+                activeThumbColor: primaryColor,
               );
             },
           ),

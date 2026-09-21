@@ -102,6 +102,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         AuthService.pendingMfaChallenge.value = null;
         AuthService.isAuthenticating.value = false;
         await _authService.signOut();
+        if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
