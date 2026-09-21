@@ -69,6 +69,8 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     'Diabetes': false,
     'Hypertension': false,
     'Heart condition': false,
+    'GERD': false,
+    'Kidney disease': false,
     'Low vision': false,
     'None': false,
   };
@@ -86,6 +88,8 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     'Diabetes': Icons.bloodtype_outlined,
     'Hypertension': Icons.monitor_heart_outlined,
     'Heart condition': Icons.favorite_border,
+    'GERD': Icons.local_fire_department_outlined,
+    'Kidney disease': Icons.water_drop_outlined,
     'Low vision': Icons.visibility_off_outlined,
     'None': Icons.block,
   };
@@ -117,6 +121,10 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
         return loc.conditionHypertension;
       case 'Heart condition':
         return loc.conditionHeartCondition;
+      case 'GERD':
+        return loc.conditionGerd;
+      case 'Kidney disease':
+        return loc.conditionKidneyDisease;
       case 'Low vision':
         return loc.conditionLowVision;
       case 'None':
@@ -203,6 +211,10 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
         return 'Hypertension';
       case HealthCondition.heartCondition:
         return 'Heart condition';
+      case HealthCondition.gerd:
+        return 'GERD';
+      case HealthCondition.kidneyDisease:
+        return 'Kidney disease';
     }
   }
 

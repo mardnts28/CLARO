@@ -259,6 +259,10 @@ $jsonFields
         return 'diabetes';
       case HealthCondition.heartCondition:
         return 'heart condition';
+      case HealthCondition.gerd:
+        return 'GERD';
+      case HealthCondition.kidneyDisease:
+        return 'kidney disease';
     }
   }
 

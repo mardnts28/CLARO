@@ -67,6 +67,7 @@ flutter:
     - assets/images/
     - assets/images/relations/
     - assets/images/avatars/
+    - assets/images/learn-more/
     - assets/model/
     - .env
 

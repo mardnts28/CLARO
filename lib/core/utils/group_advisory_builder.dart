@@ -440,6 +440,8 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
         HealthCondition.hypertension => 'hypertension',
         HealthCondition.diabetes => 'diabetes',
         HealthCondition.heartCondition => 'heart condition',
+        HealthCondition.gerd => 'GERD',
+        HealthCondition.kidneyDisease => 'kidney disease',
       };
 
   static String _nutrientLabel(String key) => switch (key) {

@@ -128,7 +128,7 @@ class NutritionGuideScreen extends StatelessWidget {
       children: [
         _buildHeroImage(
           context,
-          'assets/images/fdaimg.png',
+          'assets/images/learn-more/fdaimg.png',
         ),
 
         const SizedBox(height: 20),
@@ -276,7 +276,7 @@ class NutritionGuideScreen extends StatelessWidget {
       children: [
         _buildHeroImage(
           context,
-          'assets/images/whoimg.png',
+          'assets/images/learn-more/whoimg.png',
         ),
 
         const SizedBox(height: 20),

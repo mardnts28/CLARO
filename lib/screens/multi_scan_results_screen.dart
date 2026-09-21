@@ -159,6 +159,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         return loc.conditionDiabetes;
       case HealthCondition.heartCondition:
         return loc.conditionHeartCondition;
+      case HealthCondition.gerd:
+        return loc.conditionGerd;
+      case HealthCondition.kidneyDisease:
+        return loc.conditionKidneyDisease;
     }
   }
 
@@ -203,7 +207,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                   _selectConditionFilter(value);
                 },
               ),
-              for (final condition in HealthCondition.values)
+              // Only scored conditions can re-rank products; GERD / Kidney
+              // Disease are awareness-only and are not offered here.
+              for (final condition
+                  in HealthCondition.values.where((c) => c.isScored))
                 RadioListTile<HealthCondition?>(
                   value: condition,
                   groupValue: _selectedCondition,

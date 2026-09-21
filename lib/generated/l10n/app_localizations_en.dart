@@ -126,6 +126,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get whoCardSource => 'by WHO';
 
   @override
+  String get healthConditionsSubtitle =>
+      'Information about food and nutrients associated to GERD and Kidney diseases.';
+
+  @override
+  String get kidneyCardTitle => 'Healthy Eating for Kidney Disease';
+
+  @override
+  String get kidneyCardSource => 'by NIDDK';
+
+  @override
+  String get gerdCardTitle => 'Eating, Diet, & Nutrition for GERD';
+
+  @override
+  String get gerdCardSource => 'by NIDDK';
+
+  @override
   String get healthGradeTitle => 'Food health rating';
 
   @override
@@ -686,6 +702,85 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get conditionHeartCondition => 'Heart condition';
+
+  @override
+  String get conditionGerd => 'GERD';
+
+  @override
+  String get conditionKidneyDisease => 'Kidney disease';
+
+  @override
+  String get gerdWarningTitle => 'GERD Warning';
+
+  @override
+  String get gerdWarningIntro =>
+      'This product contains ingredients that may trigger or worsen GERD symptoms. The detected ingredient(s) listed below are commonly associated with acid reflux.';
+
+  @override
+  String get gerdNoTriggersFound =>
+      'No common GERD triggers detected from the available product information.';
+
+  @override
+  String get gerdInsufficientData =>
+      'There isn\'t enough ingredient or nutrition information for this product to check for common GERD triggers.';
+
+  @override
+  String get gerdDisclaimer =>
+      'This is general information, not a diagnosis or medical advice. If you experience symptoms, consult your doctor.';
+
+  @override
+  String get gerdExpertAdvice =>
+      'Best to consult with an expert before consuming this product.';
+
+  @override
+  String get gerdTriggerTomatoAcidic => 'Tomato / acidic ingredient';
+
+  @override
+  String get gerdTriggerSpicy => 'Spicy ingredient';
+
+  @override
+  String get gerdTriggerCaffeine => 'Caffeine';
+
+  @override
+  String get gerdTriggerChocolate => 'Chocolate / cocoa';
+
+  @override
+  String get gerdTriggerHighFat => 'High fat content';
+
+  @override
+  String get kidneyWarningTitle => 'Kidney Disease Warning';
+
+  @override
+  String get kidneyWarningIntro =>
+      'These nutrients may be relevant to kidney health. Individual dietary needs vary depending on the person\'s kidney condition.';
+
+  @override
+  String get kidneyDisclaimer =>
+      'This is general information, not a diagnosis or medical advice. Consult your healthcare provider for personalized dietary guidance.';
+
+  @override
+  String get kidneyExpertAdvice =>
+      'Best to consult with an expert before consuming this product.';
+
+  @override
+  String get kidneyNoNutrientsFound =>
+      'No kidney-relevant nutrients detected from the available product information.';
+
+  @override
+  String get kidneyNutrientSodium => 'Sodium';
+
+  @override
+  String get kidneyNutrientPotassium => 'Potassium';
+
+  @override
+  String get kidneyNutrientProtein => 'Protein';
+
+  @override
+  String get combinedGerdKidneyWarningTitle => 'GERD and Kidney Disease Warning';
+
+  @override
+  String get combinedGerdKidneyIntro =>
+      'This product contains ingredients or nutrients that may be relevant to both GERD and kidney health. Individual dietary needs vary depending on the person\'s conditions.';
 
   @override
   String get conditionLowVision => 'Low vision';

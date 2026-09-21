@@ -127,6 +127,22 @@ class AppLocalizationsTl extends AppLocalizations {
   String get whoCardSource => 'ng WHO';
 
   @override
+  String get healthConditionsSubtitle =>
+      'Impormasyon tungkol sa pagkain at nutrients na may kaugnayan sa GERD at sakit sa bato.';
+
+  @override
+  String get kidneyCardTitle => 'Malusog na Pagkain para sa Sakit sa Bato';
+
+  @override
+  String get kidneyCardSource => 'ng NIDDK';
+
+  @override
+  String get gerdCardTitle => 'Pagkain, Diyeta, at Nutrisyon para sa GERD';
+
+  @override
+  String get gerdCardSource => 'ng NIDDK';
+
+  @override
   String get healthGradeTitle => 'Sukat ng kalusugan ng pagkain';
 
   @override
@@ -695,6 +711,85 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get conditionHeartCondition => 'Sakit sa puso';
+
+  @override
+  String get conditionGerd => 'GERD';
+
+  @override
+  String get conditionKidneyDisease => 'Sakit sa bato';
+
+  @override
+  String get gerdWarningTitle => 'Babala sa GERD';
+
+  @override
+  String get gerdWarningIntro =>
+      'Ang produktong ito ay naglalaman ng mga sangkap na maaaring mag-trigger o magpalala ng sintomas ng GERD. Ang mga sangkap na nasa ibaba ay kadalasang nauugnay sa acid reflux.';
+
+  @override
+  String get gerdNoTriggersFound =>
+      'Walang karaniwang GERD trigger na natukoy mula sa available na impormasyon ng produkto.';
+
+  @override
+  String get gerdInsufficientData =>
+      'Hindi sapat ang impormasyon sa sangkap o nutrition ng produktong ito para masuri ang mga karaniwang GERD trigger.';
+
+  @override
+  String get gerdDisclaimer =>
+      'Pangkalahatang impormasyon lamang ito, hindi diagnosis o medical advice. Kung nakakaranas ka ng sintomas, kumonsulta sa iyong doktor.';
+
+  @override
+  String get gerdExpertAdvice =>
+      'Mainam na kumonsulta muna sa isang expert bago uminom ng produktong ito.';
+
+  @override
+  String get gerdTriggerTomatoAcidic => 'Tomato / maasim na sangkap';
+
+  @override
+  String get gerdTriggerSpicy => 'Maanghang na sangkap';
+
+  @override
+  String get gerdTriggerCaffeine => 'Caffeine';
+
+  @override
+  String get gerdTriggerChocolate => 'Chocolate / cacao';
+
+  @override
+  String get gerdTriggerHighFat => 'Mataas na taba (fat)';
+
+  @override
+  String get kidneyWarningTitle => 'Babala sa Sakit sa Bato';
+
+  @override
+  String get kidneyWarningIntro =>
+      'Ang mga nutrients na ito ay maaaring may kaugnayan sa kalusugan ng bato. Nagkakaiba-iba ang pangangailangan sa diyeta ng bawat tao depende sa kanilang kondisyon sa bato.';
+
+  @override
+  String get kidneyDisclaimer =>
+      'Pangkalahatang impormasyon lamang ito, hindi diagnosis o medical advice. Kumonsulta sa iyong healthcare provider para sa personalized na gabay sa diyeta.';
+
+  @override
+  String get kidneyExpertAdvice =>
+      'Mainam na kumonsulta muna sa isang expert bago uminom ng produktong ito.';
+
+  @override
+  String get kidneyNoNutrientsFound =>
+      'Walang nutrients na may kaugnayan sa bato ang natukoy mula sa available na impormasyon ng produkto.';
+
+  @override
+  String get kidneyNutrientSodium => 'Sodium';
+
+  @override
+  String get kidneyNutrientPotassium => 'Potassium';
+
+  @override
+  String get kidneyNutrientProtein => 'Protein';
+
+  @override
+  String get combinedGerdKidneyWarningTitle => 'Babala sa GERD at Sakit sa Bato';
+
+  @override
+  String get combinedGerdKidneyIntro =>
+      'Ang produktong ito ay naglalaman ng mga sangkap o nutrients na maaaring may kaugnayan sa parehong GERD at kalusugan ng bato. Nagkakaiba-iba ang pangangailangan sa diyeta ng bawat tao depende sa kanilang mga kondisyon.';
 
   @override
   String get conditionLowVision => 'Mababang Paningin';

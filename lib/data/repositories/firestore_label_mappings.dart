@@ -41,6 +41,9 @@ final Map<String, HealthCondition> _conditionLabelMap = {
   _normalize('Hypertension'): HealthCondition.hypertension,
   _normalize('Sakit sa puso'): HealthCondition.heartCondition,
   _normalize('Heart Condition'): HealthCondition.heartCondition,
+  _normalize('GERD'): HealthCondition.gerd,
+  _normalize('Kidney Disease'): HealthCondition.kidneyDisease,
+  _normalize('Sakit sa bato'): HealthCondition.kidneyDisease,
 };
 
 final Map<String, AllergenType> _allergenLabelMap = {

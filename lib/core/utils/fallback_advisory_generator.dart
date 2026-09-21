@@ -278,6 +278,10 @@ class FallbackAdvisoryGenerator {
         return 'diabetes';
       case HealthCondition.heartCondition:
         return isTagalog ? 'kondisyon sa puso' : 'heart condition';
+      case HealthCondition.gerd:
+        return 'GERD';
+      case HealthCondition.kidneyDisease:
+        return isTagalog ? 'sakit sa bato' : 'kidney disease';
     }
   }
 

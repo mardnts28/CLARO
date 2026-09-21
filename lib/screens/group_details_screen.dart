@@ -232,6 +232,10 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
         return loc.conditionHypertension;
       case HealthCondition.heartCondition:
         return loc.conditionHeartCondition;
+      case HealthCondition.gerd:
+        return loc.conditionGerd;
+      case HealthCondition.kidneyDisease:
+        return loc.conditionKidneyDisease;
     }
   }
 

@@ -181,8 +181,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         // computed against the full profile above, so this matches the
         // list just shown -- it's the same ranking, just reflected in
         // the filter UI's default state.
+        // GERD / Kidney Disease are awareness-only (no scoring), so they
+        // are never offered as ranking filters.
         _selectedConditions = HealthCondition.values
-            .where(profile.conditions.contains)
+            .where((c) => c.isScored && profile.conditions.contains(c))
             .toSet();
       });
 
@@ -450,6 +452,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         return loc.conditionDiabetes;
       case HealthCondition.heartCondition:
         return loc.conditionHeartCondition;
+      case HealthCondition.gerd:
+        return loc.conditionGerd;
+      case HealthCondition.kidneyDisease:
+        return loc.conditionKidneyDisease;
     }
   }
 
@@ -529,7 +535,8 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                     // Multi-select: any combination of the 3 conditions
                     // can be checked at once (e.g. Diabetes + Heart
                     // Condition together).
-                    for (final condition in HealthCondition.values)
+                    for (final condition
+                        in HealthCondition.values.where((c) => c.isScored))
                       CheckboxListTile(
                         value: tempConditions.contains(condition),
                         activeColor: colorScheme.primary,

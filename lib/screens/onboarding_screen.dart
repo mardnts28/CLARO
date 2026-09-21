@@ -61,6 +61,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Diabetes': false,
     'Alta-presyon': false,
     'Sakit sa puso': false,
+    'GERD': false,
+    'Sakit sa bato': false,
     'Mababang Paningin': false,
     'Wala': false,
   };
@@ -83,6 +85,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Wala': '',
   };
 
+  // Built-in Material icons for the conditions that have no PNG asset yet
+  // (GERD, Kidney Disease). If you later add assets/images/gerd.png /
+  // bato.png, move them into _conditionIcons above and delete these.
+  final Map<String, IconData> _conditionFallbackIcons = {
+    'GERD': Icons.local_fire_department_outlined,
+    'Sakit sa bato': Icons.water_drop_outlined,
+  };
+
   final Map<String, String> _allergenIcons = {
     'Isda': 'assets/images/isda.png',
     'Gatas': 'assets/images/gatas.png',
@@ -100,6 +110,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Diabetes': loc.conditionDiabetes,
     'Alta-presyon': loc.conditionHypertension,
     'Sakit sa puso': loc.conditionHeartCondition,
+    'GERD': loc.conditionGerd,
+    'Sakit sa bato': loc.conditionKidneyDisease,
     'Mababang Paningin': loc.conditionLowVision,
     'Wala': loc.conditionNone,
   };
@@ -589,6 +601,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             selected: selected,
             isWala: isWala,
             imagePath: isWala ? null : _conditionIcons[key],
+            icon: isWala ? null : _conditionFallbackIcons[key],
             theme: theme,
           ),
         );
@@ -629,6 +642,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required bool selected,
     bool isWala = false,
     String? imagePath,
+    IconData? icon,
     required ThemeData theme,
   }) {
     final colorScheme = theme.colorScheme;
@@ -659,6 +673,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         Icons.image_not_supported,
                         size: 28,
                         color: colorScheme.onSurfaceVariant),
+                  )
+                else if (icon != null)
+                  SizedBox(
+                    height: 32,
+                    width: 32,
+                    child: Icon(
+                      icon,
+                      size: 28,
+                      color: selected
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
+                    ),
                   )
                 else
                   const SizedBox(height: 32),

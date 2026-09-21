@@ -314,6 +314,36 @@ abstract class AppLocalizations {
   /// **'by WHO'**
   String get whoCardSource;
 
+  /// No description provided for @healthConditionsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Information about food and nutrients associated to GERD and Kidney diseases.'**
+  String get healthConditionsSubtitle;
+
+  /// No description provided for @kidneyCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Healthy Eating for Kidney Disease'**
+  String get kidneyCardTitle;
+
+  /// No description provided for @kidneyCardSource.
+  ///
+  /// In en, this message translates to:
+  /// **'by NIDDK'**
+  String get kidneyCardSource;
+
+  /// No description provided for @gerdCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Eating, Diet, & Nutrition for GERD'**
+  String get gerdCardTitle;
+
+  /// No description provided for @gerdCardSource.
+  ///
+  /// In en, this message translates to:
+  /// **'by NIDDK'**
+  String get gerdCardSource;
+
   /// No description provided for @healthGradeTitle.
   ///
   /// In en, this message translates to:
@@ -1387,6 +1417,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Heart condition'**
   String get conditionHeartCondition;
+
+  /// No description provided for @conditionGerd.
+  ///
+  /// In en, this message translates to:
+  /// **'GERD'**
+  String get conditionGerd;
+
+  /// No description provided for @conditionKidneyDisease.
+  ///
+  /// In en, this message translates to:
+  /// **'Kidney disease'**
+  String get conditionKidneyDisease;
+
+  /// Title of the awareness-only GERD Warning card on the product detail screen.
+  ///
+  /// In en, this message translates to:
+  /// **'GERD Warning'**
+  String get gerdWarningTitle;
+
+  /// Intro shown on the GERD Warning card when at least one potential trigger was detected.
+  ///
+  /// In en, this message translates to:
+  /// **'This product contains ingredients or nutrients that are commonly reported as GERD triggers. Reactions to these vary from person to person.'**
+  String get gerdWarningIntro;
+
+  /// Shown on the GERD Warning card when the user has GERD but no common triggers were detected.
+  ///
+  /// In en, this message translates to:
+  /// **'No common GERD triggers detected from the available product information.'**
+  String get gerdNoTriggersFound;
+
+  /// Shown on the GERD Warning card when there isn't enough ingredient/nutrition data to check.
+  ///
+  /// In en, this message translates to:
+  /// **'There isn\'t enough ingredient or nutrition information for this product to check for common GERD triggers.'**
+  String get gerdInsufficientData;
+
+  /// Disclaimer footer on the GERD Warning card.
+  ///
+  /// In en, this message translates to:
+  /// **'This is general information, not a diagnosis or medical advice. If you experience symptoms, consult your doctor.'**
+  String get gerdDisclaimer;
+
+  /// Expert consultation advice shown on the GERD Warning card.
+  ///
+  /// In en, this message translates to:
+  /// **'Best to consult with an expert before consuming this product.'**
+  String get gerdExpertAdvice;
+
+  /// GERD trigger label: tomato / acidic ingredients.
+  ///
+  /// In en, this message translates to:
+  /// **'Tomato / acidic ingredient'**
+  String get gerdTriggerTomatoAcidic;
+
+  /// GERD trigger label: spicy ingredients.
+  ///
+  /// In en, this message translates to:
+  /// **'Spicy ingredient'**
+  String get gerdTriggerSpicy;
+
+  /// GERD trigger label: caffeine.
+  ///
+  /// In en, this message translates to:
+  /// **'Caffeine'**
+  String get gerdTriggerCaffeine;
+
+  /// GERD trigger label: chocolate / cocoa.
+  ///
+  /// In en, this message translates to:
+  /// **'Chocolate / cocoa'**
+  String get gerdTriggerChocolate;
+
+  /// GERD trigger label: high fat content, shown with the measured grams.
+  ///
+  /// In en, this message translates to:
+  /// **'High fat content'**
+  String get gerdTriggerHighFat;
+
+  /// Title of the awareness-only Kidney Disease Warning card on the product detail screen.
+  ///
+  /// In en, this message translates to:
+  /// **'Kidney Disease Warning'**
+  String get kidneyWarningTitle;
+
+  /// Intro shown on the Kidney Disease Warning card.
+  ///
+  /// In en, this message translates to:
+  /// **'These nutrients may be relevant to kidney health. Individual dietary needs vary depending on the person's kidney condition.'**
+  String get kidneyWarningIntro;
+
+  /// Disclaimer footer on the Kidney Disease Warning card.
+  ///
+  /// In en, this message translates to:
+  /// **'This is general information, not a diagnosis or medical advice. Consult your healthcare provider for personalized dietary guidance.'**
+  String get kidneyDisclaimer;
+
+  /// Expert consultation advice shown on the Kidney Disease Warning card.
+  ///
+  /// In en, this message translates to:
+  /// **'Best to consult with an expert before consuming this product.'**
+  String get kidneyExpertAdvice;
+
+  /// Shown on the Kidney Disease Warning card when the user has kidney disease but no kidney-relevant nutrients were detected.
+  ///
+  /// In en, this message translates to:
+  /// **'No kidney-relevant nutrients detected from the available product information.'**
+  String get kidneyNoNutrientsFound;
+
+  /// Kidney nutrient label: sodium.
+  ///
+  /// In en, this message translates to:
+  /// **'Sodium'**
+  String get kidneyNutrientSodium;
+
+  /// Kidney nutrient label: potassium.
+  ///
+  /// In en, this message translates to:
+  /// **'Potassium'**
+  String get kidneyNutrientPotassium;
+
+  /// Kidney nutrient label: protein.
+  ///
+  /// In en, this message translates to:
+  /// **'Protein'**
+  String get kidneyNutrientProtein;
+
+  /// Title of the combined GERD and Kidney Disease Warning card.
+  ///
+  /// In en, this message translates to:
+  /// **'GERD and Kidney Disease Warning'**
+  String get combinedGerdKidneyWarningTitle;
+
+  /// Intro shown on the combined GERD and Kidney Disease Warning card.
+  ///
+  /// In en, this message translates to:
+  /// **'This product contains ingredients or nutrients that may be relevant to both GERD and kidney health. Individual dietary needs vary depending on the person's conditions.'**
+  String get combinedGerdKidneyIntro;
 
   /// No description provided for @conditionLowVision.
   ///

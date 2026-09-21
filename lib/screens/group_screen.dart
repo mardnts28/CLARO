@@ -310,61 +310,155 @@ class _GroupScreenState extends State<GroupScreen> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
-      child: Material(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
+      child: Dismissible(
+        key: Key(group.id),
+        direction: DismissDirection.endToStart,
+        background: Container(
+          alignment: Alignment.centerRight,
+          padding: const EdgeInsets.only(right: 20),
+          decoration: BoxDecoration(
+            color: colorScheme.error,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Icon(Icons.delete_outline, color: colorScheme.onError, size: 26),
+        ),
+        onDismissed: (_) async {
+          // Only allow deletion if the user is the owner
+          if (!isOwner) {
+            // If not owner, show a message that only owners can delete
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(loc.deleteGroupDisabledHint)),
+              );
+            }
+            // Reload to restore the card
+            await _load();
+            return;
+          }
+
+          // Check if group has other members before allowing deletion
+          try {
+            final memberProfiles = await _groupRepository.getGroupMemberProfiles(group.id);
+            // Check if there are other members besides the current user (owner)
+            // The owner is always included in memberProfiles, so count > 1 means there are other members
+            final hasOtherMembers = memberProfiles.length > 1;
+
+            if (hasOtherMembers) {
+              // Show error message - need to remove other members first
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(loc.deleteGroupDisabledHint)),
+                );
+              }
+              // Reload to restore the card
+              await _load();
+              return;
+            }
+
+            // Show confirmation dialog
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: Text(loc.deleteGroupConfirmTitle),
+                content: Text(loc.deleteGroupConfirmMessage),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(loc.cancel),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(loc.deleteGroupButton, style: TextStyle(color: colorScheme.error)),
+                  ),
+                ],
+              ),
+            );
+
+            if (confirmed == true) {
+              try {
+                await _groupRepository.deleteGroup(groupId: group.id, requestingUid: uid!);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(loc.deleteGroupSuccess)),
+                  );
+                }
+                // Reload the list
+                await _load();
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Error deleting group: $e')),
+                  );
+                }
+                // Reload to restore the card if deletion failed
+                await _load();
+              }
+            } else {
+              // User cancelled, reload to restore the card
+              await _load();
+            }
+          } catch (e) {
+            debugPrint('Error checking group members: $e');
+            // Reload to restore the card if there was an error
+            await _load();
+          }
+        },
+        child: Material(
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(16),
-          onTap: () => _openGroup(group),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: theme.dividerColor),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withOpacity(0.12),
-                    shape: BoxShape.circle,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _openGroup(group),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: theme.dividerColor),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    // The group's chosen type icon replaces the placeholder;
+                    // older groups without a type keep the original icon.
+                    child: group.groupType != null
+                        ? Center(
+                            child: GroupTypeUi.icon(
+                              context,
+                              group.groupType!,
+                              size: 28,
+                              color: colorScheme.primary,
+                            ),
+                          )
+                        : Icon(Icons.group, color: colorScheme.primary),
                   ),
-                  // The group's chosen type icon replaces the placeholder;
-                  // older groups without a type keep the original icon.
-                  child: group.groupType != null
-                      ? Center(
-                          child: GroupTypeUi.icon(
-                            context,
-                            group.groupType!,
-                            size: 28,
-                            color: colorScheme.primary,
-                          ),
-                        )
-                      : Icon(Icons.group, color: colorScheme.primary),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        group.name,
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isOwner ? loc.groupOwnerLabel : loc.groupMemberLabel,
-                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-                      ),
-                    ],
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group.name,
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isOwner ? loc.groupOwnerLabel : loc.groupMemberLabel,
+                          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
-              ],
+                  Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+                ],
+              ),
             ),
           ),
         ),

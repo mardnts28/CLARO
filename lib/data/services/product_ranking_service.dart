@@ -309,9 +309,13 @@ class ProductRankingService {
   }
 
   String _getConditionName(UserHealthProfile user) {
-    if (user.conditions.isEmpty) return '';
+    // Only scored conditions are named in ranking explanations -- GERD /
+    // Kidney Disease are awareness-only, so a sentence like "suitable for
+    // your GERD" must never be produced.
+    final scored = user.conditions.where((c) => c.isScored).toList();
+    if (scored.isEmpty) return '';
 
-    final conditions = user.conditions.map((c) {
+    final conditions = scored.map((c) {
       switch (c) {
         case HealthCondition.hypertension:
           return 'hypertension';
@@ -319,6 +323,10 @@ class ProductRankingService {
           return 'diabetes';
         case HealthCondition.heartCondition:
           return 'heart condition';
+        case HealthCondition.gerd:
+          return 'GERD';
+        case HealthCondition.kidneyDisease:
+          return 'kidney disease';
       }
     }).toList();
 

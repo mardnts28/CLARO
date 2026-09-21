@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../services/home_tab_controller.dart';
@@ -1359,7 +1360,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: _buildInformationCard(
                 imagePath:
-                    'assets/images/fdaimg.png',
+                    'assets/images/learn-more/fdaimg.png',
 
                 title: loc.fdaCardTitle,
 
@@ -1388,7 +1389,7 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: _buildInformationCard(
                 imagePath:
-                    'assets/images/whoimg.png',
+                    'assets/images/learn-more/whoimg.png',
 
                 title: loc.whoCardTitle,
 
@@ -1413,8 +1414,63 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+
+        const SizedBox(height: 20),
+
+        // Health conditions section description
+        Text(
+          loc.healthConditionsSubtitle,
+          style: TextStyle(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 12.5,
+            height: 1.4,
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
+        // Kidney + GERD cards
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: _buildInformationCard(
+                imagePath: 'assets/images/learn-more/niddkdimg.png',
+                title: loc.kidneyCardTitle,
+                source: loc.kidneyCardSource,
+                onTap: () {
+                  HapticService().vibrate();
+                  _launchUrl('https://www.niddk.nih.gov/health-information/kidney-disease/chronic-kidney-disease-ckd/healthy-eating-adults-chronic-kidney-disease');
+                },
+              ),
+            ),
+
+            const SizedBox(width: 12),
+
+            Expanded(
+              child: _buildInformationCard(
+                imagePath: 'assets/images/learn-more/niddkdimg.png',
+                title: loc.gerdCardTitle,
+                source: loc.gerdCardSource,
+                onTap: () {
+                  HapticService().vibrate();
+                  _launchUrl('https://www.niddk.nih.gov/health-information/digestive-diseases/acid-reflux-ger-gerd-adults/eating-diet-nutrition');
+                },
+              ),
+            ),
+          ],
+        ),
       ],
     );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      debugPrint('Could not launch $url');
+    }
   }
 
   // -------------------------------------------------------------------------

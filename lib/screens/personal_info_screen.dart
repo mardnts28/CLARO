@@ -222,6 +222,8 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
             'Diabetes': conditionsList.contains('Diabetes') || conditionsList.contains('Diabetes'),
             'Hypertension': conditionsList.contains('Hypertension') || conditionsList.contains('Alta-presyon'),
             'Heart condition': conditionsList.contains('Heart condition') || conditionsList.contains('Sakit sa puso'),
+            'GERD': conditionsList.contains('GERD'),
+            'Kidney disease': conditionsList.contains('Kidney disease') || conditionsList.contains('Kidney Disease') || conditionsList.contains('Sakit sa bato'),
             'Low vision': conditionsList.contains('Low vision') || conditionsList.contains('Mababang Paningin'),
             'None': conditionsList.contains('None') || conditionsList.contains('Wala'),
           };
@@ -470,6 +472,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         return loc.conditionHypertension;
       case 'Heart condition':
         return loc.conditionHeartCondition;
+      case 'GERD':
+        return loc.conditionGerd;
+      case 'Kidney disease':
+        return loc.conditionKidneyDisease;
       case 'Low vision':
         return loc.conditionLowVision;
       case 'None':

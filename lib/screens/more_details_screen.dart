@@ -8,6 +8,7 @@ import '../data/models/health_profile.dart';
 import '../core/constants/who_fda_thresholds.dart';
 import '../core/utils/who_calculator.dart';
 import '../core/utils/number_format_utils.dart';
+import '../core/utils/gerd_trigger_detector.dart';
 import '../services/voice_assistant_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../widgets/voice_assistant_fab.dart';
@@ -38,11 +39,15 @@ class MoreDetailsScreen extends StatefulWidget {
   // caller that doesn't have an evaluation on hand.
   final List<HealthCondition> userConditions;
 
+  // User's health profile for GERD detection - used to highlight GERD-related ingredients
+  final UserHealthProfile? healthProfile;
+
   const MoreDetailsScreen({
     super.key,
     required this.product,
     this.matchedAllergens = const [],
     this.userConditions = const [],
+    this.healthProfile,
   });
 
   @override
@@ -212,6 +217,16 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                   const SizedBox(height: 12),
                   Builder(builder: (context) {
                     final parsedItems = _parseIngredientsList(product.ingredients);
+                    // Detect GERD triggers for highlighting
+                    final gerdResult = widget.healthProfile?.hasGerd == true
+                        ? GerdTriggerDetector.detect(product)
+                        : null;
+                    final gerdTriggers = gerdResult?.triggers ?? [];
+                    final gerdMatchedIngredients = gerdTriggers
+                        .where((t) => t.matchedIngredient != null)
+                        .map((t) => t.matchedIngredient!.toLowerCase())
+                        .toSet();
+
                     if (parsedItems.isEmpty) {
                       return Text('—',
                           style: GoogleFonts.inter(
@@ -220,6 +235,8 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: parsedItems.map((item) {
+                        final isGerdTrigger = gerdMatchedIngredients.any((trigger) =>
+                            item.toLowerCase().contains(trigger));
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 6),
                           child: Row(
@@ -229,13 +246,20 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                                   style: GoogleFonts.inter(
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
-                                      color: colorScheme.primary)),
+                                      color: isGerdTrigger
+                                          ? const Color(0xFFE65100)
+                                          : colorScheme.primary)),
                               Expanded(
                                 child: Text(
                                   item,
                                   style: GoogleFonts.inter(
                                     fontSize: 14,
-                                    color: colorScheme.onSurface,
+                                    color: isGerdTrigger
+                                        ? const Color(0xFFE65100)
+                                        : colorScheme.onSurface,
+                                    fontWeight: isGerdTrigger
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
                                     height: 1.4,
                                   ),
                                 ),
@@ -293,6 +317,54 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: const Color(0xFFC62828),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                  // GERD trigger warnings -- highlight ingredients that may trigger GERD
+                  if (widget.healthProfile?.hasGerd == true) ...[
+                    const SizedBox(height: 16),
+                    Builder(builder: (context) {
+                      final gerdResult = GerdTriggerDetector.detect(product);
+                      if (!gerdResult.hasTriggers) {
+                        return const SizedBox.shrink();
+                      }
+                      final triggerIngredients = gerdResult.triggers
+                          .where((t) => t.matchedIngredient != null)
+                          .map((t) => t.matchedIngredient!)
+                          .toSet();
+                      if (triggerIngredients.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+                      final displayNames = triggerIngredients.join(', ');
+                      final tl = Localizations.localeOf(context).languageCode == 'tl';
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFFB74D)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.local_fire_department_outlined,
+                                color: Color(0xFFE65100), size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                tl
+                                    ? 'Naglalaman ng $displayNames - maaaring mag-trigger ng sintomas ng GERD'
+                                    : 'Contains $displayNames - may trigger GERD symptoms',
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: const Color(0xFFE65100),
                                 ),
                               ),
                             ),
@@ -726,6 +798,10 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
         return 'Diabetes';
       case HealthCondition.heartCondition:
         return 'Heart Condition';
+      case HealthCondition.gerd:
+        return 'GERD';
+      case HealthCondition.kidneyDisease:
+        return 'Kidney Disease';
     }
   }
 

@@ -7,6 +7,33 @@ enum HealthCondition {
   hypertension,
   diabetes,
   heartCondition,
+  // Awareness-only conditions: these are NOT part of the Suitable /
+  // Moderate / Caution scoring (see [HealthConditionKind.isScored]). They
+  // only drive their own informational warning cards. New values are
+  // appended at the end and (de)serialized by name, so existing saved
+  // profiles keep loading exactly as before.
+  gerd,
+  kidneyDisease,
+}
+
+extension HealthConditionKind on HealthCondition {
+  /// True for the conditions evaluated by the existing
+  /// Suitable/Moderate/Caution scoring (ConditionThresholds). GERD and
+  /// Kidney Disease return false: they are health-information/awareness
+  /// evaluations only, never suitability scores.
+  bool get isScored {
+    switch (this) {
+      case HealthCondition.hypertension:
+      case HealthCondition.diabetes:
+      case HealthCondition.heartCondition:
+        return true;
+      case HealthCondition.gerd:
+      case HealthCondition.kidneyDisease:
+        return false;
+    }
+  }
+
+  bool get isAwarenessOnly => !isScored;
 }
 
 // Common allergens relevant to Filipino canned food & instant noodles.
@@ -72,6 +99,12 @@ class UserHealthProfile {
   bool get hasHypertension => conditions.contains(HealthCondition.hypertension);
   bool get hasDiabetes => conditions.contains(HealthCondition.diabetes);
   bool get hasHeartCondition => conditions.contains(HealthCondition.heartCondition);
+  bool get hasGerd => conditions.contains(HealthCondition.gerd);
+  bool get hasKidneyDisease => conditions.contains(HealthCondition.kidneyDisease);
+
+  /// Conditions that feed the existing Suitable/Moderate/Caution scoring.
+  List<HealthCondition> get scoredConditions =>
+      conditions.where((c) => c.isScored).toList();
   bool get hasAnyAllergy => allergies.isNotEmpty;
 
   /// Unique deterministic fingerprint representing the user's current health state.

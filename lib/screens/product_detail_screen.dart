@@ -30,6 +30,9 @@ import '../core/utils/fallback_advisory_generator.dart';
 import '../core/utils/nutrition_availability.dart';
 import '../core/utils/nutri_score_calculator.dart';
 import '../core/utils/nova_score_calculator.dart';
+import '../core/utils/gerd_trigger_detector.dart';
+import '../core/utils/kidney_nutrient_detector.dart';
+import '../widgets/health_info_warning_card.dart';
 import '../data/services/backend_locator.dart';
 import '../data/services/favorites_service.dart';
 
@@ -1187,6 +1190,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                   const SizedBox(height: 12),
 
+                  // ── 3b. GERD/Kidney Disease Warning card (awareness-only) ─
+                  // Positioned above Health Analysis card but below Health Advisory banner
+                  // Follows the profile currently driving the Health Analysis card below
+                  _buildAwarenessWarningCards(context, loc, p),
+
+                  const SizedBox(height: 12),
+
                   // ── 3. Batayan ng Pagsusuri (Reminders Box) ───────
                   Container(
                     width: double.infinity,
@@ -1427,6 +1437,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             builder: (context) => MoreDetailsScreen(
                               product: p,
                               matchedAllergens: _evaluation?.allergenAssessment.matchedContains ?? const [],
+                              healthProfile: _userHealthProfile,
                               // Same conditions WhoCalculator.evaluateProduct() iterated
                               // over for this user (i.e. the ones on their saved health
                               // profile) -- lets the "How CLARO Calculates" guide only
@@ -1689,6 +1700,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           break;
         case HealthCondition.heartCondition:
           if (nutrientKey == 'saturatedFatG') return true;
+          break;
+        case HealthCondition.gerd:
+        case HealthCondition.kidneyDisease:
+          // Awareness-only: no row in the scored Health Analysis list.
           break;
       }
     }
@@ -2061,6 +2076,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // explanation + member avatars). Solo users never reach this.
     if (_isGroupMode) return _buildGroupBanner(context, loc);
 
+    // Known gap fix (UI layer only): a user whose ONLY saved conditions
+    // are awareness-only (GERD/Kidney Disease -- see
+    // HealthConditionKind.isAwarenessOnly) has nothing for
+    // WhoCalculator.evaluateProduct to score: `nutrientEvaluations` stays
+    // empty, so `evaluation.overallLevel`/`_currentOverallLevel()` falls
+    // back to Suitable even though nothing was actually evaluated. That
+    // "Suitable" verdict would be misleading here, so this banner is
+    // hidden entirely for that case -- the awareness card(s) below (e.g.
+    // the GERD Warning card) carry the relevant information instead.
+    // Does NOT apply when there's no profile/no conditions at all (that
+    // keeps showing today's Suitable banner, unchanged), and does not
+    // suppress a direct-allergen Caution, which is independent of
+    // condition scoring.
+    final profile = _userHealthProfile;
+    final hasOnlyAwarenessConditions = profile != null &&
+        profile.conditions.isNotEmpty &&
+        profile.scoredConditions.isEmpty;
+    if (hasOnlyAwarenessConditions &&
+        !(_evaluation?.allergenAssessment.hasDirectAllergen ?? false)) {
+      return const SizedBox.shrink();
+    }
+
     // The backend's `_evaluation.overallLevel` is fixed to the product's
     // labeled serving size (`product.servingSizeG`) -- deliberately, so
     // ranking/comparison across products stays size-independent (see
@@ -2147,6 +2184,232 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // ── Awareness Warning Cards (GERD/Kidney Disease) ─────────────────────
+  //
+  // Handles the logic for showing GERD, Kidney Disease, or combined cards
+  // based on detection rules:
+  // - Only show warning when relevant trigger/ingredient/nutrient is detected
+  // - If both conditions present but only one has detection, show only that condition's warning
+  // - If neither has detection, show no warning card
+  // - If both have detections, combine into one card
+  Widget _buildAwarenessWarningCards(BuildContext context, AppLocalizations loc, Product p) {
+    final profile = _userHealthProfile;
+    final hasGerd = profile?.hasGerd ?? false;
+    final hasKidney = profile?.hasKidneyDisease ?? false;
+
+    // If neither condition is present, show nothing
+    if (!hasGerd && !hasKidney) {
+      return const SizedBox.shrink();
+    }
+
+    // Run detections
+    final gerdResult = GerdTriggerDetector.detect(p);
+    final kidneyResult = KidneyNutrientDetector.detect(p);
+
+    // Check if each has actual detections
+    final gerdHasDetection = gerdResult.hasTriggers;
+    final kidneyHasDetection = kidneyResult.hasAnyNutrients;
+
+    // If neither has detection, show nothing
+    if (!gerdHasDetection && !kidneyHasDetection) {
+      return const SizedBox.shrink();
+    }
+
+    // If only GERD has detection, show GERD card
+    if (hasGerd && !hasKidney && gerdHasDetection) {
+      return _buildGerdWarningCard(context, loc, p);
+    }
+
+    // If only Kidney has detection, show Kidney card
+    if (!hasGerd && hasKidney && kidneyHasDetection) {
+      return _buildKidneyWarningCard(context, loc, p);
+    }
+
+    // If both conditions present but only one has detection, show only that condition's warning
+    if (hasGerd && hasKidney) {
+      if (gerdHasDetection && !kidneyHasDetection) {
+        return _buildGerdWarningCard(context, loc, p);
+      }
+      if (!gerdHasDetection && kidneyHasDetection) {
+        return _buildKidneyWarningCard(context, loc, p);
+      }
+    }
+
+    // If both have detections, show combined card
+    if (gerdHasDetection && kidneyHasDetection) {
+      return _buildCombinedGerdKidneyWarningCard(context, loc, p, gerdResult, kidneyResult);
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  // ── Combined GERD and Kidney Disease Warning card ─────────────────────
+  Widget _buildCombinedGerdKidneyWarningCard(
+    BuildContext context,
+    AppLocalizations loc,
+    Product p,
+    GerdDetectionResult gerdResult,
+    KidneyNutrientResult kidneyResult,
+  ) {
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+
+    // Combine GERD triggers
+    final gerdItems = gerdResult.triggers
+        .map((t) => HealthInfoWarningItem(
+              label: _gerdTriggerLabel(t, loc, p.name),
+              detail: t.type == GerdTriggerType.highFat
+                  ? (tl
+                      ? '${NumberFormatUtils.formatValue(t.matchedValue!)}g na taba bawat serving'
+                      : '${NumberFormatUtils.formatValue(t.matchedValue!)}g fat per serving')
+                  : t.matchedIngredient,
+            ))
+        .toList();
+
+    // Combine kidney nutrients
+    final kidneyItems = kidneyResult.nutrients
+        .map((n) => HealthInfoWarningItem(
+              label: _kidneyNutrientLabel(n.type, loc),
+              detail: _kidneyNutrientDetail(n.type, n.valuePerServing, tl),
+            ))
+        .toList();
+
+    // Combine all items
+    final allItems = [...gerdItems, ...kidneyItems];
+
+    return HealthInfoWarningCard(
+      title: loc.combinedGerdKidneyWarningTitle,
+      icon: Icons.info_outline, // Information icon as requested
+      intro: loc.combinedGerdKidneyIntro,
+      items: allItems,
+      neutralMessage: null, // No neutral message for combined card when both have detections
+      expertAdvice: loc.gerdExpertAdvice,
+    );
+  }
+
+  // ── GERD Warning card (awareness-only) ────────────────────────────────
+  //
+  // Never uses Suitable/Moderate/Caution language and never says a
+  // product is unsafe/safe/will-cause-symptoms/should-be-avoided. Shows
+  // one of three states:
+  //   1. Trigger(s) detected -> lists them; the intro copy explains these
+  //      are *potential* triggers and that reactions vary between
+  //      individuals.
+  //   2. GERD but no triggers detected, and there WAS ingredient or
+  //      nutrition data to check -> a neutral "no common triggers
+  //      detected" note. Chosen over hiding the card entirely so a GERD
+  //      user always sees that the product was actually checked, not
+  //      just silently skipped.
+  //   3. No ingredient data AND no nutrition data at all -> a neutral
+  //      "not enough information" note.
+  Widget _buildGerdWarningCard(BuildContext context, AppLocalizations loc, Product p) {
+    final result = GerdTriggerDetector.detect(p);
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+
+    final items = result.triggers
+        .map((t) => HealthInfoWarningItem(
+              label: _gerdTriggerLabel(t, loc, p.name),
+              detail: t.type == GerdTriggerType.highFat
+                  ? (tl
+                      ? '${NumberFormatUtils.formatValue(t.matchedValue!)}g na taba bawat serving'
+                      : '${NumberFormatUtils.formatValue(t.matchedValue!)}g fat per serving')
+                  : t.matchedIngredient,
+            ))
+        .toList();
+
+    String? neutralMessage;
+    if (!result.hasAnyData) {
+      neutralMessage = loc.gerdInsufficientData;
+    } else if (!result.hasTriggers) {
+      neutralMessage = loc.gerdNoTriggersFound;
+    }
+
+    return HealthInfoWarningCard(
+      title: loc.gerdWarningTitle,
+      icon: Icons.info_outline, // Information icon as requested
+      intro: loc.gerdWarningIntro,
+      items: items,
+      neutralMessage: neutralMessage,
+      expertAdvice: loc.gerdExpertAdvice,
+    );
+  }
+
+  String _gerdTriggerLabel(GerdTriggerMatch trigger, AppLocalizations loc, String productName) {
+    switch (trigger.type) {
+      case GerdTriggerType.tomatoAcidic:
+        return loc.gerdTriggerTomatoAcidic;
+      case GerdTriggerType.spicy:
+        // Always use the standard spicy label - the detail shows the actual matched ingredient
+        return loc.gerdTriggerSpicy;
+      case GerdTriggerType.caffeine:
+        return loc.gerdTriggerCaffeine;
+      case GerdTriggerType.chocolate:
+        return loc.gerdTriggerChocolate;
+      case GerdTriggerType.highFat:
+        return loc.gerdTriggerHighFat;
+    }
+  }
+
+  // ── Kidney Disease Warning card (awareness-only) ───────────────────────
+  //
+  // Never uses Suitable/Moderate/Caution language and never says a
+  // product is unsafe/safe/should-be-avoided. Shows one of two states:
+  //   1. Kidney-relevant nutrients detected -> lists them with per-serving
+  //      values (sodium, potassium, phosphorus, protein).
+  //   2. No nutrition data at all -> a neutral "not enough information" note.
+  Widget _buildKidneyWarningCard(BuildContext context, AppLocalizations loc, Product p) {
+    final result = KidneyNutrientDetector.detect(p);
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+
+    final items = result.nutrients
+        .map((n) => HealthInfoWarningItem(
+              label: _kidneyNutrientLabel(n.type, loc),
+              detail: _kidneyNutrientDetail(n.type, n.valuePerServing, tl),
+            ))
+        .toList();
+
+    String? neutralMessage;
+    if (!result.hasNutritionData) {
+      neutralMessage = loc.gerdInsufficientData;
+    } else if (!result.hasAnyNutrients) {
+      neutralMessage = loc.gerdNoTriggersFound;
+    }
+
+    return HealthInfoWarningCard(
+      title: loc.kidneyWarningTitle,
+      icon: Icons.info_outline, // Information icon as requested
+      intro: loc.kidneyWarningIntro,
+      items: items,
+      neutralMessage: neutralMessage,
+      expertAdvice: loc.kidneyExpertAdvice,
+    );
+  }
+
+  String _kidneyNutrientLabel(KidneyNutrientType type, AppLocalizations loc) {
+    switch (type) {
+      case KidneyNutrientType.sodium:
+        return loc.kidneyNutrientSodium;
+      case KidneyNutrientType.potassium:
+        return loc.kidneyNutrientPotassium;
+      case KidneyNutrientType.protein:
+        return loc.kidneyNutrientProtein;
+    }
+  }
+
+  String _kidneyNutrientDetail(KidneyNutrientType type, double value, bool isTagalog) {
+    final formattedValue = NumberFormatUtils.formatValue(value);
+    switch (type) {
+      case KidneyNutrientType.sodium:
+      case KidneyNutrientType.potassium:
+        return isTagalog
+            ? '${formattedValue}mg bawat serving'
+            : '${formattedValue}mg per serving';
+      case KidneyNutrientType.protein:
+        return isTagalog
+            ? '${formattedValue}g bawat serving'
+            : '${formattedValue}g per serving';
+    }
+  }
+
   // ── Group mode widgets ───────────────────────────────────────────────
 
   Color _groupLevelColor(AdvisoryLevel level) {
@@ -2171,6 +2434,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return 'Diabetes';
       case HealthCondition.heartCondition:
         return tl ? 'Sakit sa puso' : 'Heart condition';
+      case HealthCondition.gerd:
+        return 'GERD';
+      case HealthCondition.kidneyDisease:
+        return tl ? 'Sakit sa bato' : 'Kidney disease';
     }
   }
 
