@@ -19,6 +19,31 @@ import '../widgets/ranked_product_card.dart';
 import 'product_detail_screen.dart';
 import 'camera_scanner_screen.dart';
 
+/// Soft drop shadow used everywhere an outline/border used to be.
+List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) {
+  final isDark = theme.brightness == Brightness.dark;
+  return [
+    BoxShadow(
+      color: Colors.black.withOpacity(isDark ? 0.48 : 0.16),
+      blurRadius: blur,
+      spreadRadius: 0,
+      offset: Offset(0, dy),
+    ),
+    BoxShadow(
+      color: Colors.black.withOpacity(isDark ? 0.24 : 0.07),
+      blurRadius: blur * 0.45,
+      spreadRadius: 0,
+      offset: Offset(0, dy * 0.35),
+    ),
+  ];
+}
+
+/// Opaque version of a translucent tint (tint blended over the scaffold
+/// background). Needed because a BoxShadow shows through translucent fills,
+/// so tinted containers that now carry a shadow must have an opaque fill.
+Color _tint(ThemeData theme, Color tint, double opacity) =>
+    Color.alphaBlend(tint.withOpacity(opacity), theme.scaffoldBackgroundColor);
+
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
   /// and to highlight it in the list.
@@ -502,6 +527,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
               ),
             );
 
+            // Chips use Material elevation (shadow) instead of an outline.
             Widget tagChip({
               required String label,
               required bool selected,
@@ -521,10 +547,14 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   fontWeight: FontWeight.w600,
                   color: selected ? colorScheme.primary : colorScheme.onSurface,
                 ),
-                side: BorderSide(
-                  color: selected
-                      ? colorScheme.primary.withOpacity(0.5)
-                      : theme.dividerColor,
+                side: BorderSide.none,
+                elevation: selected ? 3 : 2,
+                pressElevation: 1,
+                shadowColor: Colors.black.withOpacity(
+                  theme.brightness == Brightness.dark ? 0.6 : 0.35,
+                ),
+                selectedShadowColor: Colors.black.withOpacity(
+                  theme.brightness == Brightness.dark ? 0.6 : 0.35,
                 ),
                 backgroundColor: colorScheme.surface,
               );
@@ -562,13 +592,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                     // ── Product Type (only shown if this comparison set
                     // actually has products with a curated type tag) ────
                     if (_availableTypeTags.isNotEmpty) ...[
-                      Divider(height: 1, color: theme.dividerColor),
                       sectionTitle(loc.filterProductTypeTitle),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Wrap(
                           spacing: 8,
-                          runSpacing: 8,
+                          runSpacing: 10,
                           children: [
                             for (final tag in _availableTypeTags)
                               tagChip(
@@ -589,13 +618,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                     // ── Flavor (spicy/non-spicy toggle + any other
                     // curated flavor tags actually present) ─────────────
                     if (_hasSpicyOption || _availableFlavorTags.isNotEmpty) ...[
-                      Divider(height: 1, color: theme.dividerColor),
                       sectionTitle(loc.filterFlavorTitle),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Wrap(
                           spacing: 8,
-                          runSpacing: 8,
+                          runSpacing: 10,
                           children: [
                             if (_hasSpicyOption) ...[
                               tagChip(
@@ -642,7 +670,18 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                       child: Row(
                         children: [
                           Expanded(
-                            child: OutlinedButton(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                elevation: 4,
+                                shadowColor: Colors.black.withOpacity(
+                                  theme.brightness == Brightness.dark ? 0.55 : 0.20,
+                                ),
+                                backgroundColor: colorScheme.surface,
+                                foregroundColor: colorScheme.onSurface,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
                               onPressed: () => setSheetState(() {
                                 tempConditions.clear();
                                 tempTypeTags.clear();
@@ -715,9 +754,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header row: back + title ──────────────────────────────
+            // ── Header row: back + title (shadow instead of divider) ──
             Container(
-              color: colorScheme.surface,
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                boxShadow: _softShadow(theme, blur: 12, dy: 4),
+              ),
               padding: EdgeInsets.only(
                 left: 16,
                 right: 16,
@@ -778,14 +820,13 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                 ],
               ),
             ),
-            Divider(height: 1, color: theme.dividerColor),
 
             // ── Category chip + active filter chips ────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Wrap(
                 spacing: 8,
-                runSpacing: 8,
+                runSpacing: 10,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Container(
@@ -794,11 +835,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.12),
+                      color: _tint(theme, colorScheme.primary, 0.12),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: colorScheme.primary.withOpacity(0.4),
-                      ),
+                      boxShadow: _softShadow(theme, blur: 9, dy: 3),
                     ),
                     child: Text(
                       widget.sourceProduct.category,
@@ -837,12 +876,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
 
             // ── Search bar ────────────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Container(
                 decoration: BoxDecoration(
                   color: colorScheme.surface,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: theme.dividerColor),
+                  boxShadow: _softShadow(theme),
                 ),
                 child: Row(
                   children: [
@@ -868,6 +907,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                             color: colorScheme.onSurfaceVariant,
                           ),
                           border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          filled: false,
                           contentPadding: const EdgeInsets.symmetric(
                             vertical: 14,
                           ),
@@ -963,9 +1005,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     final bottomSafeInset = MediaQuery.of(context).padding.bottom;
 
     return ListView.separated(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomSafeInset + 24),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottomSafeInset + 24),
       itemCount: addProductIndex + 1,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, i) {
         if (showSeeMore && i == visibleCount) {
           return _buildSeeMoreButton();
@@ -1022,12 +1064,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withOpacity(0.08),
+          color: _tint(theme, colorScheme.primary, 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: colorScheme.primary.withOpacity(0.4),
-            style: BorderStyle.solid,
-          ),
+          boxShadow: _softShadow(theme),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1285,9 +1324,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: colorScheme.secondary.withOpacity(0.12),
+          color: _tint(theme, colorScheme.secondary, 0.12),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: colorScheme.secondary.withOpacity(0.4)),
+          boxShadow: _softShadow(theme, blur: 9, dy: 3),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1323,9 +1362,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 12),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withOpacity(0.08),
+          color: _tint(theme, colorScheme.primary, 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colorScheme.primary.withOpacity(0.3)),
+          boxShadow: _softShadow(theme),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

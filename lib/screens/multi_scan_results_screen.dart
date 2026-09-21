@@ -17,6 +17,31 @@ import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
 import '../core/utils/success_feedback_utils.dart';
 
+/// Soft drop shadow used everywhere an outline/border used to be.
+List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) {
+  final isDark = theme.brightness == Brightness.dark;
+  return [
+    BoxShadow(
+      color: Colors.black.withOpacity(isDark ? 0.48 : 0.16),
+      blurRadius: blur,
+      spreadRadius: 0,
+      offset: Offset(0, dy),
+    ),
+    BoxShadow(
+      color: Colors.black.withOpacity(isDark ? 0.24 : 0.07),
+      blurRadius: blur * 0.45,
+      spreadRadius: 0,
+      offset: Offset(0, dy * 0.35),
+    ),
+  ];
+}
+
+/// Opaque version of a translucent tint (tint blended over the scaffold
+/// background). Needed because a BoxShadow shows through translucent fills,
+/// so tinted containers that now carry a shadow must have an opaque fill.
+Color _tint(ThemeData theme, Color tint, double opacity) =>
+    Color.alphaBlend(tint.withOpacity(opacity), theme.scaffoldBackgroundColor);
+
 class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
   final Map<String, int>? productCounts;
@@ -484,12 +509,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         padding: const EdgeInsets.symmetric(vertical: 14),
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: colorScheme.primary.withOpacity(0.08),
+          color: _tint(theme, colorScheme.primary, 0.08),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: colorScheme.primary.withOpacity(0.4),
-            style: BorderStyle.solid,
-          ),
+          boxShadow: _softShadow(theme),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -520,6 +542,18 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Offline banner colors (opaque so its shadow doesn't bleed through).
+    final offlineBannerColor = isDark
+        ? Color.alphaBlend(
+            const Color(0xFFE65100).withValues(alpha: 0.15),
+            theme.scaffoldBackgroundColor,
+          )
+        : const Color(0xFFFFF3E0);
+    final offlineAccent = isDark
+        ? const Color(0xFFFFB74D)
+        : const Color(0xFFE65100);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -528,10 +562,14 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Header bar: back, Resulta (perfectly centered Stack) ──
+            // Shadow replaces the old divider line underneath.
             Container(
-              color: colorScheme.surface,
               height: topPadding + 56,
               padding: EdgeInsets.only(left: 16, right: 16, top: topPadding),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                boxShadow: _softShadow(theme, blur: 12, dy: 4),
+              ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
@@ -596,11 +634,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                 ],
               ),
             ),
-            Divider(height: 1, color: theme.dividerColor),
 
             // ── Ranked description label ────────────────────────────────
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
               child: Row(
                 children: [
                   Text(
@@ -624,11 +661,9 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: colorScheme.secondary.withOpacity(0.12),
+                          color: _tint(theme, colorScheme.secondary, 0.12),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: colorScheme.secondary.withOpacity(0.4),
-                          ),
+                          boxShadow: _softShadow(theme, blur: 9, dy: 3),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -658,31 +693,23 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
 
             if (widget.detectedProducts.any((p) => p.isOfflineFallback))
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: theme.brightness == Brightness.dark
-                        ? const Color(0xFFE65100).withValues(alpha: 0.15)
-                        : const Color(0xFFFFF3E0),
+                    color: offlineBannerColor,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: theme.brightness == Brightness.dark
-                          ? const Color(0xFFFFB74D).withValues(alpha: 0.4)
-                          : const Color(0xFFFFB74D).withValues(alpha: 0.8),
-                    ),
+                    boxShadow: _softShadow(theme),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         Icons.wifi_off_rounded,
                         size: 18,
-                        color: theme.brightness == Brightness.dark
-                            ? const Color(0xFFFFB74D)
-                            : const Color(0xFFE65100),
+                        color: offlineAccent,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -691,9 +718,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,
-                            color: theme.brightness == Brightness.dark
-                                ? const Color(0xFFFFB74D)
-                                : const Color(0xFFE65100),
+                            color: offlineAccent,
                           ),
                         ),
                       ),
@@ -739,7 +764,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         16 + MediaQuery.of(context).padding.bottom + 24,
                       ),
                       itemCount: _ranked.length + 1,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (context, i) {
                         if (i == _ranked.length) {
                           return _buildAddProductButton();
@@ -822,7 +847,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
           BoxShadow(
             color: theme.brightness == Brightness.dark
                 ? Colors.black.withOpacity(0.25)
-                : Colors.black.withOpacity(0.05),
+                : Colors.black.withOpacity(0.10),
             blurRadius: 12,
             offset: const Offset(0, -2),
           ),

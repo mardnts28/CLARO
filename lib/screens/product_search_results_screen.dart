@@ -5,6 +5,16 @@ import '../models/product_model.dart';
 import '../services/haptic_service.dart';
 import 'product_detail_screen.dart';
 
+/// Soft drop shadow (same style as the Profile screen cards) used in place
+/// of the old outline.
+List<BoxShadow> _cardShadow(ColorScheme colorScheme) => [
+  BoxShadow(
+    color: colorScheme.shadow.withOpacity(0.14),
+    blurRadius: 14,
+    offset: const Offset(0, 5),
+  ),
+];
+
 class ProductSearchResultsScreen extends StatelessWidget {
   final String query;
   final List<Product> products;
@@ -33,7 +43,7 @@ class ProductSearchResultsScreen extends StatelessWidget {
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               itemCount: products.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, __) => const SizedBox(height: 14),
               itemBuilder: (context, index) {
                 final product = products[index];
                 return _ProductSearchResultCard(
@@ -65,87 +75,93 @@ class _ProductSearchResultCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Material(
-      color: theme.cardColor,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
+    // The shadow lives on an outer Container; the Material/InkWell sits
+    // inside it (transparent) so the tap ripple still works and follows the
+    // rounded corners.
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
         borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: theme.dividerColor),
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  width: 64,
-                  height: 64,
-                  color: colorScheme.surfaceContainerHighest,
-                  child: product.imageUrl.isNotEmpty
-                      ? Image.network(
-                          product.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Icon(
+        boxShadow: _cardShadow(colorScheme),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    color: colorScheme.surfaceContainerHighest,
+                    child: product.imageUrl.isNotEmpty
+                        ? Image.network(
+                            product.imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.inventory_2_outlined,
+                              color: colorScheme.primary,
+                              size: 30,
+                            ),
+                          )
+                        : Icon(
                             Icons.inventory_2_outlined,
                             color: colorScheme.primary,
                             size: 30,
                           ),
-                        )
-                      : Icon(
-                          Icons.inventory_2_outlined,
-                          color: colorScheme.primary,
-                          size: 30,
-                        ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.outfit(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    if (product.brand.isNotEmpty) ...[
-                      const SizedBox(height: 3),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        product.brand,
-                        maxLines: 1,
+                        product.name,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: colorScheme.onSurfaceVariant,
+                        style: GoogleFonts.outfit(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurface,
                         ),
                       ),
-                    ],
-                    if (product.category.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        product.category,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          color: colorScheme.onSurfaceVariant,
+                      if (product.brand.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          product.brand,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
+                      ],
+                      if (product.category.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          product.category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
-            ],
+                Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+              ],
+            ),
           ),
         ),
       ),

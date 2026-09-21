@@ -14,15 +14,19 @@ import 'preference_screen.dart';
 import 'suggestion_screen.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../widgets/avatar_picker.dart';
+
 // NOTE: "Health Group" / "Join a Group" used to be entry points here
 // (Phase 3 / Phase 4). They've moved to their own "Group" bottom nav tab
 // (see home_screen.dart) so the group feature no longer routes through
 // this screen at all.
 
 const String claroWebsiteUrl = 'https://claro-52ia.onrender.com/';
-const String privacyPolicyUrl = 'https://claro-52ia.onrender.com/privacy-policy';
-const String termsConditionsUrl = 'https://claro-52ia.onrender.com/terms-and-conditions';
-const String userGuideUrl = 'https://claro-52ia.onrender.com/user-guide';
+const String privacyPolicyUrl =
+    'https://claro-52ia.onrender.com/privacy-policy';
+const String termsConditionsUrl =
+    'https://claro-52ia.onrender.com/terms-and-conditions';
+const String userGuideUrl =
+    'https://claro-52ia.onrender.com/user-guide';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -33,31 +37,30 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _authService = AuthService();
+
   String _userName = 'User';
   String _userEmail = '';
-  String? _avatar; // users/{uid}.avatar -- asset path picked in onboarding
+  String? _avatar;
   bool _voiceAssistantEnabled = false;
   bool _mfaEnabled = false;
-  // True while an account-deletion request is in flight. Drives an
-  // in-place loading overlay in build() below -- deliberately NOT a
-  // separate dialog/route, so there's nothing left over to race against
-  // AuthGate's reactive teardown of this whole screen once the Auth
-  // account is actually deleted. See _performAccountDeletion for why.
+
   bool _isDeletingAccount = false;
   bool _darkModeEnabled = false;
   String _selectedLanguageCode = 'en';
 
-
   @override
   void initState() {
     super.initState();
+
     HomeTabController.tabNotifier.addListener(_handleTabChange);
     _announceIfVisible();
     _loadUserData();
+
     AuthService.userNameNotifier.addListener(_handleNameChanged);
     themeModeNotifier.addListener(_handleThemeChanged);
     AuthService.mfaNotifier.addListener(_handleMfaChanged);
-    VoiceAssistantService.isEnabledNotifier.addListener(_handleVoiceAssistantChanged);
+    VoiceAssistantService.isEnabledNotifier
+        .addListener(_handleVoiceAssistantChanged);
     LocaleService.localeNotifier.addListener(_onLocaleChanged);
   }
 
@@ -66,8 +69,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _announceIfVisible() {
-    // Profile moved from index 3 to index 4 when the "Group" tab was
-    // inserted between History and Profile -- see home_screen.dart.
     if (HomeTabController.tabNotifier.value == 4 &&
         _authService.currentUser != null &&
         VoiceAssistantService.instance.isEnabled &&
@@ -78,8 +79,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _onLocaleChanged() {
     if (!mounted) return;
+
     setState(() {
-      _selectedLanguageCode = LocaleService.localeNotifier.value.languageCode;
+      _selectedLanguageCode =
+          LocaleService.localeNotifier.value.languageCode;
     });
   }
 
@@ -89,90 +92,143 @@ class _ProfileScreenState extends State<ProfileScreen> {
     AuthService.userNameNotifier.removeListener(_handleNameChanged);
     themeModeNotifier.removeListener(_handleThemeChanged);
     AuthService.mfaNotifier.removeListener(_handleMfaChanged);
-    VoiceAssistantService.isEnabledNotifier.removeListener(_handleVoiceAssistantChanged);
+    VoiceAssistantService.isEnabledNotifier
+        .removeListener(_handleVoiceAssistantChanged);
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
+
     super.dispose();
   }
 
   void _handleNameChanged() {
     if (!mounted) return;
-    setState(() => _userName = AuthService.userNameNotifier.value);
+
+    setState(() {
+      _userName = AuthService.userNameNotifier.value;
+    });
   }
 
   void _handleThemeChanged() {
     if (!mounted) return;
+
     final isDark = themeModeNotifier.value == ThemeMode.dark;
+
     if (_darkModeEnabled != isDark) {
-      setState(() => _darkModeEnabled = isDark);
+      setState(() {
+        _darkModeEnabled = isDark;
+      });
     }
   }
 
   void _handleMfaChanged() {
     if (!mounted) return;
+
     if (_mfaEnabled != AuthService.mfaNotifier.value) {
-      setState(() => _mfaEnabled = AuthService.mfaNotifier.value);
+      setState(() {
+        _mfaEnabled = AuthService.mfaNotifier.value;
+      });
     }
   }
 
   void _handleVoiceAssistantChanged() {
     if (!mounted) return;
-    if (_voiceAssistantEnabled != VoiceAssistantService.isEnabledNotifier.value) {
-      setState(() => _voiceAssistantEnabled = VoiceAssistantService.isEnabledNotifier.value);
+
+    if (_voiceAssistantEnabled !=
+        VoiceAssistantService.isEnabledNotifier.value) {
+      setState(() {
+        _voiceAssistantEnabled =
+            VoiceAssistantService.isEnabledNotifier.value;
+      });
     }
   }
 
   Future<void> _loadUserData() async {
     try {
       final uid = _authService.currentUser?.uid;
+
       if (uid != null) {
-        // try server first
         try {
-          final userDoc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
+          final userDoc = await _authService.db
+              .collection('users')
+              .doc(uid)
+              .get(
+                GetOptions(source: Source.server),
+              );
+
           if (userDoc.exists) {
             final data = userDoc.data();
+
             if (data != null) {
               final themeString = data['theme'] ?? 'Default';
               final mfaVal = data['mfaEnabled'] ?? false;
               final voiceVal = data['voiceAssistant'] ?? false;
+
               setState(() {
                 _userName = data['name'] ?? 'User';
                 _userEmail = data['email'] ?? '';
-                _avatar = (data['avatar'] as String?)?.isNotEmpty == true ? data['avatar'] as String : null;
+
+                _avatar =
+                    (data['avatar'] as String?)?.isNotEmpty == true
+                        ? data['avatar'] as String
+                        : null;
+
                 _voiceAssistantEnabled = voiceVal;
                 _mfaEnabled = mfaVal;
-                _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
+
+                _darkModeEnabled = themeString
+                    .toString()
+                    .toLowerCase()
+                    .contains('dark');
+
                 final code = data['language'] ?? 'en';
                 _selectedLanguageCode = code;
               });
+
               AuthService.mfaNotifier.value = mfaVal;
               VoiceAssistantService.isEnabledNotifier.value = voiceVal;
+
               setAppThemeMode(parseThemeMode(themeString));
               AuthService.userNameNotifier.value = _userName;
             }
+
             return;
           }
         } catch (_) {}
 
-        // fallback to cache
-        final userDoc = await _authService.db.collection('users').doc(uid).get();
+        final userDoc =
+            await _authService.db.collection('users').doc(uid).get();
+
         if (userDoc.exists) {
           final data = userDoc.data();
+
           if (data != null) {
             final themeString = data['theme'] ?? 'Default';
             final mfaVal = data['mfaEnabled'] ?? false;
             final voiceVal = data['voiceAssistant'] ?? false;
+
             setState(() {
               _userName = data['name'] ?? 'User';
               _userEmail = data['email'] ?? '';
-              _avatar = (data['avatar'] as String?)?.isNotEmpty == true ? data['avatar'] as String : null;
+
+              _avatar =
+                  (data['avatar'] as String?)?.isNotEmpty == true
+                      ? data['avatar'] as String
+                      : null;
+
               _voiceAssistantEnabled = voiceVal;
               _mfaEnabled = mfaVal;
-              _darkModeEnabled = themeString.toString().toLowerCase().contains('dark');
+
+              _darkModeEnabled = themeString
+                  .toString()
+                  .toLowerCase()
+                  .contains('dark');
+
               final code = data['language'] ?? 'en';
               _selectedLanguageCode = code;
             });
+
             AuthService.mfaNotifier.value = mfaVal;
             VoiceAssistantService.isEnabledNotifier.value = voiceVal;
+
             setAppThemeMode(parseThemeMode(themeString));
             AuthService.userNameNotifier.value = _userName;
           }
@@ -183,41 +239,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  /// Pull-to-refresh handler. Forces a fresh server read of the user's
-  /// profile/settings and gives light haptic feedback so the pull gesture
-  /// feels responsive even while the network call is in flight.
   Future<void> _onRefresh() async {
     HapticService().vibrate();
     await _loadUserData();
   }
 
-  Future<bool> _updateUserPreference(String key, dynamic value) async {
+  Future<bool> _updateUserPreference(
+    String key,
+    dynamic value,
+  ) async {
     try {
       final uid = _authService.currentUser?.uid;
+
       if (uid != null) {
-        final ok = await _authService.updateUserData({key: value});
+        final ok = await _authService.updateUserData({
+          key: value,
+        });
+
         if (ok) {
-          // reload to get server-confirmed values
           await _loadUserData();
         }
+
         return ok;
       }
     } catch (e) {
       debugPrint('Error updating preference: $e');
     }
+
     return false;
   }
-
-
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final primaryColor = theme.brightness == Brightness.dark
-        ? Colors.red
-        : colorScheme.primary;
+
+    final primaryColor =
+        theme.brightness == Brightness.dark
+            ? Colors.red
+            : colorScheme.primary;
 
     return Stack(
       children: [
@@ -226,7 +287,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onRefresh: _onRefresh,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 20,
+              vertical: 24,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -239,33 +303,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: 20),
+
                 _buildProfileCard(),
+
                 const SizedBox(height: 24),
+
                 _buildPersonalSection(),
+
                 const SizedBox(height: 20),
+
                 _buildPreferenceSection(),
+
                 const SizedBox(height: 20),
+
                 _buildMoreSection(),
+
                 const SizedBox(height: 90),
               ],
             ),
           ),
         ),
-        // Deliberately an in-place overlay within THIS screen's own
-        // subtree, not a separate showDialog()/Route. A separate route
-        // would sit on top of HomeScreen in the Navigator while
-        // AuthGate reactively swaps HomeScreen for LoginScreen out from
-        // under it -- the same kind of teardown race that caused the
-        // _dependents.isEmpty assertion. Because this overlay lives
-        // inside ProfileScreen's own widget tree, it tears down
-        // atomically with the rest of this screen when AuthGate
-        // replaces it, instead of racing it.
+
         if (_isDeletingAccount)
           Positioned.fill(
             child: ColoredBox(
               color: colorScheme.surface.withOpacity(0.7),
               child: Center(
-                child: CircularProgressIndicator(color: primaryColor),
+                child: CircularProgressIndicator(
+                  color: primaryColor,
+                ),
               ),
             ),
           ),
@@ -275,43 +341,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _showAvatarDialog() async {
     HapticService().vibrate();
-    final tl = Localizations.localeOf(context).languageCode == 'tl';
+
+    final tl =
+        Localizations.localeOf(context).languageCode == 'tl';
+
     String? picked = _avatar;
+
     final result = await showDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text(tl ? 'Pumili ng avatar' : 'Choose your avatar'),
+          title: Text(
+            tl ? 'Pumili ng avatar' : 'Choose your avatar',
+          ),
           content: SizedBox(
             width: double.maxFinite,
             child: SingleChildScrollView(
               child: AvatarPicker(
                 selected: picked,
                 allowClear: false,
-                onChanged: (a) => setDialogState(() => picked = a),
+                onChanged: (a) {
+                  setDialogState(() {
+                    picked = a;
+                  });
+                },
               ),
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(tl ? 'Kanselahin' : 'Cancel')),
             TextButton(
-              onPressed: picked == null || picked == _avatar ? null : () => Navigator.pop(ctx, picked),
-              child: Text(tl ? 'I-save' : 'Save'),
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                tl ? 'Kanselahin' : 'Cancel',
+              ),
+            ),
+            TextButton(
+              onPressed: picked == null || picked == _avatar
+                  ? null
+                  : () => Navigator.pop(ctx, picked),
+              child: Text(
+                tl ? 'I-save' : 'Save',
+              ),
             ),
           ],
         ),
       ),
     );
-    if (result == null || result == _avatar || !mounted) return;
 
-    // Show the new avatar immediately; roll back if the save fails.
+    if (result == null || result == _avatar || !mounted) {
+      return;
+    }
+
     final previous = _avatar;
-    setState(() => _avatar = result);
-    final ok = await _authService.updateUserData({'avatar': result});
+
+    setState(() {
+      _avatar = result;
+    });
+
+    final ok = await _authService.updateUserData({
+      'avatar': result,
+    });
+
     if (!ok && mounted) {
-      setState(() => _avatar = previous);
+      setState(() {
+        _avatar = previous;
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(tl ? 'Hindi na-save ang avatar. Subukan muli.' : "Couldn't save your avatar. Please try again.")),
+        SnackBar(
+          content: Text(
+            tl
+                ? 'Hindi na-save ang avatar. Subukan muli.'
+                : "Couldn't save your avatar. Please try again.",
+          ),
+        ),
       );
     }
   }
@@ -325,11 +428,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(16),
+
+        // Visible soft elevation instead of an outline.
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.18),
+            blurRadius: 18,
+            spreadRadius: 0,
+            offset: const Offset(0, 7),
+          ),
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.06),
+            blurRadius: 5,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Tappable avatar (above name + email) -> opens the picker dialog.
           Semantics(
             button: true,
             label: 'Change avatar',
@@ -341,12 +459,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   CircleAvatar(
                     radius: 36,
                     backgroundColor: colorScheme.surface,
-                    backgroundImage: _avatar != null ? AssetImage(_avatar!) : null,
-                    onBackgroundImageError: _avatar != null ? (_, __) {} : null,
-                    child: _avatar == null
-                        ? Icon(Icons.person_outline, size: 36, color: colorScheme.onSurfaceVariant)
-                        : null,
+                    backgroundImage:
+                        _avatar != null
+                            ? AssetImage(_avatar!)
+                            : null,
+                    onBackgroundImageError:
+                        _avatar != null ? (_, __) {} : null,
+                    child:
+                        _avatar == null
+                            ? Icon(
+                                Icons.person_outline,
+                                size: 36,
+                                color:
+                                    colorScheme.onSurfaceVariant,
+                              )
+                            : null,
                   ),
+
                   Positioned(
                     right: -2,
                     bottom: -2,
@@ -355,16 +484,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       decoration: BoxDecoration(
                         color: colorScheme.primary,
                         shape: BoxShape.circle,
-                        border: Border.all(color: colorScheme.primaryContainer, width: 2),
+
+                        // Removed the visible outline.
+                        // Replaced with a soft floating shadow.
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.shadow.withOpacity(0.22),
+                            blurRadius: 7,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
-                      child: Icon(Icons.edit, size: 12, color: colorScheme.onPrimary),
+                      child: Icon(
+                        Icons.edit,
+                        size: 12,
+                        color: colorScheme.onPrimary,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
           ),
+
           const SizedBox(height: 12),
+
           Text(
             _userName,
             style: TextStyle(
@@ -373,12 +517,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: colorScheme.onPrimaryContainer,
             ),
           ),
+
           const SizedBox(height: 8),
+
           Text(
             _userEmail,
             style: TextStyle(
               fontSize: 14,
-              color: colorScheme.onPrimaryContainer.withOpacity(0.8),
+              color:
+                  colorScheme.onPrimaryContainer.withOpacity(0.8),
             ),
           ),
         ],
@@ -394,11 +541,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
+
+        // Soft visible elevation.
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.14),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+            color: colorScheme.shadow.withOpacity(0.18),
+            blurRadius: 18,
+            spreadRadius: 0,
+            offset: const Offset(0, 7),
+          ),
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.06),
+            blurRadius: 5,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -409,19 +565,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: loc.personalInfo,
             onTap: () async {
               HapticService().vibrate();
-              // Await the push and reload afterwards. Previously this
-              // navigated without awaiting, so any name/age/conditions/
-              // allergens edits made on PersonalInfoScreen never
-              // refreshed here on return — the old values stayed on
-              // screen until a manual pull-to-refresh. The name itself
-              // is also kept in sync live via AuthService.userNameNotifier,
-              // but this reload covers everything else shown on this
-              // screen too.
+
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const PersonalInfoScreen(),
+                ),
               );
-              if (mounted) await _loadUserData();
+
+              if (mounted) {
+                await _loadUserData();
+              }
             },
           ),
         ],
@@ -437,11 +592,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
+
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.14),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+            color: colorScheme.shadow.withOpacity(0.18),
+            blurRadius: 18,
+            spreadRadius: 0,
+            offset: const Offset(0, 7),
+          ),
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.06),
+            blurRadius: 5,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -452,29 +615,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: loc.preference,
             onTap: () {
               HapticService().vibrate();
+
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PreferenceScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const PreferenceScreen(),
+                ),
               );
             },
           ),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           _buildVoiceAssistantToggle(),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           _buildMfaToggle(),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           _buildDarkModeToggle(),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           _buildMenuItemWithArrow(
             icon: Icons.language,
             label: loc.language,
-            trailing: ValueListenableBuilder<Locale>(
-              valueListenable: LocaleService.localeNotifier,
+            trailing:
+                ValueListenableBuilder<Locale>(
+              valueListenable:
+                  LocaleService.localeNotifier,
               builder: (context, locale, _) {
-                final isTl = locale.languageCode == 'tl';
+                final isTl =
+                    locale.languageCode == 'tl';
+
                 return Text(
                   isTl ? loc.tagalog : loc.english,
-                  style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  style: TextStyle(
+                    color:
+                        colorScheme.onSurfaceVariant,
+                  ),
                 );
               },
             ),
@@ -490,6 +683,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showLanguageChooser() async {
     final loc = AppLocalizations.of(context)!;
+
     final choice = await showDialog<String>(
       context: context,
       builder: (ctx) => SimpleDialog(
@@ -515,9 +709,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (choice != null) {
       if (choice != _selectedLanguageCode) {
-        setState(() => _selectedLanguageCode = choice);
-        // Persist language code (e.g., 'en' or 'tl') to Firestore so server-side reads match locale codes.
-        await _updateUserPreference('language', choice);
+        setState(() {
+          _selectedLanguageCode = choice;
+        });
+
+        await _updateUserPreference(
+          'language',
+          choice,
+        );
+
         await LocaleService.setAppLocale(choice);
       }
     }
@@ -532,11 +732,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
+
         boxShadow: [
           BoxShadow(
-            color: colorScheme.shadow.withOpacity(0.14),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+            color: colorScheme.shadow.withOpacity(0.18),
+            blurRadius: 18,
+            spreadRadius: 0,
+            offset: const Offset(0, 7),
+          ),
+          BoxShadow(
+            color: colorScheme.shadow.withOpacity(0.06),
+            blurRadius: 5,
+            spreadRadius: 0,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -547,13 +755,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
             label: loc.suggestion,
             onTap: () {
               HapticService().vibrate();
+
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const SuggestionScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const SuggestionScreen(),
+                ),
               );
             },
           ),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           _buildMenuItemWithArrow(
             icon: Icons.info_outline,
             label: loc.aboutClaro,
@@ -562,7 +778,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _launchUrl(claroWebsiteUrl);
             },
           ),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           _buildMenuItemWithArrow(
             icon: Icons.privacy_tip_outlined,
             label: loc.privacyPolicy,
@@ -571,7 +792,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _launchUrl(privacyPolicyUrl);
             },
           ),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           _buildMenuItemWithArrow(
             icon: Icons.description_outlined,
             label: loc.termsConditions,
@@ -580,7 +806,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _launchUrl(termsConditionsUrl);
             },
           ),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           _buildMenuItemWithArrow(
             icon: Icons.menu_book_outlined,
             label: loc.userGuide,
@@ -589,9 +820,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _launchUrl(userGuideUrl);
             },
           ),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(
+              vertical: 12,
+            ),
             child: SizedBox(
               width: double.infinity,
               child: TextButton(
@@ -610,18 +848,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
-          Divider(height: 0, color: colorScheme.outlineVariant),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: const EdgeInsets.symmetric(
+              vertical: 12,
+            ),
             child: SizedBox(
               width: double.infinity,
               child: TextButton(
                 onPressed: () async {
                   HapticService().vibrate();
+
                   HomeTabController.switchToTab(0);
+
                   await _authService.signOut();
+
                   if (mounted) {
-                    Navigator.pushReplacementNamed(context, '/');
+                    Navigator.pushReplacementNamed(
+                      context,
+                      '/',
+                    );
                   }
                 },
                 child: Text(
@@ -642,6 +893,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _launchUrl(String urlString) async {
     final Uri url = Uri.parse(urlString);
+
     try {
       final bool launched = await launchUrl(
         url,
@@ -651,7 +903,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to open the website.'),
+            content: Text(
+              'Unable to open the website.',
+            ),
           ),
         );
       }
@@ -659,7 +913,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Unable to open the website.'),
+            content: Text(
+              'Unable to open the website.',
+            ),
           ),
         );
       }
@@ -670,23 +926,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // The phrase the user must type combines the last 5 characters of
-    // their Firebase UID with their current display name (e.g.
-    // "77Bh2-khae"), not a static "DELETE-<name>". Captured once when
-    // the dialog opens so it stays stable for the lifetime of the
-    // dialog even if _userName were to change underneath it.
-    //
-    // Falls back to the full uid if it's shorter than 5 characters
-    // (shouldn't happen with real Firebase UIDs, which are always 28
-    // characters, but guards against a malformed/test uid instead of
-    // throwing a RangeError on the substring below).
-    final String uid = _authService.currentUser?.uid ?? '';
-    final String uidSuffix = uid.length >= 5 ? uid.substring(uid.length - 5) : uid;
-    final String requiredDeletePhrase = '$uidSuffix-$_userName';
+    final String uid =
+        _authService.currentUser?.uid ?? '';
+
+    final String uidSuffix =
+        uid.length >= 5
+            ? uid.substring(uid.length - 5)
+            : uid;
+
+    final String requiredDeletePhrase =
+        '$uidSuffix-$_userName';
 
     showDialog(
       context: context,
-      builder: (dialogContext) => _DeleteAccountDialogContent(
+      builder: (dialogContext) =>
+          _DeleteAccountDialogContent(
         requiredPhrase: requiredDeletePhrase,
         colorScheme: colorScheme,
         deleteColor: colorScheme.primary,
@@ -695,100 +949,82 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  /// Runs the actual account deletion after the confirmation dialog has
-  /// already been dismissed (see _showDeleteAccountDialog for why the
-  /// dialog must be closed first).
-  ///
-  /// Progress is shown via `_isDeletingAccount`, an in-place overlay
-  /// inside THIS screen's own build() -- not a separate dialog/route --
-  /// so that if AuthGate swaps this whole screen out for LoginScreen
-  /// partway through (which happens automatically, reactively, the
-  /// moment the Firebase Auth account is actually deleted), the overlay
-  /// tears down atomically along with everything else instead of being
-  /// left dangling on top of a torn-down tree.
-  ///
-  /// [credential] is passed when this is a retry after a reauthRequired
-  /// response -- see _showReauthDialog.
-  Future<void> _performAccountDeletion({AuthCredential? credential}) async {
+  Future<void> _performAccountDeletion({
+    AuthCredential? credential,
+  }) async {
     if (!mounted) return;
+
     setState(() {
       _isDeletingAccount = true;
     });
 
-    final result = await _authService.deleteAccount(credential: credential);
+    final result =
+        await _authService.deleteAccount(
+      credential: credential,
+    );
 
-    // If this screen is gone by the time we get here, AuthGate has
-    // already reacted to the Auth account being deleted and replaced it
-    // with LoginScreen -- deletion succeeded and there is nothing further
-    // to do.
     if (!mounted) return;
 
     switch (result.status) {
       case DeleteAccountStatus.success:
-        // In principle AuthGate's authStateChanges() listener reacts to
-        // the Auth account being gone and swaps this whole screen out
-        // for LoginScreen on its own -- and if that already happened,
-        // this widget wouldn't even be mounted at this point (see the
-        // check above). But that reactive swap isn't guaranteed to land
-        // in the same frame, and this screen has been observed staying
-        // mounted -- overlay spinning forever -- even though deletion
-        // genuinely already succeeded. Rather than keep waiting on a
-        // stream event that may not arrive promptly, explicitly navigate
-        // to LoginScreen now, the same way the Logout button above
-        // already does after AuthService.signOut(). If AuthGate's own
-        // swap wins the race instead, this widget is torn down before
-        // this line runs and pushReplacementNamed is simply never
-        // reached -- no conflict either way.
-        Navigator.of(context).pushReplacementNamed('/');
+        Navigator.of(context)
+            .pushReplacementNamed('/');
         return;
 
       case DeleteAccountStatus.error:
-        // Deletion failed and nothing further happens automatically --
-        // the user is still signed in, so it's safe to update our own
-        // state and show the error normally.
         setState(() {
           _isDeletingAccount = false;
         });
+
         final theme = Theme.of(context);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(result.message!),
-            backgroundColor: theme.colorScheme.primary,
+            backgroundColor:
+                theme.colorScheme.primary,
           ),
         );
+
         return;
 
       case DeleteAccountStatus.reauthRequired:
-        // The user's session is too old for Firebase Auth to allow the
-        // deletion. They're still signed in (deleteAccount() no longer
-        // signs out on this path), so ask for fresh credentials right
-        // here and retry -- no trip back through LoginScreen needed.
         setState(() {
           _isDeletingAccount = false;
         });
-        _showReauthDialog(result.providerIds ?? const []);
+
+        _showReauthDialog(
+          result.providerIds ?? const [],
+        );
+
         return;
     }
   }
 
-  /// Shown when deleteAccount() reports `reauthRequired`. Asks for a
-  /// password (email/password accounts) or re-triggers the Google
-  /// picker (Google accounts), then retries deletion with the resulting
-  /// credential.
-  void _showReauthDialog(List<String> providerIds) {
+  void _showReauthDialog(
+    List<String> providerIds,
+  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final isGoogleAccount = providerIds.contains(GoogleAuthProvider.PROVIDER_ID);
+
+    final isGoogleAccount =
+        providerIds.contains(
+      GoogleAuthProvider.PROVIDER_ID,
+    );
 
     showDialog(
       context: context,
-      builder: (dialogContext) => _ReauthDialogContent(
+      builder: (dialogContext) =>
+          _ReauthDialogContent(
         isGoogleAccount: isGoogleAccount,
         colorScheme: colorScheme,
         accentColor: colorScheme.primary,
         authService: _authService,
-        onCredentialObtained: (credential) {
-          _performAccountDeletion(credential: credential);
+        onCredentialObtained:
+            (credential) {
+          _performAccountDeletion(
+            credential: credential,
+          );
         },
       ),
     );
@@ -802,12 +1038,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final primaryColor = theme.brightness == Brightness.dark
-        ? Colors.red
-        : colorScheme.primary;
+
+    final primaryColor =
+        theme.brightness == Brightness.dark
+            ? Colors.red
+            : colorScheme.primary;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 12,
+      ),
       child: GestureDetector(
         onTap: () {
           HapticService().vibrate();
@@ -816,8 +1057,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         behavior: HitTestBehavior.opaque,
         child: Row(
           children: [
-            Icon(icon, color: primaryColor, size: 20),
+            Icon(
+              icon,
+              color: primaryColor,
+              size: 20,
+            ),
+
             const SizedBox(width: 12),
+
             Expanded(
               child: Text(
                 label,
@@ -827,12 +1074,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
+
             if (trailing != null) ...[
               const SizedBox(width: 8),
               trailing,
             ],
+
             const SizedBox(width: 8),
-            Icon(Icons.chevron_right, color: colorScheme.outline, size: 20),
+
+            Icon(
+              Icons.chevron_right,
+              color: colorScheme.outline,
+              size: 20,
+            ),
           ],
         ),
       ),
@@ -842,35 +1096,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildDarkModeToggle() {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final primaryColor = theme.brightness == Brightness.dark
-        ? Colors.red
-        : colorScheme.primary;
+
+    final primaryColor =
+        theme.brightness == Brightness.dark
+            ? Colors.red
+            : colorScheme.primary;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 12,
+      ),
       child: Row(
         children: [
-          Icon(Icons.dark_mode_outlined, color: primaryColor, size: 20),
+          Icon(
+            Icons.dark_mode_outlined,
+            color: primaryColor,
+            size: 20,
+          ),
+
           const SizedBox(width: 12),
+
           Expanded(
             child: Text(
               'Dark Mode',
-              style: TextStyle(fontSize: 15, color: colorScheme.onSurface),
+              style: TextStyle(
+                fontSize: 15,
+                color: colorScheme.onSurface,
+              ),
             ),
           ),
+
           const SizedBox(width: 12),
+
           ValueListenableBuilder<ThemeMode>(
             valueListenable: themeModeNotifier,
             builder: (context, mode, _) {
-              final isDark = mode == ThemeMode.dark;
+              final isDark =
+                  mode == ThemeMode.dark;
+
               return Switch(
                 value: isDark,
                 onChanged: (value) async {
                   HapticService().vibrate();
-                  final theme = value ? 'Dark Mode' : 'Default';
-                  setState(() => _darkModeEnabled = value);
-                  await setAppThemeMode(parseThemeMode(theme));
-                  await _authService.updateUserData({'theme': theme});
+
+                  final theme =
+                      value ? 'Dark Mode' : 'Default';
+
+                  setState(() {
+                    _darkModeEnabled = value;
+                  });
+
+                  await setAppThemeMode(
+                    parseThemeMode(theme),
+                  );
+
+                  await _authService.updateUserData({
+                    'theme': theme,
+                  });
                 },
                 activeColor: primaryColor,
               );
@@ -885,16 +1168,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final primaryColor = theme.brightness == Brightness.dark
-        ? Colors.red
-        : colorScheme.primary;
+
+    final primaryColor =
+        theme.brightness == Brightness.dark
+            ? Colors.red
+            : colorScheme.primary;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 12,
+      ),
       child: Row(
         children: [
-          Icon(Icons.security_outlined, color: primaryColor, size: 20),
+          Icon(
+            Icons.security_outlined,
+            color: primaryColor,
+            size: 20,
+          ),
+
           const SizedBox(width: 12),
+
           Expanded(
             child: Text(
               loc.multiFactorAuthentication,
@@ -906,36 +1200,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+
           const SizedBox(width: 12),
+
           ValueListenableBuilder<bool>(
-            valueListenable: AuthService.mfaNotifier,
-            builder: (context, mfaEnabled, _) {
+            valueListenable:
+                AuthService.mfaNotifier,
+            builder: (
+              context,
+              mfaEnabled,
+              _,
+            ) {
               return Switch(
                 value: mfaEnabled,
                 onChanged: (value) async {
                   HapticService().vibrate();
-                  final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+
+                  final hasInternet =
+                      await SuccessFeedbackUtils
+                          .hasInternetConnection();
+
                   if (!hasInternet) {
                     if (mounted) {
-                      await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                      await SuccessFeedbackUtils
+                          .showOfflineNoticeDialog(
                         context,
-                        title: loc.noInternetTitle,
-                        message: loc.noInternetActionMessage,
+                        title:
+                            loc.noInternetTitle,
+                        message:
+                            loc.noInternetActionMessage,
                         buttonText: loc.gotIt,
                       );
                     }
+
                     return;
                   }
-                  setState(() => _mfaEnabled = value);
+
+                  setState(() {
+                    _mfaEnabled = value;
+                  });
+
                   try {
-                    await _authService.setMfaEnabled(enabled: value);
+                    await _authService.setMfaEnabled(
+                      enabled: value,
+                    );
                   } catch (_) {
-                    setState(() => _mfaEnabled = !value);
+                    setState(() {
+                      _mfaEnabled = !value;
+                    });
+
                     if (mounted) {
-                      await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                      await SuccessFeedbackUtils
+                          .showOfflineNoticeDialog(
                         context,
-                        title: loc.noInternetTitle,
-                        message: loc.noInternetActionMessage,
+                        title:
+                            loc.noInternetTitle,
+                        message:
+                            loc.noInternetActionMessage,
                         buttonText: loc.gotIt,
                       );
                     }
@@ -954,16 +1275,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    final primaryColor = theme.brightness == Brightness.dark
-        ? Colors.red
-        : colorScheme.primary;
+
+    final primaryColor =
+        theme.brightness == Brightness.dark
+            ? Colors.red
+            : colorScheme.primary;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 12,
+      ),
       child: Row(
         children: [
-          Icon(Icons.mic_outlined, color: primaryColor, size: 20),
+          Icon(
+            Icons.mic_outlined,
+            color: primaryColor,
+            size: 20,
+          ),
+
           const SizedBox(width: 12),
+
           Expanded(
             child: Text(
               loc.voiceAssistant,
@@ -973,24 +1305,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
           ),
+
           const SizedBox(width: 12),
+
           ValueListenableBuilder<bool>(
-            valueListenable: VoiceAssistantService.isEnabledNotifier,
-            builder: (context, isVoiceEnabled, _) {
+            valueListenable:
+                VoiceAssistantService
+                    .isEnabledNotifier,
+            builder: (
+              context,
+              isVoiceEnabled,
+              _,
+            ) {
               return Switch(
                 value: isVoiceEnabled,
                 onChanged: (value) async {
                   HapticService().vibrate();
-                  final previous = isVoiceEnabled;
-                  setState(() => _voiceAssistantEnabled = value);
-                  await VoiceAssistantService.instance.updateEnabled(value);
-                  final ok = await _updateUserPreference('voiceAssistant', value);
+
+                  final previous =
+                      isVoiceEnabled;
+
+                  setState(() {
+                    _voiceAssistantEnabled =
+                        value;
+                  });
+
+                  await VoiceAssistantService
+                      .instance
+                      .updateEnabled(value);
+
+                  final ok =
+                      await _updateUserPreference(
+                    'voiceAssistant',
+                    value,
+                  );
+
                   if (!ok) {
-                    // revert and inform
-                    setState(() => _voiceAssistantEnabled = previous);
-                    await VoiceAssistantService.instance.updateEnabled(previous);
+                    setState(() {
+                      _voiceAssistantEnabled =
+                          previous;
+                    });
+
+                    await VoiceAssistantService
+                        .instance
+                        .updateEnabled(
+                      previous,
+                    );
+
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.preferenceSaveError)));
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            loc.preferenceSaveError,
+                          ),
+                        ),
+                      );
                     }
                   }
                 },
@@ -1005,24 +1376,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
 }
 
 /// Content of the "Delete Account?" confirmation dialog.
-///
-/// This is a dedicated StatefulWidget -- not an inline TextEditingController
-/// paired with a StatefulBuilder -- specifically so its TextEditingController
-/// is disposed by Flutter's own State.dispose() lifecycle, at the moment
-/// this widget's element actually finishes unmounting, rather than being
-/// disposed manually alongside a Navigator.pop() call.
-///
-/// That distinction matters: showDialog's route plays an exit animation, so
-/// after pop() is called the dialog (and its TextField) is still part of
-/// the tree, still being rebuilt, for as long as that animation runs.
-/// Manually disposing the controller synchronously at pop() time -- as the
-/// previous version of this dialog did -- meant the very next frame tried
-/// to rebuild that still-animating-out TextField against an
-/// already-disposed controller, throwing "A TextEditingController was used
-/// after being disposed." mid-build. Anchoring disposal to this State's own
-/// dispose() instead guarantees it only happens once Flutter is actually
-/// done with the widget.
-class _DeleteAccountDialogContent extends StatefulWidget {
+class _DeleteAccountDialogContent
+    extends StatefulWidget {
   const _DeleteAccountDialogContent({
     required this.requiredPhrase,
     required this.colorScheme,
@@ -1061,11 +1416,14 @@ class _DeleteAccountDialogContentState
   Widget build(BuildContext context) {
     final colorScheme = widget.colorScheme;
     final deleteColor = widget.deleteColor;
-    final requiredDeletePhrase = widget.requiredPhrase;
+    final requiredDeletePhrase =
+        widget.requiredPhrase;
 
     return AlertDialog(
       backgroundColor: colorScheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       title: Row(
         children: [
           Icon(
@@ -1073,7 +1431,9 @@ class _DeleteAccountDialogContentState
             color: deleteColor,
             size: 24,
           ),
+
           const SizedBox(width: 8),
+
           Expanded(
             child: Text(
               'Delete Account?',
@@ -1088,7 +1448,8 @@ class _DeleteAccountDialogContentState
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Text(
             'This action will permanently delete your account and associated profile data. This cannot be undone.',
@@ -1098,7 +1459,9 @@ class _DeleteAccountDialogContentState
               height: 1.5,
             ),
           ),
+
           const SizedBox(height: 20),
+
           Text(
             'Type "$requiredDeletePhrase" to confirm:',
             style: TextStyle(
@@ -1107,7 +1470,9 @@ class _DeleteAccountDialogContentState
               color: deleteColor,
             ),
           ),
+
           const SizedBox(height: 8),
+
           TextField(
             controller: _controller,
             onChanged: (value) {
@@ -1123,7 +1488,9 @@ class _DeleteAccountDialogContentState
             decoration: InputDecoration(
               hintText: requiredDeletePhrase,
               hintStyle: TextStyle(
-                color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                color: colorScheme
+                    .onSurfaceVariant
+                    .withOpacity(0.5),
               ),
               border: InputBorder.none,
               errorText: _errorMessage,
@@ -1131,12 +1498,6 @@ class _DeleteAccountDialogContentState
                 color: deleteColor,
               ),
             ),
-            // NOTE: no longer forcing TextCapitalization.characters. The
-            // required phrase now embeds the user's name in its original
-            // case (e.g. "DELETE-John") and the comparison below is
-            // case-sensitive, so nudging the keyboard toward all-caps
-            // input would make it harder, not easier, for users to type a
-            // matching phrase.
           ),
         ],
       ),
@@ -1149,33 +1510,25 @@ class _DeleteAccountDialogContentState
           child: Text(
             'Cancel',
             style: TextStyle(
-              color: colorScheme.onSurfaceVariant,
+              color:
+                  colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
         ),
+
         TextButton(
           onPressed: () {
-            if (_controller.text.trim() != requiredDeletePhrase) {
+            if (_controller.text.trim() !=
+                requiredDeletePhrase) {
               setState(() {
                 _errorMessage =
                     'Please type $requiredDeletePhrase to confirm account deletion.';
               });
+
               return;
             }
 
-            // Close the dialog RIGHT NOW, before any async work starts --
-            // do not wait for account deletion first. deleteAccount() ends
-            // by deleting the Firebase Auth user, and this app's root
-            // widget (AuthGate in main.dart) wraps HomeScreen/ProfileScreen
-            // in a StreamBuilder on FirebaseAuth.authStateChanges(). That
-            // stream can emit `null` -- and AuthGate can react by tearing
-            // HomeScreen down and swapping in LoginScreen -- before this
-            // deletion even finishes. Popping first, before deletion
-            // begins, means there's no dialog route left to race against
-            // that rebuild. (The controller itself is safe regardless,
-            // since it's now disposed via this State's own dispose() --
-            // see the class doc comment above.)
             Navigator.of(context).pop();
             widget.onConfirmed();
           },
@@ -1192,19 +1545,9 @@ class _DeleteAccountDialogContentState
   }
 }
 
-/// Shown when deleteAccount() reports `reauthRequired` -- the user's
-/// session is too old for Firebase Auth to allow a sensitive operation
-/// like account deletion, so fresh credentials are needed before it can
-/// proceed. The user is still signed in at this point (see
-/// AuthService.deleteAccount), so this collects a credential in place
-/// rather than sending them back through LoginScreen.
-///
-/// Same dedicated-StatefulWidget pattern as _DeleteAccountDialogContent,
-/// for the same reason: the TextEditingController must be disposed by
-/// this State's own dispose() lifecycle, not manually at pop() time,
-/// since the dialog route's exit animation keeps the tree (and the
-/// TextField bound to that controller) around for a moment after pop().
-class _ReauthDialogContent extends StatefulWidget {
+/// Shown when deleteAccount() reports `reauthRequired`.
+class _ReauthDialogContent
+    extends StatefulWidget {
   const _ReauthDialogContent({
     required this.isGoogleAccount,
     required this.colorScheme,
@@ -1217,21 +1560,28 @@ class _ReauthDialogContent extends StatefulWidget {
   final ColorScheme colorScheme;
   final Color accentColor;
   final AuthService authService;
-  final void Function(AuthCredential credential) onCredentialObtained;
+  final void Function(
+    AuthCredential credential,
+  ) onCredentialObtained;
 
   @override
-  State<_ReauthDialogContent> createState() => _ReauthDialogContentState();
+  State<_ReauthDialogContent> createState() =>
+      _ReauthDialogContentState();
 }
 
-class _ReauthDialogContentState extends State<_ReauthDialogContent> {
-  late final TextEditingController _passwordController;
+class _ReauthDialogContentState
+    extends State<_ReauthDialogContent> {
+  late final TextEditingController
+      _passwordController;
+
   String? _errorMessage;
   bool _isProcessing = false;
 
   @override
   void initState() {
     super.initState();
-    _passwordController = TextEditingController();
+    _passwordController =
+        TextEditingController();
   }
 
   @override
@@ -1246,45 +1596,62 @@ class _ReauthDialogContentState extends State<_ReauthDialogContent> {
       _errorMessage = null;
     });
 
-    final credential = await widget.authService.buildGoogleReauthCredential();
+    final credential =
+        await widget.authService
+            .buildGoogleReauthCredential();
 
     if (!mounted) return;
 
     if (credential == null) {
       setState(() {
         _isProcessing = false;
-        _errorMessage = 'Google sign-in was cancelled. Please try again.';
+        _errorMessage =
+            'Google sign-in was cancelled. Please try again.';
       });
+
       return;
     }
 
-    // Close this dialog before kicking off deletion, same reasoning as
-    // _DeleteAccountDialogContent: AuthGate can react to the account
-    // actually being deleted before this async call returns, and there
-    // should be no dialog route left over to race against that teardown.
     Navigator.of(context).pop();
-    widget.onCredentialObtained(credential);
+
+    widget.onCredentialObtained(
+      credential,
+    );
   }
 
   void _handleEmailReauth() {
-    final password = _passwordController.text;
+    final password =
+        _passwordController.text;
+
     if (password.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter your password.';
+        _errorMessage =
+            'Please enter your password.';
       });
+
       return;
     }
 
-    final credential = widget.authService.buildEmailReauthCredential(password);
+    final credential =
+        widget.authService
+            .buildEmailReauthCredential(
+      password,
+    );
+
     if (credential == null) {
       setState(() {
-        _errorMessage = 'Could not verify your account. Please try again.';
+        _errorMessage =
+            'Could not verify your account. Please try again.';
       });
+
       return;
     }
 
     Navigator.of(context).pop();
-    widget.onCredentialObtained(credential);
+
+    widget.onCredentialObtained(
+      credential,
+    );
   }
 
   @override
@@ -1294,22 +1661,34 @@ class _ReauthDialogContentState extends State<_ReauthDialogContent> {
 
     return AlertDialog(
       backgroundColor: colorScheme.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
       title: Row(
         children: [
-          Icon(Icons.lock_clock_rounded, color: accentColor, size: 24),
+          Icon(
+            Icons.lock_clock_rounded,
+            color: accentColor,
+            size: 24,
+          ),
+
           const SizedBox(width: 8),
+
           const Expanded(
             child: Text(
               'Confirm It\'s You',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
           Text(
             'For security, please verify your identity again before we permanently delete your account.',
@@ -1319,27 +1698,55 @@ class _ReauthDialogContentState extends State<_ReauthDialogContent> {
               height: 1.5,
             ),
           ),
+
           const SizedBox(height: 20),
+
           if (widget.isGoogleAccount) ...[
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _isProcessing ? null : _handleGoogleReauth,
+              child: ElevatedButton.icon(
+                onPressed: _isProcessing
+                    ? null
+                    : _handleGoogleReauth,
                 icon: _isProcessing
                     ? SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(
+                        child:
+                            CircularProgressIndicator(
                           strokeWidth: 2,
                           color: accentColor,
                         ),
                       )
-                    : Icon(Icons.login_rounded, color: accentColor),
-                label: Text(_isProcessing ? 'Verifying...' : 'Continue with Google'),
-                style: OutlinedButton.styleFrom(
+                    : Icon(
+                        Icons.login_rounded,
+                        color: accentColor,
+                      ),
+                label: Text(
+                  _isProcessing
+                      ? 'Verifying...'
+                      : 'Continue with Google',
+                ),
+                style: ElevatedButton.styleFrom(
                   foregroundColor: accentColor,
-                  side: BorderSide.none,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  backgroundColor:
+                      colorScheme.surface,
+
+                  // Visible shadow instead of an outline.
+                  elevation: 3,
+                  shadowColor: colorScheme.shadow
+                      .withOpacity(0.22),
+
+                  shape:
+                      RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(12),
+                  ),
+
+                  padding:
+                      const EdgeInsets.symmetric(
+                    vertical: 12,
+                  ),
                 ),
               ),
             ),
@@ -1354,15 +1761,21 @@ class _ReauthDialogContentState extends State<_ReauthDialogContent> {
                   });
                 }
               },
-              style: TextStyle(color: colorScheme.onSurface),
+              style: TextStyle(
+                color: colorScheme.onSurface,
+              ),
               decoration: InputDecoration(
                 hintText: 'Password',
                 hintStyle: TextStyle(
-                  color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                  color: colorScheme
+                      .onSurfaceVariant
+                      .withOpacity(0.5),
                 ),
                 border: InputBorder.none,
                 errorText: _errorMessage,
-                errorStyle: TextStyle(color: accentColor),
+                errorStyle: TextStyle(
+                  color: accentColor,
+                ),
               ),
             ),
           ],
@@ -1377,11 +1790,13 @@ class _ReauthDialogContentState extends State<_ReauthDialogContent> {
           child: Text(
             'Cancel',
             style: TextStyle(
-              color: colorScheme.onSurfaceVariant,
+              color:
+                  colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
         ),
+
         if (!widget.isGoogleAccount)
           TextButton(
             onPressed: _handleEmailReauth,

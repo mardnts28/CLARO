@@ -19,6 +19,34 @@ class NutritionGuideScreen extends StatelessWidget {
       _isTagalog(context) ? tagalog : english;
 
   // ---------------------------------------------------------------------------
+  // SHARED SHADOW STYLE
+  //
+  // Replaces the old thin outlines. Two layers: a soft ambient shadow plus a
+  // tight contact shadow so cards read clearly as raised surfaces. Dark mode
+  // uses a stronger opacity because black shadows are much harder to see
+  // against a dark background.
+  // ---------------------------------------------------------------------------
+
+  List<BoxShadow> _softShadows(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return [
+      BoxShadow(
+        color: Colors.black.withOpacity(isDark ? 0.50 : 0.14),
+        blurRadius: 14,
+        spreadRadius: 0,
+        offset: const Offset(0, 5),
+      ),
+      BoxShadow(
+        color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
+        blurRadius: 4,
+        spreadRadius: 0,
+        offset: const Offset(0, 1.5),
+      ),
+    ];
+  }
+
+  // ---------------------------------------------------------------------------
   // OFFICIAL LINKS
   // ---------------------------------------------------------------------------
 
@@ -727,6 +755,14 @@ class NutritionGuideScreen extends StatelessWidget {
   }) {
     final theme = Theme.of(context);
 
+    // Solid (opaque) version of the old translucent primary tint. A
+    // translucent fill would let the shadow show through the inside of the
+    // button, so the tint is pre-blended onto the card color instead.
+    final solidTint = Color.alphaBlend(
+      theme.colorScheme.primary.withOpacity(0.08),
+      theme.cardColor,
+    );
+
     return Material(
       color: Colors.transparent,
 
@@ -735,19 +771,18 @@ class NutritionGuideScreen extends StatelessWidget {
 
         borderRadius: BorderRadius.circular(16),
 
+        // No outline -- visible shadow instead.
         child: Container(
           width: double.infinity,
 
           padding: const EdgeInsets.all(14),
 
           decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withOpacity(0.08),
+            color: solidTint,
 
             borderRadius: BorderRadius.circular(16),
 
-            border: Border.all(
-              color: theme.colorScheme.primary.withOpacity(0.25),
-            ),
+            boxShadow: _softShadows(context),
           ),
 
           child: Row(
@@ -861,16 +896,17 @@ class NutritionGuideScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 14),
 
       padding: const EdgeInsets.all(14),
 
+      // No outline -- visible shadow instead.
       decoration: BoxDecoration(
         color: theme.cardColor,
 
         borderRadius: BorderRadius.circular(16),
 
-        border: Border.all(color: theme.dividerColor),
+        boxShadow: _softShadows(context),
       ),
 
       child: Row(
@@ -977,16 +1013,17 @@ class NutritionGuideScreen extends StatelessWidget {
     return Container(
       width: double.infinity,
 
-      margin: const EdgeInsets.only(bottom: 10),
+      margin: const EdgeInsets.only(bottom: 14),
 
       padding: const EdgeInsets.all(14),
 
+      // No outline -- visible shadow instead.
       decoration: BoxDecoration(
         color: theme.cardColor,
 
         borderRadius: BorderRadius.circular(16),
 
-        border: Border.all(color: theme.dividerColor),
+        boxShadow: _softShadows(context),
       ),
 
       child: Row(

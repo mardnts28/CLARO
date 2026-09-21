@@ -18,6 +18,22 @@ import 'change_password_screen.dart';
 // the client -- see health-data-worker/ for the Worker implementation.
 const _workerUrl = 'https://health-data-worker.claro-app.workers.dev';
 
+/// Soft drop shadow (same style as the Profile screen cards) used in place
+/// of the old outlines. Pass a smaller [blur]/[dy] for small elements
+/// like chips.
+List<BoxShadow> _cardShadow(
+  ColorScheme colorScheme, {
+  double opacity = 0.14,
+  double blur = 14,
+  double dy = 5,
+}) => [
+  BoxShadow(
+    color: colorScheme.shadow.withOpacity(opacity),
+    blurRadius: blur,
+    offset: Offset(0, dy),
+  ),
+];
+
 class PersonalInfoScreen extends StatefulWidget {
   const PersonalInfoScreen({super.key});
 
@@ -716,7 +732,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
+        boxShadow: _cardShadow(colorScheme),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -795,7 +811,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
+        boxShadow: _cardShadow(colorScheme),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -833,7 +849,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
-            runSpacing: 8,
+            runSpacing: 10,
             children: selectedAllergens.map((allergen) {
               return Container(
                 padding: const EdgeInsets.symmetric(
@@ -841,9 +857,19 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: colorScheme.primary.withOpacity(0.12),
+                  // Opaque tint (not a translucent one) so the chip's
+                  // shadow doesn't show through its own fill.
+                  color: Color.alphaBlend(
+                    colorScheme.primary.withOpacity(0.12),
+                    theme.cardColor,
+                  ),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: colorScheme.primary),
+                  boxShadow: _cardShadow(
+                    colorScheme,
+                    opacity: 0.18,
+                    blur: 6,
+                    dy: 2,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -888,7 +914,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: theme.dividerColor),
+        boxShadow: _cardShadow(colorScheme),
       ),
       child: Column(
         children: [
@@ -913,7 +939,6 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               ],
             ),
           ),
-          Divider(height: 0, color: theme.dividerColor),
           GestureDetector(
             onTap: () async {
               HapticService().vibrate();
@@ -995,7 +1020,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
               const SizedBox(height: 16),
               Wrap(
                 spacing: 8,
-                runSpacing: 8,
+                runSpacing: 12,
                 children: _allergens.entries.map((entry) {
                   final isSelected = entry.value;
                   final allergenLabel = _getLocalizedAllergenLabel(
@@ -1019,13 +1044,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
+                        // Selected: solid primary. Unselected: opaque tint
+                        // (so the shadow doesn't bleed through the fill).
                         color: isSelected
                             ? colorScheme.primary
-                            : colorScheme.primary.withOpacity(0.12),
+                            : Color.alphaBlend(
+                                colorScheme.primary.withOpacity(0.12),
+                                sheetTheme.cardColor,
+                              ),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: colorScheme.primary,
-                          width: isSelected ? 2 : 1,
+                        boxShadow: _cardShadow(
+                          colorScheme,
+                          opacity: isSelected ? 0.28 : 0.18,
+                          blur: isSelected ? 8 : 6,
+                          dy: isSelected ? 3 : 2,
                         ),
                       ),
                       child: Text(

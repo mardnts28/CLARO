@@ -148,6 +148,28 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // CLEAR SEARCH
+  //
+  // Resets the search box (text + suggestions state) back to its default,
+  // empty state. Called whenever the user returns to the Home screen after
+  // viewing search results or a product detail page reached via search, so
+  // the search bar never shows a stale query when they land back on Home.
+  // -------------------------------------------------------------------------
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchOutsideTapTimer?.cancel();
+    _searchController.clear();
+    if (!mounted) return;
+    setState(() {
+      _suggestionQuery = '';
+      _searchSuggestions = const [];
+      _showSearchSuggestions = false;
+      _searchSuggestionsLoading = false;
+    });
+  }
+
   Future<void> _searchProducts(String rawQuery) async {
     final query = rawQuery.trim();
     if (query.isEmpty || _isSearching) return;
@@ -174,6 +196,8 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (_) => ProductDetailScreen(product: exact.single),
           ),
         );
+        // Back on Home -- clear the search bar.
+        _clearSearch();
       } else if (matches.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('No products found for "$query".')),
@@ -186,6 +210,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ProductSearchResultsScreen(query: query, products: matches),
           ),
         );
+        // Back on Home -- clear the search bar.
+        _clearSearch();
       }
     } catch (e) {
       debugPrint('Product search failed: $e');
@@ -245,14 +271,16 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  void _openSearchProduct(Product product) {
+  void _openSearchProduct(Product product) async {
     _searchOutsideTapTimer?.cancel();
     HapticService().vibrate();
     setState(() => _showSearchSuggestions = false);
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ProductDetailScreen(product: product)),
     );
+    // Back on Home -- clear the search bar.
+    _clearSearch();
   }
 
   Future<void> _viewAllSearchResults() async {
@@ -269,6 +297,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ProductSearchResultsScreen(query: query, products: matches),
       ),
     );
+    // Back on Home -- clear the search bar.
+    _clearSearch();
   }
 
   /// Pull-to-refresh handler.
@@ -285,6 +315,34 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedIndex = index;
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // SHARED SHADOW STYLE
+  //
+  // Replaces the old thin outlines. Two layers: a wide, soft ambient shadow
+  // plus a tight contact shadow so cards read clearly as raised surfaces.
+  // Dark mode uses a stronger opacity because black shadows are much harder
+  // to see against a dark background.
+  // -------------------------------------------------------------------------
+
+  List<BoxShadow> _softShadows() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return [
+      BoxShadow(
+        color: Colors.black.withOpacity(isDark ? 0.50 : 0.14),
+        blurRadius: 18,
+        spreadRadius: 0,
+        offset: const Offset(0, 6),
+      ),
+      BoxShadow(
+        color: Colors.black.withOpacity(isDark ? 0.35 : 0.08),
+        blurRadius: 5,
+        spreadRadius: 0,
+        offset: const Offset(0, 2),
+      ),
+    ];
   }
 
   @override
@@ -362,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             _buildHealthCard(),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
             _buildProcessCard(),
 
@@ -382,6 +440,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // -------------------------------------------------------------------------
   // HEADER
+  //
+  // Greeting + name + tagline sit on the left; the logo sits on the right,
+  // both aligned to the same row instead of stacked vertically.
   // -------------------------------------------------------------------------
 
   Widget _buildHeader() {
@@ -394,72 +455,166 @@ class _HomeScreenState extends State<HomeScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
 
       children: [
-        Image.asset('assets/images/logoII.png', height: 60),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
 
-        const SizedBox(height: 12),
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
 
-        Text(
-          loc.greeting(_userName),
+                children: [
+                  Text(
+                    loc.greeting(_userName),
 
-          style: bodyLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-
-        const SizedBox(height: 4),
-
-        Text(
-          loc.homeTagline,
-
-          style: bodyMedium?.copyWith(fontSize: 13, height: 1.5),
-        ),
-
-        const SizedBox(height: 16),
-        TextField(
-          controller: _searchController,
-          textInputAction: TextInputAction.search,
-          onSubmitted: _searchProducts,
-          onChanged: _onSearchChanged,
-          onTapOutside: (_) {
-            // TextField.onTapOutside fires on pointer-down, before a
-            // suggestion ListTile receives its onTap (pointer-up). Hiding
-            // the list immediately removes the tapped ListTile and prevents
-            // navigation. Delay dismissal briefly so suggestion taps can
-            // complete first.
-            _searchOutsideTapTimer?.cancel();
-            _searchOutsideTapTimer = Timer(
-              const Duration(milliseconds: 150),
-              () {
-                if (mounted) {
-                  setState(() => _showSearchSuggestions = false);
-                }
-              },
-            );
-          },
-          decoration: InputDecoration(
-            hintText: 'Search products or categories...',
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon: _isSearching
-                ? const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                    style: bodyLarge?.copyWith(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
-                  )
-                : (_searchController.text.isEmpty
-                      ? null
-                      : IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () {
-                            _searchController.clear();
-                            _onSearchChanged('');
-                          },
-                        )),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-          ),
+                  ),
+
+                  const SizedBox(height: 4),
+
+                  Text(
+                    loc.homeTagline,
+
+                    style: bodyMedium?.copyWith(fontSize: 13, height: 1.5),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 16),
+
+            Image.asset('assets/images/logo.png', height: 42),
+          ],
         ),
+
+        const SizedBox(height: 18),
+
+        // Search field: minimal filled pill, no border, no heavy shadow.
+        _buildMinimalSearchField(),
+
         if (_showSearchSuggestions) _buildSearchSuggestions(),
       ],
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // MINIMAL SEARCH FIELD
+  //
+  // Flat, borderless pill using a translucent surface tint instead of a
+  // card + shadow. Reads lighter and more "search bar" than "input card".
+  // -------------------------------------------------------------------------
+
+  Widget _buildMinimalSearchField() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Container(
+      height: 46,
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withOpacity(0.06)
+            : colorScheme.surfaceContainerHighest.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(23),
+      ),
+      child: TextField(
+        controller: _searchController,
+        textInputAction: TextInputAction.search,
+        onSubmitted: _searchProducts,
+        onChanged: _onSearchChanged,
+        style: theme.textTheme.bodyMedium?.copyWith(fontSize: 14.5),
+        onTapOutside: (_) {
+          // TextField.onTapOutside fires on pointer-down, before a
+          // suggestion ListTile receives its onTap (pointer-up). Hiding
+          // the list immediately removes the tapped ListTile and prevents
+          // navigation. Delay dismissal briefly so suggestion taps can
+          // complete first.
+          _searchOutsideTapTimer?.cancel();
+          _searchOutsideTapTimer = Timer(
+            const Duration(milliseconds: 150),
+            () {
+              if (mounted) {
+                setState(() => _showSearchSuggestions = false);
+              }
+            },
+          );
+        },
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'Search products or categories...',
+          hintStyle: TextStyle(
+            fontSize: 14,
+            color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: 20,
+            color: colorScheme.onSurfaceVariant.withOpacity(0.9),
+          ),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 42,
+            minHeight: 20,
+          ),
+          suffixIcon: _isSearching
+              ? const Padding(
+                  padding: EdgeInsets.all(13),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              : (_searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        icon: Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        },
+                      )),
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 36,
+            minHeight: 20,
+          ),
+          filled: false,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(23),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(23),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(23),
+            borderSide: BorderSide(
+              color: colorScheme.primary.withOpacity(0.45),
+              width: 1.3,
+            ),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(23),
+            borderSide: BorderSide.none,
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(23),
+            borderSide: BorderSide.none,
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(23),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
     );
   }
 
@@ -470,19 +625,12 @@ class _HomeScreenState extends State<HomeScreen> {
     final visible = _searchSuggestions.take(8).toList();
 
     return Container(
-      margin: const EdgeInsets.only(top: 6),
+      margin: const EdgeInsets.only(top: 10),
       constraints: const BoxConstraints(maxHeight: 360),
       decoration: BoxDecoration(
         color: theme.cardColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.dividerColor),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.10),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: _softShadows(),
       ),
       child: isLoading
           ? const Padding(
@@ -869,22 +1017,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
 
+      // No outline -- visible shadow instead.
       decoration: BoxDecoration(
         color: theme.cardColor,
 
         borderRadius: BorderRadius.circular(20),
 
-        border: Border.all(color: theme.dividerColor),
-
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-
-            blurRadius: 10,
-
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: _softShadows(),
       ),
 
       child: Column(
@@ -1212,20 +1351,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(18),
 
+      // No outline -- visible shadow instead.
       decoration: BoxDecoration(
         color: theme.cardColor,
 
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
 
-        border: Border.all(color: theme.dividerColor),
-
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        boxShadow: _softShadows(),
       ),
 
       child: Column(
@@ -1597,23 +1729,14 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap();
       },
 
+      // No outline -- visible shadow instead.
       child: Container(
         decoration: BoxDecoration(
           color: theme.cardColor,
 
           borderRadius: BorderRadius.circular(18),
 
-          border: Border.all(color: theme.dividerColor),
-
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-
-              blurRadius: 10,
-
-              offset: const Offset(0, 4),
-            ),
-          ],
+          boxShadow: _softShadows(),
         ),
 
         clipBehavior: Clip.antiAlias,
