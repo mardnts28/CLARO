@@ -40,14 +40,14 @@ class VoiceCommandRouter {
 
   static VoiceCommandRouter get instance => _instance;
 
-  // Group tab (index 3) was inserted between History and Profile --
-  // Profile moved from index 3 to 4. See home_screen.dart.
+  // The "Group" tab was removed from the bottom nav; Group is now
+  // reached from the Profile screen's "Invite People" tab instead.
+  // See home_screen.dart and profile_screen.dart.
   static const Map<String, int> _tabPageKeys = {
     'home': 0,
     'scan': 1,
     'history': 2,
-    'group': 3,
-    'profile': 4,
+    'profile': 3,
   };
 
   Future<void> handleMicTap(BuildContext context) async {
@@ -610,7 +610,7 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'mfa_on') {
       try {
-        HomeTabController.switchToTab(4); // Profile tab (shifted from 3 after the new Group tab was inserted)
+        HomeTabController.switchToTab(3); // Profile tab
         await AuthService().setMfaEnabled(
           enabled: true,
         );
@@ -640,7 +640,7 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'mfa_off') {
       try {
-        HomeTabController.switchToTab(4); // Profile tab (shifted from 3 after the new Group tab was inserted)
+        HomeTabController.switchToTab(3); // Profile tab
         await AuthService().setMfaEnabled(
           enabled: false,
         );
@@ -670,7 +670,7 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'mfa') {
       try {
-        HomeTabController.switchToTab(4); // Profile tab (shifted from 3 after the new Group tab was inserted)
+        HomeTabController.switchToTab(3); // Profile tab
         final currentMfa = AuthService.mfaNotifier.value;
         final newMfa = !currentMfa;
         await AuthService().setMfaEnabled(enabled: newMfa);
@@ -983,7 +983,7 @@ class VoiceCommandRouter {
     // DELETE ACCOUNT
     // ============================================================
     if (target == 'delete_account') {
-      HomeTabController.switchToTab(4); // Profile tab (shifted from 3 after the new Group tab was inserted)
+      HomeTabController.switchToTab(3); // Profile tab
 
       final msg = localeKey == 'fil'
           ? 'Para burahin ang iyong account, mag-scroll sa ibaba ng Profile screen at i-tap ang Delete Account.'

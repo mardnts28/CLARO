@@ -581,14 +581,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildConditionsGrid(ThemeData theme, AppLocalizations loc) {
     final display = _conditionDisplay(loc);
     final keys = _conditions.keys.toList();
-    return GridView.count(
-      crossAxisCount: 4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-      childAspectRatio: 0.85,
-      children: keys.map((key) {
+    return _buildToggleWrap(
+      keys.map((key) {
         final selected = _conditions[key]!;
         final isWala = key == 'Wala';
         return GestureDetector(
@@ -612,14 +606,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildAllergensGrid(ThemeData theme, AppLocalizations loc) {
     final display = _allergenDisplay(loc);
     final keys = _allergens.keys.toList();
-    return GridView.count(
-      crossAxisCount: 4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 8,
-      mainAxisSpacing: 8,
-      childAspectRatio: 0.85,
-      children: keys.map((key) {
+    return _buildToggleWrap(
+      keys.map((key) {
         final selected = _allergens[key]!;
         return GestureDetector(
           onTap: () {
@@ -637,6 +625,37 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
+  // BUG FIX: this used to be a GridView.count(..., childAspectRatio: 0.85),
+  // which forces every option into the exact same fixed-height box no
+  // matter how much content (icon + up to 2 lines of label text) that
+  // option actually needs. Options with short one-line labels fit fine,
+  // but ones whose label needs the full 2 lines -- especially on
+  // narrower phones, or with the app's own adjustable text-size setting
+  // turned up -- didn't have enough room, so their content overflowed
+  // that fixed box ("RenderFlex overflowed by X pixels").
+  //
+  // A Wrap of fixed-WIDTH (not fixed-height) boxes keeps the same
+  // 4-per-row layout, but each option's box now grows to fit its own
+  // content -- every option is properly wrapped in its own box, with no
+  // shared hardcoded height left to overflow.
+  Widget _buildToggleWrap(List<Widget> items) {
+    const crossAxisCount = 4;
+    const spacing = 8.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth =
+            (constraints.maxWidth - spacing * (crossAxisCount - 1)) / crossAxisCount;
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: items
+              .map((item) => SizedBox(width: itemWidth, child: item))
+              .toList(),
+        );
+      },
+    );
+  }
+
   Widget _buildToggleItem({
     required String label,
     required bool selected,
@@ -648,6 +667,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final colorScheme = theme.colorScheme;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
+      // A fixed minHeight keeps single-line options visually consistent
+      // with the old layout, while allowing the box to grow taller for
+      // options whose label actually needs the second line -- instead of
+      // clipping/overflowing at a hardcoded height.
+      constraints: const BoxConstraints(minHeight: 78),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
       decoration: BoxDecoration(
         color: selected ? colorScheme.surfaceContainerHighest : theme.cardColor,
         borderRadius: BorderRadius.circular(10),
@@ -660,6 +685,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         children: [
           Center(
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (isWala)

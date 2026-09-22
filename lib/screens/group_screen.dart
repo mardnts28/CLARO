@@ -37,6 +37,7 @@ class _GroupScreenState extends State<GroupScreen> {
   final _groupRepository = BackendLocator.groupRepository;
 
   bool _loading = true;
+  bool _bulkDeleting = false;
   List<HealthGroup> _groups = [];
 
   @override
@@ -234,6 +235,88 @@ class _GroupScreenState extends State<GroupScreen> {
     await _load();
   }
 
+  Future<void> _deleteAllGroups() async {
+    if (_groups.isEmpty || _bulkDeleting) return;
+    final uid = _authService.currentUser?.uid;
+    if (uid == null) return;
+
+    final loc = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    HapticService().vibrate();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: colorScheme.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(loc.deleteAllGroupsConfirmTitle),
+        content: Text(loc.deleteAllGroupsConfirmMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(loc.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              loc.deleteAllGroupsButton,
+              style: TextStyle(color: colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    HapticService().vibrate();
+    setState(() => _bulkDeleting = true);
+
+    // Snapshot the list before looping -- _load() below replaces _groups,
+    // so iterating the live field while it changes would be unsafe.
+    final groupsToRemove = List<HealthGroup>.from(_groups);
+    var failedCount = 0;
+
+    for (final group in groupsToRemove) {
+      try {
+        if (group.ownerUid == uid) {
+          // Owner: delete the group outright. deleteGroup() enforces the
+          // same rule the single-card swipe-to-delete already relies on
+          // (GroupRepository.deleteGroup) -- a group with other active
+          // members can't be deleted this way, so that one is skipped
+          // (counted as a failure) rather than silently removing other
+          // people's membership.
+          await _groupRepository.deleteGroup(
+            groupId: group.id,
+            requestingUid: uid,
+          );
+        } else {
+          // Not the owner: this user can't delete someone else's group,
+          // so "deleting" this card means leaving it -- they're no
+          // longer a member either way.
+          await _groupRepository.leaveGroup(groupId: group.id, uid: uid);
+        }
+      } catch (e) {
+        debugPrint('Error removing group ${group.id} during delete-all: $e');
+        failedCount++;
+      }
+    }
+
+    if (!mounted) return;
+    setState(() => _bulkDeleting = false);
+    await _load();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          failedCount == 0
+              ? loc.deleteAllGroupsSuccess
+              : loc.deleteAllGroupsPartialSuccess(failedCount),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -245,12 +328,41 @@ class _GroupScreenState extends State<GroupScreen> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              loc.groupTab,
-              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
-            ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  loc.groupTab,
+                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                ),
+              ),
+              // "Delete All" -- only shown once there's at least one group
+              // to remove. Reuses the same error-red delete affordance the
+              // per-card swipe-to-delete and confirm dialogs already use.
+              if (_groups.isNotEmpty)
+                TextButton.icon(
+                  onPressed: _bulkDeleting ? null : _deleteAllGroups,
+                  icon: _bulkDeleting
+                      ? SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.error,
+                          ),
+                        )
+                      : Icon(Icons.delete_sweep_outlined, size: 20, color: colorScheme.error),
+                  label: Text(
+                    loc.deleteAllGroupsButton,
+                    style: TextStyle(fontSize: 13, color: colorScheme.error, fontWeight: FontWeight.w600),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+            ],
           ),
         ),
         Expanded(

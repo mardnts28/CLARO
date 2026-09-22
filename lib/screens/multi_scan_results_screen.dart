@@ -825,11 +825,6 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         label: loc.history,
       ),
       (
-        icon: Icons.group_outlined,
-        activeIcon: Icons.group,
-        label: loc.groupTab,
-      ),
-      (
         icon: Icons.person_outline,
         activeIcon: Icons.person,
         label: loc.profile,

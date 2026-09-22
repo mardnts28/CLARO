@@ -12,13 +12,13 @@ import '../generated/l10n/app_localizations.dart';
 import 'personal_info_screen.dart';
 import 'preference_screen.dart';
 import 'suggestion_screen.dart';
+import 'group_screen.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../widgets/avatar_picker.dart';
 
-// NOTE: "Health Group" / "Join a Group" used to be entry points here
-// (Phase 3 / Phase 4). They've moved to their own "Group" bottom nav tab
-// (see home_screen.dart) so the group feature no longer routes through
-// this screen at all.
+// NOTE: "Health Group" used to have its own "Group" bottom nav tab.
+// That tab was removed -- the group feature is now reached from this
+// screen's "Invite People" row, right under "Personal Information".
 
 const String claroWebsiteUrl = 'https://claro-52ia.onrender.com/';
 const String privacyPolicyUrl =
@@ -69,7 +69,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _announceIfVisible() {
-    if (HomeTabController.tabNotifier.value == 4 &&
+    if (HomeTabController.tabNotifier.value == 3 &&
         _authService.currentUser != null &&
         VoiceAssistantService.instance.isEnabled &&
         !VoiceAssistantService.isSpeakingNotifier.value) {
@@ -577,6 +577,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (mounted) {
                 await _loadUserData();
               }
+            },
+          ),
+
+          Divider(
+            height: 0,
+            color: colorScheme.outlineVariant,
+          ),
+
+          _buildMenuItemWithArrow(
+            icon: Icons.group_outlined,
+            label: loc.invitePeople,
+            onTap: () {
+              HapticService().vibrate();
+
+              // GroupScreen used to live inside HomeScreen's own Scaffold
+              // (as a bottom-nav tab), so it has no AppBar/back button of
+              // its own. Now that it's reached from Profile instead, wrap
+              // it in a plain Scaffold + AppBar here so there's still a
+              // way back -- GroupScreen itself, and everything inside it,
+              // is untouched.
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => Scaffold(
+                    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                    appBar: AppBar(
+                      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+                      elevation: 0,
+                      title: Text(loc.groupTab),
+                    ),
+                    body: const SafeArea(child: GroupScreen()),
+                  ),
+                ),
+              );
             },
           ),
         ],

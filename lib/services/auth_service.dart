@@ -760,13 +760,24 @@ class AuthService {
       };
 
       final docData = userDoc.data();
-      // Only set name and age if they don't already exist (prevent system overwrites).
-      // NOTE: this method is for the ONE-TIME onboarding flow only. Do NOT call
-      // this method again from a profile/edit screen to change name or age —
-      // this guard will silently block the update. Use updateUserData() instead.
-      if (!userDoc.exists || docData == null || !docData.containsKey('name')) {
-        data['name'] = name;
-      }
+      // NOTE: this method is for the ONE-TIME onboarding flow only -- the
+      // app only ever routes here when users/{uid}.onboardingComplete is
+      // false/missing (see main.dart, login_screen.dart, signup_screen.dart),
+      // so this can't run twice for the same user. That means the name
+      // entered on the Basic Information step should always be saved as
+      // the user's name, with no "already exists" guard.
+      //
+      // ROOT CAUSE (bug fix): Google Sign-In pre-fills users/{uid}.name
+      // with the Google account's display name the moment the Firestore
+      // doc is first created (see signInWithGoogle() above), *before*
+      // onboarding ever runs. The old guard below ("only set name if the
+      // field doesn't already exist") saw that pre-filled Google name and
+      // skipped writing the name the user actually typed on this screen,
+      // so Google sign-up users always saw their Google name on the
+      // Profile screen instead of their onboarding entry. Writing name
+      // unconditionally here fixes that, since this is always the user's
+      // deliberate, one-time entry.
+      data['name'] = name;
       if (age != null &&
           (!userDoc.exists || docData == null || !docData.containsKey('age'))) {
         data['age'] = age;

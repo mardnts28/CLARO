@@ -2874,6 +2874,12 @@ abstract class AppLocalizations {
   /// **'Group'**
   String get groupTab;
 
+  /// No description provided for @invitePeople.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite People'**
+  String get invitePeople;
+
   /// No description provided for @noGroupYet.
   ///
   /// In en, this message translates to:
@@ -3107,6 +3113,37 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Group deleted'**
   String get deleteGroupSuccess;
+
+  /// Label for the button in the Group tab header that removes every
+  /// group the user belongs to in one action.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete All'**
+  String get deleteAllGroupsButton;
+
+  /// No description provided for @deleteAllGroupsConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete all groups?'**
+  String get deleteAllGroupsConfirmTitle;
+
+  /// No description provided for @deleteAllGroupsConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'You'll be removed from every group in this list. Groups you own with other members can't be deleted until those members are removed. This can't be undone.'**
+  String get deleteAllGroupsConfirmMessage;
+
+  /// No description provided for @deleteAllGroupsSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'All groups deleted'**
+  String get deleteAllGroupsSuccess;
+
+  /// Shown when some groups couldn't be removed (an owned group still had other members), e.g. "4 groups deleted, 1 couldn't be removed".
+  ///
+  /// In en, this message translates to:
+  /// **'{count} group(s) couldn't be removed. Owned groups need other members removed first.'**
+  String deleteAllGroupsPartialSuccess(int count);
 
   /// No description provided for @joinGroupDialogTitle.
   ///

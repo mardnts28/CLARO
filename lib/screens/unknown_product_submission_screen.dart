@@ -937,7 +937,6 @@ class _UnknownProductSubmissionScreenState
       (icon: Icons.home_outlined, label: loc.home),
       (icon: Icons.qr_code_scanner, label: loc.scan),
       (icon: Icons.history_outlined, label: loc.history),
-      (icon: Icons.group_outlined, label: loc.groupTab),
       (icon: Icons.person_outline, label: loc.profile),
     ];
 

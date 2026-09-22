@@ -279,6 +279,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get personalInfo => 'Personal Information';
 
   @override
+  String get invitePeople => 'Invite People';
+
+  @override
   String get preference => 'Preference';
 
   @override
@@ -1617,6 +1620,25 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get deleteGroupSuccess => 'Group deleted';
+
+  @override
+  String get deleteAllGroupsButton => 'Delete All';
+
+  @override
+  String get deleteAllGroupsConfirmTitle => 'Delete all groups?';
+
+  @override
+  String get deleteAllGroupsConfirmMessage =>
+      'You\'ll be removed from every group in this list. Groups you own with other members can\'t be deleted until those members are removed. This can\'t be undone.';
+
+  @override
+  String get deleteAllGroupsSuccess => 'All groups deleted';
+
+  @override
+  String deleteAllGroupsPartialSuccess(int count) {
+    return '$count group(s) couldn\'t be removed. Owned groups need other members removed first.';
+  }
+
 
   @override
   String get joinGroupDialogTitle => 'Join a Group';

@@ -294,7 +294,27 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       _isScreenActive = false;
       _hasTappedToScan = false;
       _isFallbackModalOpen = false;
+      // BUG FIX: this used to only call _stopImageStreamIfActive(), which
+      // stops frame analysis but leaves the CameraController's session
+      // open -- because this screen is embedded in HomeScreen's
+      // IndexedStack, it's never actually unmounted when the user
+      // switches to Home/History/Profile, so the camera hardware stayed
+      // locked by this controller in the background. That blocked any
+      // other screen (e.g. QrScanScreen's mobile_scanner) from opening
+      // the camera at all, showing a blank preview. Fully disposing here
+      // -- matching what didUpdateWidget/didChangeAppLifecycleState
+      // already do -- releases the hardware; _checkPermissionAndInit()
+      // above already re-creates the controller when the Scan tab is
+      // revisited, so scanning still works exactly as before.
       _stopImageStreamIfActive();
+      _cameraController?.dispose();
+      if (mounted) {
+        setState(() {
+          _cameraController = null;
+        });
+      } else {
+        _cameraController = null;
+      }
     }
   }
 

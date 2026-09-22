@@ -281,6 +281,9 @@ class AppLocalizationsTl extends AppLocalizations {
   String get personalInfo => 'Personal na Impormasyon';
 
   @override
+  String get invitePeople => 'Mag-imbita ng Tao';
+
+  @override
   String get preference => 'Preference';
 
   @override
@@ -1638,6 +1641,25 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get deleteGroupSuccess => 'Nabura ang grupo';
+
+  @override
+  String get deleteAllGroupsButton => 'Burahin Lahat';
+
+  @override
+  String get deleteAllGroupsConfirmTitle => 'Burahin lahat ng grupo?';
+
+  @override
+  String get deleteAllGroupsConfirmMessage =>
+      'Aalisin ka bilang miyembro sa lahat ng grupo sa listahang ito. Ang mga grupong pagmamay-ari mo na may ibang miyembro ay hindi mabubura hangga\'t hindi tinatanggal ang mga miyembrong iyon. Hindi na ito mababawi.';
+
+  @override
+  String get deleteAllGroupsSuccess => 'Nabura lahat ng grupo';
+
+  @override
+  String deleteAllGroupsPartialSuccess(int count) {
+    return '$count na grupo ang hindi natanggal. Kailangang tanggalin muna ang ibang miyembro sa mga grupong pagmamay-ari mo.';
+  }
+
 
   @override
   String get joinGroupDialogTitle => 'Sumali sa Grupo';
