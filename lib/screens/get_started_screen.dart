@@ -366,7 +366,7 @@ class _GetStartedScreenState extends State<GetStartedScreen>
     return Positioned(
       left: 0,
       right: 0,
-      top: height * 0.075,
+      top: height * 0.09,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -487,38 +487,38 @@ class _GetStartedScreenState extends State<GetStartedScreen>
     final items = <_ClusterItem>[
       _ClusterItem(
         asset: 'sardine_can.png',
-        centerX: 0.51,
+        centerX: 0.47,
         centerY: 0.31,
         widthFraction: 0.115,
         phase: 0.0,
       ),
       _ClusterItem(
         asset: 'pie_chart.png',
-        centerX: 0.645,
+        centerX: 0.57,
         centerY: 0.365,
         widthFraction: 0.20,
         phase: 0.4,
       ),
       _ClusterItem(
         asset: 'clipboard.png',
-        centerX: 0.465,
+        centerX: 0.43,
         centerY: 0.40,
         widthFraction: 0.13,
         phase: 0.2,
       ),
       _ClusterItem(
-        asset: 'noodle_pack.png',
-        centerX: 0.61,
-        centerY: 0.455,
-        widthFraction: 0.175,
-        phase: 0.6,
-      ),
-      _ClusterItem(
         asset: 'cart.png',
-        centerX: 0.535,
+        centerX: 0.480,
         centerY: 0.515,
         widthFraction: 0.335,
         phase: 0.8,
+      ),
+      _ClusterItem(
+        asset: 'noodle_pack.png',
+        centerX: 0.53,
+        centerY: 0.445,
+        widthFraction: 0.175,
+        phase: 0.6,
       ),
     ];
 
