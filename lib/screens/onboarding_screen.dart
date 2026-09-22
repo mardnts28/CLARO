@@ -77,30 +77,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     'Mani': false,
   };
 
-  final Map<String, String> _conditionIcons = {
-    'Diabetes': 'assets/images/diabetes.png',
-    'Alta-presyon': 'assets/images/presyon.png',
-    'Sakit sa puso': 'assets/images/puso.png',
-    'Mababang Paningin': '',
-    'Wala': '',
-  };
-
-  // Built-in Material icons for the conditions that have no PNG asset yet
-  // (GERD, Kidney Disease). If you later add assets/images/gerd.png /
-  // bato.png, move them into _conditionIcons above and delete these.
-  final Map<String, IconData> _conditionFallbackIcons = {
+  final Map<String, IconData> _conditionIcons = {
+    'Diabetes': Icons.monitor_heart_outlined,
+    'Alta-presyon': Icons.favorite_outline,
+    'Sakit sa puso': Icons.favorite_border,
     'GERD': Icons.local_fire_department_outlined,
-    'Sakit sa bato': Icons.water_drop_outlined,
+    'Sakit sa bato': Icons.health_and_safety_outlined,
+    'Mababang Paningin': Icons.visibility_outlined,
+    'Wala': Icons.block,
   };
 
-  final Map<String, String> _allergenIcons = {
-    'Isda': 'assets/images/isda.png',
-    'Gatas': 'assets/images/gatas.png',
-    'Itlog': 'assets/images/itlog.png',
-    'Soya': 'assets/images/toyo.png',
-    'Trigo': 'assets/images/trigo.png',
-    'Lamang-Dagat': 'assets/images/lamang-dagat.png',
-    'Mani': 'assets/images/mani.png',
+  final Map<String, IconData> _allergenIcons = {
+    'Isda': Icons.set_meal_outlined,
+    'Gatas': Icons.local_drink_outlined,
+    'Itlog': Icons.egg_alt_outlined,
+    'Soya': Icons.grass_outlined,
+    'Trigo': Icons.grain,
+    'Lamang-Dagat': Icons.restaurant_outlined,
+    'Mani': Icons.eco_outlined,
   };
 
   // Cosmetic-only display labels for the internal keys above, built from
@@ -584,7 +578,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return _buildToggleWrap(
       keys.map((key) {
         final selected = _conditions[key]!;
-        final isWala = key == 'Wala';
         return GestureDetector(
           onTap: () {
             HapticService().vibrate();
@@ -593,9 +586,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           child: _buildToggleItem(
             label: display[key] ?? key,
             selected: selected,
-            isWala: isWala,
-            imagePath: isWala ? null : _conditionIcons[key],
-            icon: isWala ? null : _conditionFallbackIcons[key],
+            icon: _conditionIcons[key],
             theme: theme,
           ),
         );
@@ -617,7 +608,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           child: _buildToggleItem(
             label: display[key] ?? key,
             selected: selected,
-            imagePath: _allergenIcons[key],
+            icon: _allergenIcons[key],
             theme: theme,
           ),
         );
@@ -659,22 +650,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildToggleItem({
     required String label,
     required bool selected,
-    bool isWala = false,
-    String? imagePath,
     IconData? icon,
     required ThemeData theme,
   }) {
     final colorScheme = theme.colorScheme;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      // A fixed minHeight keeps single-line options visually consistent
-      // with the old layout, while allowing the box to grow taller for
-      // options whose label actually needs the second line -- instead of
-      // clipping/overflowing at a hardcoded height.
-      constraints: const BoxConstraints(minHeight: 78),
+      height: 96,
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
       decoration: BoxDecoration(
-        color: selected ? colorScheme.surfaceContainerHighest : theme.cardColor,
+        color: selected ? colorScheme.primary.withAlpha(24) : theme.cardColor,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: selected ? colorScheme.primary : colorScheme.outlineVariant,
@@ -688,32 +673,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                if (isWala)
-                  Icon(Icons.block, color: colorScheme.onSurfaceVariant, size: 28)
-                else if (imagePath != null)
-                  Image.asset(
-                    imagePath,
-                    height: 32,
-                    width: 32,
-                    errorBuilder: (_, _, _) => Icon(
-                        Icons.image_not_supported,
-                        size: 28,
-                        color: colorScheme.onSurfaceVariant),
-                  )
-                else if (icon != null)
-                  SizedBox(
-                    height: 32,
-                    width: 32,
-                    child: Icon(
-                      icon,
-                      size: 28,
-                      color: selected
-                          ? colorScheme.primary
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                  )
-                else
-                  const SizedBox(height: 32),
+                SizedBox(
+                  height: 32,
+                  width: 32,
+                  child: Icon(
+                    icon,
+                    size: 28,
+                    color: selected
+                        ? colorScheme.primary
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                ),
                 const SizedBox(height: 4),
                 // Allow text wrapping for longer labels like "Mababang Paningin"
                 // while keeping consistent font size across all options
