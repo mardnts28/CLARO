@@ -5,6 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/haptic_service.dart';
 import '../services/get_started_service.dart';
+import '../widgets/dome_clipper.dart';
+import '../widgets/dome_page_route.dart';
+import 'select_language_screen.dart';
 
 /// CLARO Get Started / Welcome Screen
 ///
@@ -96,11 +99,26 @@ class _GetStartedScreenState extends State<GetStartedScreen>
     // Preserve haptic feedback.
     HapticService().vibrate();
 
-    // Preserve the existing GetStartedService behavior.
-    //
-    // RootGate listens to this and moves the user to the
-    // authentication/home flow.
-    await GetStartedService.markSeen();
+    if (!mounted) return;
+
+    Navigator.of(context).push(
+      DomeTransitionPageRoute(
+        exitPage: widget,
+        enterPage: const SelectLanguageScreen(),
+        // Mark as seen only once the dome transition has finished playing.
+        //
+        // RootGate (in main.dart) listens to this flag and instantly swaps
+        // in SelectLanguageScreen the moment it flips — with no animation
+        // of its own. Flipping it up front (before the push) made that
+        // instant swap happen first, so the animated dome transition never
+        // had a chance to be seen. Deferring it to completion means the
+        // instant swap happens only after this transition has already
+        // shown the same final screen, so it's invisible.
+        onAnimationComplete: () {
+          GetStartedService.markSeen();
+        },
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -270,10 +288,7 @@ class _GetStartedScreenState extends State<GetStartedScreen>
   }) {
     return Positioned.fill(
       child: ClipPath(
-        clipper: _DomeClipper(
-          peakY: height * 0.49,
-          sideY: height * 0.625,
-        ),
+        clipper: const StandardDomeClipper(isTop: false),
         child: Container(color: _red),
       ),
     );
@@ -844,56 +859,6 @@ class _FloatingElement extends StatelessWidget {
         );
       },
     );
-  }
-}
-
-// =============================================================================
-// DOME CLIPPER
-// =============================================================================
-//
-// A smooth hill/dome shape: flat at the sides (sideY), rising to a
-// rounded peak in the center (peakY), then filled solid down to the
-// bottom of the screen.
-
-class _DomeClipper extends CustomClipper<Path> {
-  final double peakY;
-  final double sideY;
-
-  const _DomeClipper({
-    required this.peakY,
-    required this.sideY,
-  });
-
-  @override
-  Path getClip(Size size) {
-    final path = Path();
-
-    path.moveTo(0, sideY);
-
-    path.quadraticBezierTo(
-      size.width * 0.25,
-      peakY,
-      size.width * 0.5,
-      peakY,
-    );
-
-    path.quadraticBezierTo(
-      size.width * 0.75,
-      peakY,
-      size.width,
-      sideY,
-    );
-
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-
-    return path;
-  }
-
-  @override
-  bool shouldReclip(covariant _DomeClipper oldClipper) {
-    return oldClipper.peakY != peakY || oldClipper.sideY != sideY;
   }
 }
 

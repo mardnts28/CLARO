@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
+import '../widgets/dome_clipper.dart';
+import '../main.dart';
 
 /// CLARO Select Language Screen
 ///
@@ -68,6 +70,17 @@ class _SelectLanguageScreenState
     HapticService().vibrate();
 
     await LocaleService.setAppLocale(code);
+
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => const AuthGate(),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+        ),
+        (route) => false,
+      );
+    }
   }
 
   // ===========================================================================
@@ -247,7 +260,7 @@ class _SelectLanguageScreenState
     double height,
   ) {
     return ClipPath(
-      clipper: const _ResponsiveBottomArcClipper(),
+      clipper: const StandardDomeClipper(isTop: true),
       child: Container(
         width: double.infinity,
         height: height,
@@ -330,26 +343,10 @@ class _SelectLanguageScreenState
      * Slightly smaller than the previous version so the entire
      * header looks more like the reference image.
      */
-    final logoSize = (width / 390 * 62).clamp(
-      52.0,
-      76.0,
-    );
-
-    final scannerSize = (width / 390 * 78).clamp(
-      66.0,
-      92.0,
-    );
-
-    final cornerSize = (width / 390 * 23).clamp(
-      20.0,
-      28.0,
-    );
-
-    final cornerThickness =
-        (width / 390 * 2.2).clamp(
-      1.8,
-      2.6,
-    );
+    final scannerSize = (width * 0.231).clamp(72.0, 130.0);
+    final cornerSize = scannerSize * 0.32;
+    final cornerThickness = (width / 390 * 3.2).clamp(2.4, 4.0);
+    final logoSize = scannerSize * 0.72;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1175,101 +1172,8 @@ class _SelectLanguageScreenState
 //           ╰────────╯
 //
 // =============================================================================
-
-class _ResponsiveBottomArcClipper
-    extends CustomClipper<Path> {
-  const _ResponsiveBottomArcClipper();
-
-  @override
-  Path getClip(Size size) {
-    /*
-     * Slightly shallower curve than the previous version.
-     *
-     * This prevents the red area from looking excessively deep
-     * while preserving the visual style of the reference.
-     */
-    final curveDepth = (size.width * 0.13).clamp(
-      38.0,
-      78.0,
-    );
-
-    /*
-     * The side of the red header stops slightly above
-     * the center of the curve.
-     */
-    final sideHeight =
-        (size.height - curveDepth * 0.58).clamp(
-      0.0,
-      size.height,
-    );
-
-    final path = Path();
-
-    // =========================================================================
-    // TOP LEFT
-    // =========================================================================
-
-    path.moveTo(
-      0,
-      0,
-    );
-
-    // =========================================================================
-    // TOP EDGE
-    // =========================================================================
-
-    path.lineTo(
-      size.width,
-      0,
-    );
-
-    // =========================================================================
-    // RIGHT SIDE
-    // =========================================================================
-
-    path.lineTo(
-      size.width,
-      sideHeight,
-    );
-
-    // =========================================================================
-    // RIGHT CURVE
-    // =========================================================================
-
-    path.quadraticBezierTo(
-      size.width * 0.76,
-      size.height,
-      size.width * 0.50,
-      size.height,
-    );
-
-    // =========================================================================
-    // LEFT CURVE
-    // =========================================================================
-
-    path.quadraticBezierTo(
-      size.width * 0.24,
-      size.height,
-      0,
-      sideHeight,
-    );
-
-    // =========================================================================
-    // CLOSE
-    // =========================================================================
-
-    path.close();
-
-    return path;
-  }
-
-  @override
-  bool shouldReclip(
-    covariant _ResponsiveBottomArcClipper oldClipper,
-  ) {
-    return false;
-  }
-}
+// SCANNER CORNER PAINTER
+// =============================================================================
 
 // =============================================================================
 // SCANNER CORNER PAINTER
