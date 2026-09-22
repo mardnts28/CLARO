@@ -40,7 +40,7 @@ class _SelectLanguageScreenState
 
   static const Color _background = Colors.white;
 
-  static const Color _red = Color(0xFFB71919);
+  static const Color _red = Color(0xFF8B1A1A);
 
   static const Color _black = Color(0xFF171717);
 
@@ -116,26 +116,47 @@ class _SelectLanguageScreenState
                   final width = constraints.maxWidth;
                   final height = constraints.maxHeight;
 
+                  final bottomInset = mediaQuery.padding.bottom;
+                  final viewPadding = mediaQuery.viewPadding;
+                  final safeBottom = bottomInset > 0 ? bottomInset : viewPadding.bottom;
+                  final bottomSpacing = (height * 0.05).clamp(28.0, 56.0);
+                  final isVeryShortScreen = height < 650;
+                  final adjustedBottomSpacing = isVeryShortScreen ? 30.0 : bottomSpacing;
+                  final dotsBottomInset = adjustedBottomSpacing + safeBottom;
+
                   final isLandscape =
                       width > height * 1.15;
 
                   final isCompact =
                       height < 620 || isLandscape;
 
-                  if (isCompact) {
-                    return _buildCompactLayout(
-                      context,
-                      loc,
-                      width,
-                      height,
-                    );
-                  }
+                  final Widget mainLayout = isCompact
+                      ? _buildCompactLayout(
+                          context,
+                          loc,
+                          width,
+                          height,
+                        )
+                      : _buildNormalLayout(
+                          context,
+                          loc,
+                          width,
+                          height,
+                        );
 
-                  return _buildNormalLayout(
-                    context,
-                    loc,
-                    width,
-                    height,
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      mainLayout,
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: dotsBottomInset,
+                        child: Center(
+                          child: _buildPageIndicator(activeIndex: 1),
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -234,60 +255,65 @@ class _SelectLanguageScreenState
         child: SafeArea(
           top: true,
           bottom: false,
-          child: Stack(
-            children: [
-              // =================================================================
-              // CENTERED LOGO
-              // =================================================================
-              //
-              // The logo is deliberately positioned lower than before.
-              // This makes it visually closer to the second reference image.
-              //
-
-              Positioned(
-                top: _logoTopPosition(
+          // ===================================================================
+          // LOGO + FEATURES, VERTICALLY CENTERED
+          // ===================================================================
+          //
+          // Instead of independently pinning the logo near the top and the
+          // feature grid near the bottom (which made the features look like
+          // they were floating too low / too small), both pieces are grouped
+          // into a single column that is centered inside the dome. This keeps
+          // the spacing balanced on every screen size and matches the
+          // reference layout, where the whole cluster sits comfortably in the
+          // upper-middle of the red area with room to breathe above the curve.
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: _headerBottomReserve(height),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLogo(
+                  context,
                   width,
-                  height,
                 ),
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: _buildLogo(
-                    context,
-                    width,
-                  ),
+
+                SizedBox(
+                  height: _logoFeatureGap(width, height),
                 ),
-              ),
 
-              // =================================================================
-              // FEATURES
-              // =================================================================
-              //
-              // Instead of allowing the feature grid to sit near the top
-              // and leaving a huge empty space underneath, the grid is
-              // anchored close to the curved bottom.
-              //
-
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: _featureBottomPosition(
+                _buildFeatureGrid(
+                  context,
+                  loc,
                   width,
-                  height,
                 ),
-                child: Center(
-                  child: _buildFeatureGrid(
-                    context,
-                    loc,
-                    width,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
+  }
+
+  // ===========================================================================
+  // HEADER BOTTOM RESERVE
+  // ===========================================================================
+  //
+  // Keeps the centered content from drifting into the curved edge itself.
+
+  double _headerBottomReserve(double height) {
+    return (height * 0.10).clamp(16.0, 40.0);
+  }
+
+  // ===========================================================================
+  // LOGO / FEATURE GRID GAP
+  // ===========================================================================
+
+  double _logoFeatureGap(
+    double width,
+    double height,
+  ) {
+    return (height * 0.07).clamp(24.0, 44.0);
   }
 
   // ===========================================================================
@@ -401,9 +427,17 @@ class _SelectLanguageScreenState
               // -----------------------------------------------------------------
               // CLARO LOGO IMAGE
               // -----------------------------------------------------------------
+              //
+              // `logo.png` is the same dark-red mark used on light
+              // backgrounds elsewhere in the app (e.g. the Get Started
+              // screen). Dropped in as-is on this red header, it renders
+              // in the wrong color and nearly disappears against the red
+              // background. `BlendMode.srcIn` uses the artwork purely as
+              // an alpha mask and repaints it solid white, matching the
+              // reference design.
 
               Image.asset(
-                'assets/images/logo.png',
+                'assets/images/whiteBorderLogo.png',
                 height: logoSize,
                 width: logoSize,
                 fit: BoxFit.contain,
@@ -465,7 +499,7 @@ class _SelectLanguageScreenState
       height: size,
       child: CustomPaint(
         painter: _CornerPainter(
-          color: Colors.white,
+          color: _red,
           thickness: thickness,
           top: top,
           left: left,
@@ -552,17 +586,17 @@ class _SelectLanguageScreenState
     required double width,
   }) {
     /*
-     * Smaller and cleaner than the previous version.
-     * This more closely matches the second reference.
+     * Sized to match the reference: the icons read clearly at a
+     * glance instead of looking like small decoration.
      */
-    final iconSize = (width / 390 * 24).clamp(
-      20.0,
-      28.0,
+    final iconSize = (width / 390 * 32).clamp(
+      27.0,
+      36.0,
     );
 
-    final labelSize = (width / 390 * 10.5).clamp(
-      9.0,
-      13.0,
+    final labelSize = (width / 390 * 12.5).clamp(
+      11.0,
+      15.0,
     );
 
     final itemWidth = _featureItemWidth(width);
@@ -698,6 +732,34 @@ class _SelectLanguageScreenState
   }
 
   // ===========================================================================
+  // PAGE INDICATOR
+  // ===========================================================================
+
+  Widget _buildPageIndicator({
+    required int activeIndex,
+    int count = 2,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(count, (index) {
+        final bool isActive = index == activeIndex;
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: isActive ? 20 : 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: isActive
+                ? _red
+                : const Color(0xFFE0C9C9),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        );
+      }),
+    );
+  }
+
+  // ===========================================================================
   // LANGUAGE BUTTON
   // ===========================================================================
 
@@ -828,80 +890,6 @@ class _SelectLanguageScreenState
   }
 
   // ===========================================================================
-  // LOGO POSITION
-  // ===========================================================================
-  //
-  // Controls how far down the logo appears inside the red header.
-  //
-  // The important difference from the previous code is that this is
-  // independent from the feature grid.
-  //
-
-  double _logoTopPosition(
-    double width,
-    double height,
-  ) {
-    if (height < 300) {
-      return 18.0;
-    }
-
-    if (width <= 320) {
-      return 25.0;
-    }
-
-    if (width <= 360) {
-      return 30.0;
-    }
-
-    if (width <= 390) {
-      return 34.0;
-    }
-
-    if (width <= 430) {
-      return 38.0;
-    }
-
-    return 42.0;
-  }
-
-  // ===========================================================================
-  // FEATURE BOTTOM POSITION
-  // ===========================================================================
-  //
-  // This is the main fix for the large empty red space.
-  //
-  // The feature grid is attached near the bottom of the red section,
-  // just above the curved edge.
-  //
-
-  double _featureBottomPosition(
-    double width,
-    double height,
-  ) {
-    if (height < 300) {
-      return 28.0;
-    }
-
-    if (width <= 320) {
-      return 18.0;
-    }
-
-    if (width <= 360) {
-      return 22.0;
-    }
-
-    if (width <= 390) {
-      return 25.0;
-    }
-
-    if (width <= 430) {
-      return 28.0;
-    }
-
-    return 32.0;
-  }
-
-  // ===========================================================================
   // HORIZONTAL PADDING
   // ===========================================================================
 
@@ -1017,22 +1005,22 @@ class _SelectLanguageScreenState
     double width,
   ) {
     if (width <= 320) {
-      return 12.0;
-    }
-
-    if (width <= 360) {
-      return 14.0;
-    }
-
-    if (width <= 390) {
-      return 16.0;
-    }
-
-    if (width <= 430) {
       return 18.0;
     }
 
-    return 20.0;
+    if (width <= 360) {
+      return 20.0;
+    }
+
+    if (width <= 390) {
+      return 22.0;
+    }
+
+    if (width <= 430) {
+      return 24.0;
+    }
+
+    return 28.0;
   }
 
   // ===========================================================================
@@ -1057,27 +1045,27 @@ class _SelectLanguageScreenState
     double height,
   ) {
     /*
-     * Reduced considerably so the white section begins cleanly
-     * after the curved red header.
+     * Gives the white section proper breathing room below the curve
+     * instead of crowding "Choose Language" right up against it.
      */
 
     if (height < 600) {
-      return 12.0;
+      return 20.0;
     }
 
     if (width <= 320) {
-      return 14.0;
+      return 28.0;
     }
 
     if (width <= 390) {
-      return 16.0;
+      return 32.0;
     }
 
     if (width <= 430) {
-      return 18.0;
+      return 36.0;
     }
 
-    return 22.0;
+    return 40.0;
   }
 
   // ===========================================================================
@@ -1114,27 +1102,23 @@ class _SelectLanguageScreenState
     double width,
     double height,
   ) {
-    /*
-     * Reduced from the previous large gaps.
-     */
-
     if (height < 600) {
-      return 14.0;
-    }
-
-    if (width <= 360) {
-      return 16.0;
-    }
-
-    if (width <= 390) {
-      return 18.0;
-    }
-
-    if (width <= 430) {
       return 20.0;
     }
 
-    return 24.0;
+    if (width <= 360) {
+      return 32.0;
+    }
+
+    if (width <= 390) {
+      return 38.0;
+    }
+
+    if (width <= 430) {
+      return 44.0;
+    }
+
+    return 50.0;
   }
 
   // ===========================================================================

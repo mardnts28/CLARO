@@ -67,6 +67,8 @@ flutter:
     - assets/images/relations/
     - assets/images/avatars/
     - assets/images/learn-more/
+    - assets/images/startscreen-elements/
+    - assets/images/logo-launch/
     - assets/model/
     - .env
 

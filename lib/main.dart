@@ -20,6 +20,7 @@ import 'screens/onboarding_screen.dart';
 import 'screens/otp_verification_screen.dart';
 import 'screens/select_language_screen.dart';
 import 'screens/get_started_screen.dart';
+import 'screens/splash_screen.dart';
 import 'dart:async';
 import 'data/services/backend_locator.dart';
 import 'data/repositories/product_repository.dart';
@@ -216,30 +217,55 @@ class _VoiceInteractionStopperState extends State<_VoiceInteractionStopper> {
 }
 
 /// App entry point. Routes, in order:
+/// 0. SplashScreen (animated logo launch)
 /// 1. Get Started not yet seen → GetStartedScreen
 /// 2. Language not yet explicitly selected → SelectLanguageScreen
 /// 3. Otherwise → AuthGate (Login/Sign Up → onboarding → Home, as below)
-class RootGate extends StatelessWidget {
+class RootGate extends StatefulWidget {
   const RootGate({super.key});
 
   @override
+  State<RootGate> createState() => _RootGateState();
+}
+
+class _RootGateState extends State<RootGate> {
+  bool _showSplash = true;
+
+  void _onSplashComplete() {
+    if (mounted) {
+      setState(() {
+        _showSplash = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: GetStartedService.hasSeenGetStartedNotifier,
-      builder: (context, hasSeenGetStarted, _) {
-        if (!hasSeenGetStarted) {
-          return const GetStartedScreen();
-        }
-        return ValueListenableBuilder<bool>(
-          valueListenable: LocaleService.hasSelectedLanguageNotifier,
-          builder: (context, hasSelectedLanguage, _) {
-            if (!hasSelectedLanguage) {
-              return const SelectLanguageScreen();
-            }
-            return const AuthGate();
-          },
-        );
-      },
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      child: _showSplash
+          ? SplashScreen(
+              key: const ValueKey('splash'),
+              onInitializationComplete: _onSplashComplete,
+            )
+          : ValueListenableBuilder<bool>(
+              key: const ValueKey('root_flow'),
+              valueListenable: GetStartedService.hasSeenGetStartedNotifier,
+              builder: (context, hasSeenGetStarted, _) {
+                if (!hasSeenGetStarted) {
+                  return const GetStartedScreen();
+                }
+                return ValueListenableBuilder<bool>(
+                  valueListenable: LocaleService.hasSelectedLanguageNotifier,
+                  builder: (context, hasSelectedLanguage, _) {
+                    if (!hasSelectedLanguage) {
+                      return const SelectLanguageScreen();
+                    }
+                    return const AuthGate();
+                  },
+                );
+              },
+            ),
     );
   }
 }

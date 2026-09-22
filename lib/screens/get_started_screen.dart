@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../generated/l10n/app_localizations.dart';
@@ -6,29 +8,40 @@ import '../services/get_started_service.dart';
 
 /// CLARO Get Started / Welcome Screen
 ///
-/// The main visual design is provided by:
-/// assets/images/startbg.png
+/// Previously this screen was a single flat image
+/// (assets/images/startbg.png) with the dome, logo, illustration
+/// cluster, and tagline all baked into one PNG. That made the dome's
+/// red shade impossible to keep in sync with the app's real primary
+/// red, and made it impossible to animate individual illustration
+/// pieces.
 ///
-/// The background image contains:
-/// - CLARO logo
-/// - Shopping cart illustration
-/// - Red curved/dome background
-/// - Tagline
-/// - Subtitle
-/// - Page indicator
-///
-/// Interactive elements placed above the background:
-/// - Get Started button
-/// - Learn More About CLARO
+/// This version rebuilds the same layout from real widgets:
+/// - The dome is drawn in code with `_red` (0xFF8B1A1A), the same
+///   constant used everywhere else in the app.
+/// - The logo, "CLARO" wordmark, and illustration cluster
+///   (assets/images/startscreen-elements/*.png, each a standalone
+///   transparent PNG) are positioned individually, using the exact
+///   coordinates measured from the original design.
+/// - Each illustration piece gently bobs/pulses in a continuous,
+///   staggered loop so the cluster feels alive instead of static.
+/// - The tagline/subtitle are real, localized `Text` widgets instead
+///   of baked-in pixels, so the Tagalog locale renders correctly here
+///   too.
 ///
 /// Existing functionality is preserved:
 /// - Haptic feedback
 /// - GetStartedService.markSeen()
 /// - External Learn More URL
 /// - Error handling if the URL cannot be opened
-class GetStartedScreen extends StatelessWidget {
+class GetStartedScreen extends StatefulWidget {
   const GetStartedScreen({super.key});
 
+  @override
+  State<GetStartedScreen> createState() => _GetStartedScreenState();
+}
+
+class _GetStartedScreenState extends State<GetStartedScreen>
+    with TickerProviderStateMixin {
   // ---------------------------------------------------------------------------
   // COLORS
   // ---------------------------------------------------------------------------
@@ -36,11 +49,10 @@ class GetStartedScreen extends StatelessWidget {
   static const Color _red = Color(0xFF8B1A1A);
 
   // ---------------------------------------------------------------------------
-  // BACKGROUND ASSET
+  // ILLUSTRATION ASSETS
   // ---------------------------------------------------------------------------
 
-  static const String _backgroundAsset =
-      'assets/images/startbg.png';
+  static const String _elementsPath = 'assets/images/startscreen-elements/';
 
   // ---------------------------------------------------------------------------
   // LEARN MORE URL
@@ -49,6 +61,32 @@ class GetStartedScreen extends StatelessWidget {
   static final Uri _learnMoreUrl = Uri.parse(
     'https://claro-52ia.onrender.com/?fbclid=IwY2xjawUXIttwZG9mA2V4dG4DYWVtAjExAHNydGMGYXBwX2lkATAAAR4YhO9Wsy20CCgjm8jxB2PI5wbOiV-pNHmZudjQn6MwtJvBLUNr-69vEw0aIA_aem_Y_mwxTMVzZKOGXKFa2OutQ',
   );
+
+  // ---------------------------------------------------------------------------
+  // FLOAT ANIMATION
+  // ---------------------------------------------------------------------------
+  //
+  // A single continuously-repeating controller drives every illustration
+  // piece. Each piece reads its own phase offset into a sine wave, so
+  // they all move on the same clock but never in sync with each other.
+
+  late final AnimationController _floatController;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _floatController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _floatController.dispose();
+    super.dispose();
+  }
 
   // ---------------------------------------------------------------------------
   // GET STARTED FUNCTION
@@ -116,8 +154,7 @@ class GetStartedScreen extends StatelessWidget {
       ),
       child: Builder(
         builder: (context) {
-          final AppLocalizations loc =
-              AppLocalizations.of(context)!;
+          final AppLocalizations loc = AppLocalizations.of(context)!;
 
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(
@@ -153,10 +190,44 @@ class GetStartedScreen extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       // ======================================================
-                      // FULL SCREEN BACKGROUND
+                      // WHITE BASE
                       // ======================================================
 
-                      _buildBackground(
+                      const ColoredBox(color: Colors.white),
+
+                      // ======================================================
+                      // RED DOME
+                      // ======================================================
+
+                      _buildDome(
+                        width: width,
+                        height: height,
+                      ),
+
+                      // ======================================================
+                      // DOME TEXT (TAGLINE + SUBTITLE)
+                      // ======================================================
+
+                      _buildDomeText(
+                        loc: loc,
+                        width: width,
+                        height: height,
+                      ),
+
+                      // ======================================================
+                      // LOGO
+                      // ======================================================
+
+                      _buildLogoArea(
+                        width: width,
+                        height: height,
+                      ),
+
+                      // ======================================================
+                      // ANIMATED ILLUSTRATION CLUSTER
+                      // ======================================================
+
+                      ..._buildIllustrationCluster(
                         width: width,
                         height: height,
                       ),
@@ -186,71 +257,275 @@ class GetStartedScreen extends StatelessWidget {
   }
 
   // ---------------------------------------------------------------------------
-  // BACKGROUND
+  // RED DOME
   // ---------------------------------------------------------------------------
+  //
+  // Measured from the original design: the curve peaks at ~49% of the
+  // screen height and the sides settle at ~62.5%, then the dome fills
+  // solid down to the bottom of the screen.
 
-  Widget _buildBackground({
+  Widget _buildDome({
     required double width,
     required double height,
   }) {
     return Positioned.fill(
-      child: ColoredBox(
-        color: Colors.white,
-        child: Image.asset(
-          _backgroundAsset,
+      child: ClipPath(
+        clipper: _DomeClipper(
+          peakY: height * 0.49,
+          sideY: height * 0.625,
+        ),
+        child: Container(color: _red),
+      ),
+    );
+  }
 
-          // COVER ensures the image fills the entire screen.
-          //
-          // This means:
-          // - No white bars
-          // - No empty space
-          // - No stretching
-          //
-          // On devices with a significantly different aspect ratio,
-          // the edges may be cropped slightly, which is preferable
-          // for this full-screen visual design.
-          fit: BoxFit.cover,
+  // ---------------------------------------------------------------------------
+  // DOME TEXT
+  // ---------------------------------------------------------------------------
 
-          // Keep the center of startbg aligned with the center
-          // of the device screen.
-          alignment: Alignment.center,
+  Widget _buildDomeText({
+    required AppLocalizations loc,
+    required double width,
+    required double height,
+  }) {
+    // Sits just below where the curve settles, inside the solid
+    // portion of the dome.
+    final double top = height * 0.625 + (height * 0.035);
 
-          // Improve image quality when the image is scaled.
-          filterQuality: FilterQuality.high,
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: top,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: (width * 0.08).clamp(20.0, 48.0),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              loc.getStartedTagline,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: _responsiveFont(width, base: 19),
+                fontWeight: FontWeight.w700,
+                height: 1.2,
+              ),
+            ),
 
-          errorBuilder: (
-            BuildContext context,
-            Object error,
-            StackTrace? stackTrace,
-          ) {
-            return _buildBackgroundError();
-          },
+            SizedBox(height: (height * 0.018).clamp(10.0, 22.0)),
+
+            Text(
+              loc.getStartedSubtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.92),
+                fontSize: _responsiveFont(width, base: 14.5),
+                fontWeight: FontWeight.w400,
+                height: 1.35,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
   // ---------------------------------------------------------------------------
-  // BACKGROUND ERROR FALLBACK
+  // LOGO
   // ---------------------------------------------------------------------------
+  //
+  // Scanner-frame corners + logo.png + "CLARO" wordmark, positioned to
+  // match the original design (centered, ~11%-22% of screen height).
 
-  Widget _buildBackgroundError() {
-    return Container(
-      color: Colors.white,
-      alignment: Alignment.center,
-      child: const Padding(
-        padding: EdgeInsets.all(24),
-        child: Text(
-          'Unable to load CLARO background.',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: _red,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+  Widget _buildLogoArea({
+    required double width,
+    required double height,
+  }) {
+    final double frameSize = (width * 0.231).clamp(72.0, 130.0);
+    final double cornerSize = frameSize * 0.32;
+    final double cornerThickness = (width / 390 * 3.2).clamp(2.4, 4.0);
+    final double logoSize = frameSize * 0.72;
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: height * 0.075,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: frameSize,
+            height: frameSize,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  child: _corner(
+                    size: cornerSize,
+                    thickness: cornerThickness,
+                    top: true,
+                    left: true,
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: _corner(
+                    size: cornerSize,
+                    thickness: cornerThickness,
+                    top: true,
+                    left: false,
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  bottom: 0,
+                  child: _corner(
+                    size: cornerSize,
+                    thickness: cornerThickness,
+                    top: false,
+                    left: true,
+                  ),
+                ),
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: _corner(
+                    size: cornerSize,
+                    thickness: cornerThickness,
+                    top: false,
+                    left: false,
+                  ),
+                ),
+                Image.asset(
+                  'assets/images/logo-launch/logo-can.png',
+                  height: logoSize,
+                  width: logoSize,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) {
+                    return Icon(
+                      Icons.qr_code_scanner,
+                      color: _red,
+                      size: logoSize * 0.78,
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
+
+          SizedBox(height: (width / 390 * 8).clamp(5.0, 11.0)),
+
+          Text(
+            'CLARO',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: _responsiveFont(width, base: 26),
+              fontWeight: FontWeight.w800,
+              color: _red,
+              letterSpacing: 1.5,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _corner({
+    required double size,
+    required double thickness,
+    required bool top,
+    required bool left,
+  }) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _CornerPainter(
+          color: _red,
+          thickness: thickness,
+          top: top,
+          left: left,
         ),
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // ILLUSTRATION CLUSTER
+  // ---------------------------------------------------------------------------
+  //
+  // Each item's center position and width are fractions of the screen,
+  // measured directly from the original design so the composition
+  // matches it. Every item bobs/pulses continuously and independently
+  // (see `_FloatingElement`).
+
+  List<Widget> _buildIllustrationCluster({
+    required double width,
+    required double height,
+  }) {
+    final items = <_ClusterItem>[
+      _ClusterItem(
+        asset: 'sardine_can.png',
+        centerX: 0.51,
+        centerY: 0.31,
+        widthFraction: 0.115,
+        phase: 0.0,
+      ),
+      _ClusterItem(
+        asset: 'pie_chart.png',
+        centerX: 0.645,
+        centerY: 0.365,
+        widthFraction: 0.20,
+        phase: 0.4,
+      ),
+      _ClusterItem(
+        asset: 'clipboard.png',
+        centerX: 0.465,
+        centerY: 0.40,
+        widthFraction: 0.13,
+        phase: 0.2,
+      ),
+      _ClusterItem(
+        asset: 'noodle_pack.png',
+        centerX: 0.61,
+        centerY: 0.455,
+        widthFraction: 0.175,
+        phase: 0.6,
+      ),
+      _ClusterItem(
+        asset: 'cart.png',
+        centerX: 0.535,
+        centerY: 0.515,
+        widthFraction: 0.335,
+        phase: 0.8,
+      ),
+    ];
+
+    return items.map((item) {
+      final double itemWidth = width * item.widthFraction;
+
+      return Positioned(
+        left: width * item.centerX - itemWidth / 2,
+        top: height * item.centerY - itemWidth / 2,
+        width: itemWidth,
+        height: itemWidth,
+        child: _FloatingElement(
+          controller: _floatController,
+          phase: item.phase,
+          child: Image.asset(
+            '$_elementsPath${item.asset}',
+            fit: BoxFit.contain,
+            errorBuilder: (_, _, _) => const SizedBox.shrink(),
+          ),
+        ),
+      );
+    }).toList();
   }
 
   // ---------------------------------------------------------------------------
@@ -434,9 +709,55 @@ class GetStartedScreen extends StatelessWidget {
                 ),
               ),
             ),
+
+            // ===============================================================
+            // GAP
+            // ===============================================================
+
+            const SizedBox(height: 14),
+
+            // ===============================================================
+            // PAGE INDICATOR
+            // ===============================================================
+            //
+            // This is the first step of the onboarding flow (Get Started
+            // -> Select Language), so the first dot is active. Added here
+            // to match the reference design and the indicator already
+            // present on the Select Language screen — the original
+            // baked-in image did not clearly show one.
+
+            _buildPageIndicator(activeIndex: 0),
           ],
         ),
       ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // PAGE INDICATOR
+  // ---------------------------------------------------------------------------
+
+  Widget _buildPageIndicator({
+    required int activeIndex,
+    int count = 2,
+  }) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(count, (index) {
+        final bool isActive = index == activeIndex;
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 4),
+          width: isActive ? 20 : 7,
+          height: 7,
+          decoration: BoxDecoration(
+            color: isActive
+                ? Colors.white
+                : Colors.white.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(4),
+          ),
+        );
+      }),
     );
   }
 
@@ -454,5 +775,184 @@ class GetStartedScreen extends StatelessWidget {
     );
 
     return base * factor;
+  }
+}
+
+// =============================================================================
+// CLUSTER ITEM DATA
+// =============================================================================
+
+class _ClusterItem {
+  final String asset;
+  final double centerX;
+  final double centerY;
+  final double widthFraction;
+  final double phase;
+
+  const _ClusterItem({
+    required this.asset,
+    required this.centerX,
+    required this.centerY,
+    required this.widthFraction,
+    required this.phase,
+  });
+}
+
+// =============================================================================
+// FLOATING ELEMENT
+// =============================================================================
+//
+// Wraps a single illustration piece in a continuous, looping "breathe"
+// motion: a gentle scale pulse combined with a small forward/upward
+// drift, giving the effect of each item floating just off the surface.
+// `phase` (0-1) offsets where in the cycle this item starts, so a
+// cluster of these never moves in unison.
+
+class _FloatingElement extends StatelessWidget {
+  final Animation<double> controller;
+  final double phase;
+  final Widget child;
+
+  const _FloatingElement({
+    required this.controller,
+    required this.phase,
+    required this.child,
+  });
+
+  static const double _scaleAmount = 0.055;
+  static const double _driftAmount = 6.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      child: child,
+      builder: (context, cachedChild) {
+        final double t = math.sin(
+          (controller.value + phase) * 2 * math.pi,
+        );
+
+        final double scale = 1.0 + _scaleAmount * (0.5 + 0.5 * t);
+        final double dy = -_driftAmount * (0.5 + 0.5 * t);
+
+        return Transform.translate(
+          offset: Offset(0, dy),
+          child: Transform.scale(
+            scale: scale,
+            child: cachedChild,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// =============================================================================
+// DOME CLIPPER
+// =============================================================================
+//
+// A smooth hill/dome shape: flat at the sides (sideY), rising to a
+// rounded peak in the center (peakY), then filled solid down to the
+// bottom of the screen.
+
+class _DomeClipper extends CustomClipper<Path> {
+  final double peakY;
+  final double sideY;
+
+  const _DomeClipper({
+    required this.peakY,
+    required this.sideY,
+  });
+
+  @override
+  Path getClip(Size size) {
+    final path = Path();
+
+    path.moveTo(0, sideY);
+
+    path.quadraticBezierTo(
+      size.width * 0.25,
+      peakY,
+      size.width * 0.5,
+      peakY,
+    );
+
+    path.quadraticBezierTo(
+      size.width * 0.75,
+      peakY,
+      size.width,
+      sideY,
+    );
+
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant _DomeClipper oldClipper) {
+    return oldClipper.peakY != peakY || oldClipper.sideY != sideY;
+  }
+}
+
+// =============================================================================
+// SCANNER CORNER PAINTER
+// =============================================================================
+
+class _CornerPainter extends CustomPainter {
+  final Color color;
+  final double thickness;
+  final bool top;
+  final bool left;
+
+  const _CornerPainter({
+    required this.color,
+    required this.thickness,
+    required this.top,
+    required this.left,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = thickness
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.square;
+
+    final path = Path();
+
+    final horizontalLength = size.width;
+    final verticalLength = size.height;
+
+    if (top && left) {
+      path.moveTo(0, verticalLength);
+      path.lineTo(0, 0);
+      path.lineTo(horizontalLength, 0);
+    } else if (top && !left) {
+      path.moveTo(0, 0);
+      path.lineTo(horizontalLength, 0);
+      path.lineTo(horizontalLength, verticalLength);
+    } else if (!top && left) {
+      path.moveTo(0, 0);
+      path.lineTo(0, verticalLength);
+      path.lineTo(horizontalLength, verticalLength);
+    } else {
+      path.moveTo(0, verticalLength);
+      path.lineTo(horizontalLength, verticalLength);
+      path.lineTo(horizontalLength, 0);
+    }
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CornerPainter oldDelegate) {
+    return oldDelegate.color != color ||
+        oldDelegate.thickness != thickness ||
+        oldDelegate.top != top ||
+        oldDelegate.left != left;
   }
 }
