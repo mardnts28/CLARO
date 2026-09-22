@@ -277,18 +277,18 @@ class GetStartedScreen extends StatelessWidget {
     //
     // On very narrow phones, it won't become too small.
     // On tablets, it won't become unnecessarily huge.
-    final double buttonWidth = (width * 0.34).clamp(
-      125.0,
-      180.0,
+    final double buttonWidth = (width * 0.46).clamp(
+      160.0,
+      220.0,
     );
 
     // ---------------------------------------------------------
     // RESPONSIVE BUTTON HEIGHT
     // ---------------------------------------------------------
 
-    final double buttonHeight = (width / 390 * 42).clamp(
-      40.0,
+    final double buttonHeight = (width / 390 * 52).clamp(
       48.0,
+      58.0,
     );
 
     // ---------------------------------------------------------
@@ -307,9 +307,9 @@ class GetStartedScreen extends StatelessWidget {
     //
     // The clamp prevents the button from moving too far away
     // from the bottom on unusually tall/short devices.
-    final double bottomSpacing = (height * 0.065).clamp(
-      42.0,
-      70.0,
+    final double bottomSpacing = (height * 0.05).clamp(
+      28.0,
+      56.0,
     );
 
     // ---------------------------------------------------------
@@ -380,7 +380,7 @@ class GetStartedScreen extends StatelessWidget {
                     color: _red,
                     fontSize: _responsiveFont(
                       width,
-                      base: 13,
+                      base: 15,
                     ),
                     fontWeight: FontWeight.w700,
                     height: 1.0,
@@ -393,7 +393,7 @@ class GetStartedScreen extends StatelessWidget {
             // GAP
             // ===============================================================
 
-            const SizedBox(height: 9),
+            const SizedBox(height: 12),
 
             // ===============================================================
             // LEARN MORE
@@ -422,7 +422,7 @@ class GetStartedScreen extends StatelessWidget {
                     color: Colors.white,
                     fontSize: _responsiveFont(
                       width,
-                      base: 10,
+                      base: 12,
                     ),
                     fontWeight: FontWeight.w400,
 

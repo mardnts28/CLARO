@@ -754,67 +754,69 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header row: back + title (shadow instead of divider) ──
+            // ── Header bar: centered title with subtle shadow, matching the
+            // ranking screens' app-wide header treatment. ──
             Container(
+              height: topPadding + 56,
+              padding: EdgeInsets.only(left: 16, right: 16, top: topPadding),
               decoration: BoxDecoration(
                 color: colorScheme.surface,
                 boxShadow: _softShadow(theme, blur: 12, dy: 4),
               ),
-              padding: EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: topPadding + 14,
-                bottom: 14,
-              ),
-              child: Row(
+              child: Stack(
+                alignment: Alignment.center,
                 children: [
-                  GestureDetector(
-                    onTap: _handleBack,
-                    child: Icon(
-                      Icons.arrow_back,
-                      color: colorScheme.primary,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Text(
                     loc.similarProductsTitle,
                     style: GoogleFonts.outfit(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
                       color: colorScheme.primary,
                     ),
                   ),
-                  const Spacer(),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: GestureDetector(
+                      onTap: _handleBack,
+                      child: Icon(
+                        Icons.arrow_back,
+                        color: colorScheme.primary,
+                        size: 24,
+                      ),
+                    ),
+                  ),
                   if (_profile != null)
-                    GestureDetector(
-                      onTap: () {
-                        HapticService().vibrate();
-                        _showFilterSheet();
-                      },
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Icon(
-                            Icons.filter_list,
-                            color: colorScheme.primary,
-                            size: 24,
-                          ),
-                          if (_selectedConditions.isNotEmpty ||
-                              _hasActiveTagFilters)
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.secondary,
-                                  shape: BoxShape.circle,
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticService().vibrate();
+                          _showFilterSheet();
+                        },
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Icon(
+                              Icons.filter_list,
+                              color: colorScheme.primary,
+                              size: 24,
+                            ),
+                            if (_selectedConditions.isNotEmpty ||
+                                _hasActiveTagFilters)
+                              Positioned(
+                                top: -2,
+                                right: -2,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.secondary,
+                                    shape: BoxShape.circle,
+                                  ),
                                 ),
                               ),
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                 ],

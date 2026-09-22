@@ -15,7 +15,7 @@ import 'history_screen.dart';
 import 'nutrition_guide_screen.dart';
 import 'group_screen.dart';
 import 'product_detail_screen.dart';
-import 'product_search_results_screen.dart';
+import 'multi_scan_results_screen.dart';
 import '../data/services/backend_locator.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -205,8 +205,10 @@ class _HomeScreenState extends State<HomeScreen> {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                ProductSearchResultsScreen(query: query, products: matches),
+            builder: (_) => MultiScanResultsScreen(
+              detectedProducts: matches,
+              isSearchResult: true,
+            ),
           ),
         );
         // Back on Home -- clear the search bar.
@@ -292,8 +294,10 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            ProductSearchResultsScreen(query: query, products: matches),
+        builder: (_) => MultiScanResultsScreen(
+          detectedProducts: matches,
+          isSearchResult: true,
+        ),
       ),
     );
     // Back on Home -- clear the search bar.

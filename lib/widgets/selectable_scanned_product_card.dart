@@ -51,17 +51,13 @@ class SelectableScannedProductCard extends StatelessWidget {
                 ? colorScheme.primary.withValues(alpha: 0.08)
                 : theme.cardColor,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: isSelected
-                  ? colorScheme.primary
-                  : theme.dividerColor,
-              width: isSelected ? 2 : 1,
-            ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.04),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
+                color: isSelected
+                    ? colorScheme.primary.withOpacity(0.10)
+                    : Colors.black.withOpacity(0.05),
+                blurRadius: isSelected ? 12 : 8,
+                offset: const Offset(0, 3),
               ),
             ],
           ),

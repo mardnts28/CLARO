@@ -561,8 +561,8 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header bar: back, Resulta (perfectly centered Stack) ──
-            // Shadow replaces the old divider line underneath.
+            // ── Header bar: centered title with subtle shadow, matching the
+            // ranking screens' consistent format. ──
             Container(
               height: topPadding + 56,
               padding: EdgeInsets.only(left: 16, right: 16, top: topPadding),
@@ -573,7 +573,6 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  // Centered Title
                   Text(
                     loc.resultsTitle,
                     style: GoogleFonts.outfit(
@@ -582,7 +581,6 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                       color: colorScheme.primary,
                     ),
                   ),
-                  // Left Back Button
                   Align(
                     alignment: Alignment.centerLeft,
                     child: GestureDetector(
@@ -597,7 +595,6 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                       ),
                     ),
                   ),
-                  // Right Filter Ranking Button (matches compare_products_screen)
                   if (_profile != null)
                     Align(
                       alignment: Alignment.centerRight,

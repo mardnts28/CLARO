@@ -50,9 +50,9 @@ class _SelectLanguageScreenState
 
   static const double _maxContentWidth = 520.0;
 
-  static const double _maxButtonWidth = 190.0;
+  static const double _maxButtonWidth = 240.0;
 
-  static const double _minButtonWidth = 118.0;
+  static const double _minButtonWidth = 170.0;
 
   // ===========================================================================
   // LANGUAGE SELECTION
@@ -168,9 +168,9 @@ class _SelectLanguageScreenState
      * the header are now positioned intentionally instead
      * of simply being placed at the top of a Column.
      */
-    final headerHeight = (height * 0.50).clamp(
-      280.0,
-      520.0,
+    final headerHeight = (height * 0.46).clamp(
+      260.0,
+      470.0,
     );
 
     return SafeArea(
@@ -707,19 +707,19 @@ class _SelectLanguageScreenState
     required String code,
     required double width,
   }) {
-    final buttonWidth = (width * 0.31).clamp(
+    final buttonWidth = (width * 0.42).clamp(
       _minButtonWidth,
       _maxButtonWidth,
     );
 
-    final buttonHeight = (width / 390 * 43).clamp(
-      40.0,
-      50.0,
+    final buttonHeight = (width / 390 * 56).clamp(
+      48.0,
+      58.0,
     );
 
-    final fontSize = (width / 390 * 13.5).clamp(
-      12.0,
-      16.0,
+    final fontSize = (width / 390 * 15.5).clamp(
+      14.0,
+      18.0,
     );
 
     return SizedBox(
@@ -788,9 +788,9 @@ class _SelectLanguageScreenState
      * The contents are still positioned using Stack,
      * so there will not be a large empty area.
      */
-    final compactHeaderHeight = (height * 0.52).clamp(
-      220.0,
-      330.0,
+    final compactHeaderHeight = (height * 0.48).clamp(
+      210.0,
+      300.0,
     );
 
     return SafeArea(
@@ -883,22 +883,22 @@ class _SelectLanguageScreenState
     }
 
     if (width <= 320) {
-      return 25.0;
+      return 18.0;
     }
 
     if (width <= 360) {
-      return 28.0;
+      return 22.0;
     }
 
     if (width <= 390) {
-      return 30.0;
+      return 25.0;
     }
 
     if (width <= 430) {
-      return 34.0;
+      return 28.0;
     }
 
-    return 38.0;
+    return 32.0;
   }
 
   // ===========================================================================
@@ -961,26 +961,26 @@ class _SelectLanguageScreenState
     double width,
   ) {
     if (width <= 320) {
-      return 250.0;
+      return 280.0;
     }
 
     if (width <= 360) {
-      return 265.0;
+      return 300.0;
     }
 
     if (width <= 390) {
-      return 285.0;
+      return 320.0;
     }
 
     if (width <= 430) {
-      return 310.0;
+      return 350.0;
     }
 
     if (width <= 600) {
-      return 345.0;
+      return 380.0;
     }
 
-    return 390.0;
+    return 420.0;
   }
 
   // ===========================================================================
@@ -991,22 +991,22 @@ class _SelectLanguageScreenState
     double width,
   ) {
     if (width <= 320) {
-      return 98.0;
+      return 120.0;
     }
 
     if (width <= 360) {
-      return 105.0;
+      return 130.0;
     }
 
     if (width <= 390) {
-      return 115.0;
+      return 140.0;
     }
 
     if (width <= 430) {
-      return 128.0;
+      return 150.0;
     }
 
-    return 145.0;
+    return 170.0;
   }
 
   // ===========================================================================
@@ -1017,22 +1017,22 @@ class _SelectLanguageScreenState
     double width,
   ) {
     if (width <= 320) {
-      return 10.0;
+      return 12.0;
     }
 
     if (width <= 360) {
-      return 11.0;
+      return 14.0;
     }
 
     if (width <= 390) {
-      return 13.0;
+      return 16.0;
     }
 
     if (width <= 430) {
-      return 15.0;
+      return 18.0;
     }
 
-    return 18.0;
+    return 20.0;
   }
 
   // ===========================================================================
@@ -1062,22 +1062,22 @@ class _SelectLanguageScreenState
      */
 
     if (height < 600) {
-      return 16.0;
+      return 12.0;
     }
 
     if (width <= 320) {
-      return 18.0;
+      return 14.0;
     }
 
     if (width <= 390) {
-      return 20.0;
+      return 16.0;
     }
 
     if (width <= 430) {
-      return 22.0;
+      return 18.0;
     }
 
-    return 28.0;
+    return 22.0;
   }
 
   // ===========================================================================
@@ -1088,22 +1088,22 @@ class _SelectLanguageScreenState
     double width,
   ) {
     if (width <= 320) {
-      return 18.0;
-    }
-
-    if (width <= 360) {
-      return 18.5;
-    }
-
-    if (width <= 390) {
-      return 19.0;
-    }
-
-    if (width <= 430) {
       return 20.0;
     }
 
-    return 22.0;
+    if (width <= 360) {
+      return 21.0;
+    }
+
+    if (width <= 390) {
+      return 22.0;
+    }
+
+    if (width <= 430) {
+      return 23.0;
+    }
+
+    return 25.0;
   }
 
   // ===========================================================================
@@ -1119,22 +1119,22 @@ class _SelectLanguageScreenState
      */
 
     if (height < 600) {
-      return 16.0;
+      return 14.0;
     }
 
     if (width <= 360) {
-      return 18.0;
+      return 16.0;
     }
 
     if (width <= 390) {
-      return 20.0;
+      return 18.0;
     }
 
     if (width <= 430) {
-      return 22.0;
+      return 20.0;
     }
 
-    return 26.0;
+    return 24.0;
   }
 
   // ===========================================================================
@@ -1145,22 +1145,22 @@ class _SelectLanguageScreenState
     double width,
   ) {
     if (width <= 320) {
-      return 10.0;
-    }
-
-    if (width <= 360) {
-      return 11.0;
-    }
-
-    if (width <= 390) {
       return 12.0;
     }
 
-    if (width <= 430) {
+    if (width <= 360) {
       return 13.0;
     }
 
-    return 15.0;
+    if (width <= 390) {
+      return 14.0;
+    }
+
+    if (width <= 430) {
+      return 15.0;
+    }
+
+    return 18.0;
   }
 
   // ===========================================================================
