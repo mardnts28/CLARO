@@ -85,6 +85,7 @@ class GerdTriggerDetector {
     'orange',
     'pineapple',
     'tamarind',
+    'kalamansi'
   ];
 
   static const List<String> _spicyKeywords = [
