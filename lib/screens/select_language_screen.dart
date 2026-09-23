@@ -202,12 +202,10 @@ class _SelectLanguageScreenState
      * the header are now positioned intentionally instead
      * of simply being placed at the top of a Column.
      */
-    final headerHeight = (height * 0.33).clamp(
-      210.0,
-      320.0,
+    final headerHeight = (height * 0.46).clamp(
+      260.0,
+      470.0,
     );
-    final featureBandHeight = _featureBandHeight(height);
-    const featureBandTopGap = 14.0;
 
     return SafeArea(
       top: false,
@@ -226,17 +224,9 @@ class _SelectLanguageScreenState
 
               _buildHeader(
                 context,
-                width,
-                headerHeight,
-              ),
-
-              const SizedBox(height: featureBandTopGap),
-
-              _buildFeatureBand(
-                context,
                 loc,
                 width,
-                height,
+                headerHeight,
               ),
 
               // =================================================================
@@ -245,19 +235,11 @@ class _SelectLanguageScreenState
 
               SizedBox(
                 width: contentWidth,
-                height: (height -
-                        headerHeight -
-                        featureBandTopGap -
-                        featureBandHeight)
-                    .clamp(0.0, height),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 20),
-                  child: _buildLanguageArea(
-                    context,
-                    loc,
-                    width,
-                    height,
-                  ),
+                child: _buildLanguageArea(
+                  context,
+                  loc,
+                  width,
+                  height,
                 ),
               ),
             ],
@@ -273,6 +255,7 @@ class _SelectLanguageScreenState
 
   Widget _buildHeader(
     BuildContext context,
+    AppLocalizations loc,
     double width,
     double height,
   ) {
@@ -286,9 +269,16 @@ class _SelectLanguageScreenState
           top: true,
           bottom: false,
           // ===================================================================
-          // LOGO, VERTICALLY CENTERED
+          // LOGO + FEATURES, VERTICALLY CENTERED
           // ===================================================================
           //
+          // Instead of independently pinning the logo near the top and the
+          // feature grid near the bottom (which made the features look like
+          // they were floating too low / too small), both pieces are grouped
+          // into a single column that is centered inside the dome. This keeps
+          // the spacing balanced on every screen size and matches the
+          // reference layout, where the whole cluster sits comfortably in the
+          // upper-middle of the red area with room to breathe above the curve.
           child: Padding(
             padding: EdgeInsets.only(
               bottom: _headerBottomReserve(height),
@@ -301,47 +291,21 @@ class _SelectLanguageScreenState
                   width,
                 ),
 
+                SizedBox(
+                  height: _logoFeatureGap(width, height),
+                ),
+
+                _buildFeatureGrid(
+                  context,
+                  loc,
+                  width,
+                ),
               ],
             ),
           ),
         ),
       ),
     );
-  }
-
-  Widget _buildFeatureBand(
-    BuildContext context,
-    AppLocalizations loc,
-    double width,
-    double height,
-  ) {
-    final bandHeight = _featureBandHeight(height);
-
-    return Container(
-      height: bandHeight,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Color(0xFFFFF7F5),
-        border: Border.symmetric(
-          horizontal: BorderSide(color: Color(0xFFF0D9D5)),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        child: Center(
-          child: _buildFeatureGrid(
-            context,
-            loc,
-            width,
-            color: _red,
-          ),
-        ),
-      ),
-    );
-  }
-
-  double _featureBandHeight(double height) {
-    return (height * 0.27).clamp(220.0, 242.0);
   }
 
   // ===========================================================================
@@ -379,7 +343,7 @@ class _SelectLanguageScreenState
      * Slightly smaller than the previous version so the entire
      * header looks more like the reference image.
      */
-    final scannerSize = (width * 0.42).clamp(128.0, 200.0);
+    final scannerSize = (width * 0.231).clamp(72.0, 130.0);
     final cornerSize = scannerSize * 0.32;
     final cornerThickness = (width / 390 * 3.2).clamp(2.4, 4.0);
     final logoSize = scannerSize * 0.72;
@@ -549,7 +513,6 @@ class _SelectLanguageScreenState
     BuildContext context,
     AppLocalizations loc,
     double width,
-    {required Color color}
   ) {
     final gridWidth = _featureGridWidth(width);
 
@@ -569,13 +532,11 @@ class _SelectLanguageScreenState
                 icon: Icons.qr_code_scanner,
                 label: loc.featureScan,
                 width: width,
-                color: color,
               ),
               _buildFeatureIcon(
                 icon: Icons.favorite_border,
                 label: loc.featureNutrition,
                 width: width,
-                color: color,
               ),
             ],
           ),
@@ -599,13 +560,11 @@ class _SelectLanguageScreenState
                 icon: Icons.add_circle_outline,
                 label: loc.featureHealth,
                 width: width,
-                color: color,
               ),
               _buildFeatureIcon(
                 icon: Icons.compare_arrows,
                 label: loc.featureCompare,
                 width: width,
-                color: color,
               ),
             ],
           ),
@@ -622,86 +581,68 @@ class _SelectLanguageScreenState
     required IconData icon,
     required String label,
     required double width,
-    required Color color,
   }) {
     /*
      * Sized to match the reference: the icons read clearly at a
      * glance instead of looking like small decoration.
      */
-    final iconSize = (width / 390 * 29).clamp(
-      25.0,
-      32.0,
+    final iconSize = (width / 390 * 32).clamp(
+      27.0,
+      36.0,
     );
 
-    final labelSize = (width / 390 * 12).clamp(
-      10.5,
-      14.0,
+    final labelSize = (width / 390 * 12.5).clamp(
+      11.0,
+      15.0,
     );
 
     final itemWidth = _featureItemWidth(width);
-    final labelWidth = (itemWidth * 0.72).clamp(88.0, 112.0);
 
     return SizedBox(
       width: itemWidth,
-      height: 88,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: const Color(0xFFF0D9D5),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
           // ===================================================================
           // ICON
           // ===================================================================
 
-              SizedBox(
-                height: iconSize + 3,
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: iconSize,
-                ),
-              ),
-
-              SizedBox(
-                height: _featureIconTextSpacing(width) + 6,
-              ),
-
-              SizedBox(
-                width: labelWidth,
-                child: Text(
-                  _wrapFeatureLabel(label),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: true,
-                  style: TextStyle(
-                    fontSize: labelSize,
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    height: 1.05,
-                  ),
-                ),
-              ),
-            ],
+          SizedBox(
+            height: iconSize + 3,
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: iconSize,
+            ),
           ),
-        ),
+
+          // ===================================================================
+          // ICON / TEXT GAP
+          // ===================================================================
+
+          SizedBox(
+            height: _featureIconTextSpacing(width),
+          ),
+
+          // ===================================================================
+          // LABEL
+          // ===================================================================
+
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: labelSize,
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+              height: 1.05,
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  String _wrapFeatureLabel(String label) {
-    final separator = label.indexOf(' ');
-    if (separator == -1) return label;
-    return '${label.substring(0, separator)}\n${label.substring(separator + 1)}';
   }
 
   // ===========================================================================
@@ -714,31 +655,31 @@ class _SelectLanguageScreenState
     double width,
     double height,
   ) {
-    final horizontalPadding = _horizontalPadding(width);
-
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      padding: EdgeInsets.only(
+        top: _languageTopSpacing(
+          width,
+          height,
+        ),
+        left: _horizontalPadding(width),
+        right: _horizontalPadding(width),
+        bottom: 24,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // ===================================================================
+          // CHOOSE LANGUAGE
+          // ===================================================================
+
           Text(
             loc.chooseLanguage,
-            textAlign: TextAlign.left,
+            textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: _languageTitleSize(width),
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: _black,
               height: 1.1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: 42,
-            height: 3,
-            decoration: BoxDecoration(
-              color: _red,
-              borderRadius: BorderRadius.circular(2),
             ),
           ),
 
@@ -762,7 +703,6 @@ class _SelectLanguageScreenState
             label: loc.english,
             code: 'en',
             width: width,
-            horizontalPadding: horizontalPadding,
           ),
 
           // ===================================================================
@@ -782,7 +722,6 @@ class _SelectLanguageScreenState
             label: loc.tagalog,
             code: 'tl',
             width: width,
-            horizontalPadding: horizontalPadding,
           ),
         ],
       ),
@@ -826,9 +765,11 @@ class _SelectLanguageScreenState
     required String label,
     required String code,
     required double width,
-    required double horizontalPadding,
   }) {
-    final buttonWidth = width - horizontalPadding * 2;
+    final buttonWidth = (width * 0.42).clamp(
+      _minButtonWidth,
+      _maxButtonWidth,
+    );
 
     final buttonHeight = (width / 390 * 56).clamp(
       48.0,
@@ -859,15 +800,11 @@ class _SelectLanguageScreenState
               _red.withValues(alpha: 0.65),
           disabledForegroundColor:
               Colors.white,
-          elevation: 2,
-          shadowColor: _red.withValues(alpha: 0.24),
+          elevation: 0,
+          shadowColor: Colors.transparent,
           padding: EdgeInsets.zero,
-          side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.18),
-            width: 1,
-          ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
+            borderRadius: BorderRadius.circular(30),
           ),
         ),
 
@@ -910,9 +847,9 @@ class _SelectLanguageScreenState
      * The contents are still positioned using Stack,
      * so there will not be a large empty area.
      */
-    final compactHeaderHeight = (height * 0.30).clamp(
-      170.0,
-      230.0,
+    final compactHeaderHeight = (height * 0.48).clamp(
+      210.0,
+      300.0,
     );
 
     return SafeArea(
@@ -928,17 +865,9 @@ class _SelectLanguageScreenState
 
             _buildHeader(
               context,
-              width,
-              compactHeaderHeight,
-            ),
-
-            const SizedBox(height: 12),
-
-            _buildFeatureBand(
-              context,
               loc,
               width,
-              height,
+              compactHeaderHeight,
             ),
 
             // =================================================================
@@ -965,11 +894,11 @@ class _SelectLanguageScreenState
     double width,
   ) {
     if (width <= 320) {
-      return 8.0;
+      return 18.0;
     }
 
     if (width <= 360) {
-      return 8.0;
+      return 20.0;
     }
 
     if (width <= 430) {
@@ -1073,22 +1002,22 @@ class _SelectLanguageScreenState
     double width,
   ) {
     if (width <= 320) {
-      return 14.0;
+      return 18.0;
     }
 
     if (width <= 360) {
-      return 14.0;
+      return 20.0;
     }
 
     if (width <= 390) {
-      return 16.0;
+      return 22.0;
     }
 
     if (width <= 430) {
-      return 16.0;
+      return 24.0;
     }
 
-    return 16.0;
+    return 28.0;
   }
 
   // ===========================================================================
@@ -1175,18 +1104,18 @@ class _SelectLanguageScreenState
     }
 
     if (width <= 360) {
-      return 24.0;
-    }
-
-    if (width <= 390) {
-      return 28.0;
-    }
-
-    if (width <= 430) {
       return 32.0;
     }
 
-    return 36.0;
+    if (width <= 390) {
+      return 38.0;
+    }
+
+    if (width <= 430) {
+      return 44.0;
+    }
+
+    return 50.0;
   }
 
   // ===========================================================================
