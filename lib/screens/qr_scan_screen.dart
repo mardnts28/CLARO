@@ -11,7 +11,7 @@
 // pubspec.yaml, e.g.:
 //
 //   dependencies:
-//     mobile_scanner: ^5.2.3
+//     mobile_scanner: ^7.4.2
 //
 // Why a new package rather than reusing the app's existing camera code:
 // camera_scanner_screen.dart already opens a camera, but it's a
@@ -36,10 +36,8 @@ class QrScanScreen extends StatefulWidget {
   State<QrScanScreen> createState() => _QrScanScreenState();
 }
 
-class _QrScanScreenState extends State<QrScanScreen> {
-  final MobileScannerController _controller = MobileScannerController(
-    detectionSpeed: DetectionSpeed.noDuplicates,
-  );
+class _QrScanScreenState extends State<QrScanScreen> with WidgetsBindingObserver {
+  late final MobileScannerController _controller;
 
   // Guards against onDetect firing more than once for the same code
   // (mobile_scanner can report multiple frames before the pop actually
@@ -47,7 +45,47 @@ class _QrScanScreenState extends State<QrScanScreen> {
   bool _handled = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _controller = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Handle app lifecycle changes to prevent camera issues
+    if (!mounted) return;
+    
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // Restart camera when app is resumed
+        if (_controller.value.isInitialized) {
+          try {
+            _controller.start();
+          } catch (e) {
+            debugPrint('Error restarting camera: $e');
+          }
+        }
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        // Stop camera when app is paused/inactive
+        try {
+          _controller.stop();
+        } catch (e) {
+          debugPrint('Error stopping camera: $e');
+        }
+        break;
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
     _controller.dispose();
   }
@@ -91,11 +129,40 @@ class _QrScanScreenState extends State<QrScanScreen> {
           MobileScanner(
             controller: _controller,
             onDetect: _onDetect,
-            errorBuilder: (context, error, child) {
+            errorBuilder: (context, error) {
+              // Attempt to recover from camera errors
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) {
+                  try {
+                    _controller.stop();
+                    Future.delayed(const Duration(milliseconds: 200), () {
+                      if (mounted) {
+                        _controller.start();
+                      }
+                    });
+                  } catch (e) {
+                    debugPrint('Error recovering camera: $e');
+                  }
+                }
+              });
+              
               return Center(
-                child: Text(
-                  'Camera error: $error',
-                  style: const TextStyle(color: Colors.white),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, color: Colors.white, size: 48),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Camera error: ${error.toString()}',
+                      style: const TextStyle(color: Colors.white),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Attempting to recover...',
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ],
                 ),
               );
             },
