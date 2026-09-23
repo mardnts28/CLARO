@@ -115,30 +115,6 @@ class FallbackAdvisoryGenerator {
       );
     }
 
-    if (evaluation.scoredFactors.isNotEmpty) {
-      final factorText = evaluation.scoredFactors
-          .map((factor) {
-            final label = _factorLabel(factor.factorKey, isTagalog);
-            if (factor.isUnknown) {
-              return isTagalog
-                  ? '$label: kulang ang impormasyon para matukoy ito.'
-                  : '$label: not enough information to determine this.';
-            }
-            return '$label: ${factor.explanation}';
-          })
-          .join(' ');
-      return HealthAdvisory(
-        overallLevel: evaluation.overallLevel,
-        warningText: isTagalog
-            ? 'Suriin ang mga health factor'
-            : 'Review health factors',
-        explanation: factorText,
-        safeServingSize: null,
-        source: AdvisorySource.fallbackRuleBased,
-        generatedAt: DateTime.now(),
-      );
-    }
-
     final servingSizeG =
         servingSizeGOverride ?? evaluation.product.servingSizeG;
 
@@ -164,6 +140,45 @@ class FallbackAdvisoryGenerator {
     final flagged = scaledEvals
         .where((e) => e.level != AdvisoryLevel.suitable)
         .toList();
+
+    // IMPORTANT: this check must come AFTER `flagged` is computed, and
+    // must only fire when there is no flagged *nutrient* to report.
+    // `evaluation.scoredFactors` is populated for every scored condition
+    // (e.g. plain hypertension contributes a 'sodiumMg' scored factor),
+    // not just the GERD/Kidney awareness-only factors it was originally
+    // written for -- so `scoredFactors.isNotEmpty` is true for almost
+    // every user with any condition on file. Checking it BEFORE `flagged`
+    // (as this used to) meant the proper amount/impact/serving 3-sentence
+    // advisory below was skipped in favor of this generic factor-by-factor
+    // dump for nearly all single (non-group) users, even when a specific
+    // nutrient really was flagged for their condition. Awareness-only
+    // factors that have no nutrient-evaluation counterpart (GERD triggers,
+    // GERD total fat, kidney phosphate additives) are already surfaced by
+    // their own dedicated warning cards elsewhere in the UI, so this
+    // fallback text is only needed when nothing else is available to say.
+    if (flagged.isEmpty && evaluation.scoredFactors.isNotEmpty) {
+      final factorText = evaluation.scoredFactors
+          .map((factor) {
+            final label = _factorLabel(factor.factorKey, isTagalog);
+            if (factor.isUnknown) {
+              return isTagalog
+                  ? '$label: kulang ang impormasyon para matukoy ito.'
+                  : '$label: not enough information to determine this.';
+            }
+            return '$label: ${factor.explanation}';
+          })
+          .join(' ');
+      return HealthAdvisory(
+        overallLevel: evaluation.overallLevel,
+        warningText: isTagalog
+            ? 'Suriin ang mga health factor'
+            : 'Review health factors',
+        explanation: factorText,
+        safeServingSize: null,
+        source: AdvisorySource.fallbackRuleBased,
+        generatedAt: DateTime.now(),
+      );
+    }
 
     if (flagged.isEmpty) {
       return HealthAdvisory(
