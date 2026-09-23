@@ -716,10 +716,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showLanguageChooser() async {
-    final loc = AppLocalizations.of(context)!;
+    final dialogContext = context;
+    final loc = AppLocalizations.of(dialogContext)!;
 
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (dialogContext.mounted) {
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          dialogContext,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
+    if (!dialogContext.mounted) return;
     final choice = await showDialog<String>(
-      context: context,
+      context: dialogContext,
       builder: (ctx) => SimpleDialog(
         title: Text(loc.chooseLanguage),
         children: [

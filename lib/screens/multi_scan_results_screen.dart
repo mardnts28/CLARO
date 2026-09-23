@@ -46,12 +46,14 @@ class MultiScanResultsScreen extends StatefulWidget {
   final List<Product> detectedProducts;
   final Map<String, int>? productCounts;
   final bool isSearchResult;
+  final bool showOfflineNotice;
 
   const MultiScanResultsScreen({
     super.key,
     required this.detectedProducts,
     this.productCounts,
     this.isSearchResult = false,
+    this.showOfflineNotice = false,
   });
 
   @override
@@ -94,6 +96,25 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     }
     _comparisonProducts = List.from(widget.detectedProducts);
     _rankProducts();
+    if (widget.showOfflineNotice) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showOfflineNotice();
+      });
+    }
+  }
+
+  Future<void> _showOfflineNotice() async {
+    if (!mounted) return;
+    final loc = AppLocalizations.of(context)!;
+    await SuccessFeedbackUtils.showOfflineNoticeDialog(
+      context,
+      title: loc.noInternetTitle,
+      message: loc.noInternetNutritionMessage,
+      buttonText: loc.gotIt,
+      onDismiss: () {
+        if (mounted) Navigator.pop(context);
+      },
+    );
   }
 
   // Ranks the scanned products via WhoCalculator (through

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
+import '../core/utils/success_feedback_utils.dart';
 import '../widgets/dome_clipper.dart';
 import '../main.dart';
 
@@ -62,6 +63,21 @@ class _SelectLanguageScreenState
 
   Future<void> _select(String code) async {
     if (_isSaving) return;
+
+    final dialogContext = context;
+    final loc = AppLocalizations.of(dialogContext)!;
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (dialogContext.mounted) {
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          dialogContext,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isSaving = true;

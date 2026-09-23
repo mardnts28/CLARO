@@ -16,7 +16,6 @@ import 'product_detail_screen.dart';
 import 'multi_scan_results_screen.dart';
 import 'unknown_product_submission_screen.dart';
 import '../models/product_model.dart';
-import '../core/utils/success_feedback_utils.dart';
 import '../generated/l10n/app_localizations.dart';
 
 class CameraScannerScreen extends StatefulWidget {
@@ -676,17 +675,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
 
       final distinctProducts = resolvedProducts.toSet().toList();
 
-      if (distinctProducts.any((p) => p.isOfflineFallback) && mounted) {
-        final loc = AppLocalizations.of(context)!;
-        await SuccessFeedbackUtils.showOfflineNoticeDialog(
-          context,
-          title: loc.noInternetTitle,
-          message: loc.noInternetNutritionMessage,
-          buttonText: loc.gotIt,
-        );
-        if (!mounted) return;
-      }
-
       if (distinctProducts.isNotEmpty && widget.returnResultsOnDetect) {
         if (mounted) {
           for (var p in distinctProducts) {
@@ -742,6 +730,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               builder: (_) => MultiScanResultsScreen(
                 detectedProducts: distinctProducts,
                 productCounts: productCounts,
+                showOfflineNotice: distinctProducts.any((p) => p.isOfflineFallback),
               ),
             ),
           ).then((_) {

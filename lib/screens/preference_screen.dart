@@ -7,6 +7,7 @@ import '../services/locale_service.dart';
 import '../services/text_size_service.dart';
 import '../services/voice_assistant_service.dart';
 import '../widgets/voice_mic_overlay.dart';
+import '../core/utils/success_feedback_utils.dart';
 
 class PreferenceScreen extends StatefulWidget {
   const PreferenceScreen({super.key});
@@ -180,6 +181,22 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                                   onSelectionChanged: (selection) async {
                                     final selectedLanguage = selection.first;
                                     if (selectedLanguage == language) return;
+
+                                    final dialogContext = context;
+                                    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+                                    if (!hasInternet) {
+                                      if (dialogContext.mounted) {
+                                        final currentLoc = AppLocalizations.of(dialogContext)!;
+                                        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                                          dialogContext,
+                                          title: currentLoc.noInternetTitle,
+                                          message: currentLoc.noInternetActionMessage,
+                                          buttonText: currentLoc.gotIt,
+                                        );
+                                      }
+                                      return;
+                                    }
+
                                     HapticService().vibrate();
                                     await VoiceAssistantService.instance.updateLanguage(selectedLanguage);
 
