@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'onboarding_page_dots.dart';
 
 /// Tracks, per-Animation, whether [_attachCompletionListenerOnce] has
 /// already added its status listener.
@@ -76,8 +77,10 @@ class DomeTransitionPageRoute<T> extends PageRouteBuilder<T> {
                 final double startPeakY = height * 0.49;
                 final double startSideY = height * 0.625;
 
-                // Select Language dome target boundaries: header height ~0.46*H
-                final double targetHeaderHeight = (height * 0.46).clamp(260.0, 470.0);
+                // Select Language dome target boundaries. Uses the exact same
+                // formula as the Select Language header so the animated dome
+                // lands precisely on the screen's real red header.
+                final double targetHeaderHeight = (height * 0.32).clamp(220.0, 290.0);
                 final double curveDepth = (width * 0.14).clamp(42.0, 78.0);
                 final double targetPeakY = targetHeaderHeight;
                 final double targetSideY = targetHeaderHeight - curveDepth;
@@ -86,6 +89,23 @@ class DomeTransitionPageRoute<T> extends PageRouteBuilder<T> {
                 final double exitOpacity = (1.0 - (t / 0.45)).clamp(0.0, 1.0);
                 final double enterOpacity = ((t - 0.25) / 0.75).clamp(0.0, 1.0);
                 final double enterSlideY = (1.0 - enterOpacity) * 24.0;
+
+                // Page-dot animation. Same vertical placement as the
+                // static dots on both screens.
+                final bool dotsHidden = animation.value < 1.0;
+                final double bottomInset = MediaQuery.of(context).padding.bottom >
+                        0
+                    ? MediaQuery.of(context).padding.bottom
+                    : MediaQuery.of(context).viewPadding.bottom;
+                final double dotsBottom =
+                    (height < 650 ? 30.0 : (height * 0.05).clamp(28.0, 56.0)) +
+                        bottomInset;
+                final double dotsPosition = Curves.easeInOutCubic
+                    .transform(((t - 0.15) / 0.7).clamp(0.0, 1.0));
+                // Swap white -> red right as the dome leaves the bottom
+                // of the screen (mid-transition).
+                final double dotsColorT =
+                    ((t - 0.45) / 0.1).clamp(0.0, 1.0);
 
                 return Stack(
                   fit: StackFit.expand,
@@ -96,7 +116,10 @@ class DomeTransitionPageRoute<T> extends PageRouteBuilder<T> {
                     // Exit screen content (GetStartedScreen elements fading out)
                     Opacity(
                       opacity: exitOpacity,
-                      child: exitPage,
+                      child: OnboardingDotsTransitionScope(
+                        hidden: dotsHidden,
+                        child: exitPage,
+                      ),
                     ),
 
                     // Animated Red Dome connecting both screens
@@ -118,9 +141,40 @@ class DomeTransitionPageRoute<T> extends PageRouteBuilder<T> {
                       opacity: enterOpacity,
                       child: Transform.translate(
                         offset: Offset(0, enterSlideY),
-                        child: enterPage,
+                        child: OnboardingDotsTransitionScope(
+                          hidden: dotsHidden,
+                          child: enterPage,
+                        ),
                       ),
                     ),
+
+                    // Shared page indicator: one set of dots that slides
+                    // from "page 1 active" (white, on the dome) to "page 2
+                    // active" (red, on white) while the dome moves. The
+                    // screens hide their own static dots for the duration
+                    // and show them again once the animation completes, at
+                    // which point they match this indicator exactly.
+                    if (dotsHidden)
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: dotsBottom,
+                        child: Center(
+                          child: OnboardingPageDots(
+                            position: dotsPosition,
+                            activeColor: Color.lerp(
+                              OnboardingPageDots.whiteActive,
+                              OnboardingPageDots.redActive,
+                              dotsColorT,
+                            )!,
+                            inactiveColor: Color.lerp(
+                              OnboardingPageDots.whiteInactive,
+                              OnboardingPageDots.redInactive,
+                              dotsColorT,
+                            )!,
+                          ),
+                        ),
+                      ),
                   ],
                 );
               },

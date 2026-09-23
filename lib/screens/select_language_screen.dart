@@ -4,58 +4,158 @@ import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../widgets/dome_clipper.dart';
+import '../widgets/onboarding_page_dots.dart';
 import '../main.dart';
 
 /// CLARO Select Language Screen
 ///
-/// UI updated to closely match the provided reference:
-/// - Compact red header
-/// - Centered and slightly lowered logo
-/// - Features positioned closer to the bottom curve
-/// - Minimal empty space
-/// - Large smooth curved bottom edge
-/// - Compact language selection section
+/// Layout (top to bottom):
+/// 1. Red dome header with the logo, wordmark and a short tagline.
+/// 2. A short, auto-advancing "How CLARO works" intro tutorial
+///    (4 steps: scan, nutrition, health guidance, compare). It is a
+///    story-style walkthrough -- step counter, progress segments,
+///    swipeable -- and intentionally NOT styled like buttons/cards.
+/// 3. "Choose language" title + reassurance line.
+/// 4. Two selectable language cards (English / Tagalog).
+/// 5. Page dots (page 2 of 2 of the welcome flow).
 ///
 /// FUNCTIONALITY PRESERVED:
 /// - English -> _select('en')
 /// - Tagalog -> _select('tl')
 /// - LocaleService.setAppLocale(code)
 /// - HapticService().vibrate()
+/// - Navigation to AuthGate after selection
+/// - Page dot hand-off with the dome transition
 class SelectLanguageScreen extends StatefulWidget {
   const SelectLanguageScreen({super.key});
 
   @override
-  State<SelectLanguageScreen> createState() =>
-      _SelectLanguageScreenState();
+  State<SelectLanguageScreen> createState() => _SelectLanguageScreenState();
 }
 
-class _SelectLanguageScreenState
-    extends State<SelectLanguageScreen> {
-  // ===========================================================================
-  // STATE
-  // ===========================================================================
-
-  bool _isSaving = false;
-
+class _SelectLanguageScreenState extends State<SelectLanguageScreen>
+    with TickerProviderStateMixin {
   // ===========================================================================
   // COLORS
   // ===========================================================================
 
   static const Color _background = Colors.white;
-
   static const Color _red = Color(0xFF8B1A1A);
-
+  static const Color _redLight = Color(0xFF9E2424);
   static const Color _black = Color(0xFF171717);
+  static const Color _grey = Color(0xFF6B6B6B);
+  static const Color _band = Color(0xFFFFF7F5);
+  static const Color _tint = Color(0xFFF7E4E1);
 
   // ===========================================================================
-  // RESPONSIVE LIMITS
+  // LAYOUT
   // ===========================================================================
 
+  /// One consistent side margin for every block on the screen.
+  static const double _sideMargin = 24.0;
   static const double _maxContentWidth = 520.0;
 
-  static const double _maxButtonWidth = 240.0;
+  // ===========================================================================
+  // STATE
+  // ===========================================================================
 
-  static const double _minButtonWidth = 170.0;
+  /// Language code currently being saved (null when idle).
+  String? _savingCode;
+  bool get _isSaving => _savingCode != null;
+
+  // Entrance animation (staggered fade + slide up).
+  late final AnimationController _entrance;
+  bool _entranceScheduled = false;
+
+  // Intro tutorial (story-style auto-advance).
+  static const Duration _slideDuration = Duration(milliseconds: 4200);
+  late final PageController _tutorialPager;
+  late final AnimationController _tutorialProgress;
+  int _slide = 0;
+
+  static const List<IconData> _slideIcons = [
+    Icons.qr_code_scanner,
+    Icons.favorite_border,
+    Icons.add_circle_outline,
+    Icons.compare_arrows,
+  ];
+
+  // ===========================================================================
+  // LIFECYCLE
+  // ===========================================================================
+
+  @override
+  void initState() {
+    super.initState();
+
+    _entrance = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+
+    _tutorialPager = PageController();
+
+    _tutorialProgress = AnimationController(
+      vsync: this,
+      duration: _slideDuration,
+    )..addStatusListener((status) {
+        if (status != AnimationStatus.completed || !mounted) return;
+        final next = (_slide + 1) % _slideIcons.length;
+        if (next == 0) {
+          _tutorialPager.animateToPage(
+            0,
+            duration: const Duration(milliseconds: 450),
+            curve: Curves.easeInOutCubic,
+          );
+        } else {
+          _tutorialPager.nextPage(
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeInOutCubic,
+          );
+        }
+      });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_entranceScheduled) return;
+    _entranceScheduled = true;
+
+    // When this screen is shown through the dome transition, wait until the
+    // dome has mostly settled before revealing the content, so the entrance
+    // animation is actually seen instead of playing while still hidden.
+    final Animation<double>? routeAnimation =
+        ModalRoute.of(context)?.animation;
+
+    if (routeAnimation == null || routeAnimation.isCompleted) {
+      _startAnimations();
+      return;
+    }
+
+    void listener() {
+      if (routeAnimation.value >= 0.55) {
+        routeAnimation.removeListener(listener);
+        _startAnimations();
+      }
+    }
+
+    routeAnimation.addListener(listener);
+  }
+
+  void _startAnimations() {
+    if (!mounted) return;
+    _entrance.forward();
+    _tutorialProgress.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _entrance.dispose();
+    _tutorialProgress.dispose();
+    _tutorialPager.dispose();
+    super.dispose();
+  }
 
   // ===========================================================================
   // LANGUAGE SELECTION
@@ -80,7 +180,7 @@ class _SelectLanguageScreenState
     }
 
     setState(() {
-      _isSaving = true;
+      _savingCode = code;
     });
 
     HapticService().vibrate();
@@ -90,13 +190,98 @@ class _SelectLanguageScreenState
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => const AuthGate(),
+          pageBuilder: (context, animation, secondaryAnimation) =>
+              const AuthGate(),
           transitionDuration: Duration.zero,
           reverseTransitionDuration: Duration.zero,
         ),
         (route) => false,
       );
     }
+  }
+
+  // ===========================================================================
+  // COPY (kept local so no generated l10n files need to change)
+  // ===========================================================================
+
+  bool get _isTagalog =>
+      Localizations.localeOf(context).languageCode == 'tl';
+
+  String get _tagline => _isTagalog
+      ? 'Alamin ang laman ng iyong pagkain'
+      : "Know what's in your food";
+
+  String get _howItWorks =>
+      _isTagalog ? 'PAANO GUMAGANA ANG CLARO' : 'HOW CLARO WORKS';
+
+  String get _changeLater => _isTagalog
+      ? 'Mababago mo ito mamaya sa Settings.'
+      : 'You can change this later in Settings.';
+
+  String _stepLabel(int i) => _isTagalog
+      ? 'HAKBANG ${i + 1} NG ${_slideIcons.length}'
+      : 'STEP ${i + 1} OF ${_slideIcons.length}';
+
+  String _slideTitle(int i) {
+    const en = [
+      'Scan any product',
+      'Understand the nutrition',
+      'Get health guidance',
+      'Compare products',
+    ];
+    const tl = [
+      'I-scan ang produkto',
+      'Alamin ang nutrisyon',
+      'Gabay sa kalusugan',
+      'Ihambing ang mga produkto',
+    ];
+    return (_isTagalog ? tl : en)[i];
+  }
+
+  String _slideBody(int i) {
+    const en = [
+      'Point your camera at local canned food or instant noodles to view its info',
+      'See calories, sugar, sodium, FDA registration status, and more.',
+      'Advice matched to your health conditions and allergens, explained simply.',
+      'Scan up to 3 products at once and see the recommended one.',
+    ];
+    const tl = [
+      'Itutok ang camera sa barcode o label para makita ang laman nito.',
+      'Tingnan ang calories, asukal, sodium at iba pa sa simpleng paliwanag.',
+      'Payong angkop sa iyong kondisyon at allergen.',
+      'Pagtabihin ang mga produkto at piliin ang mas mabuti.',
+    ];
+    return (_isTagalog ? tl : en)[i];
+  }
+
+  // ===========================================================================
+  // ENTRANCE HELPER
+  // ===========================================================================
+
+  Widget _reveal({
+    required double start,
+    required double end,
+    required Widget child,
+    double dy = 22,
+  }) {
+    final curved = CurvedAnimation(
+      parent: _entrance,
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
+    );
+
+    return AnimatedBuilder(
+      animation: curved,
+      child: child,
+      builder: (context, child) {
+        return Opacity(
+          opacity: curved.value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - curved.value) * dy),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 
   // ===========================================================================
@@ -131,58 +316,49 @@ class _SelectLanguageScreenState
           final mediaQuery = MediaQuery.of(context);
 
           return MediaQuery(
-            data: mediaQuery.copyWith(
-              textScaler: TextScaler.noScaling,
-            ),
+            data: mediaQuery.copyWith(textScaler: TextScaler.noScaling),
             child: Scaffold(
               backgroundColor: _background,
               resizeToAvoidBottomInset: true,
               body: LayoutBuilder(
-                builder: (
-                  context,
-                  constraints,
-                ) {
+                builder: (context, constraints) {
                   final width = constraints.maxWidth;
                   final height = constraints.maxHeight;
 
-                  final bottomInset = mediaQuery.padding.bottom;
-                  final viewPadding = mediaQuery.viewPadding;
-                  final safeBottom = bottomInset > 0 ? bottomInset : viewPadding.bottom;
+                  final safeBottom = mediaQuery.padding.bottom > 0
+                      ? mediaQuery.padding.bottom
+                      : mediaQuery.viewPadding.bottom;
                   final bottomSpacing = (height * 0.05).clamp(28.0, 56.0);
-                  final isVeryShortScreen = height < 650;
-                  final adjustedBottomSpacing = isVeryShortScreen ? 30.0 : bottomSpacing;
+                  final adjustedBottomSpacing =
+                      height < 650 ? 30.0 : bottomSpacing;
+
+                  // Same position the dome transition uses for its dots.
                   final dotsBottomInset = adjustedBottomSpacing + safeBottom;
 
-                  final isLandscape =
-                      width > height * 1.15;
-
-                  final isCompact =
-                      height < 620 || isLandscape;
-
-                  final Widget mainLayout = isCompact
-                      ? _buildCompactLayout(
-                          context,
-                          loc,
-                          width,
-                          height,
-                        )
-                      : _buildNormalLayout(
-                          context,
-                          loc,
-                          width,
-                          height,
-                        );
+                  // Room reserved at the end of the scroll content so the
+                  // language cards never sit underneath the page dots.
+                  final dotsReserve = dotsBottomInset + 7 + 18;
 
                   return Stack(
                     fit: StackFit.expand,
                     children: [
-                      mainLayout,
+                      _buildBody(loc, width, height, dotsReserve),
                       Positioned(
                         left: 0,
                         right: 0,
                         bottom: dotsBottomInset,
                         child: Center(
-                          child: _buildPageIndicator(activeIndex: 1),
+                          // Hidden while the dome transition runs -- the
+                          // transition draws the animated indicator itself.
+                          child: Opacity(
+                            opacity:
+                                OnboardingDotsTransitionScope.isHidden(context)
+                                    ? 0.0
+                                    : 1.0,
+                            child: const OnboardingPageDots.onLight(
+                              activeIndex: 1,
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -196,88 +372,41 @@ class _SelectLanguageScreenState
     );
   }
 
-  // ===========================================================================
-  // NORMAL PORTRAIT LAYOUT
-  // ===========================================================================
-
-  Widget _buildNormalLayout(
-    BuildContext context,
+  Widget _buildBody(
     AppLocalizations loc,
     double width,
     double height,
+    double dotsReserve,
   ) {
-    final contentWidth = width > _maxContentWidth
-        ? _maxContentWidth
-        : width;
+    final headerHeight = (height * 0.32).clamp(220.0, 290.0);
 
-    /*
-     * Keep the red area around half of the screen,
-     * similar to the reference image.
-     *
-     * The important change is that the contents inside
-     * the header are now positioned intentionally instead
-     * of simply being placed at the top of a Column.
-     */
-    final headerHeight = (height * 0.33).clamp(
-      210.0,
-      320.0,
-    );
-    final featureBandHeight = _featureBandHeight(height);
-    const featureBandTopGap = 14.0;
+    // Spare vertical space on tall screens is spread between sections
+    // instead of piling up as a big empty gap above the page dots.
+    final double spare = (height - 720).clamp(0.0, 90.0);
+    final double gap = spare / 3;
 
-    return SafeArea(
-      top: false,
-      bottom: true,
-      child: SingleChildScrollView(
-        physics: const ClampingScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: height,
-          ),
-          child: Column(
-            children: [
-              // =================================================================
-              // RED HEADER
-              // =================================================================
-
-              _buildHeader(
-                context,
-                width,
-                headerHeight,
-              ),
-
-              const SizedBox(height: featureBandTopGap),
-
-              _buildFeatureBand(
-                context,
-                loc,
-                width,
-                height,
-              ),
-
-              // =================================================================
-              // LANGUAGE SECTION
-              // =================================================================
-
-              SizedBox(
-                width: contentWidth,
-                height: (height -
-                        headerHeight -
-                        featureBandTopGap -
-                        featureBandHeight)
-                    .clamp(0.0, height),
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 20),
-                  child: _buildLanguageArea(
-                    context,
-                    loc,
-                    width,
-                    height,
-                  ),
-                ),
-              ),
-            ],
-          ),
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: height),
+        child: Column(
+          children: [
+            _buildHeader(width, headerHeight),
+            _reveal(
+              start: 0.15,
+              end: 0.6,
+              child: _buildTutorial(width),
+            ),
+            SizedBox(height: 22 + gap),
+            _reveal(
+              start: 0.3,
+              end: 0.75,
+              child: _buildLanguageTitle(loc, width),
+            ),
+            SizedBox(height: 18 + gap),
+            _buildLanguageCards(loc, width),
+            SizedBox(height: dotsReserve),
+          ],
         ),
       ),
     );
@@ -287,37 +416,34 @@ class _SelectLanguageScreenState
   // RED HEADER
   // ===========================================================================
 
-  Widget _buildHeader(
-    BuildContext context,
-    double width,
-    double height,
-  ) {
+  Widget _buildHeader(double width, double height) {
     return ClipPath(
       clipper: const StandardDomeClipper(isTop: true),
       child: Container(
         width: double.infinity,
         height: height,
-        color: _red,
+        decoration: const BoxDecoration(
+          // Subtle depth: slightly lighter at the top, brand red at the curve.
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [_redLight, _red],
+          ),
+        ),
         child: SafeArea(
           top: true,
           bottom: false,
-          // ===================================================================
-          // LOGO, VERTICALLY CENTERED
-          // ===================================================================
-          //
           child: Padding(
             padding: EdgeInsets.only(
-              bottom: _headerBottomReserve(height),
+              bottom: (height * 0.14).clamp(24.0, 44.0),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildLogo(
-                  context,
-                  width,
-                ),
-
-              ],
+            child: Center(
+              child: _reveal(
+                start: 0.0,
+                end: 0.45,
+                dy: 12,
+                child: _buildLogo(width),
+              ),
             ),
           ),
         ),
@@ -325,208 +451,46 @@ class _SelectLanguageScreenState
     );
   }
 
-  Widget _buildFeatureBand(
-    BuildContext context,
-    AppLocalizations loc,
-    double width,
-    double height,
-  ) {
-    final bandHeight = _featureBandHeight(height);
-
-    return Container(
-      height: bandHeight,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Color(0xFFFFF7F5),
-        border: Border.symmetric(
-          horizontal: BorderSide(color: Color(0xFFF0D9D5)),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-        child: Center(
-          child: _buildFeatureGrid(
-            context,
-            loc,
-            width,
-            color: _red,
-          ),
-        ),
-      ),
-    );
-  }
-
-  double _featureBandHeight(double height) {
-    return (height * 0.27).clamp(220.0, 242.0);
-  }
-
-  // ===========================================================================
-  // HEADER BOTTOM RESERVE
-  // ===========================================================================
-  //
-  // Keeps the centered content from drifting into the curved edge itself.
-
-  double _headerBottomReserve(double height) {
-    return (height * 0.10).clamp(16.0, 40.0);
-  }
-
-  // ===========================================================================
-  // LOGO / FEATURE GRID GAP
-  // ===========================================================================
-
-  double _logoFeatureGap(
-    double width,
-    double height,
-  ) {
-    return (height * 0.07).clamp(24.0, 44.0);
-  }
-
-  // ===========================================================================
-  // LOGO
-  // ===========================================================================
-
-  Widget _buildLogo(
-    BuildContext context,
-    double width,
-  ) {
-    /*
-     * Responsive logo size.
-     *
-     * Slightly smaller than the previous version so the entire
-     * header looks more like the reference image.
-     */
-    final scannerSize = (width * 0.42).clamp(128.0, 200.0);
-    final cornerSize = scannerSize * 0.32;
-    final cornerThickness = (width / 390 * 3.2).clamp(2.4, 4.0);
-    final logoSize = scannerSize * 0.72;
+  Widget _buildLogo(double width) {
+    final logoSize = (width * 0.34).clamp(104.0, 150.0);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        // =====================================================================
-        // SCANNER FRAME + LOGO
-        // =====================================================================
-
-        SizedBox(
-          width: scannerSize,
-          height: scannerSize,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // -----------------------------------------------------------------
-              // TOP LEFT
-              // -----------------------------------------------------------------
-
-              Positioned(
-                left: 0,
-                top: 0,
-                child: _corner(
-                  size: cornerSize,
-                  thickness: cornerThickness,
-                  top: true,
-                  left: true,
-                ),
-              ),
-
-              // -----------------------------------------------------------------
-              // TOP RIGHT
-              // -----------------------------------------------------------------
-
-              Positioned(
-                right: 0,
-                top: 0,
-                child: _corner(
-                  size: cornerSize,
-                  thickness: cornerThickness,
-                  top: true,
-                  left: false,
-                ),
-              ),
-
-              // -----------------------------------------------------------------
-              // BOTTOM LEFT
-              // -----------------------------------------------------------------
-
-              Positioned(
-                left: 0,
-                bottom: 0,
-                child: _corner(
-                  size: cornerSize,
-                  thickness: cornerThickness,
-                  top: false,
-                  left: true,
-                ),
-              ),
-
-              // -----------------------------------------------------------------
-              // BOTTOM RIGHT
-              // -----------------------------------------------------------------
-
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: _corner(
-                  size: cornerSize,
-                  thickness: cornerThickness,
-                  top: false,
-                  left: false,
-                ),
-              ),
-
-              // -----------------------------------------------------------------
-              // CLARO LOGO IMAGE
-              // -----------------------------------------------------------------
-              //
-              // `logo.png` is the same dark-red mark used on light
-              // backgrounds elsewhere in the app (e.g. the Get Started
-              // screen). Dropped in as-is on this red header, it renders
-              // in the wrong color and nearly disappears against the red
-              // background. `BlendMode.srcIn` uses the artwork purely as
-              // an alpha mask and repaints it solid white, matching the
-              // reference design.
-
-              Image.asset(
-                'assets/images/whiteBorderLogo.png',
-                height: logoSize,
-                width: logoSize,
-                fit: BoxFit.contain,
-                errorBuilder: (
-                  _,
-                  _,
-                  _,
-                ) {
-                  return Icon(
-                    Icons.qr_code_scanner,
-                    color: Colors.white,
-                    size: logoSize * 0.78,
-                  );
-                },
-              ),
-            ],
-          ),
+        Image.asset(
+          'assets/images/whiteBorderLogo.png',
+          height: logoSize,
+          width: logoSize,
+          fit: BoxFit.contain,
+          errorBuilder: (_, _, _) {
+            return Icon(
+              Icons.qr_code_scanner,
+              color: Colors.white,
+              size: logoSize * 0.78,
+            );
+          },
         ),
-
-        // =====================================================================
-        // LOGO / TEXT GAP
-        // =====================================================================
-
-        SizedBox(
-          height: _logoTextSpacing(width),
-        ),
-
-        // =====================================================================
-        // CLARO TEXT
-        // =====================================================================
-
+        const SizedBox(height: 6),
         Text(
           'CLARO',
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: _claroTextSize(width),
+            fontSize: (width / 390 * 17).clamp(15.0, 21.0),
             fontWeight: FontWeight.w800,
             color: Colors.white,
             letterSpacing: 1.3,
             height: 1.0,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _tagline,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: (width / 390 * 12.5).clamp(11.0, 14.0),
+            fontWeight: FontWeight.w400,
+            color: Colors.white.withValues(alpha: 0.85),
+            height: 1.1,
           ),
         ),
       ],
@@ -534,868 +498,490 @@ class _SelectLanguageScreenState
   }
 
   // ===========================================================================
-  // SCANNER CORNER
+  // INTRO TUTORIAL
   // ===========================================================================
+  //
+  // Deliberately flat: no borders, no shadows, no rounded "tap targets".
+  // It reads as a mini walkthrough -- a section label, a step counter,
+  // an illustration, a title + explanation, and story-style progress
+  // segments -- rather than four buttons.
 
-  Widget _corner({
-    required double size,
-    required double thickness,
-    required bool top,
-    required bool left,
-  }) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: CustomPaint(
-        painter: _CornerPainter(
-          color: _red,
-          thickness: thickness,
-          top: top,
-          left: left,
-        ),
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // FEATURE GRID
-  // ===========================================================================
-
-  Widget _buildFeatureGrid(
-    BuildContext context,
-    AppLocalizations loc,
-    double width,
-    {required Color color}
-  ) {
-    final gridWidth = _featureGridWidth(width);
-
-    return SizedBox(
-      width: gridWidth,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ===================================================================
-          // FIRST ROW
-          // ===================================================================
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildFeatureIcon(
-                icon: Icons.qr_code_scanner,
-                label: loc.featureScan,
-                width: width,
-                color: color,
-              ),
-              _buildFeatureIcon(
-                icon: Icons.favorite_border,
-                label: loc.featureNutrition,
-                width: width,
-                color: color,
-              ),
-            ],
-          ),
-
-          // ===================================================================
-          // ROW GAP
-          // ===================================================================
-
-          SizedBox(
-            height: _featureRowSpacing(width),
-          ),
-
-          // ===================================================================
-          // SECOND ROW
-          // ===================================================================
-
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildFeatureIcon(
-                icon: Icons.add_circle_outline,
-                label: loc.featureHealth,
-                width: width,
-                color: color,
-              ),
-              _buildFeatureIcon(
-                icon: Icons.compare_arrows,
-                label: loc.featureCompare,
-                width: width,
-                color: color,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // FEATURE ITEM
-  // ===========================================================================
-
-  Widget _buildFeatureIcon({
-    required IconData icon,
-    required String label,
-    required double width,
-    required Color color,
-  }) {
-    /*
-     * Sized to match the reference: the icons read clearly at a
-     * glance instead of looking like small decoration.
-     */
-    final iconSize = (width / 390 * 29).clamp(
-      25.0,
-      32.0,
-    );
-
-    final labelSize = (width / 390 * 12).clamp(
-      10.5,
-      14.0,
-    );
-
-    final itemWidth = _featureItemWidth(width);
-    final labelWidth = (itemWidth * 0.72).clamp(88.0, 112.0);
-
-    return SizedBox(
-      width: itemWidth,
-      height: 88,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(
-            color: const Color(0xFFF0D9D5),
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+  Widget _buildTutorial(double width) {
+    return Container(
+      width: double.infinity,
+      color: _band,
+      padding: const EdgeInsets.fromLTRB(_sideMargin, 14, _sideMargin, 16),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: _maxContentWidth),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-          // ===================================================================
-          // ICON
-          // ===================================================================
+              // Section label with hairline
+              Row(
+                children: [
+                  Text(
+                    _howItWorks,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.4,
+                      color: _red,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Container(
+                      height: 1,
+                      color: _red.withValues(alpha: 0.18),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
 
+              // Slides
               SizedBox(
-                height: iconSize + 3,
-                child: Icon(
-                  icon,
-                  color: color,
-                  size: iconSize,
+                height: 96,
+                child: PageView.builder(
+                  controller: _tutorialPager,
+                  itemCount: _slideIcons.length,
+                  onPageChanged: (i) {
+                    setState(() => _slide = i);
+                    // Restart the progress for the newly visible step
+                    // (also covers manual swipes).
+                    _tutorialProgress.forward(from: 0);
+                  },
+                  itemBuilder: (context, i) => _buildSlide(i),
                 ),
               ),
+              const SizedBox(height: 12),
 
-              SizedBox(
-                height: _featureIconTextSpacing(width) + 6,
+              // Story-style progress segments
+              _buildProgressSegments(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSlide(int i) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Illustration: soft rings + icon, with the step number as a badge.
+        SizedBox(
+          width: 84,
+          height: 84,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _tint.withValues(alpha: 0.55),
+                ),
               ),
-
-              SizedBox(
-                width: labelWidth,
-                child: Text(
-                  _wrapFeatureLabel(label),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  softWrap: true,
-                  style: TextStyle(
-                    fontSize: labelSize,
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                    height: 1.05,
+              Container(
+                width: 62,
+                height: 62,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _tint,
+                ),
+                child: Icon(_slideIcons[i], color: _red, size: 30),
+              ),
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Container(
+                  width: 22,
+                  height: 22,
+                  alignment: Alignment.center,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _red,
+                  ),
+                  child: Text(
+                    '${i + 1}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      height: 1.0,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
 
-  String _wrapFeatureLabel(String label) {
-    final separator = label.indexOf(' ');
-    if (separator == -1) return label;
-    return '${label.substring(0, separator)}\n${label.substring(separator + 1)}';
-  }
-
-  // ===========================================================================
-  // LANGUAGE AREA
-  // ===========================================================================
-
-  Widget _buildLanguageArea(
-    BuildContext context,
-    AppLocalizations loc,
-    double width,
-    double height,
-  ) {
-    final horizontalPadding = _horizontalPadding(width);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            loc.chooseLanguage,
-            textAlign: TextAlign.left,
-            style: TextStyle(
-              fontSize: _languageTitleSize(width),
-              fontWeight: FontWeight.w700,
-              color: _black,
-              height: 1.1,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: 42,
-            height: 3,
-            decoration: BoxDecoration(
-              color: _red,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-
-          // ===================================================================
-          // TITLE / BUTTON GAP
-          // ===================================================================
-
-          SizedBox(
-            height: _titleButtonSpacing(
-              width,
-              height,
-            ),
-          ),
-
-          // ===================================================================
-          // ENGLISH
-          // ===================================================================
-
-          _buildLanguageOption(
-            context,
-            label: loc.english,
-            code: 'en',
-            width: width,
-            horizontalPadding: horizontalPadding,
-          ),
-
-          // ===================================================================
-          // BUTTON GAP
-          // ===================================================================
-
-          SizedBox(
-            height: _languageButtonSpacing(width),
-          ),
-
-          // ===================================================================
-          // TAGALOG
-          // ===================================================================
-
-          _buildLanguageOption(
-            context,
-            label: loc.tagalog,
-            code: 'tl',
-            width: width,
-            horizontalPadding: horizontalPadding,
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ===========================================================================
-  // PAGE INDICATOR
-  // ===========================================================================
-
-  Widget _buildPageIndicator({
-    required int activeIndex,
-    int count = 2,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(count, (index) {
-        final bool isActive = index == activeIndex;
-
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 20 : 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: isActive
-                ? _red
-                : const Color(0xFFE0C9C9),
-            borderRadius: BorderRadius.circular(4),
-          ),
-        );
-      }),
-    );
-  }
-
-  // ===========================================================================
-  // LANGUAGE BUTTON
-  // ===========================================================================
-
-  Widget _buildLanguageOption(
-    BuildContext context, {
-    required String label,
-    required String code,
-    required double width,
-    required double horizontalPadding,
-  }) {
-    final buttonWidth = (width - horizontalPadding * 2).clamp(
-      _minButtonWidth,
-      _maxButtonWidth,
-    );
-
-    final buttonHeight = (width / 390 * 56).clamp(
-      48.0,
-      58.0,
-    );
-
-    final fontSize = (width / 390 * 15.5).clamp(
-      14.0,
-      18.0,
-    );
-
-    return SizedBox(
-      width: buttonWidth,
-      height: buttonHeight,
-      child: ElevatedButton(
-        // =====================================================================
-        // ORIGINAL FUNCTIONALITY
-        // =====================================================================
-
-        onPressed: _isSaving
-            ? null
-            : () => _select(code),
-
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _red,
-          foregroundColor: Colors.white,
-          disabledBackgroundColor:
-              _red.withValues(alpha: 0.65),
-          disabledForegroundColor:
-              Colors.white,
-          elevation: 2,
-          shadowColor: _red.withValues(alpha: 0.24),
-          padding: EdgeInsets.zero,
-          side: BorderSide(
-            color: Colors.white.withValues(alpha: 0.18),
-            width: 1,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-        ),
-
-        child: _isSaving
-            ? const SizedBox(
-                width: 19,
-                height: 19,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : Text(
-                label,
-                textAlign: TextAlign.center,
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _stepLabel(i),
                 style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                  height: 1.0,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.0,
+                  color: _red.withValues(alpha: 0.7),
                 ),
               ),
-      ),
+              const SizedBox(height: 3),
+              Text(
+                _slideTitle(i),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 16.5,
+                  fontWeight: FontWeight.w700,
+                  color: _black,
+                  height: 1.15,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _slideBody(i),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w400,
+                  color: _grey,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressSegments() {
+    return AnimatedBuilder(
+      animation: _tutorialProgress,
+      builder: (context, _) {
+        return Row(
+          children: List.generate(_slideIcons.length, (i) {
+            final double fill = i < _slide
+                ? 1.0
+                : (i == _slide ? _tutorialProgress.value : 0.0);
+
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(
+                  right: i == _slideIcons.length - 1 ? 0 : 6,
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: Stack(
+                    children: [
+                      Container(
+                        height: 3,
+                        color: _red.withValues(alpha: 0.15),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: fill,
+                        child: Container(height: 3, color: _red),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 
   // ===========================================================================
-  // COMPACT / LANDSCAPE LAYOUT
+  // LANGUAGE TITLE
   // ===========================================================================
 
-  Widget _buildCompactLayout(
-    BuildContext context,
-    AppLocalizations loc,
-    double width,
-    double height,
-  ) {
-    /*
-     * Compact screens use a shorter header.
-     *
-     * The contents are still positioned using Stack,
-     * so there will not be a large empty area.
-     */
-    final compactHeaderHeight = (height * 0.30).clamp(
-      170.0,
-      230.0,
+  Widget _buildLanguageTitle(AppLocalizations loc, double width) {
+    return Column(
+      children: [
+        Text(
+          loc.chooseLanguage,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: (width / 390 * 22).clamp(20.0, 25.0),
+            fontWeight: FontWeight.w700,
+            color: _black,
+            height: 1.1,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: 56,
+          height: 3,
+          decoration: BoxDecoration(
+            color: _red,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _sideMargin),
+          child: Text(
+            _changeLater,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: _grey,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
     );
+  }
 
-    return SafeArea(
-      top: false,
-      bottom: true,
-      child: SingleChildScrollView(
-        physics: const ClampingScrollPhysics(),
-        child: Column(
-          children: [
-            // =================================================================
-            // COMPACT HEADER
-            // =================================================================
+  // ===========================================================================
+  // LANGUAGE CARDS
+  // ===========================================================================
 
-            _buildHeader(
-              context,
-              width,
-              compactHeaderHeight,
-            ),
-
-            const SizedBox(height: 12),
-
-            _buildFeatureBand(
-              context,
-              loc,
-              width,
-              height,
-            ),
-
-            // =================================================================
-            // LANGUAGE AREA
-            // =================================================================
-
-            _buildLanguageArea(
-              context,
-              loc,
-              width,
-              height,
-            ),
-          ],
+  Widget _buildLanguageCards(AppLocalizations loc, double width) {
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _maxContentWidth),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: _sideMargin),
+          child: Column(
+            children: [
+              _reveal(
+                start: 0.45,
+                end: 0.9,
+                child: _LanguageCard(
+                  badge: 'EN',
+                  imageAsset: 'assets/images/en.png',
+                  label: loc.english,
+                  subtitle: 'Continue in English',
+                  loading: _savingCode == 'en',
+                  enabled: !_isSaving,
+                  onTap: () => _select('en'),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _reveal(
+                start: 0.55,
+                end: 1.0,
+                child: _LanguageCard(
+                  badge: 'TL',
+                  imageAsset: 'assets/images/tl.png',
+                  label: loc.tagalog,
+                  subtitle: 'Magpatuloy sa Tagalog',
+                  loading: _savingCode == 'tl',
+                  enabled: !_isSaving,
+                  onTap: () => _select('tl'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  // ===========================================================================
-  // HORIZONTAL PADDING
-  // ===========================================================================
-
-  double _horizontalPadding(
-    double width,
-  ) {
-    if (width <= 320) {
-      return 8.0;
-    }
-
-    if (width <= 360) {
-      return 8.0;
-    }
-
-    if (width <= 430) {
-      return 24.0;
-    }
-
-    if (width <= 600) {
-      return 32.0;
-    }
-
-    return 40.0;
-  }
-
-  // ===========================================================================
-  // LOGO TEXT SPACING
-  // ===========================================================================
-
-  double _logoTextSpacing(
-    double width,
-  ) {
-    return (width / 390 * 5).clamp(
-      3.0,
-      7.0,
-    );
-  }
-
-  // ===========================================================================
-  // CLARO TEXT SIZE
-  // ===========================================================================
-
-  double _claroTextSize(
-    double width,
-  ) {
-    return (width / 390 * 17).clamp(
-      15.0,
-      21.0,
-    );
-  }
-
-  // ===========================================================================
-  // FEATURE GRID WIDTH
-  // ===========================================================================
-
-  double _featureGridWidth(
-    double width,
-  ) {
-    if (width <= 320) {
-      return 280.0;
-    }
-
-    if (width <= 360) {
-      return 300.0;
-    }
-
-    if (width <= 390) {
-      return 320.0;
-    }
-
-    if (width <= 430) {
-      return 350.0;
-    }
-
-    if (width <= 600) {
-      return 380.0;
-    }
-
-    return 420.0;
-  }
-
-  // ===========================================================================
-  // FEATURE ITEM WIDTH
-  // ===========================================================================
-
-  double _featureItemWidth(
-    double width,
-  ) {
-    if (width <= 320) {
-      return 120.0;
-    }
-
-    if (width <= 360) {
-      return 130.0;
-    }
-
-    if (width <= 390) {
-      return 140.0;
-    }
-
-    if (width <= 430) {
-      return 150.0;
-    }
-
-    return 170.0;
-  }
-
-  // ===========================================================================
-  // FEATURE ROW SPACING
-  // ===========================================================================
-
-  double _featureRowSpacing(
-    double width,
-  ) {
-    if (width <= 320) {
-      return 14.0;
-    }
-
-    if (width <= 360) {
-      return 14.0;
-    }
-
-    if (width <= 390) {
-      return 16.0;
-    }
-
-    if (width <= 430) {
-      return 16.0;
-    }
-
-    return 16.0;
-  }
-
-  // ===========================================================================
-  // FEATURE ICON / TEXT SPACING
-  // ===========================================================================
-
-  double _featureIconTextSpacing(
-    double width,
-  ) {
-    return (width / 390 * 3).clamp(
-      2.0,
-      5.0,
-    );
-  }
-
-  // ===========================================================================
-  // LANGUAGE TOP SPACING
-  // ===========================================================================
-
-  double _languageTopSpacing(
-    double width,
-    double height,
-  ) {
-    /*
-     * Gives the white section proper breathing room below the curve
-     * instead of crowding "Choose Language" right up against it.
-     */
-
-    if (height < 600) {
-      return 20.0;
-    }
-
-    if (width <= 320) {
-      return 28.0;
-    }
-
-    if (width <= 390) {
-      return 32.0;
-    }
-
-    if (width <= 430) {
-      return 36.0;
-    }
-
-    return 40.0;
-  }
-
-  // ===========================================================================
-  // LANGUAGE TITLE SIZE
-  // ===========================================================================
-
-  double _languageTitleSize(
-    double width,
-  ) {
-    if (width <= 320) {
-      return 20.0;
-    }
-
-    if (width <= 360) {
-      return 21.0;
-    }
-
-    if (width <= 390) {
-      return 22.0;
-    }
-
-    if (width <= 430) {
-      return 23.0;
-    }
-
-    return 25.0;
-  }
-
-  // ===========================================================================
-  // TITLE / BUTTON SPACING
-  // ===========================================================================
-
-  double _titleButtonSpacing(
-    double width,
-    double height,
-  ) {
-    if (height < 600) {
-      return 20.0;
-    }
-
-    if (width <= 360) {
-      return 24.0;
-    }
-
-    if (width <= 390) {
-      return 28.0;
-    }
-
-    if (width <= 430) {
-      return 32.0;
-    }
-
-    return 36.0;
-  }
-
-  // ===========================================================================
-  // LANGUAGE BUTTON SPACING
-  // ===========================================================================
-
-  double _languageButtonSpacing(
-    double width,
-  ) {
-    if (width <= 320) {
-      return 12.0;
-    }
-
-    if (width <= 360) {
-      return 13.0;
-    }
-
-    if (width <= 390) {
-      return 14.0;
-    }
-
-    if (width <= 430) {
-      return 15.0;
-    }
-
-    return 18.0;
-  }
-
-  // ===========================================================================
-  // DISPOSE
-  // ===========================================================================
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 }
 
 // =============================================================================
-// RESPONSIVE RED HEADER CURVE
+// LANGUAGE CARD
 // =============================================================================
 //
-// Creates the large smooth downward curve:
-//
-//        RED HEADER
-//
-//  ┌────────────────────────┐
-//  │                        │
-//  │         CLARO          │
-//  │                        │
-//  │   FEATURES   FEATURES  │
-//  │                        │
-//  └───────╮          ╭─────┘
-//           ╰────────╯
-//
-// =============================================================================
-// SCANNER CORNER PAINTER
-// =============================================================================
+// White selectable card: circular badge, language name + native subtitle,
+// chevron (or a spinner while saving). Scales down slightly while pressed.
 
-// =============================================================================
-// SCANNER CORNER PAINTER
-// =============================================================================
+class _LanguageCard extends StatefulWidget {
+  final String badge;
 
-class _CornerPainter extends CustomPainter {
-  final Color color;
-  final double thickness;
-  final bool top;
-  final bool left;
+  /// Icon shown in the circular badge. Falls back to the [badge] letters
+  /// if the image cannot be loaded.
+  final String imageAsset;
+  final String label;
+  final String subtitle;
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onTap;
 
-  const _CornerPainter({
-    required this.color,
-    required this.thickness,
-    required this.top,
-    required this.left,
+  const _LanguageCard({
+    required this.badge,
+    required this.imageAsset,
+    required this.label,
+    required this.subtitle,
+    required this.loading,
+    required this.enabled,
+    required this.onTap,
   });
 
   @override
-  void paint(
-    Canvas canvas,
-    Size size,
-  ) {
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = thickness
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.square;
+  State<_LanguageCard> createState() => _LanguageCardState();
+}
 
-    final path = Path();
+class _LanguageCardState extends State<_LanguageCard> {
+  static const Color _red = Color(0xFF8B1A1A);
+  static const Color _black = Color(0xFF171717);
+  static const Color _grey = Color(0xFF6B6B6B);
 
-    final horizontalLength = size.width;
+  bool _pressed = false;
 
-    final verticalLength = size.height;
-
-    // =========================================================================
-    // TOP LEFT
-    // =========================================================================
-
-    if (top && left) {
-      path.moveTo(
-        0,
-        verticalLength,
-      );
-
-      path.lineTo(
-        0,
-        0,
-      );
-
-      path.lineTo(
-        horizontalLength,
-        0,
-      );
-    }
-
-    // =========================================================================
-    // TOP RIGHT
-    // =========================================================================
-
-    else if (top && !left) {
-      path.moveTo(
-        0,
-        0,
-      );
-
-      path.lineTo(
-        horizontalLength,
-        0,
-      );
-
-      path.lineTo(
-        horizontalLength,
-        verticalLength,
-      );
-    }
-
-    // =========================================================================
-    // BOTTOM LEFT
-    // =========================================================================
-
-    else if (!top && left) {
-      path.moveTo(
-        0,
-        0,
-      );
-
-      path.lineTo(
-        0,
-        verticalLength,
-      );
-
-      path.lineTo(
-        horizontalLength,
-        verticalLength,
-      );
-    }
-
-    // =========================================================================
-    // BOTTOM RIGHT
-    // =========================================================================
-
-    else {
-      path.moveTo(
-        0,
-        verticalLength,
-      );
-
-      path.lineTo(
-        horizontalLength,
-        verticalLength,
-      );
-
-      path.lineTo(
-        horizontalLength,
-        0,
-      );
-    }
-
-    canvas.drawPath(
-      path,
-      paint,
-    );
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
   }
 
   @override
-  bool shouldRepaint(
-    covariant _CornerPainter oldDelegate,
-  ) {
-    return oldDelegate.color != color ||
-        oldDelegate.thickness != thickness ||
-        oldDelegate.top != top ||
-        oldDelegate.left != left;
+  Widget build(BuildContext context) {
+    final bool dimmed = !widget.enabled && !widget.loading;
+
+    return AnimatedScale(
+      scale: _pressed ? 0.97 : 1.0,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      child: AnimatedOpacity(
+        opacity: dimmed ? 0.5 : 1.0,
+        duration: const Duration(milliseconds: 200),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: _red.withValues(alpha: _pressed ? 0.06 : 0.12),
+                blurRadius: _pressed ? 6 : 14,
+                offset: Offset(0, _pressed ? 2 : 5),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: const BorderSide(color: Color(0xFFEBD6D3)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: widget.enabled ? widget.onTap : null,
+              onTapDown: widget.enabled ? (_) => _setPressed(true) : null,
+              onTapUp: (_) => _setPressed(false),
+              onTapCancel: () => _setPressed(false),
+              splashColor: _red.withValues(alpha: 0.08),
+              highlightColor: _red.withValues(alpha: 0.04),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    // Language icon
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFF7E4E1),
+                        border: Border.all(
+                          color: const Color(0xFFEBD6D3),
+                          width: 1,
+                        ),
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          widget.imageAsset,
+                          width: 46,
+                          height: 46,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => Container(
+                            color: _red,
+                            alignment: Alignment.center,
+                            child: Text(
+                              widget.badge,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                                height: 1.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+
+                    // Names
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            widget.label,
+                            style: const TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w700,
+                              color: _black,
+                              height: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            widget.subtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: _grey,
+                              height: 1.1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+
+                    // Trailing: spinner while saving, chevron otherwise
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: widget.loading
+                          ? const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.4,
+                                color: _red,
+                              ),
+                            )
+                          : Container(
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFFF7E4E1),
+                              ),
+                              child: const Icon(
+                                Icons.chevron_right_rounded,
+                                color: _red,
+                                size: 22,
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
