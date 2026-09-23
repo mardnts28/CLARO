@@ -246,10 +246,10 @@ class _SelectLanguageScreenState extends State<SelectLanguageScreen>
       'Scan up to 3 products at once and see the recommended one.',
     ];
     const tl = [
-      'Itutok ang camera sa barcode o label para makita ang laman nito.',
-      'Tingnan ang calories, asukal, sodium at iba pa sa simpleng paliwanag.',
-      'Payong angkop sa iyong kondisyon at allergen.',
-      'Pagtabihin ang mga produkto at piliin ang mas mabuti.',
+      'Itutok ang camera sa delata o instant noodles upang makita ang impormasyon nito',
+      'Tingnan ang calories, asukal, sodium, FDA registration status, at iba pa.',
+      'Payong angkop sa iyong kondisyon at allergen sa simpleng paliwanag.',
+      'Maaaring mag-iscan ng mahigit 3 produkto at makita ang mas bagay sa kalagayan mo',
     ];
     return (_isTagalog ? tl : en)[i];
   }

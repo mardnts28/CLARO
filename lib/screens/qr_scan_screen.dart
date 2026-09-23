@@ -48,8 +48,8 @@ class _QrScanScreenState extends State<QrScanScreen> {
 
   @override
   void dispose() {
-    _controller.dispose();
     super.dispose();
+    _controller.dispose();
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -88,7 +88,18 @@ class _QrScanScreenState extends State<QrScanScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          MobileScanner(controller: _controller, onDetect: _onDetect),
+          MobileScanner(
+            controller: _controller,
+            onDetect: _onDetect,
+            errorBuilder: (context, error, child) {
+              return Center(
+                child: Text(
+                  'Camera error: $error',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              );
+            },
+          ),
           // Simple viewfinder frame -- purely visual, doesn't affect
           // detection (mobile_scanner scans the full camera frame
           // regardless of this overlay).
