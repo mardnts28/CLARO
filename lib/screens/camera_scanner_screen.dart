@@ -16,6 +16,7 @@ import 'product_detail_screen.dart';
 import 'multi_scan_results_screen.dart';
 import 'unknown_product_submission_screen.dart';
 import '../models/product_model.dart';
+import '../core/utils/success_feedback_utils.dart';
 import '../generated/l10n/app_localizations.dart';
 
 class CameraScannerScreen extends StatefulWidget {
@@ -549,12 +550,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     // Safety timer: 8.0s timeout to reset UI in case hardware capture stalls
     Timer? safetyTimer = Timer(const Duration(milliseconds: 8000), () {
       if (mounted && _isProcessing) {
-        debugPrint('CameraScannerScreen: Safety timer triggered, resetting scan state.');
-        setState(() {
-          _isProcessing = false;
-          _hasTappedToScan = false;
-          _qualityWarning = 'Scan timed out. Please try again.';
-        });
+        _handleScanTimeout();
       }
     });
 
@@ -625,7 +621,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           _liveDetections = [];
           _isProductInGuide = false;
         });
-        _showNoProductFallbackDialog(capturedImagePath: imagePath);
+        final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+        if (!hasInternet) {
+          await _showOfflineScanNotice();
+        } else {
+          _showNoProductFallbackDialog(capturedImagePath: imagePath);
+        }
       }
     } catch (e) {
       safetyTimer.cancel();
@@ -634,10 +635,49 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         setState(() {
           _isProcessing = false;
           _hasTappedToScan = false;
-          _qualityWarning = 'Scan error. Please try again.';
+          _qualityWarning = null;
         });
+        final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+        if (!hasInternet) {
+          await _showOfflineScanNotice();
+        } else if (mounted) {
+          setState(() {
+            _qualityWarning = 'Scan error. Please try again.';
+          });
+        }
       }
     }
+  }
+
+  Future<void> _handleScanTimeout() async {
+    if (!mounted || !_isProcessing) return;
+
+    debugPrint('CameraScannerScreen: Safety timer triggered, resetting scan state.');
+    setState(() {
+      _isProcessing = false;
+      _hasTappedToScan = false;
+      _qualityWarning = null;
+    });
+
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      await _showOfflineScanNotice();
+    } else if (mounted) {
+      setState(() {
+        _qualityWarning = 'Scan timed out. Please try again.';
+      });
+    }
+  }
+
+  Future<void> _showOfflineScanNotice() async {
+    if (!mounted) return;
+    final loc = AppLocalizations.of(context)!;
+    await SuccessFeedbackUtils.showOfflineNoticeDialog(
+      context,
+      title: loc.noInternetTitle,
+      message: loc.noInternetNutritionMessage,
+      buttonText: loc.gotIt,
+    );
   }
 
   Future<void> _resolveAndNavigateDetections(
