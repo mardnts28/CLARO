@@ -828,7 +828,10 @@ class _SelectLanguageScreenState
     required double width,
     required double horizontalPadding,
   }) {
-    final buttonWidth = width - horizontalPadding * 2;
+    final buttonWidth = (width - horizontalPadding * 2).clamp(
+      _minButtonWidth,
+      _maxButtonWidth,
+    );
 
     final buttonHeight = (width / 390 * 56).clamp(
       48.0,
