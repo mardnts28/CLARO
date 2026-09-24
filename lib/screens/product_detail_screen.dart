@@ -10,6 +10,7 @@ import '../services/haptic_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/locale_service.dart';
 import '../widgets/voice_assistant_fab.dart';
+import '../widgets/score_badge_strips.dart';
 import 'compare_products_screen.dart';
 import 'more_details_screen.dart';
 import 'unknown_product_submission_screen.dart';
@@ -924,6 +925,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
 
+    // Nutri-Score + NOVA are shown twice: as the badge panel at the bottom of
+    // the product info card and in the Scores section further down.
+    // Computed once per build so both places always agree, and so the
+    // Nutri-Score badge follows the pack-size dropdown.
+    final nutriResult = NutriScoreCalculator.computeFromProduct(
+      _currentProduct,
+      customServingSizeG: _selectedSizeG,
+    );
+    final novaResult = NovaScoreCalculator.computeFromProduct(_currentProduct);
+
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
@@ -1082,145 +1093,161 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       // ── 1. Main Product Info Card ──────────────────────
                       _buildCard(
                         context: context,
-                        child: Row(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Product image (Cloudinary-hosted, via imageURL from
-                            // Firestore) with graceful placeholder fallback for
-                            // missing/invalid URLs.
-                            Column(
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    width: 80,
-                                    height: 80,
-                                    color: theme.cardColor.withValues(alpha: 0.5),
-                                    child: _displayedImageUrl.isEmpty
-                                        ? Icon(
-                                            Icons.dining_outlined,
-                                            size: 40,
-                                            color: colorScheme.outline,
-                                          )
-                                        : Image.network(
-                                            _displayedImageUrl,
-                                            key: ValueKey(_displayedImageUrl),
-                                            width: 80,
-                                            height: 80,
-                                            fit: BoxFit.cover,
-                                            loadingBuilder:
-                                                (context, child, progress) {
-                                                  if (progress == null) {
-                                                    return child;
-                                                  }
-                                                  return Center(
-                                                    child: SizedBox(
-                                                      width: 20,
-                                                      height: 20,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                            strokeWidth: 2,
-                                                            color: colorScheme
-                                                                .outline,
-                                                          ),
-                                                    ),
-                                                  );
-                                                },
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                                  return Icon(
-                                                    Icons.dining_outlined,
-                                                    size: 40,
-                                                    color: colorScheme.outline,
-                                                  );
-                                                },
+                                // Product image (Cloudinary-hosted, via imageURL from
+                                // Firestore) with graceful placeholder fallback for
+                                // missing/invalid URLs.
+                                Column(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: theme.cardColor.withValues(alpha: 0.5),
+                                        child: _displayedImageUrl.isEmpty
+                                            ? Icon(
+                                                Icons.dining_outlined,
+                                                size: 40,
+                                                color: colorScheme.outline,
+                                              )
+                                            : Image.network(
+                                                _displayedImageUrl,
+                                                key: ValueKey(_displayedImageUrl),
+                                                width: 80,
+                                                height: 80,
+                                                fit: BoxFit.cover,
+                                                loadingBuilder:
+                                                    (context, child, progress) {
+                                                      if (progress == null) {
+                                                        return child;
+                                                      }
+                                                      return Center(
+                                                        child: SizedBox(
+                                                          width: 20,
+                                                          height: 20,
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                strokeWidth: 2,
+                                                                color: colorScheme
+                                                                    .outline,
+                                                              ),
+                                                        ),
+                                                      );
+                                                    },
+                                                errorBuilder:
+                                                    (context, error, stackTrace) {
+                                                      return Icon(
+                                                        Icons.dining_outlined,
+                                                        size: 40,
+                                                        color: colorScheme.outline,
+                                                      );
+                                                    },
+                                              ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    // ── Size dropdown ──
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme.surfaceContainerHighest
+                                            .withValues(alpha: 0.3),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: theme.dividerColor,
+                                        ),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<double>(
+                                          value: _selectedSizeG,
+                                          isDense: true,
+                                          icon: Icon(
+                                            Icons.arrow_drop_down,
+                                            size: 18,
+                                            color: colorScheme.onSurfaceVariant,
                                           ),
-                                  ),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                          items: _availableSizes.map((size) {
+                                            final label =
+                                                size == size.roundToDouble()
+                                                ? '${size.toInt()}g'
+                                                : '${size.toStringAsFixed(1)}g';
+                                            return DropdownMenuItem(
+                                              value: size,
+                                              child: Text(label),
+                                            );
+                                          }).toList(),
+                                          onChanged: (newSize) {
+                                            if (newSize != null) {
+                                              setState(() {
+                                                _selectedSizeG = newSize;
+                                                _displayedImageUrl = p
+                                                    .imageUrlForSize(newSize);
+                                              });
+                                              _refreshVoiceSummary();
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 8),
-                                // ── Size dropdown ──
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.surfaceContainerHighest
-                                        .withValues(alpha: 0.3),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: theme.dividerColor,
-                                    ),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<double>(
-                                      value: _selectedSizeG,
-                                      isDense: true,
-                                      icon: Icon(
-                                        Icons.arrow_drop_down,
-                                        size: 18,
-                                        color: colorScheme.onSurfaceVariant,
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        widget.productCounts != null &&
+                                                (widget.productCounts![p.id] ?? 1) >
+                                                    1
+                                            ? '${p.name} (x${widget.productCounts![p.id]})'
+                                            : p.name,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: colorScheme.onSurface,
+                                        ),
                                       ),
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: colorScheme.onSurface,
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        p.nutritionalFacts.servingSize,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
                                       ),
-                                      items: _availableSizes.map((size) {
-                                        final label =
-                                            size == size.roundToDouble()
-                                            ? '${size.toInt()}g'
-                                            : '${size.toStringAsFixed(1)}g';
-                                        return DropdownMenuItem(
-                                          value: size,
-                                          child: Text(label),
-                                        );
-                                      }).toList(),
-                                      onChanged: (newSize) {
-                                        if (newSize != null) {
-                                          setState(() {
-                                            _selectedSizeG = newSize;
-                                            _displayedImageUrl = p
-                                                .imageUrlForSize(newSize);
-                                          });
-                                          _refreshVoiceSummary();
-                                        }
-                                      },
-                                    ),
+                                      const SizedBox(height: 10),
+                                      // FDA status
+                                      _buildFdaBadge(),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.productCounts != null &&
-                                            (widget.productCounts![p.id] ?? 1) >
-                                                1
-                                        ? '${p.name} (x${widget.productCounts![p.id]})'
-                                        : p.name,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    p.nutritionalFacts.servingSize,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  // FDA badge
-                                  _buildFdaBadge(),
-                                ],
-                              ),
+                            const SizedBox(height: 14),
+                            // Nutri-Score + NOVA panel (below the product info).
+                            // Only the grade / group that applies is enlarged.
+                            ScoreBadgePanel(
+                              nutriGrade: p.nutritionalFacts.hasNutritionData
+                                  ? nutriResult.gradeLetter
+                                  : '',
+                              nutriColor: Color(nutriResult.gradeColorHex),
+                              novaGroup: novaResult.groupString,
+                              novaColor: Color(novaResult.colorHex),
                             ),
                           ],
                         ),
@@ -1768,19 +1795,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(height: 20),
 
                       // ── 7. Scores (Individual White Cards: Nutri-Score & NOVA) ─
+                      // nutriResult / novaResult are computed once at the top
+                      // of build() and shared with the badges in the product
+                      // info card.
                       (() {
                         final langCode = Localizations.localeOf(
                           context,
                         ).languageCode;
-                        final nutriResult =
-                            NutriScoreCalculator.computeFromProduct(
-                              _currentProduct,
-                              customServingSizeG: _selectedSizeG,
-                            );
-                        final novaResult =
-                            NovaScoreCalculator.computeFromProduct(
-                              _currentProduct,
-                            );
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -3908,26 +3929,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: badgeColor,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(badgeIcon, color: Colors.white, size: 13),
-              const SizedBox(width: 4),
-              Text(
-                badgeText,
-                style: GoogleFonts.inter(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+        // FittedBox shrinks the pill slightly on very narrow screens instead
+        // of overflowing.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: badgeColor,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(badgeIcon, color: Colors.white, size: 13),
+                const SizedBox(width: 4),
+                Text(
+                  badgeText,
+                  style: GoogleFonts.inter(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         if (fda.cprNumber.isNotEmpty) ...[
