@@ -89,7 +89,17 @@ class AdvisoryPromptBuilder {
     } else if (worst == null && scoredFactors.isEmpty) {
       factsBlock =
           'All evaluated nutrients are within the suitable range for this user\'s condition(s).';
-    } else if (scoredFactors.isNotEmpty) {
+    } else if (worst == null && scoredFactors.isNotEmpty) {
+      // Only reached when there is no flagged *nutrient* to report.
+      // `scoredFactors` is populated for every scored condition (e.g. plain
+      // hypertension contributes a 'sodiumMg' scored factor, not just the
+      // GERD/Kidney awareness-only factors this branch was written for), so
+      // checking it ahead of `worst` used to skip the proper amount/impact/
+      // serving facts below for nearly every user with any condition, even
+      // when a specific nutrient really was flagged. Awareness-only factors
+      // with no nutrient-evaluation counterpart (GERD triggers, GERD total
+      // fat, kidney phosphate additives) are already surfaced by their own
+      // dedicated warning cards elsewhere in the UI.
       final factorLines = scoredFactors
           .map((factor) {
             final status = factor.isUnknown ? 'UNKNOWN' : 'KNOWN';
@@ -97,7 +107,6 @@ class AdvisoryPromptBuilder {
           })
           .join('\n');
       factsBlock =
-          '${worst == null ? '' : 'Legacy nutrient facts are included above.\n'}'
           'Deterministic condition-factor results (source of truth):\n$factorLines\n'
           'The risk score and classification have already been calculated by the application. '
           'Do not change them or interpret unknown as clean.';
@@ -165,7 +174,7 @@ Also write a "comparisonExplanation" field: ONE short sentence explaining why th
 IMPORTANT: For the "warningText" field, do NOT include the decision word ("Caution") at the beginning. The UI already displays the decision separately. The warningText should only describe the allergen, e.g. "Fish allergen detected" not "Caution: Fish allergen detected".
 
 Do NOT mention: calculations, algorithms, risk scores, WHO, "recommended maximum daily intake"'''
-        : (scoredFactors.isNotEmpty
+        : (worst == null && scoredFactors.isNotEmpty
               ? '''IMPORTANT:
     - Explain the supplied deterministic condition-factor results only.
     - Do not invent thresholds, medical limits, points, classifications, or safety claims.

@@ -7,6 +7,7 @@ import '../services/haptic_service.dart';
 import '../services/get_started_service.dart';
 import '../widgets/dome_clipper.dart';
 import '../widgets/dome_page_route.dart';
+import '../widgets/onboarding_page_dots.dart';
 import 'select_language_screen.dart';
 
 /// CLARO Get Started / Welcome Screen
@@ -741,38 +742,19 @@ class _GetStartedScreenState extends State<GetStartedScreen>
             // present on the Select Language screen — the original
             // baked-in image did not clearly show one.
 
-            _buildPageIndicator(activeIndex: 0),
+            //
+            // Hidden (but still occupying space) while the dome transition
+            // runs -- the transition draws one shared indicator that
+            // animates from page 1 to page 2.
+            Opacity(
+              opacity: OnboardingDotsTransitionScope.isHidden(context)
+                  ? 0.0
+                  : 1.0,
+              child: const _GetStartedDots(),
+            ),
           ],
         ),
       ),
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // PAGE INDICATOR
-  // ---------------------------------------------------------------------------
-
-  Widget _buildPageIndicator({
-    required int activeIndex,
-    int count = 2,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(count, (index) {
-        final bool isActive = index == activeIndex;
-
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isActive ? 20 : 7,
-          height: 7,
-          decoration: BoxDecoration(
-            color: isActive
-                ? Colors.white
-                : Colors.white.withValues(alpha: 0.45),
-            borderRadius: BorderRadius.circular(4),
-          ),
-        );
-      }),
     );
   }
 
@@ -790,6 +772,19 @@ class _GetStartedScreenState extends State<GetStartedScreen>
     );
 
     return base * factor;
+  }
+}
+
+// =============================================================================
+// PAGE INDICATOR (page 1 of 2, white on the red dome)
+// =============================================================================
+
+class _GetStartedDots extends StatelessWidget {
+  const _GetStartedDots();
+
+  @override
+  Widget build(BuildContext context) {
+    return OnboardingPageDots.onDome(activeIndex: 0);
   }
 }
 

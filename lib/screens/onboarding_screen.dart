@@ -6,6 +6,7 @@ import '../services/haptic_service.dart';
 import '../services/locale_service.dart';
 import '../widgets/avatar_picker.dart';
 import '../widgets/date_of_birth_picker.dart';
+import '../widgets/onboarding_page_dots.dart';
 import 'home_screen.dart';
 
 /// NOTE ON LANGUAGE: this screen's user-facing text now follows the
@@ -466,7 +467,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             checkValidation: true,
             isFormValid: isBasicInfoValid,
           ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 20),
+          // Page 1 of 2
+          const Center(child: OnboardingPageDots.onLight(activeIndex: 0)),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -558,15 +562,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             isFormValid: _isFormValid,
           ),
           const SizedBox(height: 12),
-          Center(
-            child: Text(
-              '...',
-              style: TextStyle(
-                  color: colorScheme.outlineVariant,
-                  fontSize: 18,
-                  letterSpacing: 4),
-            ),
-          ),
+          // Page 2 of 2
+          const Center(child: OnboardingPageDots.onLight(activeIndex: 1)),
+          const SizedBox(height: 16),
         ],
       ),
     );
