@@ -1276,14 +1276,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(height: 16),
                       _buildAdvisoryBanner(context, loc),
 
-                      const SizedBox(height: 12),
+                      // Spacers are dropped for whichever of the two cards is
+                      // hidden by the GERD-only rule (see _gerdOnlyDetection).
+                      if (!_hideAdvisoryForGerdOnly) const SizedBox(height: 12),
 
                       // ── 3b. GERD Warning card (awareness-only) ────────────────
                       // Positioned above Health Analysis card but below Health Advisory banner
                       // Follows the profile currently driving the Health Analysis card below
                       _buildAwarenessWarningCards(context, loc, p),
 
-                      const SizedBox(height: 12),
+                      if (!_isGerdOnlyClean) const SizedBox(height: 12),
 
                       // ── 3. Batayan ng Pagsusuri (Reminders Box) ───────
                       Container(
@@ -1347,7 +1349,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               _buildMemberSwitcher(context, colorScheme),
                               const Divider(height: 28),
                             ] else
-                              const SizedBox(height: 20),
+                              ...(() {
+                                // Non-group users: the suggested-amount badge
+                                // sits in the same spot group members get
+                                // theirs (under the header, above the rows).
+                                final badge = _buildSuggestedAmountBadge(
+                                  context,
+                                  colorScheme,
+                                );
+                                return <Widget>[
+                                  if (badge != null) ...[
+                                    const SizedBox(height: 16),
+                                    badge,
+                                  ],
+                                  const SizedBox(height: 20),
+                                ];
+                              })(),
 
                             if (!p.nutritionalFacts.hasNutritionData)
                               Padding(
@@ -2424,6 +2441,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       return const SizedBox.shrink();
     }
 
+    // GERD-only user + detected GERD trigger(s): the GERD Warning card is
+    // the only card shown, so the Health Advisory banner is hidden. A direct
+    // allergen match still keeps the banner (see _hideAdvisoryForGerdOnly).
+    if (_hideAdvisoryForGerdOnly) return const SizedBox.shrink();
+
     // The backend's `_evaluation.overallLevel` is fixed to the product's
     // labeled serving size (`product.servingSizeG`) -- deliberately, so
     // ranking/comparison across products stays size-independent (see
@@ -2452,8 +2474,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final levelLabel = _levelLabel(level);
     final effectiveAdvisory = _effectiveAdvisory(context);
     final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
+    // A GERD-only user with no detected GERD triggers gets the same advisory
+    // a user with no health condition gets when the product is Suitable
+    // (see _isGerdOnlyClean and _effectiveAdvisory).
     final hasNoConditionsAndNoAllergens =
-        (profile == null || profile.conditions.isEmpty) &&
+        ((profile == null || profile.conditions.isEmpty) ||
+            _isGerdOnlyClean) &&
         (profile == null || profile.allergies.isEmpty) &&
         !(_evaluation?.allergenAssessment.hasDirectAllergen ?? false);
     final hasNoFlaggedNutrients =
@@ -2507,22 +2533,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ) !=
             null;
 
-    // Suggested per-meal amount badge -- shown in place of the sentence
-    // the advisory text used to end with, for users with a scored health
-    // condition (safeServingSize is only populated in that case; see
-    // FallbackAdvisoryGenerator/AdvisoryPromptBuilder). Users with no
-    // health conditions and no allergens keep their existing single-
-    // sentence advisory unchanged, so the badge is not shown for them.
-    // Styled to match the equivalent per-member badge already shown in
-    // the group Health Analysis card (see _buildMemberSwitcher).
-    final suggestedAmount = effectiveAdvisory?.safeServingSize;
-    final showSuggestedAmountBadge =
-        !hasNoConditionsAndNoAllergens && suggestedAmount != null;
-    final suggestedAmountText = suggestedAmount == null
-        ? null
-        : (isTagalog
-              ? '$suggestedAmount (para sa hanggang 3 beses na pagkain sa isang araw).'
-              : '$suggestedAmount (for up to 3 meals a day).');
+    // "Multiple allergen detected" variant: only when 2+ of the user's
+    // allergens matched this product. Replaces the title/explanation with a
+    // list of "Allergen: triggering ingredient" rows.
+    final multiAllergenRows = _multiAllergenRows(
+      Localizations.localeOf(context).languageCode,
+    );
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -2548,51 +2564,63 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: GoogleFonts.outfit(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: color,
+                if (multiAllergenRows != null) ...[
+                  Text(
+                    isTagalog ? 'Babala sa Allergen' : 'Allergen Warning',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                _buildAdvisorySubtitle(subtitle, colorScheme, level),
-                if (showSuggestedAmountBadge) ...[
-                  const SizedBox(height: 10),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
+                  const SizedBox(height: 2),
+                  Text(
+                    isTagalog
+                        ? 'Maraming allergen ang natukoy'
+                        : 'Multiple allergen detected',
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: color,
                     ),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.restaurant_outlined,
-                          size: 16,
-                          color: color,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            suggestedAmountText!,
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: colorScheme.onSurface,
-                              height: 1.4,
-                            ),
+                  ),
+                  const SizedBox(height: 8),
+                  for (final row in multiAllergenRows)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text.rich(
+                        TextSpan(
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: colorScheme.onSurface,
+                            height: 1.4,
                           ),
+                          children: [
+                            TextSpan(
+                              text: row.ingredient.isEmpty
+                                  ? row.allergen
+                                  : '${row.allergen}: ',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            if (row.ingredient.isNotEmpty)
+                              TextSpan(text: row.ingredient),
+                          ],
                         ),
-                      ],
+                      ),
+                    ),
+                ] else ...[
+                  Text(
+                    title,
+                    style: GoogleFonts.outfit(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: color,
                     ),
                   ),
+                  const SizedBox(height: 4),
+                  _buildAdvisorySubtitle(subtitle, colorScheme, level),
                 ],
                 // Kidney Disease footer note -- the same note the removed
                 // Kidney Disease Warning card ended with. Only shown while the
@@ -2633,6 +2661,122 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // Rows for the "Multiple allergen detected" Health Advisory variant, or
+  // null when it doesn't apply (fewer than two of the user's allergens
+  // matched this product, or group mode). One row per matched allergen, in
+  // the order WhoCalculator.assessAllergens produced them, paired with the
+  // product ingredient that triggered the match (first letter capitalised,
+  // otherwise as written on the label). The ingredient comes only from
+  // AllergenAssessment.ingredientSources, so nothing here is guessed.
+  List<({String allergen, String ingredient})>? _multiAllergenRows(
+    String langCode,
+  ) {
+    if (_isGroupMode) return null;
+    final assessment = _evaluation?.allergenAssessment;
+    if (assessment == null || !assessment.hasDirectAllergen) return null;
+    if (assessment.matchedContains.length < 2) return null;
+
+    final rows = <({String allergen, String ingredient})>[];
+    for (final type in assessment.matchedContains) {
+      AllergenIngredientMatch? source;
+      for (final m in assessment.ingredientSources) {
+        if (m.allergen == type) {
+          source = m;
+          break;
+        }
+      }
+      final raw = (source?.ingredient ?? '').trim();
+      final ingredient = raw.isEmpty
+          ? ''
+          : raw[0].toUpperCase() + raw.substring(1);
+      rows.add((
+        allergen: _allergenLabelFor(type, _currentProduct, langCode),
+        ingredient: ingredient,
+      ));
+    }
+    return rows;
+  }
+
+  // Suggested per-meal amount badge for NON-group users. Rendered at the top
+  // of the Health Analysis card (below the header), in the same position and
+  // with the same styling/level colour as the per-member badge that group
+  // members see in _buildMemberSwitcher, so the card looks the same whether
+  // or not the user belongs to a health group. It used to live in the Health
+  // Advisory banner; it must not be shown there any more.
+  //
+  // The amount itself is untouched: it is still `safeServingSize` from the
+  // effective advisory, only populated for users with a scored health
+  // condition. Visibility mirrors the old banner placement exactly (hidden
+  // while loading, when nutrition data is unavailable, when the banner is
+  // hidden for awareness-only / GERD-only users, and for users with no
+  // conditions and no allergens). Group mode returns null -- group members
+  // already get their badge from _buildMemberSwitcher.
+  Widget? _buildSuggestedAmountBadge(
+    BuildContext context,
+    ColorScheme colorScheme,
+  ) {
+    if (_isGroupMode ||
+        _advisoryLoading ||
+        _groupChecking ||
+        _nutritionUnavailable) {
+      return null;
+    }
+
+    final profile = _userHealthProfile;
+    final hasDirectAllergen =
+        _evaluation?.allergenAssessment.hasDirectAllergen ?? false;
+    final hasOnlyAwarenessConditions =
+        profile != null &&
+        profile.conditions.isNotEmpty &&
+        profile.scoredConditions.isEmpty;
+    if (hasOnlyAwarenessConditions && !hasDirectAllergen) return null;
+    if (_hideAdvisoryForGerdOnly) return null;
+
+    final hasNoConditionsAndNoAllergens =
+        ((profile == null || profile.conditions.isEmpty) ||
+            _isGerdOnlyClean) &&
+        (profile == null || profile.allergies.isEmpty) &&
+        !hasDirectAllergen;
+
+    final suggestedAmount = _effectiveAdvisory(context)?.safeServingSize;
+    if (hasNoConditionsAndNoAllergens || suggestedAmount == null) return null;
+
+    final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
+    final suggestedAmountText = isTagalog
+        ? '$suggestedAmount (para sa hanggang 3 beses na pagkain sa isang araw).'
+        : '$suggestedAmount (for up to 3 meals a day).';
+
+    // Same colour source as the group card's badge (_groupLevelColor).
+    final color = _groupLevelColor(_currentOverallLevel());
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.restaurant_outlined, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              suggestedAmountText,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Awareness Warning Cards (GERD) ────────────────────────────────────
   //
   // Only GERD still uses a dedicated warning card. Kidney Disease no longer
@@ -2640,9 +2784,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // additives are now written into the Health Advisory banner (see
   // KidneyAdvisoryFacts), followed by the consult-an-expert footer note.
   //
-  // The card is shown for the profile currently driving the Health Analysis
-  // card, and always explains clean and unknown states too -- absence of a
-  // match is not a reason to hide the scored condition's explanation.
+  // The card is shown only when the user has GERD *and*
+  // GerdTriggerDetector.detect() reports at least one detected trigger for
+  // the current product -- whether GERD is the user's only condition or is
+  // combined with one or more other conditions. A GERD user whose product
+  // has no detected trigger (including when there's simply no
+  // ingredient/nutrition data to check) never sees this card.
   Widget _buildAwarenessWarningCards(
     BuildContext context,
     AppLocalizations loc,
@@ -2650,7 +2797,51 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   ) {
     final hasGerd = _userHealthProfile?.hasGerd ?? false;
     if (!hasGerd) return const SizedBox.shrink();
+    // Show the GERD Warning card only when a trigger is actually detected
+    // in the current product. This applies regardless of whether GERD is
+    // the user's only condition or combined with others -- a GERD user
+    // with no detected trigger should never see the card, and "no
+    // ingredient/nutrition data" is not treated as a detected trigger
+    // (GerdDetectionResult.hasTriggers is false in that case).
+    final detection = GerdTriggerDetector.detect(_currentProduct);
+    if (!detection.hasTriggers) return const SizedBox.shrink();
     return _buildGerdWarningCard(context, loc, p);
+  }
+
+  // ── GERD-only display rule ────────────────────────────────────────────
+  //
+  // For a solo user whose ONLY health condition is GERD, exactly one card
+  // is shown, depending on what GerdTriggerDetector finds in the product:
+  //   - trigger(s) detected -> GERD Warning card only (Health Advisory
+  //     card hidden).
+  //   - checked, nothing detected -> Health Advisory card only, using the
+  //     no-condition Suitable advisory (GERD Warning card hidden).
+  // Returns null (rule not applicable, everything renders as before) for
+  // group mode, unavailable nutrition data, and any user who has another
+  // condition or no GERD.
+  GerdDetectionResult? _gerdOnlyDetection() {
+    if (_isGroupMode || _nutritionUnavailable) return null;
+    final profile = _userHealthProfile;
+    if (profile == null || !profile.hasGerd) return null;
+    if (profile.conditions.any((c) => c != HealthCondition.gerd)) return null;
+    return GerdTriggerDetector.detect(_currentProduct);
+  }
+
+  /// GERD-only + trigger(s) detected -> hide the Health Advisory card. A
+  /// direct allergen match is independent of GERD, so it keeps the banner.
+  bool get _hideAdvisoryForGerdOnly {
+    final result = _gerdOnlyDetection();
+    if (result == null || !result.hasTriggers) return false;
+    return !(_evaluation?.allergenAssessment.hasDirectAllergen ?? false);
+  }
+
+  /// GERD-only + product actually checked (ingredient list available) + no
+  /// triggers found. When the ingredient list is missing, "nothing detected"
+  /// really means "couldn't check", so that case keeps its existing display
+  /// (Health Advisory + the GERD card's "not enough information" note).
+  bool get _isGerdOnlyClean {
+    final result = _gerdOnlyDetection();
+    return result != null && !result.hasTriggers && result.hasIngredientData;
   }
 
   // ── GERD Warning card (awareness-only) ────────────────────────────────
@@ -3878,17 +4069,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final matchedTypes = _evaluation?.allergenAssessment.matchedContains;
     if (matchedTypes == null || matchedTypes.isEmpty) return const [];
 
-    final productAllergenTypes =
-        product.containsAllergens; // parallel to product.allergens
     final labels = <String>[];
     for (final type in matchedTypes) {
-      final rawIndex = productAllergenTypes.indexOf(type);
-      final label = rawIndex != -1
-          ? _getAllergenName(product.allergens[rawIndex], langCode)
-          : type.displayLabel;
+      final label = _allergenLabelFor(type, product, langCode);
       if (!labels.contains(label)) labels.add(label);
     }
     return labels;
+  }
+
+  // Display label for one allergen type: the product's own (possibly
+  // localized) allergen string when it lists that type, otherwise the generic
+  // `AllergenTypeDisplay.displayLabel`.
+  String _allergenLabelFor(
+    AllergenType type,
+    Product product,
+    String langCode,
+  ) {
+    final rawIndex = product.containsAllergens.indexOf(type);
+    return rawIndex != -1
+        ? _getAllergenName(product.allergens[rawIndex], langCode)
+        : type.displayLabel;
   }
 
   String _buildVoiceSummary(
@@ -4099,15 +4299,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final evaluation = _evaluation;
     if (evaluation == null) return _advisory;
 
+    // GERD-only user with no detected GERD triggers: `_advisory` was written
+    // for a user WITH a condition, so build the same no-condition Suitable
+    // advisory instead (deterministic, no AI call -- the same template
+    // GeminiAdvisoryService uses for a Suitable product). A direct allergen
+    // match keeps the normal allergen advisory.
+    final useNoConditionAdvisory =
+        _isGerdOnlyClean && !evaluation.allergenAssessment.hasDirectAllergen;
+
     final labelServingSizeG = evaluation.product.servingSizeG;
-    if (_selectedSizeG == labelServingSizeG) return _advisory;
+    if (_selectedSizeG == labelServingSizeG && !useNoConditionAdvisory) {
+      return _advisory;
+    }
 
     // Use combined nutrient calculation for users without health conditions
-    final useCombinedNutrients =
-        _userHealthProfile?.conditions.isEmpty ?? false;
+    final conditionsEmpty =
+        (_userHealthProfile?.conditions.isEmpty ?? false) ||
+        useNoConditionAdvisory;
+    final useCombinedNutrients = conditionsEmpty;
     final hasNoConditionsAndNoAllergens =
-        (_userHealthProfile?.conditions.isEmpty ?? false) &&
-        !evaluation.allergenAssessment.hasDirectAllergen;
+        conditionsEmpty && !evaluation.allergenAssessment.hasDirectAllergen;
 
     return FallbackAdvisoryGenerator.generate(
       evaluation,
