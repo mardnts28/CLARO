@@ -21,6 +21,7 @@ import '../../core/utils/advisory_prompt_builder.dart';
 import '../../core/utils/comparison_calculator.dart';
 import '../../core/utils/fallback_advisory_generator.dart';
 import '../../core/utils/group_advisory_builder.dart';
+import '../../core/utils/kidney_advisory_facts.dart';
 
 class GeminiAdvisoryService {
   GeminiAdvisoryService({
@@ -92,7 +93,11 @@ class GeminiAdvisoryService {
     required String languageCode,
     required bool isComparison,
   }) =>
-      'advisory_cache_${fingerprint}_${productId}_$languageCode${isComparison ? '_cmp' : ''}';
+      // Kidney Disease advisories were rewritten (sodium + protein WHO %s and
+      // phosphate additives, replacing the old Kidney Disease Warning card),
+      // so their cache keys get a version suffix to drop previously cached
+      // text. Every other profile keeps its existing key and cache.
+      'advisory_cache_${fingerprint}_${productId}_$languageCode${isComparison ? '_cmp' : ''}${fingerprint.contains(HealthCondition.kidneyDisease.name) ? '_kd2' : ''}';
 
   Future<HealthAdvisory> generateAdvisory({
     required String scanEventId,
@@ -395,6 +400,24 @@ class GeminiAdvisoryService {
 
       if (warningText == null || explanation == null) {
         throw const FormatException('Missing required fields');
+      }
+
+      // Kidney Disease advisories must state both supplied WHO percentages
+      // (sodium and protein). If the model dropped or altered either one,
+      // use the deterministic fallback text instead of showing a
+      // half-correct advisory.
+      final kidneyFacts = KidneyAdvisoryFacts.build(evaluation);
+      if (kidneyFacts != null) {
+        final sodiumToken =
+            '${kidneyFacts.sodiumPercentage.toStringAsFixed(1)}%';
+        final proteinToken =
+            '${kidneyFacts.proteinPercentage.toStringAsFixed(1)}%';
+        if (!explanation.contains(sodiumToken) ||
+            !explanation.contains(proteinToken)) {
+          throw const FormatException(
+            'Kidney advisory is missing the supplied WHO percentages',
+          );
+        }
       }
 
       return HealthAdvisory(

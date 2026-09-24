@@ -10,7 +10,6 @@ import '../services/haptic_service.dart';
 import '../generated/l10n/app_localizations.dart';
 import '../services/locale_service.dart';
 import '../widgets/voice_assistant_fab.dart';
-import '../widgets/score_badge_strips.dart';
 import 'compare_products_screen.dart';
 import 'more_details_screen.dart';
 import 'unknown_product_submission_screen.dart';
@@ -29,10 +28,11 @@ import '../core/utils/rank_label_helper.dart';
 import '../core/utils/who_calculator.dart';
 import '../core/utils/fallback_advisory_generator.dart';
 import '../core/utils/nutrition_availability.dart';
+import '../core/utils/nutrition_calculator.dart';
 import '../core/utils/nutri_score_calculator.dart';
 import '../core/utils/nova_score_calculator.dart';
 import '../core/utils/gerd_trigger_detector.dart';
-import '../core/utils/kidney_nutrient_detector.dart';
+import '../core/utils/kidney_advisory_facts.dart';
 import '../widgets/health_info_warning_card.dart';
 import '../data/services/backend_locator.dart';
 import '../data/services/favorites_service.dart';
@@ -925,16 +925,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
 
-    // Nutri-Score + NOVA are shown twice: as the badge panel at the bottom of
-    // the product info card and in the Scores section further down.
-    // Computed once per build so both places always agree, and so the
-    // Nutri-Score badge follows the pack-size dropdown.
-    final nutriResult = NutriScoreCalculator.computeFromProduct(
-      _currentProduct,
-      customServingSizeG: _selectedSizeG,
-    );
-    final novaResult = NovaScoreCalculator.computeFromProduct(_currentProduct);
-
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
@@ -1093,161 +1083,145 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       // ── 1. Main Product Info Card ──────────────────────
                       _buildCard(
                         context: context,
-                        child: Column(
+                        child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            // Product image (Cloudinary-hosted, via imageURL from
+                            // Firestore) with graceful placeholder fallback for
+                            // missing/invalid URLs.
+                            Column(
                               children: [
-                                // Product image (Cloudinary-hosted, via imageURL from
-                                // Firestore) with graceful placeholder fallback for
-                                // missing/invalid URLs.
-                                Column(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Container(
-                                        width: 80,
-                                        height: 80,
-                                        color: theme.cardColor.withValues(alpha: 0.5),
-                                        child: _displayedImageUrl.isEmpty
-                                            ? Icon(
-                                                Icons.dining_outlined,
-                                                size: 40,
-                                                color: colorScheme.outline,
-                                              )
-                                            : Image.network(
-                                                _displayedImageUrl,
-                                                key: ValueKey(_displayedImageUrl),
-                                                width: 80,
-                                                height: 80,
-                                                fit: BoxFit.cover,
-                                                loadingBuilder:
-                                                    (context, child, progress) {
-                                                      if (progress == null) {
-                                                        return child;
-                                                      }
-                                                      return Center(
-                                                        child: SizedBox(
-                                                          width: 20,
-                                                          height: 20,
-                                                          child:
-                                                              CircularProgressIndicator(
-                                                                strokeWidth: 2,
-                                                                color: colorScheme
-                                                                    .outline,
-                                                              ),
-                                                        ),
-                                                      );
-                                                    },
-                                                errorBuilder:
-                                                    (context, error, stackTrace) {
-                                                      return Icon(
-                                                        Icons.dining_outlined,
-                                                        size: 40,
-                                                        color: colorScheme.outline,
-                                                      );
-                                                    },
-                                              ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    // ── Size dropdown ──
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colorScheme.surfaceContainerHighest
-                                            .withValues(alpha: 0.3),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: theme.dividerColor,
-                                        ),
-                                      ),
-                                      child: DropdownButtonHideUnderline(
-                                        child: DropdownButton<double>(
-                                          value: _selectedSizeG,
-                                          isDense: true,
-                                          icon: Icon(
-                                            Icons.arrow_drop_down,
-                                            size: 18,
-                                            color: colorScheme.onSurfaceVariant,
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    width: 80,
+                                    height: 80,
+                                    color: theme.cardColor.withValues(alpha: 0.5),
+                                    child: _displayedImageUrl.isEmpty
+                                        ? Icon(
+                                            Icons.dining_outlined,
+                                            size: 40,
+                                            color: colorScheme.outline,
+                                          )
+                                        : Image.network(
+                                            _displayedImageUrl,
+                                            key: ValueKey(_displayedImageUrl),
+                                            width: 80,
+                                            height: 80,
+                                            fit: BoxFit.cover,
+                                            loadingBuilder:
+                                                (context, child, progress) {
+                                                  if (progress == null) {
+                                                    return child;
+                                                  }
+                                                  return Center(
+                                                    child: SizedBox(
+                                                      width: 20,
+                                                      height: 20,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            color: colorScheme
+                                                                .outline,
+                                                          ),
+                                                    ),
+                                                  );
+                                                },
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                                  return Icon(
+                                                    Icons.dining_outlined,
+                                                    size: 40,
+                                                    color: colorScheme.outline,
+                                                  );
+                                                },
                                           ),
-                                          style: GoogleFonts.inter(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
-                                          ),
-                                          items: _availableSizes.map((size) {
-                                            final label =
-                                                size == size.roundToDouble()
-                                                ? '${size.toInt()}g'
-                                                : '${size.toStringAsFixed(1)}g';
-                                            return DropdownMenuItem(
-                                              value: size,
-                                              child: Text(label),
-                                            );
-                                          }).toList(),
-                                          onChanged: (newSize) {
-                                            if (newSize != null) {
-                                              setState(() {
-                                                _selectedSizeG = newSize;
-                                                _displayedImageUrl = p
-                                                    .imageUrlForSize(newSize);
-                                              });
-                                              _refreshVoiceSummary();
-                                            }
-                                          },
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        widget.productCounts != null &&
-                                                (widget.productCounts![p.id] ?? 1) >
-                                                    1
-                                            ? '${p.name} (x${widget.productCounts![p.id]})'
-                                            : p.name,
-                                        style: GoogleFonts.outfit(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                          color: colorScheme.onSurface,
-                                        ),
+                                const SizedBox(height: 8),
+                                // ── Size dropdown ──
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.3),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: theme.dividerColor,
+                                    ),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<double>(
+                                      value: _selectedSizeG,
+                                      isDense: true,
+                                      icon: Icon(
+                                        Icons.arrow_drop_down,
+                                        size: 18,
+                                        color: colorScheme.onSurfaceVariant,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        p.nutritionalFacts.servingSize,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 13,
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: colorScheme.onSurface,
                                       ),
-                                      const SizedBox(height: 10),
-                                      // FDA status
-                                      _buildFdaBadge(),
-                                    ],
+                                      items: _availableSizes.map((size) {
+                                        final label =
+                                            size == size.roundToDouble()
+                                            ? '${size.toInt()}g'
+                                            : '${size.toStringAsFixed(1)}g';
+                                        return DropdownMenuItem(
+                                          value: size,
+                                          child: Text(label),
+                                        );
+                                      }).toList(),
+                                      onChanged: (newSize) {
+                                        if (newSize != null) {
+                                          setState(() {
+                                            _selectedSizeG = newSize;
+                                            _displayedImageUrl = p
+                                                .imageUrlForSize(newSize);
+                                          });
+                                          _refreshVoiceSummary();
+                                        }
+                                      },
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
-                            // Nutri-Score + NOVA panel (below the product info).
-                            // Only the grade / group that applies is enlarged.
-                            ScoreBadgePanel(
-                              nutriGrade: p.nutritionalFacts.hasNutritionData
-                                  ? nutriResult.gradeLetter
-                                  : '',
-                              nutriColor: Color(nutriResult.gradeColorHex),
-                              novaGroup: novaResult.groupString,
-                              novaColor: Color(novaResult.colorHex),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    widget.productCounts != null &&
+                                            (widget.productCounts![p.id] ?? 1) >
+                                                1
+                                        ? '${p.name} (x${widget.productCounts![p.id]})'
+                                        : p.name,
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    p.nutritionalFacts.servingSize,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  // FDA badge
+                                  _buildFdaBadge(),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -1304,7 +1278,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                       const SizedBox(height: 12),
 
-                      // ── 3b. GERD/Kidney Disease Warning card (awareness-only) ─
+                      // ── 3b. GERD Warning card (awareness-only) ────────────────
                       // Positioned above Health Analysis card but below Health Advisory banner
                       // Follows the profile currently driving the Health Analysis card below
                       _buildAwarenessWarningCards(context, loc, p),
@@ -1329,20 +1303,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           children: [
                             Row(
                               children: [
-                                Container(
+                                Image.asset(
+                                  'assets/images/health.png',
                                   width: 44,
                                   height: 44,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFB71C1C),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.bookmark,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                  ),
+                                  fit: BoxFit.contain,
                                 ),
                                 const SizedBox(width: 14),
                                 Expanded(
@@ -1487,6 +1452,63 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       unit: 'g',
                                     );
                                   })(),
+                                  // 4. Trans Fat (Heart disease) -- WHO: < 1% of
+                                  // total energy/day (~2.2 g/day on 2,000 kcal).
+                                  // Always shown; highlighted only for users
+                                  // with heart disease (see
+                                  // `_isNutrientKeyRelatedToUser`).
+                                  (() {
+                                    final val100g =
+                                        p.nutritionalFacts.getPer100g(
+                                          'transFatG',
+                                        ) ??
+                                        p.nutritionalFacts.transFatG;
+                                    final valServing =
+                                        (val100g / 100) * _selectedSizeG;
+                                    final limit = WhoDailyLimits.transFatGPerDay;
+                                    final pct = (valServing / limit) * 100;
+                                    return DisplayNutrientEval(
+                                      label: _heartTransFatLabel(loc),
+                                      shortLabel: _transFatShortLabel(loc),
+                                      nutrientKey: 'transFatG',
+                                      valuePerServing: valServing,
+                                      limit: limit,
+                                      percentage: pct,
+                                      level:
+                                          WhoCalculator.classifyByWhoPercentage(
+                                            pct,
+                                          ),
+                                      unit: 'g',
+                                    );
+                                  })(),
+                                  // 5. Protein (Kidney disease only) -- WHO:
+                                  // 10-15% of daily energy (~75 g/day on 2,000
+                                  // kcal). Only added, and therefore only
+                                  // highlighted, for users with kidney disease.
+                                  if (_userHealthProfile?.hasKidneyDisease ??
+                                      false)
+                                    (() {
+                                      final val100g =
+                                          p.nutritionPer100g.proteinG;
+                                      final valServing =
+                                          (val100g / 100) * _selectedSizeG;
+                                      final limit =
+                                          WhoDailyLimits.proteinGPerDay;
+                                      final pct = (valServing / limit) * 100;
+                                      return DisplayNutrientEval(
+                                        label: _kidneyProteinLabel(loc),
+                                        shortLabel: _proteinShortLabel(loc),
+                                        nutrientKey: 'proteinG',
+                                        valuePerServing: valServing,
+                                        limit: limit,
+                                        percentage: pct,
+                                        level:
+                                            WhoCalculator.classifyByWhoPercentage(
+                                              pct,
+                                            ),
+                                        unit: 'g',
+                                      );
+                                    })(),
                                 ];
 
                                 // Reorder evaluations based on user's health profile
@@ -1686,19 +1708,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     _sizeScale;
                                 final carbsVal =
                                     p.nutritionalFacts.carbsG * _sizeScale;
-                                final sugarVal =
-                                    p.nutritionalFacts.sugarsG * _sizeScale;
-                                final sodiumVal =
-                                    p.nutritionalFacts.sodiumMg * _sizeScale;
                                 final proteinVal =
                                     p.nutritionalFacts.proteinG * _sizeScale;
                                 final totalFatVal =
                                     p.nutritionalFacts.totalFatG * _sizeScale;
-                                final satFatVal =
-                                    p.nutritionalFacts.saturatedFatG *
-                                    _sizeScale;
-                                final transFatVal =
-                                    p.nutritionalFacts.transFatG * _sizeScale;
                                 final fiberVal =
                                     p.nutritionalFacts.fiberG * _sizeScale;
                                 final potassiumVal =
@@ -1723,35 +1736,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     carbsVal,
                                     '${carbsVal.toStringAsFixed(1)}g',
                                   ),
-                                  _NutrientEntry(
-                                    loc.nutriSugar,
-                                    sugarVal,
-                                    '${sugarVal.toStringAsFixed(1)}g',
-                                  ),
-                                  _NutrientEntry(
-                                    loc.nutriSodium,
-                                    sodiumVal,
-                                    '${sodiumVal.toStringAsFixed(0)}mg',
-                                  ),
-                                  _NutrientEntry(
-                                    loc.nutriProtein,
-                                    proteinVal,
-                                    '${proteinVal.toStringAsFixed(1)}g',
-                                  ),
+                                  // Protein is hidden for users with Kidney
+                                  // Disease -- it is shown (and highlighted)
+                                  // in the Health Analysis card instead.
+                                  // Follows the profile currently driving the
+                                  // Health Analysis card (the selected member
+                                  // in group mode).
+                                  if (!(_userHealthProfile?.hasKidneyDisease ??
+                                      false))
+                                    _NutrientEntry(
+                                      loc.nutriProtein,
+                                      proteinVal,
+                                      '${proteinVal.toStringAsFixed(1)}g',
+                                    ),
                                   _NutrientEntry(
                                     loc.nutriTotalFat,
                                     totalFatVal,
                                     '${totalFatVal.toStringAsFixed(1)}g',
-                                  ),
-                                  _NutrientEntry(
-                                    loc.nutriSatFat,
-                                    satFatVal,
-                                    '${satFatVal.toStringAsFixed(1)}g',
-                                  ),
-                                  _NutrientEntry(
-                                    loc.nutriTransFat,
-                                    transFatVal,
-                                    '${transFatVal.toStringAsFixed(1)}g',
                                   ),
                                   _NutrientEntry(
                                     loc.nutriFiber,
@@ -1795,13 +1796,19 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(height: 20),
 
                       // ── 7. Scores (Individual White Cards: Nutri-Score & NOVA) ─
-                      // nutriResult / novaResult are computed once at the top
-                      // of build() and shared with the badges in the product
-                      // info card.
                       (() {
                         final langCode = Localizations.localeOf(
                           context,
                         ).languageCode;
+                        final nutriResult =
+                            NutriScoreCalculator.computeFromProduct(
+                              _currentProduct,
+                              customServingSizeG: _selectedSizeG,
+                            );
+                        final novaResult =
+                            NovaScoreCalculator.computeFromProduct(
+                              _currentProduct,
+                            );
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1931,12 +1938,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           if (nutrientKey == 'sugarsG') return true;
           break;
         case HealthCondition.heartCondition:
-          if (nutrientKey == 'saturatedFatG') return true;
+          if (nutrientKey == 'saturatedFatG' || nutrientKey == 'transFatG') {
+            return true;
+          }
           break;
         case HealthCondition.gerd:
           break;
         case HealthCondition.kidneyDisease:
-          if (nutrientKey == 'sodiumMg') return true;
+          if (nutrientKey == 'sodiumMg' || nutrientKey == 'proteinG') {
+            return true;
+          }
           break;
       }
     }
@@ -1972,6 +1983,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
     return loc.bpSodiumLabel;
   }
+
+  // Trans fat row titles. There are no localization keys for these yet, so
+  // they mirror `heartSatFatLabel` / `heartSatFatShortLabel` ("Heart disease
+  // - Saturated fats" / "Saturated fats") for both supported languages.
+  String _heartTransFatLabel(AppLocalizations loc) =>
+      loc.localeName.startsWith('tl')
+      ? 'Sakit sa puso - Trans fats'
+      : 'Heart disease - Trans fats';
+
+  String _transFatShortLabel(AppLocalizations loc) => 'Trans fats';
+
+  // Kidney Disease protein row titles, mirroring `kidneySodiumLabel` ("Kidney
+  // Disease - Sodium" / "Sakit sa Bato - Sodium").
+  String _kidneyProteinLabel(AppLocalizations loc) =>
+      loc.localeName.startsWith('tl')
+      ? 'Sakit sa Bato - Protein'
+      : 'Kidney Disease - Protein';
+
+  String _proteinShortLabel(AppLocalizations loc) => 'Protein';
 
   // ── Helper method to reorder nutrient evaluations based on user's health profile ──────
   List<DisplayNutrientEval> _reorderNutrientEvaluations(
@@ -2225,17 +2255,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   // ── Helper method to build advisory subtitle with emphasized last sentence ──────
   //
-  // The last sentence of the advisory text is where both the fallback
-  // generator (fallback_advisory_generator.dart) and the AI prompt
-  // (advisory_prompt_builder.dart, instruction #4) are told to place the
-  // "safe serving" recommendation, so bolding/italicizing it is how the
+  // For users with health conditions or allergens, the advisory text is always
+  // a 3-sentence structure (see fallback_advisory_generator.dart and
+  // advisory_prompt_builder.dart). The last sentence is where the "safe
+  // serving" recommendation is placed, so bolding/italicizing it is how the
   // recommended intake amount gets visual emphasis without touching the
   // underlying text or calculation.
   //
-  // Text.rich/Text always soft-wrap within whatever width their parent
-  // (an Expanded Column here) gives them, so long translated sentences or
-  // long words wrap onto new lines instead of overflowing -- no fixed
-  // width/height is applied here, intentionally, so this keeps working
+  // For users with no health conditions and no allergens, the advisory uses
+  // sentences too, just fewer of them.
+  // Text.rich/Text always soft-wrap within whatever width their parent (an Expanded Column here)
+  // gives them, so long translated sentences or long words wrap onto new lines instead of
+  // overflowing -- no fixed width/height is applied here, intentionally, so this keeps working
   // regardless of text length or screen size.
   Widget _buildAdvisorySubtitle(
     String subtitle,
@@ -2257,25 +2288,20 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       );
     }
 
-    // Split the text into sentences, dropping any empty/whitespace-only
-    // fragments -- e.g. the fallback generator can leave a trailing space
-    // with nothing after it when there's no safe-serving recommendation
-    // to append, which previously produced a bogus empty "last sentence"
-    // instead of correctly emphasizing the real final sentence.
-    final sentences = trimmedSubtitle
+    final parts = trimmedSubtitle
         .split(RegExp(r'(?<=[.!?])\s+'))
         .map((s) => s.trim())
         .where((s) => s.isNotEmpty)
         .toList();
 
-    if (sentences.isEmpty) {
+    if (parts.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    // If there's only one sentence, emphasize it
-    if (sentences.length == 1) {
+    // If there's only one part, emphasize it
+    if (parts.length == 1) {
       return Text(
-        sentences.first,
+        parts.first,
         softWrap: true,
         style: GoogleFonts.inter(
           fontSize: 13,
@@ -2291,10 +2317,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final textSpans = <TextSpan>[];
 
     // Add all sentences except the last one normally
-    for (int i = 0; i < sentences.length - 1; i++) {
+    for (int i = 0; i < parts.length - 1; i++) {
       textSpans.add(
         TextSpan(
-          text: '${sentences[i]} ',
+          text: '${parts[i]} ',
           style: GoogleFonts.inter(
             fontSize: 13,
             color: colorScheme.onSurface,
@@ -2308,7 +2334,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // with emphasis (bold and italic, no underline).
     textSpans.add(
       TextSpan(
-        text: sentences.last,
+        text: parts.last,
         style: GoogleFonts.inter(
           fontSize: 13,
           color: colorScheme.onSurface,
@@ -2377,8 +2403,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_isGroupMode) return _buildGroupBanner(context, loc);
 
     // Known gap fix (UI layer only): a user whose ONLY saved conditions
-    // are awareness-only (GERD/Kidney Disease -- see
-    // HealthConditionKind.isAwarenessOnly) has nothing for
+    // are awareness-only (see HealthConditionKind.isAwarenessOnly) has nothing for
     // WhoCalculator.evaluateProduct to score: `nutrientEvaluations` stays
     // empty, so `evaluation.overallLevel`/`_currentOverallLevel()` falls
     // back to Suitable even though nothing was actually evaluated. That
@@ -2473,6 +2498,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final subtitle =
         effectiveAdvisory?.explanation ?? loc.safeToConsumeSubtitle;
 
+    final currentEvaluation = _evaluation;
+    final showKidneyFooterNote =
+        currentEvaluation != null &&
+        KidneyAdvisoryFacts.build(
+              currentEvaluation,
+              servingSizeG: _selectedSizeG,
+            ) !=
+            null;
+
+    // Suggested per-meal amount badge -- shown in place of the sentence
+    // the advisory text used to end with, for users with a scored health
+    // condition (safeServingSize is only populated in that case; see
+    // FallbackAdvisoryGenerator/AdvisoryPromptBuilder). Users with no
+    // health conditions and no allergens keep their existing single-
+    // sentence advisory unchanged, so the badge is not shown for them.
+    // Styled to match the equivalent per-member badge already shown in
+    // the group Health Analysis card (see _buildMemberSwitcher).
+    final suggestedAmount = effectiveAdvisory?.safeServingSize;
+    final showSuggestedAmountBadge =
+        !hasNoConditionsAndNoAllergens && suggestedAmount != null;
+    final suggestedAmountText = suggestedAmount == null
+        ? null
+        : (isTagalog
+              ? '$suggestedAmount (para sa hanggang 3 beses na pagkain sa isang araw).'
+              : '$suggestedAmount (for up to 3 meals a day).');
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
@@ -2507,6 +2558,73 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 _buildAdvisorySubtitle(subtitle, colorScheme, level),
+                if (showSuggestedAmountBadge) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.restaurant_outlined,
+                          size: 16,
+                          color: color,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            suggestedAmountText!,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.onSurface,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                // Kidney Disease footer note -- the same note the removed
+                // Kidney Disease Warning card ended with. Only shown while the
+                // advisory above is the kidney version (see
+                // KidneyAdvisoryFacts.build), so it always refers to the
+                // nutrients that advisory just mentioned.
+                if (showKidneyFooterNote) ...[
+                  const SizedBox(height: 10),
+                  Divider(height: 1, color: color.withValues(alpha: 0.5)),
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 14,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          loc.kidneyExpertAdvice,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -2515,103 +2633,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // ── Awareness Warning Cards (GERD/Kidney Disease) ─────────────────────
+  // ── Awareness Warning Cards (GERD) ────────────────────────────────────
   //
-  // Handles the logic for showing GERD, Kidney Disease, or combined cards
-  // based on detection rules:
-  // - Only show warning when relevant trigger/ingredient/nutrient is detected
-  // - If both conditions present but only one has detection, show only that condition's warning
-  // - If neither has detection, show no warning card
-  // - If both have detections, combine into one card
+  // Only GERD still uses a dedicated warning card. Kidney Disease no longer
+  // has one: its sodium/protein WHO percentages and detected phosphate
+  // additives are now written into the Health Advisory banner (see
+  // KidneyAdvisoryFacts), followed by the consult-an-expert footer note.
+  //
+  // The card is shown for the profile currently driving the Health Analysis
+  // card, and always explains clean and unknown states too -- absence of a
+  // match is not a reason to hide the scored condition's explanation.
   Widget _buildAwarenessWarningCards(
     BuildContext context,
     AppLocalizations loc,
     Product p,
   ) {
-    final profile = _userHealthProfile;
-    final hasGerd = profile?.hasGerd ?? false;
-    final hasKidney = profile?.hasKidneyDisease ?? false;
-
-    // If neither condition is present, show nothing
-    if (!hasGerd && !hasKidney) {
-      return const SizedBox.shrink();
-    }
-
-    // Run detections
-    final gerdResult = GerdTriggerDetector.detect(p);
-    final kidneyResult = KidneyNutrientDetector.detect(p);
-
-    // These cards explain clean and unknown states too; absence of a match
-    // is not a reason to hide the scored condition's explanation.
-    if (hasGerd && hasKidney) {
-      return _buildCombinedGerdKidneyWarningCard(
-        context,
-        loc,
-        p,
-        gerdResult,
-        kidneyResult,
-      );
-    }
-    if (hasGerd) return _buildGerdWarningCard(context, loc, p);
-    if (hasKidney) return _buildKidneyWarningCard(context, loc, p);
-
-    return const SizedBox.shrink();
-  }
-
-  // ── Combined GERD and Kidney Disease Warning card ─────────────────────
-  Widget _buildCombinedGerdKidneyWarningCard(
-    BuildContext context,
-    AppLocalizations loc,
-    Product p,
-    GerdDetectionResult gerdResult,
-    KidneyNutrientResult kidneyResult,
-  ) {
-    final tl = Localizations.localeOf(context).languageCode == 'tl';
-
-    // Combine GERD triggers
-    final gerdItems = gerdResult.triggers
-        .map(
-          (t) => HealthInfoWarningItem(
-            label: _gerdTriggerLabel(t, loc, p.name),
-            detail: t.type == GerdTriggerType.highFat
-                ? (tl
-                      ? '${NumberFormatUtils.formatValue(t.matchedValue!)}g na taba bawat serving'
-                      : '${NumberFormatUtils.formatValue(t.matchedValue!)}g fat per serving')
-                : t.matchedIngredient,
-          ),
-        )
-        .toList();
-
-    // Combine kidney nutrients
-    final kidneyItems = kidneyResult.nutrients
-        .map(
-          (n) => HealthInfoWarningItem(
-            label: _kidneyNutrientLabel(n.type, loc),
-            detail: _kidneyNutrientDetail(
-              n.type,
-              n.valuePerServing,
-              tl,
-              matchedIngredient: n.matchedIngredient,
-            ),
-          ),
-        )
-        .toList();
-
-    // Combine all items
-    final allItems = [...gerdItems, ...kidneyItems];
-
-    return HealthInfoWarningCard(
-      title: loc.combinedGerdKidneyWarningTitle,
-      icon: Icons.info_outline, // Information icon as requested
-      intro: loc.combinedGerdKidneyIntro,
-      items: allItems,
-      neutralMessage: allItems.isEmpty
-          ? ((!gerdResult.hasIngredientData || !kidneyResult.hasIngredientData)
-                ? loc.gerdInsufficientData
-                : loc.gerdNoTriggersFound)
-          : null,
-      expertAdvice: loc.gerdExpertAdvice,
-    );
+    final hasGerd = _userHealthProfile?.hasGerd ?? false;
+    if (!hasGerd) return const SizedBox.shrink();
+    return _buildGerdWarningCard(context, loc, p);
   }
 
   // ── GERD Warning card (awareness-only) ────────────────────────────────
@@ -2684,163 +2723,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return loc.gerdTriggerChocolate;
       case GerdTriggerType.highFat:
         return loc.gerdTriggerHighFat;
-    }
-  }
-
-  // ── Kidney Disease Warning card (awareness-only) ───────────────────────
-  //
-  // Never uses Suitable/Moderate/Caution language and never says a
-  // product is unsafe/safe/should-be-avoided. Shows one of two states:
-  //   1. Kidney-relevant nutrients detected -> lists them with per-serving
-  //      values (sodium, potassium, protein) plus phosphorus when phosphate
-  //      additives are found in the ingredient list (the matched ingredient
-  //      text is shown instead of a per-serving value).
-  //   2. No nutrition data AND no ingredient data -> a neutral "not enough
-  //      information" note.
-  Widget _buildKidneyWarningCard(
-    BuildContext context,
-    AppLocalizations loc,
-    Product p,
-  ) {
-    final result = KidneyNutrientDetector.detect(p);
-    final tl = Localizations.localeOf(context).languageCode == 'tl';
-
-    final items = result.nutrients
-        .map(
-          (n) => HealthInfoWarningItem(
-            label: _kidneyNutrientLabel(n.type, loc),
-            detail: _kidneyNutrientDetail(
-              n.type,
-              n.valuePerServing,
-              tl,
-              matchedIngredient: n.matchedIngredient,
-            ),
-          ),
-        )
-        .toList();
-
-    String? neutralMessage;
-    if (!result.hasIngredientData) {
-      neutralMessage = loc.gerdInsufficientData;
-    } else if (!result.hasAnyNutrients) {
-      neutralMessage = loc.gerdNoTriggersFound;
-    }
-
-    String? customIntro;
-    if (result.hasAnyNutrients) {
-      final stressNutrientNames = <String>[];
-      bool hasProtein = false;
-      for (final n in result.nutrients) {
-        switch (n.type) {
-          case KidneyNutrientType.sodium:
-            stressNutrientNames.add(tl ? 'sodium' : 'sodium');
-            break;
-          case KidneyNutrientType.potassium:
-            stressNutrientNames.add(tl ? 'potassium' : 'potassium');
-            break;
-          case KidneyNutrientType.phosphorus:
-            stressNutrientNames.add(tl ? 'phosphorus' : 'phosphorus');
-            break;
-          case KidneyNutrientType.protein:
-            hasProtein = true;
-            break;
-          case KidneyNutrientType.potassiumChloride:
-            stressNutrientNames.add('potassium chloride');
-            break;
-        }
-      }
-
-      final List<String> parts = [];
-      if (stressNutrientNames.isNotEmpty) {
-        String formattedList;
-        if (stressNutrientNames.length == 1) {
-          formattedList = stressNutrientNames[0];
-        } else if (stressNutrientNames.length == 2) {
-          formattedList = tl
-              ? '${stressNutrientNames[0]} at ${stressNutrientNames[1]}'
-              : '${stressNutrientNames[0]} and ${stressNutrientNames[1]}';
-        } else {
-          final last = stressNutrientNames.last;
-          final head = stressNutrientNames
-              .sublist(0, stressNutrientNames.length - 1)
-              .join(', ');
-          formattedList = tl ? '$head, at $last' : '$head, and $last';
-        }
-        parts.add(
-          tl
-              ? 'Ang mataas na pagkonsumo ng $formattedList ay maaaring magdulot ng stress sa kalusugan ng bato'
-              : 'High consumption of $formattedList may place stress on kidney health',
-        );
-      }
-
-      if (hasProtein) {
-        if (stressNutrientNames.isNotEmpty) {
-          parts.add(
-            tl
-                ? ', samantalang ang protina ay dapat ikonsumo sa katamtamang dami.'
-                : ', while protein should be consumed in moderate amounts.',
-          );
-        } else {
-          parts.add(
-            tl
-                ? 'Ang protina ay dapat ikonsumo sa katamtamang dami.'
-                : 'Protein should be consumed in moderate amounts.',
-          );
-        }
-      } else {
-        parts.add('.');
-      }
-      customIntro = parts.join('');
-    }
-
-    return HealthInfoWarningCard(
-      title: loc.kidneyWarningTitle,
-      icon: Icons.info_outline, // Information icon as requested
-      intro: customIntro ?? loc.kidneyWarningIntro,
-      items: items,
-      neutralMessage: neutralMessage,
-      expertAdvice: loc.kidneyExpertAdvice,
-    );
-  }
-
-  String _kidneyNutrientLabel(KidneyNutrientType type, AppLocalizations loc) {
-    switch (type) {
-      case KidneyNutrientType.sodium:
-        return loc.kidneyNutrientSodium;
-      case KidneyNutrientType.potassium:
-        return loc.kidneyNutrientPotassium;
-      case KidneyNutrientType.protein:
-        return loc.kidneyNutrientProtein;
-      case KidneyNutrientType.phosphorus:
-        return loc.kidneyNutrientPhosphorus;
-      case KidneyNutrientType.potassiumChloride:
-        return 'Potassium chloride';
-    }
-  }
-
-  String? _kidneyNutrientDetail(
-    KidneyNutrientType type,
-    double value,
-    bool isTagalog, {
-    String? matchedIngredient,
-  }) {
-    final formattedValue = NumberFormatUtils.formatValue(value);
-    switch (type) {
-      case KidneyNutrientType.phosphorus:
-        // Detected from phosphate additives in the ingredients: show the
-        // matched ingredient text (no per-serving amount on the label).
-        return matchedIngredient;
-      case KidneyNutrientType.sodium:
-      case KidneyNutrientType.potassium:
-        return isTagalog
-            ? '${formattedValue}mg bawat serving'
-            : '${formattedValue}mg per serving';
-      case KidneyNutrientType.protein:
-        return isTagalog
-            ? '${formattedValue}g bawat serving'
-            : '${formattedValue}g per serving';
-      case KidneyNutrientType.potassiumChloride:
-        return matchedIngredient;
     }
   }
 
@@ -3929,32 +3811,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // FittedBox shrinks the pill slightly on very narrow screens instead
-        // of overflowing.
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: badgeColor,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(badgeIcon, color: Colors.white, size: 13),
-                const SizedBox(width: 4),
-                Text(
-                  badgeText,
-                  style: GoogleFonts.inter(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: badgeColor,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(badgeIcon, color: Colors.white, size: 13),
+              const SizedBox(width: 4),
+              Text(
+                badgeText,
+                style: GoogleFonts.inter(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
         if (fda.cprNumber.isNotEmpty) ...[

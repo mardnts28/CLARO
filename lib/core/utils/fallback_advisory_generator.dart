@@ -9,6 +9,7 @@ import '../../data/models/health_advisory.dart';
 import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
 import '../constants/who_fda_thresholds.dart';
+import 'kidney_advisory_facts.dart';
 import 'serving_size_calculator.dart';
 import 'who_calculator.dart';
 import '../../models/product_model.dart';
@@ -134,9 +135,15 @@ class FallbackAdvisoryGenerator {
           .toList();
       final sourceText = sourceSentences.join(' ');
 
-      final explanation = isTagalog
-          ? 'Ang produktong ito ay minarkahan para sa iyong naitalang food allergy ($allergenLabels). $sourceText Inirerekomenda naming kumain nang maingat o iwasan ang produktong ito.'
-          : 'This product is flagged for your recorded food allergy ($allergenLabels). $sourceText Consume with caution or avoid this product.';
+      final sentence1 = isTagalog
+          ? 'Ang produktong ito ay minarkahan para sa iyong naitalang food allergy ($allergenLabels).'
+          : 'This product is flagged for your recorded food allergy ($allergenLabels).';
+      final sentence2 = sourceText;
+      final sentence3 = isTagalog
+          ? 'Inirerekomenda naming kumain nang maingat o iwasan ang produktong ito.'
+          : 'Consume with caution or avoid this product.';
+
+      final explanation = '$sentence1 $sentence2 $sentence3';
 
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.caution,
@@ -176,6 +183,18 @@ class FallbackAdvisoryGenerator {
         .where((e) => e.level != AdvisoryLevel.suitable)
         .toList();
 
+    // Kidney Disease: same 3-sentence structure as every other condition,
+    // but narrating sodium + protein (each as a % of the WHO daily reference
+    // amount) and any detected phosphate additives. Null for everyone else,
+    // so no other condition's advisory changes.
+    final kidneyFacts = KidneyAdvisoryFacts.build(
+      evaluation,
+      servingSizeG: servingSizeG,
+    );
+    if (kidneyFacts != null) {
+      return _kidneyAdvisory(evaluation, kidneyFacts, isTagalog);
+    }
+
     // IMPORTANT: this check must come AFTER `flagged` is computed, and
     // must only fire when there is no flagged *nutrient* to report.
     // `evaluation.scoredFactors` is populated for every scored condition
@@ -188,9 +207,10 @@ class FallbackAdvisoryGenerator {
     // dump for nearly all single (non-group) users, even when a specific
     // nutrient really was flagged for their condition. Awareness-only
     // factors that have no nutrient-evaluation counterpart (GERD triggers,
-    // GERD total fat, kidney phosphate additives) are already surfaced by
-    // their own dedicated warning cards elsewhere in the UI, so this
-    // fallback text is only needed when nothing else is available to say.
+    // GERD total fat) are surfaced by the GERD warning card elsewhere in the
+    // UI (kidney phosphate additives are handled by the kidney branch
+    // above), so this fallback text is only needed when nothing else is
+    // available to say.
     if (flagged.isEmpty && evaluation.scoredFactors.isNotEmpty) {
       final factorText = evaluation.scoredFactors
           .map((factor) {
@@ -277,31 +297,22 @@ class FallbackAdvisoryGenerator {
               : 'This product contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of $nutrientName '
                     '(${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the WHO daily reference amount).');
 
-    // Build concise advisory in exactly 3 sentences (mirrors the Gemini
+    // Build concise advisory in exactly 2 sentences (mirrors the Gemini
     // prompt's structure -- see AdvisoryPromptBuilder):
     // 1. Nutrient amount + % of WHO daily reference amount (no serving
     //    size, no math explanation).
     // 2. What that means for the user's condition, without implying this
     //    product causes/worsens/triggers it.
-    // 3. The supplied suggested per-meal amount, exactly as supplied,
-    //    with the 3-meals-a-day context kept in parentheses and no
-    //    restatement of the underlying 100%/WHO math. Falls back to a
-    //    short general recommendation when no serving amount was supplied.
-    final perMealSentence = safeServing != null
-        ? (isTagalog
-              ? '$safeServing (para sa hanggang 3 beses na pagkain sa isang araw).'
-              : '$safeServing (for up to 3 meals a day).')
-        : (isTagalog
-              ? 'Kainin ito nang katamtaman bilang bahagi ng balanced na pagkain.'
-              : 'Enjoy this in moderation as part of a balanced diet.');
+    // The suggested per-meal amount (safeServing) is no longer stated as a
+    // sentence here -- the UI shows it separately as a badge, using the
+    // safeServingSize field below, matching how the group health analysis
+    // card already presents a member's suggested amount.
+    final sentence1 = amountSentence;
+    final sentence2 = isTagalog
+        ? 'Mahalagang bantayan ito kung mayroon kang ${_conditionLabel(worst.condition, isTagalog)}.'
+        : 'This is worth watching if you have ${_conditionLabel(worst.condition, isTagalog)}.';
 
-    final explanation = isTagalog
-        ? '$amountSentence '
-              'Mahalagang bantayan ito kung mayroon kang ${_conditionLabel(worst.condition, isTagalog)}. '
-              '$perMealSentence'
-        : '$amountSentence '
-              'This is worth watching if you have ${_conditionLabel(worst.condition, isTagalog)}. '
-              '$perMealSentence';
+    final explanation = '$sentence1 $sentence2';
 
     return HealthAdvisory(
       overallLevel: overallLevel,
@@ -309,6 +320,104 @@ class FallbackAdvisoryGenerator {
           ? '$severityWord sa $nutrientName'
           : '$severityWord in $nutrientName',
       explanation: explanation,
+      safeServingSize: safeServing,
+      source: AdvisorySource.fallbackRuleBased,
+      generatedAt: DateTime.now(),
+    );
+  }
+
+  // Builds the Kidney Disease advisory in the same exactly-3-sentence shape
+  // the other conditions use (mirrors the kidney branch of
+  // AdvisoryPromptBuilder):
+  //   1. Sodium and protein amounts, each with its % of the WHO daily
+  //      reference amount.
+  //   2. Detected phosphate additive ingredients -- or, when there are none,
+  //      a short "worth watching" note (phosphate additives are never
+  //      mentioned unless actually detected).
+  // The suggested per-meal amount (sodium-based) is no longer stated as a
+  // sentence here -- the UI shows it separately as a badge, using the
+  // safeServingSize field below, matching how the group health analysis
+  // card already presents a member's suggested amount.
+  // The "consult an expert" footer is shown by the UI, not repeated here.
+  static HealthAdvisory _kidneyAdvisory(
+    ProductEvaluation evaluation,
+    KidneyAdvisoryFacts k,
+    bool isTagalog,
+  ) {
+    final sodiumAmount = '${k.sodiumMg.toStringAsFixed(1)}mg';
+    final sodiumPct = k.sodiumPercentage.toStringAsFixed(1);
+    final proteinAmount = '${k.proteinG.toStringAsFixed(1)}g';
+    final proteinPct = k.proteinPercentage.toStringAsFixed(1);
+
+    final amountSentence = isTagalog
+        ? 'Naglalaman ang produktong ito ng $sodiumAmount na sodium '
+              '($sodiumPct% ng WHO daily reference amount) at $proteinAmount na protein '
+              '($proteinPct% ng WHO daily reference amount).'
+        : 'This product contains $sodiumAmount of sodium '
+              '($sodiumPct% of the WHO daily reference amount) and $proteinAmount of protein '
+              '($proteinPct% of the WHO daily reference amount).';
+
+    final meaningSentence = k.hasPhosphateAdditives
+        ? (isTagalog
+              ? 'Naglalaman din ito ng mga phosphate additive (${k.phosphateIngredients}), na maaaring may kaugnayan sa kalusugan ng bato.'
+              : 'It also contains phosphate additives (${k.phosphateIngredients}), which may be relevant to kidney health.')
+        : (isTagalog
+              ? 'Mahalagang bantayan ang mga halagang ito kung mayroon kang sakit sa bato.'
+              : 'These amounts are worth watching if you have kidney disease.');
+
+    // Suggested amount stays sodium-based, exactly as it was for kidney
+    // users before (protein is informational only, not scored).
+    final safeServing = k.sodiumFlagged
+        ? ServingSizeCalculator.calculate(
+            nutrientKey: 'sodiumMg',
+            valuePer100g: evaluation.product.nutritionPer100g.sodiumMg,
+            servingSizeG: k.servingSizeG,
+          )
+        : null;
+
+    // Level/headline follow only what is actually scored for kidney users
+    // (sodium and phosphate additives) -- protein stays informational.
+    final phosphateLevel = !k.ingredientDataKnown
+        ? AdvisoryLevel.moderate
+        : (k.hasPhosphateAdditives
+              ? AdvisoryLevel.caution
+              : AdvisoryLevel.suitable);
+    final overallLevel = _severityRank(phosphateLevel) >
+            _severityRank(k.sodiumLevel)
+        ? phosphateLevel
+        : k.sodiumLevel;
+
+    final String warningText;
+    if (k.sodiumFlagged) {
+      final severityWord = k.sodiumLevel == AdvisoryLevel.caution
+          ? (isTagalog ? 'Mataas' : 'High')
+          : (isTagalog ? 'Medyo Mataas' : 'Elevated');
+      warningText = k.hasPhosphateAdditives
+          ? (isTagalog
+                ? '$severityWord sa sodium at phosphate additives'
+                : '$severityWord in sodium and phosphate additives')
+          : (isTagalog
+                ? '$severityWord sa sodium'
+                : '$severityWord in sodium');
+    } else if (k.hasPhosphateAdditives) {
+      warningText = isTagalog
+          ? 'Natukoy ang phosphate additives'
+          : 'Phosphate additives detected';
+    } else if (overallLevel == AdvisoryLevel.suitable) {
+      warningText = isTagalog ? 'Angkop' : 'Suitable';
+    } else {
+      warningText = isTagalog
+          ? 'Limitado ang impormasyon sa sangkap'
+          : 'Limited ingredient information';
+    }
+
+    final sentence1 = amountSentence;
+    final sentence2 = meaningSentence;
+
+    return HealthAdvisory(
+      overallLevel: overallLevel,
+      warningText: warningText,
+      explanation: '$sentence1 $sentence2',
       safeServingSize: safeServing,
       source: AdvisorySource.fallbackRuleBased,
       generatedAt: DateTime.now(),

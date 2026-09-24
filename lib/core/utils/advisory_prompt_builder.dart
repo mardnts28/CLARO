@@ -5,6 +5,7 @@ import '../../data/models/product_evaluation.dart';
 import '../../data/models/ranked_product_result.dart';
 import '../constants/who_fda_thresholds.dart';
 import 'comparison_calculator.dart';
+import 'kidney_advisory_facts.dart';
 import 'serving_size_calculator.dart';
 import '../../models/product_model.dart';
 
@@ -23,6 +24,12 @@ class AdvisoryPromptBuilder {
     final flagged = evaluation.nutrientEvaluations
         .where((e) => e.level != AdvisoryLevel.suitable)
         .toList();
+
+    // Kidney Disease has its own facts + instructions below (sodium and
+    // protein WHO percentages, detected phosphate additives), still within
+    // the same 3-sentence Health Advisory structure. Null for every other
+    // user, so all other conditions keep their existing prompt untouched.
+    final kidneyFacts = KidneyAdvisoryFacts.build(evaluation);
 
     NutrientEvaluation? worst;
     if (flagged.isNotEmpty) {
@@ -94,6 +101,25 @@ class AdvisoryPromptBuilder {
       factsBlock =
           'This product CONTAINS an allergen the user is allergic to: $allergenLabels.\n'
           'Ingredient attribution (use exactly this, do not add, guess, or invent beyond it):\n$sourceLines';
+    } else if (kidneyFacts != null) {
+      final phosphateLine = kidneyFacts.hasPhosphateAdditives
+          ? 'Phosphate additive ingredients detected (name them exactly as written): "${kidneyFacts.phosphateIngredients}".'
+          : (kidneyFacts.ingredientDataKnown
+                ? 'Phosphate additive ingredients detected: none. Do NOT mention phosphate additives.'
+                : 'Phosphate additive ingredients: the ingredient list is unavailable, so this could not be checked. Do NOT mention phosphate additives.');
+      final drivers = <String>[
+        if (kidneyFacts.sodiumFlagged)
+          'sodium (${_levelLabel(kidneyFacts.sodiumLevel)})',
+        if (kidneyFacts.hasPhosphateAdditives) 'phosphate additives detected',
+      ];
+      factsBlock =
+          'User has kidney disease.\n'
+          'Serving size: ${product.servingSizeG.toStringAsFixed(0)}g.\n'
+          'Sodium: ${kidneyFacts.sodiumMg.toStringAsFixed(1)}mg per serving = ${kidneyFacts.sodiumPercentage.toStringAsFixed(1)}% of the WHO daily reference amount.\n'
+          'Protein: ${kidneyFacts.proteinG.toStringAsFixed(1)}g per serving = ${kidneyFacts.proteinPercentage.toStringAsFixed(1)}% of the WHO daily reference amount.\n'
+          '$phosphateLine\n'
+          'Headline drivers: ${drivers.isEmpty ? 'none' : drivers.join(', ')}.\n'
+          '${safeServing != null ? 'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".' : 'No suggested serving amount was supplied.'}';
     } else if (hasNoConditionsAndNoAllergens) {
       final exceededNote = exceededDailyLimitKeys.isNotEmpty
           ? '\nNote: at this product\'s full labeled serving size (${product.servingSizeG.toStringAsFixed(0)}g), the following nutrient(s) already exceed 100% of the WHO daily reference amount: ${exceededDailyLimitKeys.map(_nutrientLabel).join(', ')}. This is the reason a smaller suggested amount was calculated above -- briefly explain this to the user without restating exact numbers or percentages.'
@@ -111,10 +137,10 @@ class AdvisoryPromptBuilder {
       // GERD/Kidney awareness-only factors this branch was written for), so
       // checking it ahead of `worst` used to skip the proper amount/impact/
       // serving facts below for nearly every user with any condition, even
-      // when a specific nutrient really was flagged. Awareness-only factors
-      // with no nutrient-evaluation counterpart (GERD triggers, GERD total
-      // fat, kidney phosphate additives) are already surfaced by their own
-      // dedicated warning cards elsewhere in the UI.
+      // when a specific nutrient really was flagged. Factors with no
+      // nutrient-evaluation counterpart (GERD triggers, GERD total fat) are
+      // surfaced by the GERD warning card elsewhere in the UI; kidney
+      // phosphate additives are covered by the kidney branch above.
       final factorLines = scoredFactors
           .map((factor) {
             final status = factor.isUnknown ? 'UNKNOWN' : 'KNOWN';
@@ -189,7 +215,42 @@ Also write a "comparisonExplanation" field: ONE short sentence explaining why th
 IMPORTANT: For the "warningText" field, do NOT include the decision word ("Caution") at the beginning. The UI already displays the decision separately. The warningText should only describe the allergen, e.g. "Fish allergen detected" not "Caution: Fish allergen detected".
 
 Do NOT mention: calculations, algorithms, risk scores, WHO, "recommended maximum daily intake"'''
-        : (worst == null && scoredFactors.isNotEmpty
+        : (kidneyFacts != null
+              ? '''IMPORTANT:
+- The application has already calculated all nutrient amounts, percentages, classification levels, and the suggested serving amount.
+- You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
+- Every number in the advisory must come directly from the supplied facts above.
+- The suggested serving amount is displayed separately as a badge -- do NOT mention it in the explanation text.
+- Never describe any amount as "safe." Use non-medical, non-diagnostic, and non-prescriptive language.
+
+WARNINGTEXT field:
+- Maximum 8 words.
+- Do NOT repeat the decision level ("Caution", "Moderate", "Suitable") -- the UI already displays that separately.
+- Describe only the "Headline drivers" listed in the facts above, e.g. "High in sodium and phosphate additives". Do NOT mention protein in the headline.
+- If the headline drivers are "none", use a short neutral phrase such as "Kidney health reminder".
+
+EXPLANATION field -- write EXACTLY 2 short sentences, preferably 20-30 words total:
+
+Sentence 1:
+- Start with "This product" and state BOTH the exact supplied sodium amount and the exact supplied protein amount, each with its supplied WHO percentage in parentheses. Do NOT mention serving size in this sentence.
+  Example: "This product contains 727.3mg of sodium (36.4% of the WHO daily reference amount) and 5.0g of protein (6.7% of the WHO daily reference amount)."
+
+Sentence 2:
+- Explain how these amounts relate to the user's health in 1 sentence. If phosphate additive ingredients are listed in the facts above, name them exactly as supplied and say they may be relevant to kidney health.
+  Example: "It also contains phosphate additives (Sodium Phosphate), which may be relevant to kidney health."
+- If none are listed, do NOT mention phosphate additives at all. Instead, simply say these amounts are worth watching for someone with kidney disease.
+- Be cautious and non-medical. Do not imply the product causes, worsens, aggravates, or triggers the condition.
+
+Do NOT include a sentence about the suggested serving amount -- the app displays that separately as a badge alongside the advisory, using the safeServingSize value supplied above.
+
+Do NOT add any "consult an expert" or disclaimer sentence -- the app shows that note separately below the advisory.
+
+WORDING:
+- Use simple language suitable for an ordinary grocery shopper.
+- Prefer "daily reference amount" over "daily limit."
+- Never invent or calculate numbers -- use only the supplied facts.
+- Keep the advisory concise.'''
+              : (worst == null && scoredFactors.isNotEmpty
               ? '''IMPORTANT:
     - Explain the supplied deterministic condition-factor results only.
     - Do not invent thresholds, medical limits, points, classifications, or safety claims.
@@ -240,7 +301,7 @@ EXPLANATION field -- write EXACTLY TWO short sentences:
 - You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
 - Every number in the advisory must come directly from the supplied facts above.
 - Do not calculate daily limits, remaining amounts, maximum servings, nutrient amounts, percentages, or serving sizes.
-- If a suggested serving amount is supplied above, communicate that exact value without modifying it.
+- The suggested serving amount is displayed separately as a badge -- do NOT mention it in the explanation text.
 - Never describe any amount as "safe." Use non-medical, non-diagnostic, and non-prescriptive language.
 
 WARNINGTEXT field:
@@ -248,22 +309,18 @@ WARNINGTEXT field:
 - Do NOT repeat the decision level ("Caution", "Moderate", "Suitable") -- the UI already displays that separately.
 - Use a short descriptive phrase instead. Example: "High in Sodium", NOT "Sodium Caution for Hypertension".
 
-EXPLANATION field -- write EXACTLY 3 short sentences, preferably 30-45 words total:
+EXPLANATION field -- write EXACTLY 2 short sentences, preferably 20-30 words total:
 
 Sentence 1:
-- Start with "This product" and state the exact supplied nutrient amount. Do NOT mention serving size in this sentence. Put the supplied WHO percentage in parentheses at the end.
+- List the nutrients associated with the user's health and their WHO daily percentage. Start with "This product" and state the exact supplied nutrient amount. Do NOT mention serving size in this sentence. Put the supplied WHO percentage in parentheses at the end.
   Example: "This product contains 727.3mg of sodium (36.4% of the WHO daily reference amount)."
 - EXCEPTION: if a "Data limitation" note about sugars appears in the facts above, use this exact wording instead of the format above: "This serving contains [supplied amount] of total sugars, which is about [supplied percentage]% of the WHO reference for free sugars." Fill in only the exact supplied values. Never call this value "free sugars" or "added sugars" on its own.
 
 Sentence 2:
-- Simply explain what that amount means for the user's specific health condition.
+- Explain how that amount relates to the user's health in 1 sentence. Simply explain what that amount means for the user's specific health condition.
 - Be cautious and non-medical. Do not imply the product causes, worsens, or triggers the condition.
 
-Sentence 3:
-- Give the supplied suggested serving amount as a practical suggestion, exactly as supplied -- do not calculate, modify, convert, or estimate it.
-  Example: "Consider a smaller 50g serving (for 3 meals a day)."
-- Keep the 3-meal context in parentheses. Do NOT explain the 100% calculation or repeat the full mathematical reasoning behind it.
-- If no suggested serving amount is supplied above, give a short general recommendation instead. Do not invent a serving amount.
+Do NOT include a sentence about the suggested serving amount -- the app displays that separately as a badge alongside the advisory, using the safeServingSize value supplied above.
 
 WORDING:
 - Use simple language suitable for an ordinary grocery shopper.
@@ -272,7 +329,7 @@ WORDING:
 - Never invent or calculate numbers -- use only the supplied facts.
 - Avoid repetition and unnecessary disclaimers.
 - For sugars specifically: always say "total sugars", never "free sugars" or "added sugars" as a standalone label.
-- Keep the advisory concise.'''));
+- Keep the advisory concise.''')));
 
     final introBlock = allergen.hasDirectAllergen
         ? 'You are a friendly grocery assistant inside a Filipino grocery app called CLARO, writing a quick health tip for a scanned product.'

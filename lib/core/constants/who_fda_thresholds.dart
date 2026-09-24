@@ -29,6 +29,13 @@ class WhoDailyLimits {
   static const double sodiumMgPerDay = 2000;
   static const double sugarsGPerDay = 50;
   static const double saturatedFatGPerDay = 22.2;
+
+  // WHO: trans fat < 1% of total energy/day (~2.2 g/day on 2,000 kcal).
+  static const double transFatGPerDay = 2.2;
+
+  // WHO: protein 10-15% of daily energy; the upper bound is ~75 g/day on
+  // 2,000 kcal. Used as the reference for the Kidney Disease protein row.
+  static const double proteinGPerDay = 75;
 }
 
 class ConditionThresholds {
