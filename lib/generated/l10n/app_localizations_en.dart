@@ -1166,6 +1166,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get bpSodiumShortLabel => 'Sodium';
 
   @override
+  String get kidneySodiumLabel => 'Kidney Disease - Sodium';
+
+  @override
+  String get ckdBpSodiumLabel => 'CKD & Blood Pressure - Sodium';
+
+  @override
   String get diabetesSugarsShortLabel => 'Total sugars';
 
   @override

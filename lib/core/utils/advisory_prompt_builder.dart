@@ -35,6 +35,18 @@ class AdvisoryPromptBuilder {
     final hasNoConditionsAndNoAllergens =
         user.conditions.isEmpty && !allergen.hasDirectAllergen;
 
+    // Nutrients that, at this product's own FULL labeled serving size,
+    // deliver more than 100% of the WHO daily reference amount. Only
+    // meaningful (and only computed) for the no-conditions/no-allergens
+    // path above -- everyone else already gets a per-condition nutrient
+    // breakdown via `flagged`/`worst`. This never changes the "Suitable"
+    // decision word or the suggested-amount math already computed by
+    // `safeServing`; it only gives the model a fact to explain briefly
+    // *why* a smaller-than-full-serving amount was suggested.
+    final exceededDailyLimitKeys = hasNoConditionsAndNoAllergens
+        ? _exceededDailyLimitKeys(product)
+        : const <String>[];
+
     final safeServing = hasNoConditionsAndNoAllergens
         ? ServingSizeCalculator.calculateCombinedNutrients(
             nutritionPer100g: product.nutritionPer100g,
@@ -83,9 +95,12 @@ class AdvisoryPromptBuilder {
           'This product CONTAINS an allergen the user is allergic to: $allergenLabels.\n'
           'Ingredient attribution (use exactly this, do not add, guess, or invent beyond it):\n$sourceLines';
     } else if (hasNoConditionsAndNoAllergens) {
+      final exceededNote = exceededDailyLimitKeys.isNotEmpty
+          ? '\nNote: at this product\'s full labeled serving size (${product.servingSizeG.toStringAsFixed(0)}g), the following nutrient(s) already exceed 100% of the WHO daily reference amount: ${exceededDailyLimitKeys.map(_nutrientLabel).join(', ')}. This is the reason a smaller suggested amount was calculated above -- briefly explain this to the user without restating exact numbers or percentages.'
+          : '';
       factsBlock =
           'User has no health conditions and no allergens.\n'
-          'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".';
+          'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".$exceededNote';
     } else if (worst == null && scoredFactors.isEmpty) {
       factsBlock =
           'All evaluated nutrients are within the suitable range for this user\'s condition(s).';
@@ -183,7 +198,8 @@ Do NOT mention: calculations, algorithms, risk scores, WHO, "recommended maximum
     - Potassium, protein, natural phosphorus, and potassium chloride are informational only and are not scored risks.
     - Keep the explanation concise and user-facing.'''
               : (hasNoConditionsAndNoAllergens
-                    ? '''IMPORTANT:
+                    ? (exceededDailyLimitKeys.isEmpty
+                          ? '''IMPORTANT:
 - The application has already calculated the suggested serving amount.
 - You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
 - The suggested serving amount is for up to 3 meals per day.
@@ -202,6 +218,23 @@ EXPLANATION field -- write EXACTLY ONE short sentence:
 - Do not explain the mathematical calculation.
 - Do not repeat nutrient amounts or WHO percentages.
 - Keep it very short and user-friendly.'''
+                          : '''IMPORTANT:
+- The application has already calculated the suggested serving amount.
+- You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
+- The suggested serving amount is for up to 3 meals per day.
+- Never describe any amount as "safe" or medically recommended.
+
+WARNINGTEXT field:
+- Maximum 8 words.
+- Must clearly state "Suitable".
+- May include a short descriptive phrase after it if needed.
+- Do not make the header unnecessarily long.
+
+EXPLANATION field -- write EXACTLY TWO short sentences:
+- Sentence 1: tell the user the suggested amount PER MEAL, using the exact suggested serving amount supplied above. Preferred format: "Consider a [amount] serving per meal (for 3 meals a day)."
+- Sentence 2: a short, user-friendly reason for the smaller amount, based on the note above about the nutrient(s) that exceed the daily reference amount at a full serving. Do not restate exact numbers or percentages -- keep it plain and non-alarming (e.g. "A full serving is higher in sodium than the recommended daily amount.").
+- Do not explain the mathematical calculation.
+- Keep it very short and user-friendly.''')
                     : '''IMPORTANT:
 - The application has already calculated all nutrient amounts, percentages, classification levels, and suitable/recommended serving amounts.
 - You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
@@ -275,6 +308,32 @@ $jsonFields
       case SuitabilityRankLabel.forcedLast:
         return 'not recommended due to an allergen match';
     }
+  }
+
+  // Sodium/total sugars/saturated fat whose value at the product's own
+  // full labeled serving size exceeds 100% of the WHO daily reference
+  // amount (WhoDailyLimits). Uses raw per-100g values directly rather
+  // than `evaluation.nutrientEvaluations` because that list is only
+  // populated per-condition -- this path is for users with none.
+  static List<String> _exceededDailyLimitKeys(Product product) {
+    final checks = <String, double>{
+      'sodiumMg': product.nutritionPer100g.sodiumMg,
+      'sugarsG': product.nutritionPer100g.sugarsG,
+      'saturatedFatG': product.nutritionPer100g.saturatedFatG,
+    };
+    final exceeded = <String>[];
+    checks.forEach((key, valuePer100g) {
+      if (valuePer100g <= 0) return;
+      final valuePerServing = (valuePer100g / 100) * product.servingSizeG;
+      final dailyLimit = key == 'sodiumMg'
+          ? WhoDailyLimits.sodiumMgPerDay
+          : (key == 'sugarsG'
+                ? WhoDailyLimits.sugarsGPerDay
+                : WhoDailyLimits.saturatedFatGPerDay);
+      final whoPercentage = (valuePerServing / dailyLimit) * 100;
+      if (whoPercentage > 100) exceeded.add(key);
+    });
+    return exceeded;
   }
 
   static int _severityRank(AdvisoryLevel level) {

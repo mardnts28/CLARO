@@ -74,12 +74,47 @@ class FallbackAdvisoryGenerator {
                 ? 'Mainit ito nang maayos bilang bahagi ng balanced na pagkain.'
                 : 'Enjoy this in moderation as part of a balanced diet.');
 
+      // Overall level stays Suitable regardless -- this branch is only
+      // reached for users with no health conditions and no allergens, and
+      // "Suitable" here reflects that nothing was flagged *against a
+      // condition*. But a full labeled serving can still deliver more
+      // than 100% of the WHO daily reference amount for sodium, total
+      // sugars, and/or saturated fat even for someone with no diagnosed
+      // condition -- worth surfacing so the suggested per-meal amount
+      // above doesn't read as an arbitrary downsize. Checked at the
+      // product's own full serving size (not the possibly-smaller
+      // suggested amount), using the same WhoCalculator daily limits used
+      // everywhere else, so this can't drift from the rest of the app.
+      final exceededNutrientKeys = <String>[];
+      final fullServingChecks = <String, double>{
+        'sodiumMg': evaluation.product.nutritionPer100g.sodiumMg,
+        'sugarsG': evaluation.product.nutritionPer100g.sugarsG,
+        'saturatedFatG': evaluation.product.nutritionPer100g.saturatedFatG,
+      };
+      fullServingChecks.forEach((key, valuePer100g) {
+        if (valuePer100g <= 0) return;
+        final valuePerServing = (valuePer100g / 100) * servingSizeG;
+        final whoDailyLimit = WhoCalculator.getWhoDailyLimit(key);
+        final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
+        if (whoPercentage > 100) exceededNutrientKeys.add(key);
+      });
+
+      String reasonSentence = '';
+      if (exceededNutrientKeys.isNotEmpty) {
+        final names = exceededNutrientKeys
+            .map((k) => _nutrientLabel(k, isTagalog))
+            .join(isTagalog ? ' at ' : ' and ');
+        reasonSentence = isTagalog
+            ? ' Mataas ang $names sa isang buong serving nito kaysa sa inirerekomendang pang-araw-araw na limitasyon, kaya iminumungkahi namin ang mas maliit na bahagi.'
+            : ' A full serving of this product is higher in $names than the recommended daily reference amount, which is why a smaller portion is suggested.';
+      }
+
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.suitable,
         warningText: isTagalog
             ? 'Angkop - Walang Minarkahang Nutrient o Sangkap'
             : 'Suitable - No Flagged Nutrient or Ingredient',
-        explanation: explanation,
+        explanation: '$explanation$reasonSentence',
         safeServingSize: safeServing,
         source: AdvisorySource.fallbackRuleBased,
         generatedAt: DateTime.now(),

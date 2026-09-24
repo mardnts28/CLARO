@@ -1404,7 +1404,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     final limit = 2000.0;
                                     final pct = (valServing / limit) * 100;
                                     return DisplayNutrientEval(
-                                      label: loc.bpSodiumLabel,
+                                      label: _sodiumConditionLabel(loc),
                                       shortLabel: loc.bpSodiumShortLabel,
                                       nutrientKey: 'sodiumMg',
                                       valuePerServing: valServing,
@@ -1920,6 +1920,36 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       }
     }
     return false;
+  }
+
+  // Picks the Health Analysis card's sodium row title based on which of
+  // the two sodium-relevant conditions (hypertension, kidney disease) the
+  // signed-in user actually has on file. Only the LABEL changes here --
+  // the nutrient math (val100g/valServing/pct/level above), the
+  // `_isNutrientKeyRelatedToUser`/`_reorderNutrientEvaluations` relevance
+  // and ordering logic, the highlight styling in `_buildConditionRow`,
+  // and every other condition's row are untouched: kidney disease already
+  // shares the same `sodiumMg` key as hypertension via
+  // `ConditionThresholds.thresholds`, so no new nutrientKey or threshold
+  // is introduced, only which title is shown for that existing row.
+  //   - Hypertension only (or no conditions on file): "Blood pressure -
+  //     Sodium", same text as before this change.
+  //   - Kidney disease only: "Kidney Disease - Sodium".
+  //   - Both hypertension and kidney disease: "CKD & Blood Pressure -
+  //     Sodium".
+  String _sodiumConditionLabel(AppLocalizations loc) {
+    final List<HealthCondition> conditions =
+        _userHealthProfile?.conditions ?? const <HealthCondition>[];
+    final hasHypertension = conditions.contains(HealthCondition.hypertension);
+    final hasKidneyDisease = conditions.contains(HealthCondition.kidneyDisease);
+
+    if (hasHypertension && hasKidneyDisease) {
+      return loc.ckdBpSodiumLabel;
+    }
+    if (hasKidneyDisease) {
+      return loc.kidneySodiumLabel;
+    }
+    return loc.bpSodiumLabel;
   }
 
   // ── Helper method to reorder nutrient evaluations based on user's health profile ──────
