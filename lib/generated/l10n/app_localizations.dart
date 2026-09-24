@@ -2270,6 +2270,18 @@ abstract class AppLocalizations {
   /// **'Sodium'**
   String get bpSodiumShortLabel;
 
+  /// No description provided for @kidneySodiumLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Kidney Disease - Sodium'**
+  String get kidneySodiumLabel;
+
+  /// No description provided for @ckdBpSodiumLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'CKD & Blood Pressure - Sodium'**
+  String get ckdBpSodiumLabel;
+
   /// No description provided for @diabetesSugarsShortLabel.
   ///
   /// In en, this message translates to:
