@@ -34,6 +34,7 @@ import '../core/utils/nova_score_calculator.dart';
 import '../core/utils/gerd_trigger_detector.dart';
 import '../core/utils/kidney_advisory_facts.dart';
 import '../widgets/health_info_warning_card.dart';
+import '../widgets/score_badge_strips.dart';
 import '../data/services/backend_locator.dart';
 import '../data/services/favorites_service.dart';
 
@@ -1083,9 +1084,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       // ── 1. Main Product Info Card ──────────────────────
                       _buildCard(
                         context: context,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                             // Product image (Cloudinary-hosted, via imageURL from
                             // Firestore) with graceful placeholder fallback for
                             // missing/invalid URLs.
@@ -1223,6 +1227,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                 ],
                               ),
                             ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            _buildScoreBadgePanel(p),
                           ],
                         ),
                       ),
@@ -3874,6 +3882,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             color: theme.dividerColor.withValues(alpha: 0.5),
           ),
       ],
+    );
+  }
+
+  Widget _buildScoreBadgePanel(Product product) {
+    final nutriResult = NutriScoreCalculator.computeFromProduct(
+      product,
+      customServingSizeG: _selectedSizeG,
+    );
+    final novaResult = NovaScoreCalculator.computeFromProduct(product);
+
+    return ScoreBadgePanel(
+      nutriGrade: nutriResult.gradeLetter,
+      novaGroup: novaResult.groupString,
+      nutriColor: Color(nutriResult.gradeColorHex),
+      novaColor: Color(novaResult.colorHex),
     );
   }
 
