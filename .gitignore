@@ -34,6 +34,14 @@ ios/Podfile
 /build/
 /coverage/
 
+# Flutter iOS/macOS ephemeral build artifacts
+**/ios/Flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/ios/Flutter/flutter_export_environment.sh
+**/macos/Flutter/flutter_export_environment.sh
+**/ios/Flutter/Generated.xcconfig
+**/macos/Flutter/Generated.xcconfig
+
 # Symbolication related
 app.*.symbols
 
