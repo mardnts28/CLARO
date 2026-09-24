@@ -48,21 +48,28 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     with WidgetsBindingObserver {
   CameraController? _cameraController;
 
+  void _resetScanState() {
+    _isProcessing = false;
+    _qualityWarning = null;
+    _hasTappedToScan = false;
+    _liveDetections = [];
+    _isProductInGuide = false;
+    _isFallbackModalOpen = false;
+  }
+
   @override
   void didUpdateWidget(CameraScannerScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isActive != oldWidget.isActive) {
+      _isScreenActive = widget.isActive;
       if (widget.isActive) {
-        setState(() {
-          _isProcessing = false;
-          _qualityWarning = null;
-        });
+        setState(_resetScanState);
         _checkPermissionAndInit();
       } else {
         _stopImageStreamIfActive();
         _cameraController?.dispose();
         setState(() {
-          _isProcessing = false;
+          _resetScanState();
           _cameraController = null;
         });
       }
@@ -285,15 +292,13 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     final isScanTab = !widget.embeddedMode || HomeTabController.tabNotifier.value == 1;
     if (isScanTab) {
       _isScreenActive = true;
-      _hasTappedToScan = false;
+      setState(_resetScanState);
       _announceIfVisible();
       if (_cameraController == null || !_cameraController!.value.isInitialized) {
         _checkPermissionAndInit();
       }
     } else {
       _isScreenActive = false;
-      _hasTappedToScan = false;
-      _isFallbackModalOpen = false;
       // BUG FIX: this used to only call _stopImageStreamIfActive(), which
       // stops frame analysis but leaves the CameraController's session
       // open -- because this screen is embedded in HomeScreen's
@@ -310,9 +315,11 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       _cameraController?.dispose();
       if (mounted) {
         setState(() {
+          _resetScanState();
           _cameraController = null;
         });
       } else {
+        _resetScanState();
         _cameraController = null;
       }
     }
@@ -604,7 +611,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           '${detections.map((d) => "${d.label} (${(d.confidence * 100).toStringAsFixed(1)}%)").join(", ")}');
 
       safetyTimer.cancel();
-      if (!mounted) return;
+        if (!mounted || !_isScreenActive) return;
 
       if (detections.isNotEmpty) {
         setState(() {
