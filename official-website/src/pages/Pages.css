@@ -82,7 +82,7 @@
 .app-preview-image {
   width: 100%;
   max-width: 440px;
-  height: auto;
+  height: 60%;
   object-fit: contain;
 }
 

@@ -23,7 +23,7 @@
   --radius-full: 9999px;
   --transition-fast: 0.2s ease;
   --transition-normal: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-  --container-max-width: 1200px;
+  --container-max-width: 85%;
   --doc-container-width: 860px;
 }
 

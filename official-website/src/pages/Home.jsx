@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Download, Scan, FileText, ShieldCheck, HeartPulse, GitCompare, Mic } from 'lucide-react';
 import logoImg from '../assets/images/logoII.png';
-import appPreviewImg from '../assets/images/app preview.png';
+import appPreviewImg1 from '../assets/images/preview1.png';
+import appPreviewImg2 from '../assets/images/preview2.png';
 import './Pages.css';
 
 // TODO: update this to wherever the APK is actually hosted (Firebase Hosting,
@@ -59,7 +60,8 @@ export default function Home() {
 
           {/* Hero Visual - App Preview Image */}
           <div className="hero-visual">
-            <img src={appPreviewImg} alt="CLARO App Preview" className="app-preview-image" />
+            <img src={appPreviewImg1} alt="CLARO App Preview" className="app-preview-image" />
+            <img src={appPreviewImg2} alt="CLARO App Preview" className="app-preview-image" />
           </div>
         </div>
       </section>

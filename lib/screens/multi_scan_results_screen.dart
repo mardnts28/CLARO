@@ -10,6 +10,7 @@ import '../widgets/voice_mic_overlay.dart';
 import '../data/models/ranked_product_result.dart';
 import '../data/models/health_profile.dart';
 import '../core/utils/nutrition_availability.dart';
+import '../core/utils/product_characteristics.dart';
 import '../data/services/backend_locator.dart';
 import '../widgets/ranked_product_card.dart';
 import '../widgets/selectable_scanned_product_card.dart';
@@ -65,7 +66,14 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
 
   bool _loading = true;
   bool _nutritionUnavailable = false;
-  List<RankedProductResult> _ranked = [];
+
+  // Full re-ranked set (health-condition scoring applied) and the subset
+  // of it actually shown after Product Type / Flavor tag filters are
+  // layered on top. Mirrors CompareProductsScreen's _allRanked/_filtered
+  // split: tag filtering only narrows which re-ranked results are
+  // displayed, it never changes their order.
+  List<RankedProductResult> _allRanked = [];
+  List<RankedProductResult> _filtered = [];
 
   // Full profile (so the filter sheet knows every condition the user has)
   // and the fixed detected-products list (so re-ranking on filter change is
@@ -75,9 +83,46 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   // and ranking source (ProductRankingService.rankProducts) are unchanged.
   UserHealthProfile? _profile;
 
-  // null == "Overall" (all of the user's conditions). Non-null == ranking
-  // narrowed to that single condition.
-  HealthCondition? _selectedCondition;
+  // Multi-select, same as CompareProductsScreen: empty set == "Overall"
+  // (rank against the full saved profile). Non-empty narrows the
+  // effective profile to just those condition(s), which can be one or
+  // several at once.
+  Set<HealthCondition> _selectedConditions = {};
+
+  // Product Type / Flavor filter chips -- membership filters (hide
+  // non-matching products) layered on top of the health-condition
+  // re-ranking above. Multi-select within each group (OR): e.g. selecting
+  // both "Chicken" and "Beef" shows either. Between groups (type AND
+  // flavor) it's AND: selecting "Chicken" + "Spicy" shows only spicy
+  // chicken products. Ported from CompareProductsScreen -- same
+  // ProductCharacteristics keyword lists, same facet semantics.
+  static const String _spicyTag = '__spicy__';
+  static const String _nonSpicyTag = '__non_spicy__';
+
+  final Set<String> _selectedTypeTags = {};
+  final Set<String> _selectedFlavorTags = {};
+
+  // A multi-scan result can contain products from several different
+  // categories at once (e.g. a drink and a snack scanned together),
+  // unlike CompareProductsScreen where every product shares
+  // sourceProduct.category by construction. When that happens, each
+  // distinct category becomes an extra selectable option inside the
+  // Product Type filter group (tagged so it doesn't collide with a
+  // ProductCharacteristics type keyword of the same name).
+  static const String _categoryTagPrefix = '__category__:';
+  String _categoryTag(String category) => '$_categoryTagPrefix$category';
+  bool _isCategoryTag(String tag) => tag.startsWith(_categoryTagPrefix);
+
+  // Chip OPTIONS shown in the filter sheet -- derived once (and
+  // recomputed whenever the comparison set grows) from the actual
+  // products in this set, so a chip never appears for a tag that has
+  // zero matches in the current results.
+  Set<String> _availableTypeTags = {};
+  Set<String> _availableFlavorTags = {};
+  bool _hasSpicyOption = false;
+
+  bool get _hasActiveTagFilters =>
+      _selectedTypeTags.isNotEmpty || _selectedFlavorTags.isNotEmpty;
 
   // Comparison products set that can be extended via "Add Product" button
   // (mirrors CompareProductsScreen._comparisonProducts). Starts as a copy
@@ -161,8 +206,18 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
       if (!mounted) return;
       setState(() {
         _profile = profile;
-        _ranked = ranked;
+        _allRanked = ranked;
+        _filtered = _computeFiltered(ranked);
         _loading = false;
+        _computeAvailableTags();
+        // `ranked` above was already scored against the full saved
+        // profile, so pre-checking whichever of the deterministic
+        // conditions the user actually has doesn't require a re-rank --
+        // it just reflects, in the filter UI, the same ranking already
+        // shown. Matches CompareProductsScreen's default.
+        _selectedConditions = HealthCondition.values
+            .where((c) => c.isScored && profile.conditions.contains(c))
+            .toSet();
       });
     } catch (e) {
       debugPrint('Error ranking scanned products: $e');
@@ -186,21 +241,117 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     }
   }
 
+  /// Scans the fixed comparison set once (after load, and again whenever it
+  /// grows via "Add Product") to find which Product Type / Flavor keywords
+  /// actually occur in it -- these become the chip options offered in the
+  /// filter sheet. "Spicy" is offered separately (as a Spicy/Non-Spicy
+  /// toggle) whenever at least one product in the set matches a spicy
+  /// keyword. Ported verbatim from CompareProductsScreen.
+  void _computeAvailableTags() {
+    final typeTags = <String>{};
+    final flavorTags = <String>{};
+    var hasSpicy = false;
+
+    for (final product in _comparisonProducts) {
+      typeTags.addAll(ProductCharacteristics.typeTags(product));
+      final flavors = ProductCharacteristics.flavorTags(product);
+      flavorTags.addAll(
+        flavors.where((f) => !ProductCharacteristics.spicyKeywords.contains(f)),
+      );
+      if (flavors.any(ProductCharacteristics.spicyKeywords.contains)) {
+        hasSpicy = true;
+      }
+    }
+
+    // Only surface category as a Product Type option when this scan
+    // actually mixes categories -- a single-category scan (the common
+    // case, and CompareProductsScreen's case) has nothing to disambiguate
+    // and shouldn't show a one-option "filter".
+    final categories = _comparisonProducts.map((p) => p.category).toSet();
+    if (categories.length > 1) {
+      typeTags.addAll(categories.map(_categoryTag));
+    }
+
+    _availableTypeTags = typeTags;
+    _availableFlavorTags = flavorTags;
+    _hasSpicyOption = hasSpicy;
+  }
+
+  /// True if [product] matches the currently-selected Product Type /
+  /// Flavor filters. Same faceted semantics as CompareProductsScreen:
+  /// Product Type tags OR'd together; Flavor is two independent facets
+  /// (Spicy/Non-Spicy toggle, and flavor keyword chips OR'd among
+  /// themselves) that must each pass when selected; Product Type and
+  /// Flavor combine with AND.
+  bool _matchesTagFilters(Product product) {
+    if (_selectedTypeTags.isNotEmpty) {
+      final productTypeTags = {
+        ...ProductCharacteristics.typeTags(product),
+        _categoryTag(product.category),
+      };
+      if (productTypeTags.intersection(_selectedTypeTags).isEmpty) {
+        return false;
+      }
+    }
+
+    if (_selectedFlavorTags.isNotEmpty) {
+      final productFlavorTags = ProductCharacteristics.flavorTags(product);
+      final isSpicy = ProductCharacteristics.isSpicy(product);
+
+      final spicySelection = _selectedFlavorTags.intersection({
+        _spicyTag,
+        _nonSpicyTag,
+      });
+      final keywordSelection = _selectedFlavorTags.difference({
+        _spicyTag,
+        _nonSpicyTag,
+      });
+
+      if (spicySelection.isNotEmpty) {
+        final matchesSpicy = spicySelection.any((tag) {
+          if (tag == _spicyTag) return isSpicy;
+          return !isSpicy; // _nonSpicyTag
+        });
+        if (!matchesSpicy) return false;
+      }
+
+      if (keywordSelection.isNotEmpty) {
+        if (!keywordSelection.any(productFlavorTags.contains)) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  List<RankedProductResult> _computeFiltered(List<RankedProductResult> source) {
+    if (!_hasActiveTagFilters) return source;
+    return source.where((r) => _matchesTagFilters(r.evaluation.product)).toList();
+  }
+
   /// Re-ranks the SAME detected-products set (no re-scan, no re-detection)
-  /// against a health profile narrowed to just [condition] -- or the full
-  /// profile when [condition] is null ("Overall"). Runs through the exact
+  /// against a health profile narrowed to [conditions] -- or the full
+  /// profile when [conditions] is empty ("Overall") -- and applies the
+  /// given Product Type / Flavor tag selections. Runs through the exact
   /// same ProductRankingService.rankProducts pipeline as the default
-  /// ranking; only which condition(s) are on the profile changes.
-  void _selectConditionFilter(HealthCondition? condition) {
+  /// ranking; tag filtering happens afterward, in _computeFiltered -- it
+  /// narrows which of the re-ranked results are shown, it never changes
+  /// their order. Ported from CompareProductsScreen._reRankAndFilter.
+  void _reRankAndFilter({
+    required Set<HealthCondition> conditions,
+    required Set<String> typeTags,
+    required Set<String> flavorTags,
+  }) {
     final profile = _profile;
     if (profile == null) return;
 
-    final effectiveProfile = condition == null
+    final effectiveProfile = conditions.isEmpty
         ? profile
         : UserHealthProfile(
             userId: profile.userId,
             displayName: profile.displayName,
-            conditions: [condition],
+            conditions: conditions.toList(),
             allergies: profile.allergies,
             voiceAssistant: profile.voiceAssistant,
           );
@@ -211,9 +362,58 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     );
 
     setState(() {
-      _selectedCondition = condition;
-      _ranked = reRanked;
+      _selectedConditions
+        ..clear()
+        ..addAll(conditions);
+      _selectedTypeTags
+        ..clear()
+        ..addAll(typeTags);
+      _selectedFlavorTags
+        ..clear()
+        ..addAll(flavorTags);
+      _allRanked = reRanked;
+      _filtered = _computeFiltered(reRanked);
     });
+  }
+
+  /// Removes a single condition from the current multi-select, keeping
+  /// the rest of the selection (and the Product Type/Flavor filters)
+  /// untouched.
+  void _removeConditionTag(HealthCondition condition) {
+    final updated = Set<HealthCondition>.from(_selectedConditions)
+      ..remove(condition);
+    _reRankAndFilter(
+      conditions: updated,
+      typeTags: _selectedTypeTags,
+      flavorTags: _selectedFlavorTags,
+    );
+  }
+
+  void _removeTypeTag(String tag) {
+    final updated = Set<String>.from(_selectedTypeTags)..remove(tag);
+    _reRankAndFilter(
+      conditions: _selectedConditions,
+      typeTags: updated,
+      flavorTags: _selectedFlavorTags,
+    );
+  }
+
+  void _removeFlavorTag(String tag) {
+    final updated = Set<String>.from(_selectedFlavorTags)..remove(tag);
+    _reRankAndFilter(
+      conditions: _selectedConditions,
+      typeTags: _selectedTypeTags,
+      flavorTags: updated,
+    );
+  }
+
+  /// Display label for a selected/available Product Type or Flavor tag.
+  String _tagLabel(String tag) {
+    final loc = AppLocalizations.of(context)!;
+    if (tag == _spicyTag) return loc.spicyLabel;
+    if (tag == _nonSpicyTag) return loc.nonSpicyLabel;
+    if (_isCategoryTag(tag)) return tag.substring(_categoryTagPrefix.length);
+    return ProductCharacteristics.displayLabel(tag);
   }
 
   String _conditionLabel(HealthCondition condition) {
@@ -240,56 +440,226 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
 
+    // Local, transient copies -- edited freely while the sheet is open,
+    // only committed to screen state when "Apply" is tapped. "Clear All"
+    // resets these (and the sheet's view of itself) without touching the
+    // screen until Apply/Clear is actually pressed.
+    final tempConditions = Set<HealthCondition>.from(_selectedConditions);
+    final tempTypeTags = Set<String>.from(_selectedTypeTags);
+    final tempFlavorTags = Set<String>.from(_selectedFlavorTags);
+
     showModalBottomSheet(
       context: context,
       backgroundColor: theme.cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
+      isScrollControlled: true,
       builder: (sheetContext) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
-                child: Text(
-                  loc.filterConditionTitle,
-                  style: GoogleFonts.outfit(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: colorScheme.primary,
-                  ),
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
+            Widget sectionTitle(String text) => Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                text,
+                style: GoogleFonts.outfit(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.primary,
                 ),
               ),
-              RadioListTile<HealthCondition?>(
-                value: null,
-                groupValue: _selectedCondition,
-                activeColor: colorScheme.primary,
-                title: Text(loc.conditionOverall),
-                onChanged: (value) {
-                  Navigator.pop(sheetContext);
-                  _selectConditionFilter(value);
+            );
+
+            Widget tagChip({
+              required String label,
+              required bool selected,
+              required VoidCallback onTap,
+            }) {
+              return FilterChip(
+                label: Text(label),
+                selected: selected,
+                onSelected: (_) {
+                  HapticService().vibrate();
+                  onTap();
                 },
-              ),
-              // Only deterministic scored conditions can re-rank products.
-              for (final condition in HealthCondition.values.where(
-                (c) => c.isScored,
-              ))
-                RadioListTile<HealthCondition?>(
-                  value: condition,
-                  groupValue: _selectedCondition,
-                  activeColor: colorScheme.primary,
-                  title: Text(_conditionLabel(condition)),
-                  onChanged: (value) {
-                    Navigator.pop(sheetContext);
-                    _selectConditionFilter(value);
-                  },
+                selectedColor: colorScheme.primary.withValues(alpha: 0.15),
+                checkmarkColor: colorScheme.primary,
+                labelStyle: GoogleFonts.inter(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? colorScheme.primary : colorScheme.onSurface,
                 ),
-              const SizedBox(height: 12),
-            ],
-          ),
+                side: BorderSide.none,
+                elevation: selected ? 3 : 2,
+                pressElevation: 1,
+                shadowColor: Colors.black.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.6 : 0.35,
+                ),
+                selectedShadowColor: Colors.black.withValues(
+                  alpha: theme.brightness == Brightness.dark ? 0.6 : 0.35,
+                ),
+                backgroundColor: colorScheme.surface,
+              );
+            }
+
+            return SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    sectionTitle(loc.filterConditionTitle),
+                    // Multi-select: any combination of the conditions can
+                    // be checked at once (e.g. Diabetes + Heart Condition
+                    // together). Only deterministic scored conditions can
+                    // re-rank products.
+                    for (final condition in HealthCondition.values.where(
+                      (c) => c.isScored,
+                    ))
+                      CheckboxListTile(
+                        value: tempConditions.contains(condition),
+                        activeColor: colorScheme.primary,
+                        title: Text(_conditionLabel(condition)),
+                        onChanged: (checked) {
+                          HapticService().vibrate();
+                          setSheetState(() {
+                            if (checked == true) {
+                              tempConditions.add(condition);
+                            } else {
+                              tempConditions.remove(condition);
+                            }
+                          });
+                        },
+                      ),
+
+                    // ── Product Type (only shown if this comparison set
+                    // actually has products with a curated type tag) ────
+                    if (_availableTypeTags.isNotEmpty) ...[
+                      sectionTitle(loc.filterProductTypeTitle),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 10,
+                          children: [
+                            for (final tag in _availableTypeTags)
+                              tagChip(
+                                label: _tagLabel(tag),
+                                selected: tempTypeTags.contains(tag),
+                                onTap: () => setSheetState(() {
+                                  if (!tempTypeTags.remove(tag)) {
+                                    tempTypeTags.add(tag);
+                                  }
+                                }),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // ── Flavor (spicy/non-spicy toggle + any other
+                    // curated flavor tags actually present) ─────────────
+                    if (_hasSpicyOption || _availableFlavorTags.isNotEmpty) ...[
+                      sectionTitle(loc.filterFlavorTitle),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 10,
+                          children: [
+                            if (_hasSpicyOption) ...[
+                              tagChip(
+                                label: loc.spicyLabel,
+                                selected: tempFlavorTags.contains(_spicyTag),
+                                onTap: () => setSheetState(() {
+                                  if (!tempFlavorTags.remove(_spicyTag)) {
+                                    tempFlavorTags
+                                      ..remove(_nonSpicyTag)
+                                      ..add(_spicyTag);
+                                  }
+                                }),
+                              ),
+                              tagChip(
+                                label: loc.nonSpicyLabel,
+                                selected: tempFlavorTags.contains(_nonSpicyTag),
+                                onTap: () => setSheetState(() {
+                                  if (!tempFlavorTags.remove(_nonSpicyTag)) {
+                                    tempFlavorTags
+                                      ..remove(_spicyTag)
+                                      ..add(_nonSpicyTag);
+                                  }
+                                }),
+                              ),
+                            ],
+                            for (final tag in _availableFlavorTags)
+                              tagChip(
+                                label: _tagLabel(tag),
+                                selected: tempFlavorTags.contains(tag),
+                                onTap: () => setSheetState(() {
+                                  if (!tempFlavorTags.remove(tag)) {
+                                    tempFlavorTags.add(tag);
+                                  }
+                                }),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 20),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                elevation: 4,
+                                shadowColor: Colors.black.withValues(
+                                  alpha: theme.brightness == Brightness.dark ? 0.55 : 0.20,
+                                ),
+                                backgroundColor: colorScheme.surface,
+                                foregroundColor: colorScheme.onSurface,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: () => setSheetState(() {
+                                tempConditions.clear();
+                                tempTypeTags.clear();
+                                tempFlavorTags.clear();
+                              }),
+                              child: Text(loc.clearAll),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
+                              ),
+                              onPressed: () {
+                                Navigator.pop(sheetContext);
+                                _reRankAndFilter(
+                                  conditions: tempConditions,
+                                  typeTags: tempTypeTags,
+                                  flavorTags: tempFlavorTags,
+                                );
+                              },
+                              child: Text(loc.apply),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -478,7 +848,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
 
   /// Folds newly-selected product(s) into the SAME ranking/comparison
   /// set this screen already manages -- not a separate ranking. Reuses
-  /// the exact re-ranking pipeline _selectConditionFilter/rankProducts already
+  /// the exact re-ranking pipeline _reRankAndFilter/rankProducts already
   /// runs on filter changes, so the newly added products are compared
   /// against the existing ones (and vice versa) exactly as if they'd
   /// been part of the initial comparison. Previously-ranked products are
@@ -498,11 +868,16 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     if (toAdd.isEmpty) return;
 
     _comparisonProducts = [..._comparisonProducts, ...toAdd];
+    _computeAvailableTags();
 
     // Re-rank the combined set through the same pipeline used for every
-    // other re-rank on this screen, preserving whatever condition filter
-    // is currently active.
-    _selectConditionFilter(_selectedCondition);
+    // other re-rank on this screen, preserving whatever condition /
+    // Product Type / Flavor filters are currently active.
+    _reRankAndFilter(
+      conditions: _selectedConditions,
+      typeTags: _selectedTypeTags,
+      flavorTags: _selectedFlavorTags,
+    );
 
     if (!mounted) return;
     final loc = AppLocalizations.of(context)!;
@@ -553,6 +928,74 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRemovableChip({
+    required String label,
+    required VoidCallback onRemove,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return GestureDetector(
+      onTap: onRemove,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: _tint(theme, colorScheme.secondary, 0.12),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: _softShadow(theme, blur: 9, dy: 3),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: colorScheme.secondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.close, size: 14, color: colorScheme.secondary),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterEmpty() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 64,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            loc.noProductsFound,
+            style: GoogleFonts.outfit(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            loc.noSearchMatchDesc,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -632,7 +1075,8 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                               color: colorScheme.primary,
                               size: 24,
                             ),
-                            if (_selectedCondition != null)
+                            if (_selectedConditions.isNotEmpty ||
+                                _hasActiveTagFilters)
                               Positioned(
                                 top: -2,
                                 right: -2,
@@ -653,10 +1097,13 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
               ),
             ),
 
-            // ── Ranked description label ────────────────────────────────
+            // ── Ranked description label + active filter chips ─────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-              child: Row(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Text(
                     loc.rankedBySuitability,
@@ -666,45 +1113,30 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (_selectedCondition != null) ...[
-                    const SizedBox(width: 8),
-                    GestureDetector(
-                      onTap: () {
+                  for (final condition in _selectedConditions)
+                    _buildRemovableChip(
+                      label: _conditionLabel(condition),
+                      onRemove: () {
                         HapticService().vibrate();
-                        _selectConditionFilter(null);
+                        _removeConditionTag(condition);
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _tint(theme, colorScheme.secondary, 0.12),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: _softShadow(theme, blur: 9, dy: 3),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              _conditionLabel(_selectedCondition!),
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: colorScheme.secondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Icon(
-                              Icons.close,
-                              size: 14,
-                              color: colorScheme.secondary,
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
-                  ],
+                  for (final tag in _selectedTypeTags)
+                    _buildRemovableChip(
+                      label: _tagLabel(tag),
+                      onRemove: () {
+                        HapticService().vibrate();
+                        _removeTypeTag(tag);
+                      },
+                    ),
+                  for (final tag in _selectedFlavorTags)
+                    _buildRemovableChip(
+                      label: _tagLabel(tag),
+                      onRemove: () {
+                        HapticService().vibrate();
+                        _removeFlavorTag(tag);
+                      },
+                    ),
                 ],
               ),
             ),
@@ -774,6 +1206,8 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         ),
                       ),
                     )
+                  : (_filtered.isEmpty && _hasActiveTagFilters)
+                  ? _buildFilterEmpty()
                   : ListView.separated(
                       padding: EdgeInsets.fromLTRB(
                         16,
@@ -781,17 +1215,17 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                         16,
                         16 + MediaQuery.of(context).padding.bottom + 24,
                       ),
-                      itemCount: _ranked.length + 1,
+                      itemCount: _filtered.length + 1,
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
                       itemBuilder: (context, i) {
-                        if (i == _ranked.length) {
+                        if (i == _filtered.length) {
                           return _buildAddProductButton();
                         }
 
-                        final ranked = _ranked[i];
+                        final ranked = _filtered[i];
                         return RankedProductCard(
                           ranked: ranked,
-                          totalProducts: _ranked.length,
+                          totalProducts: _filtered.length,
                           quantity: widget
                               .productCounts?[ranked.evaluation.product.id],
                           onTap: () {
@@ -804,7 +1238,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                               MaterialPageRoute(
                                 builder: (_) => ProductDetailScreen(
                                   product: ranked.evaluation.product,
-                                  comparisonSet: _ranked,
+                                  comparisonSet: _allRanked,
                                 ),
                               ),
                             );
