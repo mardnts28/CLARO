@@ -5,6 +5,9 @@ import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../services/haptic_service.dart';
+import '../services/guest_session.dart';
+import 'home_screen.dart';
+import 'onboarding_screen.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   const OtpVerificationScreen({
@@ -15,6 +18,8 @@ class OtpVerificationScreen extends StatefulWidget {
     this.otpCode,
     this.emailSent = true,
     this.expiresAt,
+    this.returnTo,
+    this.returnBuilder,
   });
 
   final String email;
@@ -30,6 +35,8 @@ class OtpVerificationScreen extends StatefulWidget {
   final String? otpCode;
   final bool emailSent;
   final DateTime? expiresAt;
+  final String? returnTo;
+  final WidgetBuilder? returnBuilder;
 
   @override
   State<OtpVerificationScreen> createState() => _OtpVerificationScreenState();
@@ -102,7 +109,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     HapticService().vibrate();
     final code = _otpController.text.trim();
     if (code.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter the 6-digit verification code.')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter the 6-digit verification code.')),
+      );
       return;
     }
 
@@ -114,7 +123,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       if (message == null) {
         await _authService.clearOtpChallenge(uid: widget.uid);
         await _authService.finishMfaLogin();
-        // AuthGate will now navigate to Home automatically.
+        GuestSession.clear();
+        final onboarded = await _authService.hasCompletedOnboarding();
+        if (!mounted) return;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (ctx) => onboarded
+                ? (widget.returnBuilder?.call(ctx) ?? const HomeScreen())
+                : OnboardingScreen(
+                    returnTo: widget.returnTo,
+                    returnBuilder: widget.returnBuilder,
+                  ),
+          ),
+          (route) => false,
+        );
         return;
       }
 
@@ -136,7 +158,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() => _isVerifying = false);
@@ -156,13 +180,21 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       // already signed in via resendOtpForCurrentSession.
       final Map<String, dynamic>? otpData = widget.password != null
           ? await _authService.buildOtpChallenge(
-          email: widget.email, password: widget.password!)
+              email: widget.email,
+              password: widget.password!,
+            )
           : await _authService.resendOtpForCurrentSession(
-          uid: widget.uid, email: widget.email);
+              uid: widget.uid,
+              email: widget.email,
+            );
 
       if (!mounted) return;
       if (otpData == null || otpData['code'] == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Unable to resend the verification code.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Unable to resend the verification code.'),
+          ),
+        );
         return;
       }
       final resendEmailSent = otpData['emailSent'] == true;
@@ -172,11 +204,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           _currentExpiresAt = (otpData['expiresAt'] as DateTime);
         }
         _startTimer();
-        SuccessFeedbackUtils.showSuccessSnackBar(context, 'A new verification code has been sent.');
+        SuccessFeedbackUtils.showSuccessSnackBar(
+          context,
+          'A new verification code has been sent.',
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('We couldn\'t send the code to your email. Please try again in a moment.'),
+            content: Text(
+              'We couldn\'t send the code to your email. Please try again in a moment.',
+            ),
           ),
         );
       }
@@ -216,15 +253,18 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
           final colorScheme = theme.colorScheme;
 
           return MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: TextScaler.noScaling,
-            ),
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.noScaling),
             child: Scaffold(
               backgroundColor: theme.scaffoldBackgroundColor,
               appBar: AppBar(
                 backgroundColor: colorScheme.surface,
                 elevation: 0,
-                title: Text('Verify your email', style: TextStyle(color: colorScheme.primary)),
+                title: Text(
+                  'Verify your email',
+                  style: TextStyle(color: colorScheme.primary),
+                ),
                 leading: IconButton(
                   icon: Icon(Icons.arrow_back, color: colorScheme.primary),
                   onPressed: () async {
@@ -254,7 +294,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         widget.emailSent
                             ? 'A verification code has been sent to your email.'
                             : 'We couldn\'t send the code to your email right now. Please tap "Resend Code" below to try again.',
-                        style: TextStyle(fontSize: 15, color: colorScheme.onSurfaceVariant),
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
                       // NOTE: the OTP code is intentionally never rendered on
                       // screen, even as a fallback when email delivery fails.
@@ -268,74 +311,77 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       // OTP Expiry Countdown Timer
                       if (_remainingSeconds > 0)
                         Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: _remainingSeconds <= 10
-                              ? Colors.red.withValues(alpha: 0.1)
-                              : colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: _remainingSeconds <= 10
-                                ? Colors.red
-                                : colorScheme.primary.withValues(alpha: 0.3),
-                            width: 1,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.timer_outlined,
-                              size: 18,
+                          decoration: BoxDecoration(
+                            color: _remainingSeconds <= 10
+                                ? Colors.red.withValues(alpha: 0.1)
+                                : colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
                               color: _remainingSeconds <= 10
                                   ? Colors.red
-                                  : colorScheme.primary,
+                                  : colorScheme.primary.withValues(alpha: 0.3),
+                              width: 1,
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Code expires in ${_formatTime(_remainingSeconds)}',
-                              style: TextStyle(
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.timer_outlined,
+                                size: 18,
                                 color: _remainingSeconds <= 10
                                     ? Colors.red
                                     : colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_remainingSeconds == 0)
-                        Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Colors.red,
-                            width: 1,
+                              const SizedBox(width: 8),
+                              Text(
+                                'Code expires in ${_formatTime(_remainingSeconds)}',
+                                style: TextStyle(
+                                  color: _remainingSeconds <= 10
+                                      ? Colors.red
+                                      : colorScheme.primary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.timer_off_outlined,
-                              size: 18,
-                              color: Colors.red,
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Code has expired',
-                              style: TextStyle(
+                      if (_remainingSeconds == 0)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.red, width: 1),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.timer_off_outlined,
+                                size: 18,
                                 color: Colors.red,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14,
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Code has expired',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 24),
                       TextField(
                         controller: _otpController,
@@ -347,10 +393,20 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         keyboardType: TextInputType.number,
                         textAlign: TextAlign.center,
                         decoration: InputDecoration(
-                          hintText: AppLocalizations.of(context)!.enterDigitCode,
-                          hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
-                          enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.outlineVariant)),
-                          focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: colorScheme.primary)),
+                          hintText: AppLocalizations.of(
+                            context,
+                          )!.enterDigitCode,
+                          hintStyle: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(
+                              color: colorScheme.outlineVariant,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: colorScheme.primary),
+                          ),
                           border: const OutlineInputBorder(),
                         ),
                       ),
@@ -365,13 +421,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                           onPressed: _isVerifying ? null : _verifyOtp,
                           child: _isVerifying
                               ? SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: colorScheme.onPrimary,
-                            ),
-                          )
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.onPrimary,
+                                  ),
+                                )
                               : const Text('Verify'),
                         ),
                       ),
@@ -400,14 +456,22 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                                 )
                               : Text(
                                   _resendCooldownSeconds > 0
-                                    ? 'Resend Code in ${_formatTime(_resendCooldownSeconds)}'
-                                    : 'Resend Code',
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                      ? 'Resend Code in ${_formatTime(_resendCooldownSeconds)}'
+                                      : 'Resend Code',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                         ),
                       ),
                       const SizedBox(height: 12),
-                      Text('Attempts used: $_attempts/5', style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12)),
+                      Text(
+                        'Attempts used: $_attempts/5',
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),

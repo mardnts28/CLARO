@@ -12,6 +12,8 @@ import '../services/home_tab_controller.dart';
 import '../services/voice_assistant_service.dart';
 import '../services/haptic_service.dart';
 import '../data/services/backend_locator.dart';
+import '../services/guest_session.dart';
+import '../data/repositories/product_repository.dart';
 import 'product_detail_screen.dart';
 import 'multi_scan_results_screen.dart';
 import 'unknown_product_submission_screen.dart';
@@ -122,7 +124,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         _cameraController = null;
       });
     } else if (state == AppLifecycleState.resumed) {
-      final isScanTab = !widget.embeddedMode || HomeTabController.tabNotifier.value == 1;
+      final isScanTab =
+          !widget.embeddedMode || HomeTabController.tabNotifier.value == 1;
       if (isScanTab && mounted) {
         _checkPermissionAndInit();
       }
@@ -142,7 +145,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   /// Concurrency Guard — ensures initialize() can only be in-flight once.
   Future<void> _checkPermissionAndInit() async {
     if (_isInitializingCamera) {
-      debugPrint('[Camera] Initialization already in progress, skipping duplicate request.');
+      debugPrint(
+        '[Camera] Initialization already in progress, skipping duplicate request.',
+      );
       return;
     }
     if (_cameraController != null && _cameraController!.value.isInitialized) {
@@ -209,7 +214,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       // Attempt 1: ResolutionPreset.medium with explicit YUV_420 format
       bool success = false;
       try {
-        debugPrint('[Camera] Attempting controller creation with ResolutionPreset.medium...');
+        debugPrint(
+          '[Camera] Attempting controller creation with ResolutionPreset.medium...',
+        );
         final controller = CameraController(
           back,
           ResolutionPreset.medium,
@@ -221,9 +228,13 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         await controller.setFlashMode(FlashMode.off);
         _cameraController = controller;
         success = true;
-        debugPrint('[Camera] ResolutionPreset.medium initialize() completed successfully! Preview size: ${controller.value.previewSize}');
+        debugPrint(
+          '[Camera] ResolutionPreset.medium initialize() completed successfully! Preview size: ${controller.value.previewSize}',
+        );
       } catch (mediumErr) {
-        debugPrint('[Camera] ResolutionPreset.medium failed ($mediumErr). Falling back to ResolutionPreset.low...');
+        debugPrint(
+          '[Camera] ResolutionPreset.medium failed ($mediumErr). Falling back to ResolutionPreset.low...',
+        );
       }
 
       // Attempt 2: ResolutionPreset.low fallback
@@ -236,7 +247,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         }
 
         try {
-          debugPrint('[Camera] Attempting fallback with ResolutionPreset.low...');
+          debugPrint(
+            '[Camera] Attempting fallback with ResolutionPreset.low...',
+          );
           final lowController = CameraController(
             back,
             ResolutionPreset.low,
@@ -248,13 +261,18 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           await lowController.setFlashMode(FlashMode.off);
           _cameraController = lowController;
           success = true;
-          debugPrint('[Camera] ResolutionPreset.low fallback initialize() completed successfully! Preview size: ${lowController.value.previewSize}');
+          debugPrint(
+            '[Camera] ResolutionPreset.low fallback initialize() completed successfully! Preview size: ${lowController.value.previewSize}',
+          );
         } catch (lowErr) {
-          debugPrint('[Camera] ResolutionPreset.low fallback also failed: $lowErr');
+          debugPrint(
+            '[Camera] ResolutionPreset.low fallback also failed: $lowErr',
+          );
           if (mounted) {
             setState(() {
               _cameraInitFailed = true;
-              _cameraErrorMessage = 'Camera hardware initialization failed ($lowErr). Tap to retry.';
+              _cameraErrorMessage =
+                  'Camera hardware initialization failed ($lowErr). Tap to retry.';
             });
           }
           return;
@@ -266,7 +284,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           _isFlashOn = false;
           _cameraInitFailed = false;
         });
-        debugPrint('[Camera] Camera preview ready. Smooth native preview active — awaiting user tap to scan.');
+        debugPrint(
+          '[Camera] Camera preview ready. Smooth native preview active — awaiting user tap to scan.',
+        );
       }
     } catch (e) {
       debugPrint('[Camera] _initCameraWithFallback outer error: $e');
@@ -289,12 +309,14 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   }
 
   void _handleTabChange() {
-    final isScanTab = !widget.embeddedMode || HomeTabController.tabNotifier.value == 1;
+    final isScanTab =
+        !widget.embeddedMode || HomeTabController.tabNotifier.value == 1;
     if (isScanTab) {
       _isScreenActive = true;
       setState(_resetScanState);
       _announceIfVisible();
-      if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      if (_cameraController == null ||
+          !_cameraController!.value.isInitialized) {
         _checkPermissionAndInit();
       }
     } else {
@@ -389,8 +411,11 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Icon(Icons.help_outline_rounded,
-                      color: Colors.amberAccent, size: 48),
+                  const Icon(
+                    Icons.help_outline_rounded,
+                    color: Colors.amberAccent,
+                    size: 48,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     isTl ? 'Walang Produktong Nahanap' : 'No Product Found',
@@ -420,9 +445,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                         backgroundColor: const Color(0xFF2E7D32),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       icon: const Icon(Icons.report_problem_outlined),
                       label: Text(
@@ -438,7 +466,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                       onPressed: () {
                         HapticService().vibrate();
                         Navigator.pop(ctx);
-                        _navigateToReportDirectly(capturedImagePath: capturedImagePath);
+                        _navigateToReportDirectly(
+                          capturedImagePath: capturedImagePath,
+                        );
                       },
                     ),
                   ),
@@ -450,9 +480,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: Colors.white30),
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       icon: const Icon(Icons.refresh_rounded),
                       label: Text(
@@ -508,7 +541,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     _stopImageStreamIfActive();
 
     String? path = capturedImagePath;
-    if ((path == null || path.isEmpty) && _cameraController?.value.isInitialized == true) {
+    if ((path == null || path.isEmpty) &&
+        _cameraController?.value.isInitialized == true) {
       try {
         await _cameraController!.setFlashMode(
           _isFlashOn ? FlashMode.torch : FlashMode.off,
@@ -525,9 +559,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => UnknownProductSubmissionScreen(
-          capturedImagePath: path,
-        ),
+        builder: (_) => UnknownProductSubmissionScreen(capturedImagePath: path),
       ),
     );
 
@@ -587,7 +619,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       final String imagePath = file.path;
 
       if (imagePath.isNotEmpty) {
-        final quality = await _validationService.validateImageQuality(imagePath);
+        final quality = await _validationService.validateImageQuality(
+          imagePath,
+        );
         if (!quality.isValid) {
           safetyTimer.cancel();
           if (mounted) {
@@ -602,16 +636,20 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       }
 
       // Step 3: Run YOLO detection on the captured still photo
-      debugPrint('CameraScannerScreen: Running YOLO detection on captured image...');
+      debugPrint(
+        'CameraScannerScreen: Running YOLO detection on captured image...',
+      );
       final List<DetectionResult> detections = imagePath.isNotEmpty
           ? await _yoloService.detectProducts(imagePath)
           : <DetectionResult>[];
 
-      debugPrint('CameraScannerScreen: YOLO detected ${detections.length} objects: '
-          '${detections.map((d) => "${d.label} (${(d.confidence * 100).toStringAsFixed(1)}%)").join(", ")}');
+      debugPrint(
+        'CameraScannerScreen: YOLO detected ${detections.length} objects: '
+        '${detections.map((d) => "${d.label} (${(d.confidence * 100).toStringAsFixed(1)}%)").join(", ")}',
+      );
 
       safetyTimer.cancel();
-        if (!mounted || !_isScreenActive) return;
+      if (!mounted || !_isScreenActive) return;
 
       if (detections.isNotEmpty) {
         setState(() {
@@ -659,7 +697,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
   Future<void> _handleScanTimeout() async {
     if (!mounted || !_isProcessing) return;
 
-    debugPrint('CameraScannerScreen: Safety timer triggered, resetting scan state.');
+    debugPrint(
+      'CameraScannerScreen: Safety timer triggered, resetting scan state.',
+    );
     setState(() {
       _isProcessing = false;
       _hasTappedToScan = false;
@@ -711,12 +751,18 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         final label = entry.key;
         final count = entry.value;
         try {
+          final repository = BackendLocator.productRepository;
           final prod =
-              await BackendLocator.productRepository.getProductByYoloLabel(label);
+              repository is FirestoreProductRepository &&
+                  GuestSession.isGuest.value
+              ? await repository.getProductByYoloLabel(label, forceLive: true)
+              : await repository.getProductByYoloLabel(label);
           resolvedProducts.add(prod);
           productCounts[prod.id] = (productCounts[prod.id] ?? 0) + count;
         } catch (e) {
-          debugPrint('CameraScannerScreen: product lookup failed for $label: $e');
+          debugPrint(
+            'CameraScannerScreen: product lookup failed for $label: $e',
+          );
         }
       }
 
@@ -750,7 +796,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               ),
             ),
           ).then((_) {
-            if (mounted && (!widget.embeddedMode || HomeTabController.tabNotifier.value == 1)) {
+            if (mounted &&
+                (!widget.embeddedMode ||
+                    HomeTabController.tabNotifier.value == 1)) {
               setState(() {
                 _isScreenActive = true;
                 _hasTappedToScan = false;
@@ -777,11 +825,15 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               builder: (_) => MultiScanResultsScreen(
                 detectedProducts: distinctProducts,
                 productCounts: productCounts,
-                showOfflineNotice: distinctProducts.any((p) => p.isOfflineFallback),
+                showOfflineNotice: distinctProducts.any(
+                  (p) => p.isOfflineFallback,
+                ),
               ),
             ),
           ).then((_) {
-            if (mounted && (!widget.embeddedMode || HomeTabController.tabNotifier.value == 1)) {
+            if (mounted &&
+                (!widget.embeddedMode ||
+                    HomeTabController.tabNotifier.value == 1)) {
               setState(() {
                 _isScreenActive = true;
                 _hasTappedToScan = false;
@@ -818,8 +870,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 // Live camera preview (smooth native 60fps, no continuous frame processing)
                 Positioned.fill(
                   child: _cameraController?.value.isInitialized == true
-                    ? CameraPreview(_cameraController!)
-                    : const SizedBox.shrink(),
+                      ? CameraPreview(_cameraController!)
+                      : const SizedBox.shrink(),
                 ),
 
                 // Camera Hardware Init Error Fallback Card
@@ -837,12 +889,20 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.videocam_off_outlined, color: Colors.amber, size: 48),
+                            const Icon(
+                              Icons.videocam_off_outlined,
+                              color: Colors.amber,
+                              size: 48,
+                            ),
                             const SizedBox(height: 16),
                             Text(
-                              _cameraErrorMessage ?? 'Camera initialization error',
+                              _cameraErrorMessage ??
+                                  'Camera initialization error',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.white, fontSize: 14),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
                             ),
                             const SizedBox(height: 20),
                             ElevatedButton.icon(
@@ -886,7 +946,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                           duration: const Duration(milliseconds: 250),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 8),
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.45),
                               borderRadius: BorderRadius.circular(20),
@@ -993,8 +1055,11 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                           color: Colors.white.withValues(alpha: 0.85),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.close,
-                            color: Colors.black87, size: 20),
+                        child: const Icon(
+                          Icons.close,
+                          color: Colors.black87,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -1010,7 +1075,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                       // Report icon button in top bar
                       Semantics(
                         button: true,
-                        label: AppLocalizations.of(context)!.reportProductButton,
+                        label: AppLocalizations.of(
+                          context,
+                        )!.reportProductButton,
                         child: GestureDetector(
                           onTap: () {
                             HapticService().vibrate();
@@ -1036,12 +1103,14 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                       Semantics(
                         button: true,
                         label: _isFlashOn
-                            ? (Localizations.localeOf(context).languageCode == 'tl'
-                                ? 'Patayin ang flash'
-                                : 'Turn off flash')
-                            : (Localizations.localeOf(context).languageCode == 'tl'
-                                ? 'Buksan ang flash'
-                                : 'Turn on flash'),
+                            ? (Localizations.localeOf(context).languageCode ==
+                                      'tl'
+                                  ? 'Patayin ang flash'
+                                  : 'Turn off flash')
+                            : (Localizations.localeOf(context).languageCode ==
+                                      'tl'
+                                  ? 'Buksan ang flash'
+                                  : 'Turn on flash'),
                         child: GestureDetector(
                           onTap: () {
                             HapticService().vibrate();
@@ -1080,7 +1149,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                       const SizedBox(height: 12),
                       Semantics(
                         button: true,
-                        label: Localizations.localeOf(context).languageCode == 'tl'
+                        label:
+                            Localizations.localeOf(context).languageCode == 'tl'
                             ? 'Hindi mahanap ang produkto? I-report'
                             : 'Can’t scan your product? Report here',
                         child: GestureDetector(
@@ -1090,7 +1160,9 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                           },
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.6),
                               borderRadius: BorderRadius.circular(20),
@@ -1110,11 +1182,16 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                                 const SizedBox(width: 6),
                                 Flexible(
                                   child: Text(
-                                    Localizations.localeOf(context).languageCode == 'tl'
+                                    Localizations.localeOf(
+                                              context,
+                                            ).languageCode ==
+                                            'tl'
                                         ? 'Hindi mahanap ang produkto? I-report'
                                         : 'Can’t scan your product? Report here',
                                     style: GoogleFonts.inter(
-                                      color: Colors.white.withValues(alpha: 0.9),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.9,
+                                      ),
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
                                       decoration: TextDecoration.underline,
@@ -1145,7 +1222,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                       ),
                     ),
                   ),
-
               ],
             ),
           ),
@@ -1175,12 +1251,16 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
 
     if (_isProcessing) {
-      statusText = isTagalog ? 'Sinusuri ang Produkto...' : 'Analyzing Product...';
+      statusText = isTagalog
+          ? 'Sinusuri ang Produkto...'
+          : 'Analyzing Product...';
       statusColor = const Color(0xFF00E676);
       iconData = Icons.sync;
     } else if (_qualityWarning != null) {
       if (_qualityWarning!.toLowerCase().contains('dark')) {
-        statusText = isTagalog ? 'Masyadong Madilim - Buksan ang Flash' : 'Too Dark - Turn on Flash';
+        statusText = isTagalog
+            ? 'Masyadong Madilim - Buksan ang Flash'
+            : 'Too Dark - Turn on Flash';
         statusColor = const Color(0xFFFFB74D);
         iconData = Icons.flash_on;
       } else {
@@ -1207,8 +1287,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             color: _isProductInGuide || _isProcessing
                 ? const Color(0xFF00E676)
                 : (_qualityWarning != null
-                    ? const Color(0xFFFFB74D)
-                    : Colors.white24),
+                      ? const Color(0xFFFFB74D)
+                      : Colors.white24),
             width: 1.2,
           ),
         ),
@@ -1226,11 +1306,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 ),
               )
             else
-              Icon(
-                iconData,
-                size: 17,
-                color: statusColor,
-              ),
+              Icon(iconData, size: 17, color: statusColor),
             const SizedBox(width: 8),
             Flexible(
               child: Text(
@@ -1250,8 +1326,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       ),
     );
   }
-
-
 
   // (_buildPermissionDeniedView removed — OS native permission dialog is used instead)
 }
@@ -1276,9 +1350,9 @@ class _ScannerOverlayPainter extends CustomPainter {
     // Viewfinder: 88% wide, stretched from top controls to near bottom
     final vw = w * 0.88;
     final vl = (w - vw) / 2;
-    final vt = h * 0.12;   // starts just below top controls
+    final vt = h * 0.12; // starts just below top controls
     final vr = vl + vw;
-    final vb = h * 0.88;   // stretches to near bottom
+    final vb = h * 0.88; // stretches to near bottom
     final vh = vb - vt;
 
     // Dim the region outside viewfinder

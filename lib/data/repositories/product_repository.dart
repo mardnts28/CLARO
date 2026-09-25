@@ -25,13 +25,17 @@ import '../../services/nutrition_service.dart';
 abstract class ProductRepository {
   Future<Product> getProductById(String id);
   Future<List<Product>> getAllProducts();
+
   /// Look up a product by its `yolo_label` field (the exact class name from labels.json).
   Future<Product> getProductByYoloLabel(String yoloLabel);
   // Matches on Product.category (e.g. "Canned Fish", "Instant Noodles") --
   // the grouping field the UI's compare screen uses. [excludeId] is fully
   // excluded from the result (not just moved to the end), since callers
   // use this to fetch ALTERNATIVES to a product they already have.
-  Future<List<Product>> getSimilarProducts(String category, {String? excludeId});
+  Future<List<Product>> getSimilarProducts(
+    String category, {
+    String? excludeId,
+  });
 }
 
 // ─── Firestore-backed implementation ───────────────────────────────────────
@@ -55,7 +59,7 @@ abstract class ProductRepository {
 // stays at its default.
 class FirestoreProductRepository implements ProductRepository {
   FirestoreProductRepository({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+    : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
   static const String _collection = 'fda_products';
@@ -84,7 +88,10 @@ class FirestoreProductRepository implements ProductRepository {
     return null;
   }
 
-  static Future<void> _saveToPersistentCache(String key, Product product) async {
+  static Future<void> _saveToPersistentCache(
+    String key,
+    Product product,
+  ) async {
     try {
       final p = await _getPrefs();
       final jsonStr = jsonEncode(product.toJson());
@@ -109,7 +116,9 @@ class FirestoreProductRepository implements ProductRepository {
           final enriched = await NutritionService().enrichProduct(base);
           _productCache[doc.id] = enriched;
           _productCache[enriched.id] = enriched;
-          final yolo = (doc.data()['yolo_label'] as String? ?? '').trim().toLowerCase();
+          final yolo = (doc.data()['yolo_label'] as String? ?? '')
+              .trim()
+              .toLowerCase();
           if (yolo.isNotEmpty) {
             _productCache[yolo] = enriched;
             await _saveToPersistentCache(yolo, enriched);
@@ -117,25 +126,36 @@ class FirestoreProductRepository implements ProductRepository {
           await _saveToPersistentCache(doc.id, enriched);
         } catch (_) {}
       }
-      debugPrint('FirestoreProductRepository: Preloaded ${snapshot.docs.length} products to offline storage.');
+      debugPrint(
+        'FirestoreProductRepository: Preloaded ${snapshot.docs.length} products to offline storage.',
+      );
     } catch (e) {
       debugPrint('Offline preload skipped: $e');
     }
   }
 
   @override
-  Future<Product> getProductById(String id) async {
-    final cached = _productCache[id];
+  Future<Product> getProductById(String id, {bool forceLive = false}) async {
+    final cached = forceLive ? null : _productCache[id];
     if (cached != null) return cached;
 
-    final persistentCached = await _getFromPersistentCache(id);
+    final persistentCached = forceLive
+        ? null
+        : await _getFromPersistentCache(id);
     if (persistentCached != null) return persistentCached;
 
     try {
-      final doc = await _db.collection(_collection).doc(id).get().timeout(const Duration(seconds: 5));
+      final doc = await _db
+          .collection(_collection)
+          .doc(id)
+          .get()
+          .timeout(const Duration(seconds: 5));
       if (doc.exists) {
         final base = _productFromDoc(doc.id, doc.data()!);
-        final enriched = await NutritionService().enrichProduct(base);
+        final enriched = await NutritionService().enrichProduct(
+          base,
+          forceLive: forceLive,
+        );
         _productCache[id] = enriched;
         _productCache[enriched.id] = enriched;
         await _saveToPersistentCache(id, enriched);
@@ -145,7 +165,10 @@ class FirestoreProductRepository implements ProductRepository {
 
     // Fallback: match by normalized product name or slug if doc.id differs from YOLO label
     try {
-      final snapshot = await _db.collection(_collection).get().timeout(const Duration(seconds: 5));
+      final snapshot = await _db
+          .collection(_collection)
+          .get()
+          .timeout(const Duration(seconds: 5));
       final normId = id.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
       for (final d in snapshot.docs) {
         final pName = (d.data()['product_name'] as String? ?? '')
@@ -156,7 +179,10 @@ class FirestoreProductRepository implements ProductRepository {
             pName.contains(normId) ||
             normId.contains(pName)) {
           final base = _productFromDoc(d.id, d.data());
-          final enriched = await NutritionService().enrichProduct(base);
+          final enriched = await NutritionService().enrichProduct(
+            base,
+            forceLive: forceLive,
+          );
           _productCache[id] = enriched;
           _productCache[enriched.id] = enriched;
           await _saveToPersistentCache(id, enriched);
@@ -171,12 +197,17 @@ class FirestoreProductRepository implements ProductRepository {
   static List<QueryDocumentSnapshot<Map<String, dynamic>>>? _cachedCatalogDocs;
 
   @override
-  Future<Product> getProductByYoloLabel(String yoloLabel) async {
+  Future<Product> getProductByYoloLabel(
+    String yoloLabel, {
+    bool forceLive = false,
+  }) async {
     final cleanLabel = yoloLabel.trim().toLowerCase();
-    final cached = _productCache[cleanLabel];
+    final cached = forceLive ? null : _productCache[cleanLabel];
     if (cached != null) return cached;
 
-    final persistentCached = await _getFromPersistentCache(cleanLabel);
+    final persistentCached = forceLive
+        ? null
+        : await _getFromPersistentCache(cleanLabel);
     if (persistentCached != null) return persistentCached;
 
     // 1. Direct Firestore query on the yolo_label field (with 6s timeout)
@@ -190,7 +221,10 @@ class FirestoreProductRepository implements ProductRepository {
       if (query.docs.isNotEmpty) {
         final d = query.docs.first;
         final base = _productFromDoc(d.id, d.data());
-        final enriched = await NutritionService().enrichProduct(base);
+        final enriched = await NutritionService().enrichProduct(
+          base,
+          forceLive: forceLive,
+        );
         _productCache[cleanLabel] = enriched;
         _productCache[enriched.id] = enriched;
         await _saveToPersistentCache(cleanLabel, enriched);
@@ -200,30 +234,45 @@ class FirestoreProductRepository implements ProductRepository {
 
     // 2. Multi-pass token matching against cached or freshly fetched catalog
     try {
-      if (_cachedCatalogDocs == null) {
+      final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
+      if (forceLive) {
         final snapshot = await _db
             .collection(_collection)
             .get()
             .timeout(const Duration(seconds: 6));
-        _cachedCatalogDocs = snapshot.docs;
+        docs = snapshot.docs;
+      } else {
+        if (_cachedCatalogDocs == null) {
+          final snapshot = await _db
+              .collection(_collection)
+              .get()
+              .timeout(const Duration(seconds: 6));
+          _cachedCatalogDocs = snapshot.docs;
+        }
+        docs = _cachedCatalogDocs!;
       }
-      final docs = _cachedCatalogDocs!;
       final normYolo = cleanLabel.replaceAll(RegExp(r'[^a-z0-9]'), '');
 
       // Pass A: Exact match on doc ID or yolo_label field
       for (final d in docs) {
         final data = d.data();
-        final docYolo = (data['yolo_label'] as String? ?? '').trim().toLowerCase();
+        final docYolo = (data['yolo_label'] as String? ?? '')
+            .trim()
+            .toLowerCase();
         if (d.id == yoloLabel || docYolo == cleanLabel) {
           final base = _productFromDoc(d.id, data);
-          return NutritionService().enrichProduct(base);
+          return NutritionService().enrichProduct(base, forceLive: forceLive);
         }
       }
 
       // Pass B: Smart Token Overlap matching against product_name
       final yoloTokens = cleanLabel
           .split('_')
-          .where((t) => t.length > 2 && !['and', 'with', 'the', 'pck', 'sauce'].contains(t))
+          .where(
+            (t) =>
+                t.length > 2 &&
+                !['and', 'with', 'the', 'pck', 'sauce'].contains(t),
+          )
           .toList();
 
       QueryDocumentSnapshot<Map<String, dynamic>>? bestDoc;
@@ -237,7 +286,7 @@ class FirestoreProductRepository implements ProductRepository {
         // Direct normalized substring match
         if (normPName.contains(normYolo) || normYolo.contains(normPName)) {
           final base = _productFromDoc(d.id, data);
-          return NutritionService().enrichProduct(base);
+          return NutritionService().enrichProduct(base, forceLive: forceLive);
         }
 
         // Count token matches
@@ -256,7 +305,10 @@ class FirestoreProductRepository implements ProductRepository {
 
       if (bestDoc != null && maxMatches >= 2) {
         final base = _productFromDoc(bestDoc.id, bestDoc.data());
-        final enriched = await NutritionService().enrichProduct(base);
+        final enriched = await NutritionService().enrichProduct(
+          base,
+          forceLive: forceLive,
+        );
         _productCache[cleanLabel] = enriched;
         _productCache[enriched.id] = enriched;
         return enriched;
@@ -267,20 +319,27 @@ class FirestoreProductRepository implements ProductRepository {
 
     // 3. Fallback: format YOLO label into human-readable product representation
     final fallback = _fallbackProductFromYoloLabel(cleanLabel);
-    final enriched = await NutritionService().enrichProduct(fallback);
+    final enriched = await NutritionService().enrichProduct(
+      fallback,
+      forceLive: forceLive,
+    );
     _productCache[cleanLabel] = enriched;
     _productCache[enriched.id] = enriched;
     return enriched;
   }
 
   Product _fallbackProductFromYoloLabel(String label) {
-    final words = label.split('_').map((w) {
-      if (w == 'lm') return 'Lucky Me';
-      if (w == 'pc') return 'Pancit Canton';
-      if (w == 'pck') return 'Pack';
-      if (w.isEmpty) return '';
-      return w[0].toUpperCase() + w.substring(1);
-    }).where((w) => w.isNotEmpty).toList();
+    final words = label
+        .split('_')
+        .map((w) {
+          if (w == 'lm') return 'Lucky Me';
+          if (w == 'pc') return 'Pancit Canton';
+          if (w == 'pck') return 'Pack';
+          if (w.isEmpty) return '';
+          return w[0].toUpperCase() + w.substring(1);
+        })
+        .where((w) => w.isNotEmpty)
+        .toList();
 
     final formattedName = words.join(' ');
 
@@ -430,7 +489,8 @@ class FirestoreProductRepository implements ProductRepository {
       final sizeRaw = e['size_grams'] ?? e['size'] ?? e['grams'];
       final grams = _parseGramValue(sizeRaw);
       if (grams == null) return null;
-      final imageUrl = (e['image_url'] ?? e['imageURL'] ?? e['imageUrl']) as String?;
+      final imageUrl =
+          (e['image_url'] ?? e['imageURL'] ?? e['imageUrl']) as String?;
       return ProductSizeOption(
         sizeGrams: grams,
         imageUrl: (imageUrl != null && imageUrl.isNotEmpty) ? imageUrl : null,

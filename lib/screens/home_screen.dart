@@ -16,6 +16,10 @@ import 'nutrition_guide_screen.dart';
 import 'product_detail_screen.dart';
 import 'multi_scan_results_screen.dart';
 import '../data/services/backend_locator.dart';
+import '../services/guest_session.dart';
+import '../widgets/account_required_gate.dart';
+import 'login_screen.dart';
+import 'signup_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -47,6 +51,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
+    if (GuestSession.isGuest.value) _userName = 'Guest';
 
     // Keep local state in sync with HomeTabController.
     _selectedIndex = HomeTabController.tabNotifier.value;
@@ -367,7 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 SafeArea(bottom: false, child: _buildHistoryPage()),
 
-                const SafeArea(bottom: false, child: ProfileScreen()),
+                SafeArea(bottom: false, child: _buildProfilePage()),
               ],
             ),
           ],
@@ -528,14 +534,11 @@ class _HomeScreenState extends State<HomeScreen> {
           // navigation. Delay dismissal briefly so suggestion taps can
           // complete first.
           _searchOutsideTapTimer?.cancel();
-          _searchOutsideTapTimer = Timer(
-            const Duration(milliseconds: 150),
-            () {
-              if (mounted) {
-                setState(() => _showSearchSuggestions = false);
-              }
-            },
-          );
+          _searchOutsideTapTimer = Timer(const Duration(milliseconds: 150), () {
+            if (mounted) {
+              setState(() => _showSearchSuggestions = false);
+            }
+          });
         },
         decoration: InputDecoration(
           isDense: true,
@@ -1855,7 +1858,70 @@ class _HomeScreenState extends State<HomeScreen> {
   // -------------------------------------------------------------------------
 
   Widget _buildHistoryPage() {
+    if (GuestSession.isGuest.value) {
+      return AccountRequiredGate(
+        message: 'Sign up to save and view your scan history',
+        onLogin: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LoginScreen(
+              returnTo: 'history',
+              returnBuilder: (_) {
+                HomeTabController.switchToTab(2);
+                return const HomeScreen();
+              },
+            ),
+          ),
+        ),
+        onCreateAccount: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SignupScreen(
+              returnTo: 'history',
+              returnBuilder: (_) {
+                HomeTabController.switchToTab(2);
+                return const HomeScreen();
+              },
+            ),
+          ),
+        ),
+      );
+    }
     return const HistoryScreen(embeddedMode: true);
+  }
+
+  Widget _buildProfilePage() {
+    if (GuestSession.isGuest.value) {
+      return AccountRequiredGate(
+        message:
+            'Create an account to manage your profile, preferences, and health settings',
+        onLogin: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LoginScreen(
+              returnTo: 'profile',
+              returnBuilder: (_) {
+                HomeTabController.switchToTab(3);
+                return const HomeScreen();
+              },
+            ),
+          ),
+        ),
+        onCreateAccount: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SignupScreen(
+              returnTo: 'profile',
+              returnBuilder: (_) {
+                HomeTabController.switchToTab(3);
+                return const HomeScreen();
+              },
+            ),
+          ),
+        ),
+      );
+    }
+    return const ProfileScreen();
   }
 
   // -------------------------------------------------------------------------

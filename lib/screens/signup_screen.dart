@@ -11,6 +11,7 @@ import '../services/auth_service.dart';
 import '../services/home_tab_controller.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
+import '../services/guest_session.dart';
 import '../widgets/terms_and_conditions_dialog.dart';
 
 // NOTE ON LANGUAGE: the headline text, field hints, and primary buttons on
@@ -28,13 +29,16 @@ import '../widgets/terms_and_conditions_dialog.dart';
 class _SanitizingTextInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
-      TextEditingValue oldValue,
-      TextEditingValue newValue,
-      ) {
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     final sanitized = newValue.text.replaceAll(RegExp(r'[\r\n\t]'), '');
     if (sanitized == newValue.text) return newValue;
     final delta = newValue.text.length - sanitized.length;
-    final newOffset = (newValue.selection.end - delta).clamp(0, sanitized.length);
+    final newOffset = (newValue.selection.end - delta).clamp(
+      0,
+      sanitized.length,
+    );
     return TextEditingValue(
       text: sanitized,
       selection: TextSelection.collapsed(offset: newOffset),
@@ -51,7 +55,10 @@ class _Requirement {
 }
 
 class SignupScreen extends StatefulWidget {
-  const SignupScreen({super.key});
+  const SignupScreen({super.key, this.returnTo, this.returnBuilder});
+
+  final String? returnTo;
+  final WidgetBuilder? returnBuilder;
 
   @override
   State<SignupScreen> createState() => _SignupScreenState();
@@ -96,8 +103,12 @@ class _SignupScreenState extends State<SignupScreen> {
   List<_Requirement> get _emailRequirements {
     final loc = AppLocalizations.of(context)!;
     return [
-      _Requirement(loc.validEmailHint,
-              (v) => ValidationService.validateEmail(v.trim().toLowerCase(), loc) == null),
+      _Requirement(
+        loc.validEmailHint,
+        (v) =>
+            ValidationService.validateEmail(v.trim().toLowerCase(), loc) ==
+            null,
+      ),
     ];
   }
 
@@ -106,13 +117,17 @@ class _SignupScreenState extends State<SignupScreen> {
     _Requirement('One uppercase letter', (v) => RegExp(r'[A-Z]').hasMatch(v)),
     _Requirement('One lowercase letter', (v) => RegExp(r'[a-z]').hasMatch(v)),
     _Requirement('One number', (v) => RegExp(r'[0-9]').hasMatch(v)),
-    _Requirement('One special character (!@#\$%^&* etc.)',
-            (v) => RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(v)),
+    _Requirement(
+      'One special character (!@#\$%^&* etc.)',
+      (v) => RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(v),
+    ),
   ];
 
   List<_Requirement> get _confirmPasswordRequirements => [
-    _Requirement('Matches the password above',
-            (v) => v.isNotEmpty && v == _rawPassword),
+    _Requirement(
+      'Matches the password above',
+      (v) => v.isNotEmpty && v == _rawPassword,
+    ),
   ];
 
   @override
@@ -179,7 +194,8 @@ class _SignupScreenState extends State<SignupScreen> {
   /// "  Foo@Bar.com " and "foo@bar.com" are treated identically both
   /// for validation and for what gets sent to the backend.
   String get _cleanEmail => _emailController.text.trim().toLowerCase();
-  String get _rawPassword => _passwordController.text; // do not trim passwords' interior
+  String get _rawPassword =>
+      _passwordController.text; // do not trim passwords' interior
   String get _rawConfirmPassword => _confirmPasswordController.text;
 
   bool _validateEmail({bool showIfEmpty = true}) {
@@ -226,7 +242,8 @@ class _SignupScreenState extends State<SignupScreen> {
   /// to a clear, actionable sentence. Never surfaces raw exception text.
   String _friendlyFormError(String raw) {
     final lower = raw.toLowerCase();
-    if (lower.contains('email-already-in-use') || lower.contains('already in use')) {
+    if (lower.contains('email-already-in-use') ||
+        lower.contains('already in use')) {
       return 'That email is already registered. Try logging in instead.';
     }
     if (lower.contains('network')) {
@@ -293,15 +310,21 @@ class _SignupScreenState extends State<SignupScreen> {
   Future<void> _routeAfterAuth() async {
     final onboarded = await _authService.hasCompletedOnboarding();
     if (!mounted) return;
+    GuestSession.clear();
     HomeTabController.switchToTab(0);
     // Dismiss the keyboard/field focus before navigating away -- see
     // LoginScreen._routeAfterAuth for why this matters.
     FocusScope.of(context).unfocus();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
-        builder: (_) => onboarded ? const HomeScreen() : const OnboardingScreen(),
+        builder: (ctx) => onboarded
+            ? (widget.returnBuilder?.call(ctx) ?? const HomeScreen())
+            : OnboardingScreen(
+                returnTo: widget.returnTo,
+                returnBuilder: widget.returnBuilder,
+              ),
       ),
-          (route) => false,
+      (route) => false,
     );
   }
 
@@ -326,9 +349,11 @@ class _SignupScreenState extends State<SignupScreen> {
           otpCode: challenge['code']?.toString(),
           emailSent: challenge['emailSent'] == true,
           expiresAt: challenge['expiresAt'] as DateTime?,
+          returnTo: widget.returnTo,
+          returnBuilder: widget.returnBuilder,
         ),
       ),
-          (route) => false,
+      (route) => false,
     );
   }
 
@@ -387,6 +412,7 @@ class _SignupScreenState extends State<SignupScreen> {
       setState(() => _isLoading = false);
       await _showAccountCreatedDialog();
       if (!mounted) return;
+      GuestSession.clear();
       // Dismiss the keyboard/field focus before navigating away -- see
       // LoginScreen._routeAfterAuth for why this matters. Signed-up
       // users go straight to OnboardingScreen, which now opens on the
@@ -394,8 +420,13 @@ class _SignupScreenState extends State<SignupScreen> {
       FocusScope.of(context).unfocus();
       HomeTabController.switchToTab(0);
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-            (route) => false,
+        MaterialPageRoute(
+          builder: (_) => OnboardingScreen(
+            returnTo: widget.returnTo,
+            returnBuilder: widget.returnBuilder,
+          ),
+        ),
+        (route) => false,
       );
       return;
     } catch (e) {
@@ -489,204 +520,230 @@ class _SignupScreenState extends State<SignupScreen> {
         useMaterial3: true,
       ),
       child: Builder(
-          builder: (context) {
-            final colorScheme = Theme.of(context).colorScheme;
-            final loc = AppLocalizations.of(context)!;
+        builder: (context) {
+          final colorScheme = Theme.of(context).colorScheme;
+          final loc = AppLocalizations.of(context)!;
 
-            return AnnotatedRegion<SystemUiOverlayStyle>(
-              value: SystemUiOverlayStyle.dark,
-              child: Scaffold(
-                backgroundColor: colorScheme.surface,
-                body: SafeArea(
-                  child: RefreshIndicator(
-                    color: colorScheme.primary,
-                    onRefresh: _refreshForm,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Column(
-                              children: [
-                                Image.asset(
-                                  'assets/images/logo.png',
-                                  height: 90,
-                                  cacheHeight: (90 * MediaQuery.devicePixelRatioOf(context)).round(),
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.dark,
+            child: Scaffold(
+              backgroundColor: colorScheme.surface,
+              body: SafeArea(
+                child: RefreshIndicator(
+                  color: colorScheme.primary,
+                  onRefresh: _refreshForm,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 32,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Column(
+                            children: [
+                              Image.asset(
+                                'assets/images/logo.png',
+                                height: 90,
+                                cacheHeight:
+                                    (90 *
+                                            MediaQuery.devicePixelRatioOf(
+                                              context,
+                                            ))
+                                        .round(),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'CLARO',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary,
+                                  letterSpacing: 3,
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'CLARO',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.primary,
-                                    letterSpacing: 3,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 32),
-                          Text(
-                            loc.signUpWelcome,
-                            style: TextStyle(
-                                fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.primary),
+                        ),
+                        const SizedBox(height: 32),
+                        Text(
+                          loc.signUpWelcome,
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
                           ),
-                          Text(
-                            loc.signUpSubtitle,
-                            style: TextStyle(fontSize: 13, color: colorScheme.primary),
+                        ),
+                        Text(
+                          loc.signUpSubtitle,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colorScheme.primary,
                           ),
-                          const SizedBox(height: 24),
+                        ),
+                        const SizedBox(height: 24),
 
-                          if (_formError != null) ...[
-                            _buildFormErrorBanner(context, _formError!),
-                            const SizedBox(height: 14),
-                          ],
-
-                          _buildTextField(
-                            context,
-                            controller: _emailController,
-                            focusNode: _emailFocus,
-                            hint: loc.email,
-                            icon: Icons.email_outlined,
-                            errorText: _emailError,
-                            keyboardType: TextInputType.emailAddress,
-                            inputFormatters: [_SanitizingTextInputFormatter()],
-                            textInputAction: TextInputAction.next,
-                          ),
-                          _buildRequirementsPanel(
-                            visible: _emailFocus.hasFocus,
-                            requirements: _emailRequirements,
-                            value: _cleanEmail,
-                          ),
+                        if (_formError != null) ...[
+                          _buildFormErrorBanner(context, _formError!),
                           const SizedBox(height: 14),
-                          _buildTextField(
-                            context,
-                            controller: _passwordController,
-                            focusNode: _passwordFocus,
-                            hint: loc.password,
-                            icon: Icons.lock_outline,
-                            obscure: !_showPassword,
-                            errorText: _passwordError,
-                            inputFormatters: [_SanitizingTextInputFormatter()],
-                            textInputAction: TextInputAction.next,
-                            suffix: IconButton(
-                              icon: Icon(
-                                _showPassword ? Icons.visibility : Icons.visibility_off,
-                                size: 20,
-                                color: Colors.grey,
-                              ),
-                              onPressed: () =>
-                                  setState(() => _showPassword = !_showPassword),
-                            ),
-                          ),
-                          _buildRequirementsPanel(
-                            visible: _passwordFocus.hasFocus,
-                            requirements: _passwordRequirements,
-                            value: _rawPassword,
-                          ),
-                          const SizedBox(height: 14),
-                          _buildTextField(
-                            context,
-                            controller: _confirmPasswordController,
-                            focusNode: _confirmPasswordFocus,
-                            hint: loc.confirmPassword,
-                            icon: Icons.lock_outline,
-                            obscure: !_showConfirmPassword,
-                            errorText: _confirmPasswordError,
-                            inputFormatters: [_SanitizingTextInputFormatter()],
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _handleSignUp(),
-                            suffix: IconButton(
-                              icon: Icon(
-                                _showConfirmPassword
-                                    ? Icons.visibility
-                                    : Icons.visibility_off,
-                                size: 20,
-                                color: Colors.grey,
-                              ),
-                              onPressed: () => setState(
-                                      () => _showConfirmPassword = !_showConfirmPassword),
-                            ),
-                          ),
-                          _buildRequirementsPanel(
-                            visible: _confirmPasswordFocus.hasFocus,
-                            requirements: _confirmPasswordRequirements,
-                            value: _rawConfirmPassword,
-                          ),
-                          const SizedBox(height: 20),
-                          _buildTermsAgreementSection(context, colorScheme, loc),
-                          const SizedBox(height: 24),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: colorScheme.primary,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: _isLoading ? null : _handleSignUp,
-                              child: _isLoading
-                                  ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2),
-                              )
-                                  : Text(
-                                loc.signUp,
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildDivider(context),
-                          const SizedBox(height: 16),
-                          _buildGoogleButton(context),
-                          const SizedBox(height: 24),
-                          Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text('${loc.alreadyHaveAccount} ',
-                                    style: const TextStyle(fontSize: 13)),
-                                GestureDetector(
-                                  onTap: () {
-                                    HapticService().vibrate();
-                                    FocusScope.of(context).unfocus();
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) => const LoginScreen()),
-                                    );
-                                  },
-                                  child: Text(
-                                    loc.login,
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        color: colorScheme.primary,
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
-                      ),
+
+                        _buildTextField(
+                          context,
+                          controller: _emailController,
+                          focusNode: _emailFocus,
+                          hint: loc.email,
+                          icon: Icons.email_outlined,
+                          errorText: _emailError,
+                          keyboardType: TextInputType.emailAddress,
+                          inputFormatters: [_SanitizingTextInputFormatter()],
+                          textInputAction: TextInputAction.next,
+                        ),
+                        _buildRequirementsPanel(
+                          visible: _emailFocus.hasFocus,
+                          requirements: _emailRequirements,
+                          value: _cleanEmail,
+                        ),
+                        const SizedBox(height: 14),
+                        _buildTextField(
+                          context,
+                          controller: _passwordController,
+                          focusNode: _passwordFocus,
+                          hint: loc.password,
+                          icon: Icons.lock_outline,
+                          obscure: !_showPassword,
+                          errorText: _passwordError,
+                          inputFormatters: [_SanitizingTextInputFormatter()],
+                          textInputAction: TextInputAction.next,
+                          suffix: IconButton(
+                            icon: Icon(
+                              _showPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () =>
+                                setState(() => _showPassword = !_showPassword),
+                          ),
+                        ),
+                        _buildRequirementsPanel(
+                          visible: _passwordFocus.hasFocus,
+                          requirements: _passwordRequirements,
+                          value: _rawPassword,
+                        ),
+                        const SizedBox(height: 14),
+                        _buildTextField(
+                          context,
+                          controller: _confirmPasswordController,
+                          focusNode: _confirmPasswordFocus,
+                          hint: loc.confirmPassword,
+                          icon: Icons.lock_outline,
+                          obscure: !_showConfirmPassword,
+                          errorText: _confirmPasswordError,
+                          inputFormatters: [_SanitizingTextInputFormatter()],
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _handleSignUp(),
+                          suffix: IconButton(
+                            icon: Icon(
+                              _showConfirmPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () => setState(
+                              () =>
+                                  _showConfirmPassword = !_showConfirmPassword,
+                            ),
+                          ),
+                        ),
+                        _buildRequirementsPanel(
+                          visible: _confirmPasswordFocus.hasFocus,
+                          requirements: _confirmPasswordRequirements,
+                          value: _rawConfirmPassword,
+                        ),
+                        const SizedBox(height: 20),
+                        _buildTermsAgreementSection(context, colorScheme, loc),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorScheme.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: _isLoading ? null : _handleSignUp,
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    loc.signUp,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildDivider(context),
+                        const SizedBox(height: 16),
+                        _buildGoogleButton(context),
+                        const SizedBox(height: 24),
+                        Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '${loc.alreadyHaveAccount} ',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  HapticService().vibrate();
+                                  FocusScope.of(context).unfocus();
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const LoginScreen(),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  loc.login,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-            );
-          },
-        ),
-      );
+            ),
+          );
+        },
+      ),
+    );
   }
 
   /// Terms & Conditions agreement row: checkbox + "I agree to the Terms
@@ -695,7 +752,10 @@ class _SignupScreenState extends State<SignupScreen> {
   /// terms_and_conditions_dialog.dart). Shows an inline error if the user
   /// tries to submit without checking it.
   Widget _buildTermsAgreementSection(
-      BuildContext context, ColorScheme colorScheme, AppLocalizations loc) {
+    BuildContext context,
+    ColorScheme colorScheme,
+    AppLocalizations loc,
+  ) {
     final hasError = _termsError != null;
     return Semantics(
       hint: hasError ? 'Error: $_termsError' : null,
@@ -717,7 +777,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   visualDensity: VisualDensity.compact,
                   side: BorderSide(
-                    color: hasError ? colorScheme.error : colorScheme.outlineVariant,
+                    color: hasError
+                        ? colorScheme.error
+                        : colorScheme.outlineVariant,
                   ),
                   onChanged: (value) {
                     HapticService().vibrate();
@@ -737,7 +799,10 @@ class _SignupScreenState extends State<SignupScreen> {
                 // unreliable. Each span gets its own recognizer instead.
                 child: RichText(
                   text: TextSpan(
-                    style: TextStyle(fontSize: 13, color: colorScheme.onSurface),
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurface,
+                    ),
                     children: [
                       TextSpan(
                         text: loc.agreeToTermsPrefix,
@@ -843,67 +908,78 @@ class _SignupScreenState extends State<SignupScreen> {
       child: !show
           ? const SizedBox(width: double.infinity)
           : Builder(
-        builder: (context) {
-          final colorScheme = Theme.of(context).colorScheme;
-          return Container(
-            width: double.infinity,
-            margin: const EdgeInsets.only(top: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: colorScheme.outlineVariant),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: requirements.map((r) {
-                final met = r.isMet(value);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Row(
+              builder: (context) {
+                final colorScheme = Theme.of(context).colorScheme;
+                return Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.35,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        met ? Icons.check_circle : Icons.radio_button_unchecked,
-                        size: 14,
-                        color: met ? Colors.green : colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          r.label,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: met ? Colors.green : colorScheme.onSurfaceVariant,
-                          ),
+                    mainAxisSize: MainAxisSize.min,
+                    children: requirements.map((r) {
+                      final met = r.isMet(value);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              met
+                                  ? Icons.check_circle
+                                  : Icons.radio_button_unchecked,
+                              size: 14,
+                              color: met
+                                  ? Colors.green
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                r.label,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: met
+                                      ? Colors.green
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
+                      );
+                    }).toList(),
                   ),
                 );
-              }).toList(),
+              },
             ),
-          );
-        },
-      ),
     );
   }
 
   Widget _buildTextField(
-      BuildContext context, {
-        required TextEditingController controller,
-        required FocusNode focusNode,
-        required String hint,
-        required IconData icon,
-        bool obscure = false,
-        Widget? suffix,
-        String? errorText,
-        TextInputType? keyboardType,
-        List<TextInputFormatter>? inputFormatters,
-        TextInputAction? textInputAction,
-        ValueChanged<String>? onSubmitted,
-      }) {
+    BuildContext context, {
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+    Widget? suffix,
+    String? errorText,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+    TextInputAction? textInputAction,
+    ValueChanged<String>? onSubmitted,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     return CustomTextField(
       controller: controller,
@@ -928,8 +1004,10 @@ class _SignupScreenState extends State<SignupScreen> {
         Expanded(child: Divider(color: colorScheme.outlineVariant)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(loc.orContinueWith,
-              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+          child: Text(
+            loc.orContinueWith,
+            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+          ),
         ),
         Expanded(child: Divider(color: colorScheme.outlineVariant)),
       ],
@@ -945,8 +1023,7 @@ class _SignupScreenState extends State<SignupScreen> {
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: colorScheme.outlineVariant),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         icon: Image.asset('assets/images/google.png', height: 20),
         label: Text(

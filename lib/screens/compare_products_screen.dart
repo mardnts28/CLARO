@@ -18,9 +18,17 @@ import '../data/models/health_profile.dart';
 import '../widgets/ranked_product_card.dart';
 import 'product_detail_screen.dart';
 import 'camera_scanner_screen.dart';
+import '../services/guest_session.dart';
+import '../services/feature_access.dart';
+import '../widgets/locked_feature_card.dart';
+import 'login_screen.dart';
 
 /// Soft drop shadow used everywhere an outline/border used to be.
-List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) {
+List<BoxShadow> _softShadow(
+  ThemeData theme, {
+  double blur = 14,
+  double dy = 5,
+}) {
   final isDark = theme.brightness == Brightness.dark;
   return [
     BoxShadow(
@@ -41,8 +49,10 @@ List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) 
 /// Opaque version of a translucent tint (tint blended over the scaffold
 /// background). Needed because a BoxShadow shows through translucent fills,
 /// so tinted containers that now carry a shadow must have an opaque fill.
-Color _tint(ThemeData theme, Color tint, double opacity) =>
-    Color.alphaBlend(tint.withValues(alpha: opacity), theme.scaffoldBackgroundColor);
+Color _tint(ThemeData theme, Color tint, double opacity) => Color.alphaBlend(
+  tint.withValues(alpha: opacity),
+  theme.scaffoldBackgroundColor,
+);
 
 class CompareProductsScreen extends StatefulWidget {
   /// The product the user is currently viewing — used to filter by category
@@ -69,6 +79,8 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   final HistoryService _historyService = HistoryService();
 
   bool _loading = true;
+  bool _profileComplete = false;
+  bool _dismissRankingLock = false;
   bool _nutritionUnavailable = false;
   String? _error;
 
@@ -164,15 +176,26 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   Future<void> _loadRanking() async {
     try {
       final uid = _authService.currentUser?.uid;
-      if (uid == null) {
+      final profile = GuestSession.isGuest.value
+          ? const UserHealthProfile(
+              userId: 'guest',
+              displayName: 'Guest',
+              conditions: [],
+              allergies: [],
+            )
+          : uid == null
+          ? null
+          : await BackendLocator.userRepository.getHealthProfile(uid);
+      if (!GuestSession.isGuest.value) {
+        _profileComplete = await _authService.hasCompletedOnboarding();
+      }
+      if (profile == null) {
         setState(() {
           _loading = false;
           _error = 'no_user';
         });
         return;
       }
-
-      final profile = await BackendLocator.userRepository.getHealthProfile(uid);
 
       // ProductComparisonService (WhoCalculator under the hood) scores this
       // product against alternatives -- if it has no real nutrition data
@@ -674,7 +697,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                               style: ElevatedButton.styleFrom(
                                 elevation: 4,
                                 shadowColor: Colors.black.withValues(
-                                  alpha: theme.brightness == Brightness.dark ? 0.55 : 0.20,
+                                  alpha: theme.brightness == Brightness.dark
+                                      ? 0.55
+                                      : 0.20,
                                 ),
                                 backgroundColor: colorScheme.surface,
                                 foregroundColor: colorScheme.onSurface,
@@ -785,7 +810,9 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                       ),
                     ),
                   ),
-                  if (_profile != null)
+                  if (_profile != null &&
+                      _profileComplete &&
+                      !GuestSession.isGuest.value)
                     Align(
                       alignment: Alignment.centerRight,
                       child: Stack(
@@ -965,7 +992,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
             const SizedBox(height: 6),
 
             // ── Ranked-by-suitability label ───────────────────────────
-            if (!_loading && _error == null && !_nutritionUnavailable)
+            if (!_loading &&
+                _error == null &&
+                !_nutritionUnavailable &&
+                !GuestSession.isGuest.value)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
                 child: Text(
@@ -988,7 +1018,36 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   ? _buildNutritionUnavailable()
                   : _filtered.isEmpty
                   ? _buildEmpty()
-                  : _buildRankedList(),
+                  : Column(
+                      children: [
+                        if (!_dismissRankingLock &&
+                            !useFeatureAccess(
+                              FeatureKey.healthRanking,
+                              isProfileComplete: _profileComplete,
+                            ).allowed)
+                          LockedFeatureCard(
+                            title: 'Sign in for Personalized Safety Insights',
+                            subtitle:
+                                'See health-suitability rankings based on your conditions and allergies.',
+                            ctaLabel: 'Sign In',
+                            onCtaPress: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => LoginScreen(
+                                  returnTo:
+                                      'comparison:${widget.sourceProduct.id}',
+                                  returnBuilder: (_) => CompareProductsScreen(
+                                    sourceProduct: widget.sourceProduct,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            onNotNow: () =>
+                                setState(() => _dismissRankingLock = true),
+                          ),
+                        Expanded(child: _buildRankedList()),
+                      ],
+                    ),
             ),
           ],
         ),

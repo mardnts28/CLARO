@@ -36,7 +36,13 @@ import '../core/utils/kidney_advisory_facts.dart';
 import '../widgets/health_info_warning_card.dart';
 import '../widgets/score_badge_strips.dart';
 import '../data/services/backend_locator.dart';
+import '../data/repositories/product_repository.dart';
 import '../data/services/favorites_service.dart';
+import '../services/guest_session.dart';
+import '../services/guest_favorites_service.dart';
+import '../services/feature_access.dart';
+import '../widgets/locked_feature_card.dart';
+import 'login_screen.dart';
 
 // One selectable health group on the product detail screen. `members` stays
 // null until that group's member profiles have been fetched and evaluated.
@@ -87,6 +93,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // Backend-derived health advisory state (WhoCalculator + GeminiAdvisoryService,
   // via ProductRankingService.getProductDetail -- see backend_locator.dart).
   bool _advisoryLoading = true;
+  bool? _profileComplete;
+  Future<void>? _guestLiveRefresh;
+  bool _dismissPersonalizedLock = false;
 
   // Ensures the full spoken analysis is only auto-announced once per
   // product load -- not on every _refreshVoiceSummary() call (e.g. when
@@ -182,6 +191,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _scanEventId =
         '${widget.product.id}_${DateTime.now().millisecondsSinceEpoch}';
     _initSizes(_currentProduct);
+    if (GuestSession.isGuest.value &&
+        BackendLocator.productRepository is FirestoreProductRepository) {
+      _guestLiveRefresh = _refreshGuestProductLive();
+    }
     if (_authService.currentUser != null &&
         VoiceAssistantService.instance.isEnabled) {
       VoiceAssistantService.instance.announcePage('product_detail');
@@ -405,6 +418,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _loadFdaVerification() async {
+    await _guestLiveRefresh;
     // Try verification using CPR number first, fall back to fuzzy match by product name
     FdaVerificationResult result = await FdaVerificationService()
         .verifyByCprNumber(_currentProduct.fdaRegistrationNumber);
@@ -422,6 +436,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _loadFavoriteStatus() async {
+    if (GuestSession.isGuest.value) {
+      if (mounted) {
+        setState(() {
+          _isFavorite = GuestFavoritesService.isFavorite(_currentProduct.id);
+          _favoriteBusy = false;
+        });
+      }
+      return;
+    }
     final uid = _authService.currentUser?.uid;
     if (uid == null) {
       if (mounted) setState(() => _favoriteBusy = false);
@@ -451,6 +474,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   Future<void> _toggleFavorite() async {
+    if (GuestSession.isGuest.value) {
+      if (mounted) {
+        setState(
+          () => _isFavorite = GuestFavoritesService.toggle(_currentProduct.id),
+        );
+      }
+      return;
+    }
     final uid = _authService.currentUser?.uid;
     if (uid == null || _favoriteBusy) return;
 
@@ -495,8 +526,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   /// product, replacing the old hand-rolled warning strings.
   Future<void> _loadAdvisory() async {
     try {
+      await _guestLiveRefresh;
       final uid = _authService.currentUser?.uid;
+      final isGuest = GuestSession.isGuest.value;
+      final guestProfile = isGuest
+          ? const UserHealthProfile(
+              userId: 'guest',
+              displayName: 'Guest',
+              conditions: [],
+              allergies: [],
+            )
+          : null;
       if (uid == null) {
+        if (guestProfile != null &&
+            NutritionAvailability.isAvailable(_currentProduct)) {
+          await _loadSoloAdvisory(profile: guestProfile);
+          if (mounted) setState(() => _groupChecking = false);
+          return;
+        }
         if (mounted) {
           setState(() {
             _advisoryLoading = false;
@@ -505,6 +552,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         }
         return;
       }
+
+      _profileComplete = await _authService.hasCompletedOnboarding();
 
       // WhoCalculator/GeminiAdvisoryService/ProductRankingService assume
       // real nutrition data for every product involved -- a product with no
@@ -528,7 +577,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       // everyone: it produces the primary user's own evaluation plus the
       // comparison matrix / ranking text, none of which are group-specific.
       final groupFuture = _prepareGroups(uid);
-      await _loadSoloAdvisory(uid);
+      await _loadSoloAdvisory();
       await _finishGroup(groupFuture, uid);
     } catch (e) {
       debugPrint('Error loading health advisory: $e');
@@ -541,13 +590,41 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
+  Future<void> _refreshGuestProductLive() async {
+    final repository = BackendLocator.productRepository;
+    if (repository is! FirestoreProductRepository) return;
+
+    try {
+      final refreshed = _currentProduct.isOfflineFallback
+          ? await repository.getProductByYoloLabel(
+              _currentProduct.id,
+              forceLive: true,
+            )
+          : await repository.getProductById(
+              _currentProduct.id,
+              forceLive: true,
+            );
+      if (!mounted) return;
+      setState(() {
+        _currentProduct = refreshed;
+        _initSizes(refreshed);
+      });
+    } catch (e) {
+      debugPrint('Guest live product refresh failed: $e');
+    }
+  }
+
   /// Evaluates the current product against the primary user's own health
   /// profile only.
-  Future<void> _loadSoloAdvisory(String uid) async {
-    final profile = await BackendLocator.userRepository.getHealthProfile(uid);
+  Future<void> _loadSoloAdvisory({UserHealthProfile? profile}) async {
+    final resolvedProfile =
+        profile ??
+        await BackendLocator.userRepository.getHealthProfile(
+          _authService.currentUser!.uid,
+        );
 
     if (mounted) {
-      setState(() => _userHealthProfile = profile);
+      setState(() => _userHealthProfile = resolvedProfile);
     }
 
     // Filter comparison set to only include products with available nutrition data
@@ -565,7 +642,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     } else {
       ranked = BackendLocator.productRankingService.rankProducts(
         products: [_currentProduct],
-        user: profile,
+        user: resolvedProfile,
       );
     }
 
@@ -581,7 +658,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final detail = await BackendLocator.productRankingService.getProductDetail(
       target: target,
       comparisonSet: ranked.length > 1 ? ranked : null,
-      user: profile,
+      user: resolvedProfile,
       scanEventId: _scanEventId,
       languageCode: languageCode,
     );
@@ -1090,143 +1167,156 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                            // Product image (Cloudinary-hosted, via imageURL from
-                            // Firestore) with graceful placeholder fallback for
-                            // missing/invalid URLs.
-                            Column(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    width: 80,
-                                    height: 80,
-                                    color: theme.cardColor.withValues(alpha: 0.5),
-                                    child: _displayedImageUrl.isEmpty
-                                        ? Icon(
-                                            Icons.dining_outlined,
-                                            size: 40,
-                                            color: colorScheme.outline,
-                                          )
-                                        : Image.network(
-                                            _displayedImageUrl,
-                                            key: ValueKey(_displayedImageUrl),
-                                            width: 80,
-                                            height: 80,
-                                            fit: BoxFit.cover,
-                                            loadingBuilder:
-                                                (context, child, progress) {
-                                                  if (progress == null) {
-                                                    return child;
-                                                  }
-                                                  return Center(
-                                                    child: SizedBox(
-                                                      width: 20,
-                                                      height: 20,
-                                                      child:
-                                                          CircularProgressIndicator(
-                                                            strokeWidth: 2,
-                                                            color: colorScheme
-                                                                .outline,
-                                                          ),
-                                                    ),
-                                                  );
-                                                },
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                                  return Icon(
-                                                    Icons.dining_outlined,
-                                                    size: 40,
-                                                    color: colorScheme.outline,
-                                                  );
-                                                },
+                                // Product image (Cloudinary-hosted, via imageURL from
+                                // Firestore) with graceful placeholder fallback for
+                                // missing/invalid URLs.
+                                Column(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        width: 80,
+                                        height: 80,
+                                        color: theme.cardColor.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                        child: _displayedImageUrl.isEmpty
+                                            ? Icon(
+                                                Icons.dining_outlined,
+                                                size: 40,
+                                                color: colorScheme.outline,
+                                              )
+                                            : Image.network(
+                                                _displayedImageUrl,
+                                                key: ValueKey(
+                                                  _displayedImageUrl,
+                                                ),
+                                                width: 80,
+                                                height: 80,
+                                                fit: BoxFit.cover,
+                                                loadingBuilder:
+                                                    (context, child, progress) {
+                                                      if (progress == null) {
+                                                        return child;
+                                                      }
+                                                      return Center(
+                                                        child: SizedBox(
+                                                          width: 20,
+                                                          height: 20,
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                                strokeWidth: 2,
+                                                                color:
+                                                                    colorScheme
+                                                                        .outline,
+                                                              ),
+                                                        ),
+                                                      );
+                                                    },
+                                                errorBuilder:
+                                                    (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) {
+                                                      return Icon(
+                                                        Icons.dining_outlined,
+                                                        size: 40,
+                                                        color:
+                                                            colorScheme.outline,
+                                                      );
+                                                    },
+                                              ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    // ── Size dropdown ──
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colorScheme
+                                            .surfaceContainerHighest
+                                            .withValues(alpha: 0.3),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: theme.dividerColor,
+                                        ),
+                                      ),
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<double>(
+                                          value: _selectedSizeG,
+                                          isDense: true,
+                                          icon: Icon(
+                                            Icons.arrow_drop_down,
+                                            size: 18,
+                                            color: colorScheme.onSurfaceVariant,
                                           ),
+                                          style: GoogleFonts.inter(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                          items: _availableSizes.map((size) {
+                                            final label =
+                                                size == size.roundToDouble()
+                                                ? '${size.toInt()}g'
+                                                : '${size.toStringAsFixed(1)}g';
+                                            return DropdownMenuItem(
+                                              value: size,
+                                              child: Text(label),
+                                            );
+                                          }).toList(),
+                                          onChanged: (newSize) {
+                                            if (newSize != null) {
+                                              setState(() {
+                                                _selectedSizeG = newSize;
+                                                _displayedImageUrl = p
+                                                    .imageUrlForSize(newSize);
+                                              });
+                                              _refreshVoiceSummary();
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        widget.productCounts != null &&
+                                                (widget.productCounts![p.id] ??
+                                                        1) >
+                                                    1
+                                            ? '${p.name} (x${widget.productCounts![p.id]})'
+                                            : p.name,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                          color: colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        p.nutritionalFacts.servingSize,
+                                        style: GoogleFonts.inter(
+                                          fontSize: 13,
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 10),
+                                      // FDA badge
+                                      _buildFdaBadge(),
+                                    ],
                                   ),
                                 ),
-                                const SizedBox(height: 8),
-                                // ── Size dropdown ──
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.surfaceContainerHighest
-                                        .withValues(alpha: 0.3),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: theme.dividerColor,
-                                    ),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<double>(
-                                      value: _selectedSizeG,
-                                      isDense: true,
-                                      icon: Icon(
-                                        Icons.arrow_drop_down,
-                                        size: 18,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: colorScheme.onSurface,
-                                      ),
-                                      items: _availableSizes.map((size) {
-                                        final label =
-                                            size == size.roundToDouble()
-                                            ? '${size.toInt()}g'
-                                            : '${size.toStringAsFixed(1)}g';
-                                        return DropdownMenuItem(
-                                          value: size,
-                                          child: Text(label),
-                                        );
-                                      }).toList(),
-                                      onChanged: (newSize) {
-                                        if (newSize != null) {
-                                          setState(() {
-                                            _selectedSizeG = newSize;
-                                            _displayedImageUrl = p
-                                                .imageUrlForSize(newSize);
-                                          });
-                                          _refreshVoiceSummary();
-                                        }
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.productCounts != null &&
-                                            (widget.productCounts![p.id] ?? 1) >
-                                                1
-                                        ? '${p.name} (x${widget.productCounts![p.id]})'
-                                        : p.name,
-                                    style: GoogleFonts.outfit(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: colorScheme.onSurface,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    p.nutritionalFacts.servingSize,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 13,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  // FDA badge
-                                  _buildFdaBadge(),
-                                ],
-                              ),
-                            ),
                               ],
                             ),
                             const SizedBox(height: 12),
@@ -1490,7 +1580,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                         p.nutritionalFacts.transFatG;
                                     final valServing =
                                         (val100g / 100) * _selectedSizeG;
-                                    final limit = WhoDailyLimits.transFatGPerDay;
+                                    final limit =
+                                        WhoDailyLimits.transFatGPerDay;
                                     final pct = (valServing / limit) * 100;
                                     return DisplayNutrientEval(
                                       label: _heartTransFatLabel(loc),
@@ -2374,9 +2465,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // ── Health advisory banner (WhoCalculator + GeminiAdvisoryService) ──────
-  Widget _buildAdvisoryBanner(BuildContext context, AppLocalizations loc) {
+  Widget _buildAdvisoryBanner(
+    BuildContext context,
+    AppLocalizations loc, {
+    bool includePersonalizedLock = true,
+  }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
+    if (GuestSession.isGuest.value && includePersonalizedLock) {
+      return Column(
+        children: [
+          _buildAdvisoryBanner(context, loc, includePersonalizedLock: false),
+          _buildPersonalizedLockCard(context),
+        ],
+      );
+    }
+
+    if (includePersonalizedLock &&
+        !useFeatureAccess(
+          FeatureKey.personalizedAdvisory,
+          isProfileComplete: _profileComplete,
+        ).allowed) {
+      if (_dismissPersonalizedLock) return const SizedBox.shrink();
+      return _buildPersonalizedLockCard(context);
+    }
 
     if (_advisoryLoading || _groupChecking) {
       return Container(
@@ -2486,8 +2599,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // a user with no health condition gets when the product is Suitable
     // (see _isGerdOnlyClean and _effectiveAdvisory).
     final hasNoConditionsAndNoAllergens =
-        ((profile == null || profile.conditions.isEmpty) ||
-            _isGerdOnlyClean) &&
+        ((profile == null || profile.conditions.isEmpty) || _isGerdOnlyClean) &&
         (profile == null || profile.allergies.isEmpty) &&
         !(_evaluation?.allergenAssessment.hasDirectAllergen ?? false);
     final hasNoFlaggedNutrients =
@@ -2669,6 +2781,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  Widget _buildPersonalizedLockCard(BuildContext context) {
+    return LockedFeatureCard(
+      title: 'Sign in for Personalized Safety Insights',
+      subtitle:
+          'See if this product is safe for your specific health conditions and allergies.',
+      ctaLabel: 'Sign In',
+      onCtaPress: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => LoginScreen(
+            returnTo: 'product_detail:${_currentProduct.id}',
+            returnBuilder: (_) => ProductDetailScreen(product: _currentProduct),
+          ),
+        ),
+      ),
+      onNotNow: () => setState(() => _dismissPersonalizedLock = true),
+    );
+  }
+
   // Rows for the "Multiple allergen detected" Health Advisory variant, or
   // null when it doesn't apply (fewer than two of the user's allergens
   // matched this product, or group mode). One row per matched allergen, in
@@ -2741,8 +2872,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_hideAdvisoryForGerdOnly) return null;
 
     final hasNoConditionsAndNoAllergens =
-        ((profile == null || profile.conditions.isEmpty) ||
-            _isGerdOnlyClean) &&
+        ((profile == null || profile.conditions.isEmpty) || _isGerdOnlyClean) &&
         (profile == null || profile.allergies.isEmpty) &&
         !hasDirectAllergen;
 
@@ -3497,7 +3627,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.fromLTRB(6, 5, 12, 5),
                     decoration: BoxDecoration(
-                      color: isSel ? cs.primary.withValues(alpha: 0.12) : cs.surface,
+                      color: isSel
+                          ? cs.primary.withValues(alpha: 0.12)
+                          : cs.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: isSel ? cs.primary : cs.outlineVariant,

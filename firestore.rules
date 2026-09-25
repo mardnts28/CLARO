@@ -62,7 +62,9 @@ service cloud.firestore {
     // dashboard, and the Flutter app if it ever writes here directly,
     // which it currently doesn't).
     match /fda_products/{productId} {
-      allow read: if request.auth != null;
+      // Product catalog data is public app content. Guest users need the same
+      // live FDA/product reads as signed-in users.
+      allow read: if true;
       allow write: if isAdmin();
     }
 
@@ -73,7 +75,8 @@ service cloud.firestore {
     // this rule). Read policy matches fda_products since NutritionService
     // (Flutter app) reads both together to build one enriched Product.
     match /product_nutrition_data/{productId} {
-      allow read: if request.auth != null;
+      // Nutrition and ingredient data is public product content, not profile data.
+      allow read: if true;
       allow write: if isAdmin();
     }
 

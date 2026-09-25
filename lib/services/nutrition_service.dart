@@ -32,10 +32,13 @@ class NutritionService {
   /// zero/empty defaults (see NutritionalFacts.hasNutritionData /
   /// core/utils/nutrition_availability.dart). Never throws: enrichment
   /// failures shouldn't break a product fetch.
-  Future<Product> enrichProduct(Product product) async {
+  Future<Product> enrichProduct(
+    Product product, {
+    bool forceLive = false,
+  }) async {
     if (product.name.isEmpty) return product;
 
-    final cachedData = _nutritionDocCache[product.id];
+    final cachedData = forceLive ? null : _nutritionDocCache[product.id];
     if (cachedData != null) {
       return _mergeDataDoc(product, cachedData);
     }

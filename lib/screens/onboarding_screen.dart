@@ -31,7 +31,10 @@ import 'home_screen.dart';
 /// _allergenDisplay* maps below, which are purely cosmetic and never
 /// written anywhere.
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({super.key});
+  const OnboardingScreen({super.key, this.returnTo, this.returnBuilder});
+
+  final String? returnTo;
+  final WidgetBuilder? returnBuilder;
 
   @override
   State<OnboardingScreen> createState() => _OnboardingScreenState();
@@ -184,7 +187,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         } else {
           message = tl ? 'Pumili ng avatar.' : 'Please choose an avatar.';
         }
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
         return;
       } else {
         setState(() {
@@ -206,9 +211,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     } else {
       // Validate name
       if (_nameController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(loc.onboardingNameEmpty)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(loc.onboardingNameEmpty)));
         return;
       }
 
@@ -238,14 +243,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         FocusScope.of(context).unfocus();
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(
+            builder: (ctx) =>
+                widget.returnBuilder?.call(ctx) ?? const HomeScreen(),
+          ),
         );
       } catch (e) {
         debugPrint('Onboarding data save failed: $e');
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save your profile. Please check your connection and try again.'),
+            content: Text(
+              'Failed to save your profile. Please check your connection and try again.',
+            ),
             duration: const Duration(seconds: 4),
           ),
         );
@@ -319,10 +329,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ? const NeverScrollableScrollPhysics()
                       : const PageScrollPhysics(),
                   onPageChanged: (i) => setState(() => _currentPage = i),
-                  children: [
-                    _buildPage1(theme, loc),
-                    _buildPage2(theme, loc),
-                  ],
+                  children: [_buildPage1(theme, loc), _buildPage2(theme, loc)],
                 ),
               ),
             ),
@@ -344,7 +351,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             loc.onboardingBasicInfoIntro,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: colorScheme.onSurface, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              fontSize: 16,
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           const SizedBox(height: 24),
           Semantics(
@@ -363,11 +374,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               style: TextStyle(color: colorScheme.onSurface),
               decoration: InputDecoration(
                 hintText: loc.onboardingNameHint,
-                hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
-                prefixIcon: Icon(Icons.person_outline, color: colorScheme.onSurfaceVariant, size: 20),
+                hintStyle: TextStyle(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 14,
+                ),
+                prefixIcon: Icon(
+                  Icons.person_outline,
+                  color: colorScheme.onSurfaceVariant,
+                  size: 20,
+                ),
                 errorText: _nameError,
                 errorMaxLines: 2,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 14,
+                  horizontal: 12,
+                ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide(color: colorScheme.outlineVariant),
@@ -425,13 +446,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             alignment: Alignment.centerLeft,
             child: Text(
               'Avatar',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: colorScheme.onSurface),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurface,
+              ),
             ),
           ),
           const SizedBox(height: 12),
           AvatarPicker(
             selected: _avatar,
-            allowClear: false, // required: one avatar is always kept once chosen
+            allowClear:
+                false, // required: one avatar is always kept once chosen
             onChanged: (a) => setState(() {
               _avatar = a;
               if (a != null) _avatarError = false;
@@ -446,7 +472,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.error_outline, size: 14, color: colorScheme.error),
+                    Icon(
+                      Icons.error_outline,
+                      size: 14,
+                      color: colorScheme.error,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       Localizations.localeOf(context).languageCode == 'tl'
@@ -502,7 +532,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Text(
             loc.onboardingInstructions,
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: colorScheme.onSurface, height: 1.5),
+            style: TextStyle(
+              fontSize: 13,
+              color: colorScheme.onSurface,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 20),
           _buildSelectionCard(
@@ -532,7 +566,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.shield_outlined, color: colorScheme.primary, size: 20),
+                Icon(
+                  Icons.shield_outlined,
+                  color: colorScheme.primary,
+                  size: 20,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -540,12 +578,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     children: [
                       Text(
                         loc.safetyPriorityTitle,
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.primary),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: colorScheme.primary,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         loc.safetyPriorityMessage,
-                        style: TextStyle(fontSize: 12, color: colorScheme.onSurface, height: 1.4),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurface,
+                          height: 1.4,
+                        ),
                       ),
                     ],
                   ),
@@ -633,7 +679,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final itemWidth =
-            (constraints.maxWidth - spacing * (crossAxisCount - 1)) / crossAxisCount;
+            (constraints.maxWidth - spacing * (crossAxisCount - 1)) /
+            crossAxisCount;
         return Wrap(
           spacing: spacing,
           runSpacing: spacing,
@@ -696,9 +743,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     softWrap: true,
                     style: TextStyle(
                       fontSize: 10,
-                      color: selected ? colorScheme.primary : colorScheme.onSurface,
-                      fontWeight:
-                      selected ? FontWeight.bold : FontWeight.normal,
+                      color: selected
+                          ? colorScheme.primary
+                          : colorScheme.onSurface,
+                      fontWeight: selected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
                     ),
                   ),
                 ),
@@ -713,9 +763,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 width: 16,
                 height: 16,
                 decoration: BoxDecoration(
-                    color: colorScheme.primary, shape: BoxShape.circle),
-                child:
-                const Icon(Icons.check, size: 10, color: Colors.white),
+                  color: colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, size: 10, color: Colors.white),
               ),
             ),
         ],
@@ -754,25 +805,42 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: Text(
                   title,
                   style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 13, color: colorScheme.onSurface),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          Text(subtitle,
-              style: TextStyle(fontSize: 13, color: colorScheme.onSurface.withValues(alpha: 0.85))),
+          Text(
+            subtitle,
+            style: TextStyle(
+              fontSize: 13,
+              color: colorScheme.onSurface.withValues(alpha: 0.85),
+            ),
+          ),
           const SizedBox(height: 12),
           child,
           if (note != null) ...[
             const SizedBox(height: 10),
             Row(
               children: [
-                Icon(noteIcon, size: 14, color: colorScheme.onSurface.withValues(alpha: 0.85)),
+                Icon(
+                  noteIcon,
+                  size: 14,
+                  color: colorScheme.onSurface.withValues(alpha: 0.85),
+                ),
                 const SizedBox(width: 4),
                 Expanded(
-                  child: Text(note,
-                      style: TextStyle(fontSize: 13, color: colorScheme.onSurface.withValues(alpha: 0.85))),
+                  child: Text(
+                    note,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: colorScheme.onSurface.withValues(alpha: 0.85),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -805,7 +873,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   bool isBasicInfoValid() {
-    return _nameController.text.trim().isNotEmpty && _dateOfBirth != null && _avatar != null;
+    return _nameController.text.trim().isNotEmpty &&
+        _dateOfBirth != null &&
+        _avatar != null;
   }
 
   bool _isFormValid() {
@@ -823,31 +893,39 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }) {
     final colorScheme = theme.colorScheme;
     final enabledChecker = isFormValid ?? _isFormValid;
-    final isButtonEnabled = checkValidation ? (enabledChecker() && !_isLoading) : !_isLoading;
+    final isButtonEnabled = checkValidation
+        ? (enabledChecker() && !_isLoading)
+        : !_isLoading;
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: isButtonEnabled ? colorScheme.primary : colorScheme.outlineVariant,
-          foregroundColor: isButtonEnabled ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
+          backgroundColor: isButtonEnabled
+              ? colorScheme.primary
+              : colorScheme.outlineVariant,
+          foregroundColor: isButtonEnabled
+              ? colorScheme.onPrimary
+              : colorScheme.onSurfaceVariant,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         onPressed: isButtonEnabled ? onTap : null,
         child: _isLoading
             ? SizedBox(
-          height: 20,
-          width: 20,
-          child: CircularProgressIndicator(
-              color: colorScheme.onPrimary, strokeWidth: 2),
-        )
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: colorScheme.onPrimary,
+                  strokeWidth: 2,
+                ),
+              )
             : Text(
-          label,
-          style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold),
-        ),
+                label,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
       ),
     );
   }

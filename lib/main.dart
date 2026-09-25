@@ -11,6 +11,7 @@ import 'services/theme_service.dart';
 import 'services/locale_service.dart';
 import 'services/get_started_service.dart';
 import 'services/auth_service.dart';
+import 'services/guest_session.dart';
 import 'services/haptic_service.dart';
 import 'services/text_size_service.dart';
 import 'services/voice_assistant_service.dart';
@@ -270,18 +271,20 @@ class _RootGateState extends State<RootGate> {
   }
 }
 
-/// Routes users based on authentication state:
-/// - Not logged in → LoginScreen
-/// - Logged in but onboarding incomplete → OnboardingScreen
-/// - Logged in and onboarded → HomeScreen
+/// Routes users based on authentication state. Guest mode is process-local and
+/// is checked before Firebase profile lookup so it never enters onboarding.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
-      builder: (context, snapshot) {
+    return ValueListenableBuilder<bool>(
+      valueListenable: GuestSession.isGuest,
+      builder: (context, isGuest, _) {
+        if (isGuest) return const HomeScreen();
+        return StreamBuilder<User?>(
+          stream: FirebaseAuth.instance.authStateChanges(),
+          builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
@@ -380,6 +383,8 @@ class AuthGate extends StatelessWidget {
                 );
               },
             );
+          },
+        );
           },
         );
       },

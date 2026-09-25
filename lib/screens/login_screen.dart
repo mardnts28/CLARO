@@ -11,6 +11,7 @@ import '../services/auth_service.dart';
 import '../services/home_tab_controller.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
+import '../services/guest_session.dart';
 
 /// NOTE ON LANGUAGE: this screen now follows the app-wide selected
 /// language (Select Language screen on first launch / Settings >
@@ -21,7 +22,10 @@ import '../services/haptic_service.dart';
 /// screen needs to actually honor that choice instead of always showing
 /// English.
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.returnTo, this.returnBuilder});
+
+  final String? returnTo;
+  final WidgetBuilder? returnBuilder;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -114,6 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _routeAfterAuth() async {
     final onboarded = await _authService.hasCompletedOnboarding();
     if (!mounted) return;
+    GuestSession.clear();
     HomeTabController.switchToTab(0);
     // Dismiss the keyboard/field focus before navigating away -- carrying
     // focus over to the next screen (which may not have a matching text
@@ -123,9 +128,14 @@ class _LoginScreenState extends State<LoginScreen> {
     FocusScope.of(context).unfocus();
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
-        builder: (_) => onboarded ? const HomeScreen() : const OnboardingScreen(),
+        builder: (ctx) => onboarded
+            ? (widget.returnBuilder?.call(ctx) ?? const HomeScreen())
+            : OnboardingScreen(
+                returnTo: widget.returnTo,
+                returnBuilder: widget.returnBuilder,
+              ),
       ),
-          (route) => false,
+      (route) => false,
     );
   }
 
@@ -155,9 +165,11 @@ class _LoginScreenState extends State<LoginScreen> {
           otpCode: challenge['code']?.toString(),
           emailSent: challenge['emailSent'] == true,
           expiresAt: challenge['expiresAt'] as DateTime?,
+          returnTo: widget.returnTo,
+          returnBuilder: widget.returnBuilder,
         ),
       ),
-          (route) => false,
+      (route) => false,
     );
   }
 
@@ -188,10 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      final result = await _authService.login(
-        email: email,
-        password: password,
-      );
+      final result = await _authService.login(email: email, password: password);
 
       if (!mounted) return;
 
@@ -301,185 +310,226 @@ class _LoginScreenState extends State<LoginScreen> {
         useMaterial3: true,
       ),
       child: Builder(
-          builder: (context) {
-            final colorScheme = Theme.of(context).colorScheme;
-            final loc = AppLocalizations.of(context)!;
+        builder: (context) {
+          final colorScheme = Theme.of(context).colorScheme;
+          final loc = AppLocalizations.of(context)!;
 
-            return AnnotatedRegion<SystemUiOverlayStyle>(
-              value: SystemUiOverlayStyle.dark,
-              child: Scaffold(
-                backgroundColor: colorScheme.surface,
-                body: SafeArea(
-                  child: RefreshIndicator(
-                    color: colorScheme.primary,
-                    onRefresh: _refreshForm,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Center(
-                            child: Column(
-                              children: [
-                                Image.asset(
-                                  'assets/images/logo.png',
-                                  height: 90,
-                                  cacheHeight: (90 * MediaQuery.devicePixelRatioOf(context)).round(),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'CLARO',
-                                  style: TextStyle(
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.primary,
-                                    letterSpacing: 3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          Text(
-                            loc.welcomeBack,
-                            style: TextStyle(
-                                fontSize: 26, fontWeight: FontWeight.bold, color: colorScheme.primary),
-                          ),
-                          Text(
-                            loc.loginToContinue,
-                            style: TextStyle(fontSize: 13, color: colorScheme.primary),
-                          ),
-                          const SizedBox(height: 24),
-
-                          if (_formError != null) ...[
-                            _buildFormErrorBanner(context, _formError!),
-                            const SizedBox(height: 14),
-                          ],
-
-                          _buildTextField(
-                            context,
-                            controller: _emailController,
-                            focusNode: _emailFocus,
-                            hint: loc.email,
-                            icon: Icons.email_outlined,
-                            errorText: _emailError,
-                            keyboardType: TextInputType.emailAddress,
-                            textInputAction: TextInputAction.next,
-                          ),
-                          const SizedBox(height: 14),
-                          _buildTextField(
-                            context,
-                            controller: _passwordController,
-                            focusNode: _passwordFocus,
-                            hint: loc.password,
-                            icon: Icons.lock_outline,
-                            obscure: !_showPassword,
-                            errorText: _passwordError,
-                            textInputAction: TextInputAction.done,
-                            onSubmitted: (_) => _handleLogin(),
-                            suffix: IconButton(
-                              icon: Icon(
-                                _showPassword ? Icons.visibility : Icons.visibility_off,
-                                size: 20,
-                                color: Colors.grey,
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.dark,
+            child: Scaffold(
+              backgroundColor: colorScheme.surface,
+              body: SafeArea(
+                child: RefreshIndicator(
+                  color: colorScheme.primary,
+                  onRefresh: _refreshForm,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 32,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Column(
+                            children: [
+                              Image.asset(
+                                'assets/images/logo.png',
+                                height: 90,
+                                cacheHeight:
+                                    (90 *
+                                            MediaQuery.devicePixelRatioOf(
+                                              context,
+                                            ))
+                                        .round(),
                               ),
-                              onPressed: () =>
-                                  setState(() => _showPassword = !_showPassword),
+                              const SizedBox(height: 8),
+                              Text(
+                                'CLARO',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: colorScheme.primary,
+                                  letterSpacing: 3,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        Text(
+                          loc.welcomeBack,
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        Text(
+                          loc.loginToContinue,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        if (_formError != null) ...[
+                          _buildFormErrorBanner(context, _formError!),
+                          const SizedBox(height: 14),
+                        ],
+
+                        _buildTextField(
+                          context,
+                          controller: _emailController,
+                          focusNode: _emailFocus,
+                          hint: loc.email,
+                          icon: Icons.email_outlined,
+                          errorText: _emailError,
+                          keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
+                        ),
+                        const SizedBox(height: 14),
+                        _buildTextField(
+                          context,
+                          controller: _passwordController,
+                          focusNode: _passwordFocus,
+                          hint: loc.password,
+                          icon: Icons.lock_outline,
+                          obscure: !_showPassword,
+                          errorText: _passwordError,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => _handleLogin(),
+                          suffix: IconButton(
+                            icon: Icon(
+                              _showPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              size: 20,
+                              color: Colors.grey,
+                            ),
+                            onPressed: () =>
+                                setState(() => _showPassword = !_showPassword),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: GestureDetector(
+                            onTap: () {
+                              HapticService().vibrate();
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ForgotPasswordScreen(),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              loc.forgotPassword,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: colorScheme.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: GestureDetector(
-                              onTap: () {
-                                HapticService().vibrate();
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => const ForgotPasswordScreen()),
-                                );
-                              },
-                              child: Text(
-                                loc.forgotPassword,
-                                style: TextStyle(
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorScheme.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            onPressed: _isLoading ? null : _handleLogin,
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    loc.login,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Center(
+                          child: TextButton(
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    HapticService().vibrate();
+                                    GuestSession.enter();
+                                  },
+                            child: const Text('Continue as Guest'),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        _buildDivider(context),
+                        const SizedBox(height: 16),
+                        _buildGoogleButton(context),
+                        const SizedBox(height: 24),
+                        Center(
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                '${loc.dontHaveAccount} ',
+                                style: const TextStyle(fontSize: 13),
+                              ),
+                              GestureDetector(
+                                onTap: () {
+                                  HapticService().vibrate();
+                                  // Dismiss keyboard/focus before leaving
+                                  // this screen (see _routeAfterAuth).
+                                  FocusScope.of(context).unfocus();
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => SignupScreen(
+                                        returnTo: widget.returnTo,
+                                        returnBuilder: widget.returnBuilder,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Text(
+                                  loc.signUp,
+                                  style: TextStyle(
                                     fontSize: 13,
                                     color: colorScheme.primary,
-                                    fontWeight: FontWeight.w500),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: colorScheme.primary,
-                                shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
-                              ),
-                              onPressed: _isLoading ? null : _handleLogin,
-                              child: _isLoading
-                                  ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                    color: Colors.white, strokeWidth: 2),
-                              )
-                                  : Text(
-                                loc.login,
-                                style: const TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildDivider(context),
-                          const SizedBox(height: 16),
-                          _buildGoogleButton(context),
-                          const SizedBox(height: 24),
-                          Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text('${loc.dontHaveAccount} ',
-                                    style: const TextStyle(fontSize: 13)),
-                                GestureDetector(
-                                  onTap: () {
-                                    HapticService().vibrate();
-                                    // Dismiss keyboard/focus before leaving
-                                    // this screen (see _routeAfterAuth).
-                                    FocusScope.of(context).unfocus();
-                                    Navigator.pushReplacement(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (_) => const SignupScreen()),
-                                    );
-                                  },
-                                  child: Text(
-                                    loc.signUp,
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        color: colorScheme.primary,
-                                        fontWeight: FontWeight.bold),
+                                    fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-            );
-          },
-        ),
-      );
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Widget _buildFormErrorBanner(BuildContext context, String message) {
@@ -513,18 +563,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildTextField(
-      BuildContext context, {
-        required TextEditingController controller,
-        required FocusNode focusNode,
-        required String hint,
-        required IconData icon,
-        bool obscure = false,
-        Widget? suffix,
-        String? errorText,
-        TextInputType? keyboardType,
-        TextInputAction? textInputAction,
-        ValueChanged<String>? onSubmitted,
-      }) {
+    BuildContext context, {
+    required TextEditingController controller,
+    required FocusNode focusNode,
+    required String hint,
+    required IconData icon,
+    bool obscure = false,
+    Widget? suffix,
+    String? errorText,
+    TextInputType? keyboardType,
+    TextInputAction? textInputAction,
+    ValueChanged<String>? onSubmitted,
+  }) {
     final colorScheme = Theme.of(context).colorScheme;
     return CustomTextField(
       controller: controller,
@@ -548,8 +598,10 @@ class _LoginScreenState extends State<LoginScreen> {
         Expanded(child: Divider(color: colorScheme.outlineVariant)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Text(loc.orContinueWith,
-              style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant)),
+          child: Text(
+            loc.orContinueWith,
+            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+          ),
         ),
         Expanded(child: Divider(color: colorScheme.outlineVariant)),
       ],
@@ -565,8 +617,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: OutlinedButton.icon(
         style: OutlinedButton.styleFrom(
           side: BorderSide(color: colorScheme.outlineVariant),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         icon: Image.asset('assets/images/google.png', height: 20),
         label: Text(
