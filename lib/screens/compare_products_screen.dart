@@ -788,35 +788,59 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   if (_profile != null)
                     Align(
                       alignment: Alignment.centerRight,
-                      child: GestureDetector(
-                        onTap: () {
-                          HapticService().vibrate();
-                          _showFilterSheet();
-                        },
-                        child: Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            Icon(
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              HapticService().vibrate();
+                              _showFilterSheet();
+                            },
+                            icon: Icon(
                               Icons.filter_list,
                               color: colorScheme.primary,
-                              size: 24,
+                              size: 18,
                             ),
-                            if (_selectedConditions.isNotEmpty ||
-                                _hasActiveTagFilters)
-                              Positioned(
-                                top: -2,
-                                right: -2,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.secondary,
-                                    shape: BoxShape.circle,
-                                  ),
+                            label: Text(
+                              Localizations.localeOf(context).languageCode ==
+                                      'tl'
+                                  ? 'I-filter'
+                                  : 'Filter',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: colorScheme.primary,
+                              side: BorderSide(color: colorScheme.primary),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                          if (_selectedConditions.isNotEmpty ||
+                              _hasActiveTagFilters)
+                            Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.secondary,
+                                  shape: BoxShape.circle,
                                 ),
                               ),
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
                     ),
                 ],

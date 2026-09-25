@@ -441,6 +441,299 @@ final List<_TermsSection> _termsSections = [
   ]),
 ];
 
+/// Body + header + footer of the Terms & Conditions dialog, extracted
+/// into its own StatefulWidget (rather than a plain closure inside
+/// showDialog's builder) specifically so it can own a [ScrollController]
+/// with a proper [dispose] and drive the mandatory variant's "Agree"
+/// button off real scroll position.
+///
+/// NEW: when [requireAgreement] is true (the blocking, post-Google-auth
+/// gate), the "Agree" button now starts disabled (grayed out,
+/// unclickable) and only becomes enabled once the user has scrolled the
+/// body to (or very near) the bottom -- they can no longer tap "Agree"
+/// without ever having scrolled past the header. The informational
+/// variant (opened from the Sign Up screen's "Terms and Conditions"
+/// link) has no footer button at all, so this gating doesn't apply to it.
+class _TermsDialogContent extends StatefulWidget {
+  final bool requireAgreement;
+  final double width;
+  final double height;
+
+  const _TermsDialogContent({
+    required this.requireAgreement,
+    required this.width,
+    required this.height,
+  });
+
+  @override
+  State<_TermsDialogContent> createState() => _TermsDialogContentState();
+}
+
+class _TermsDialogContentState extends State<_TermsDialogContent> {
+  final _scrollController = ScrollController();
+
+  // Only the mandatory variant gates anything on this -- the
+  // informational variant has no footer button to enable/disable, so it
+  // starts (and stays) true for it.
+  late bool _reachedEnd = !widget.requireAgreement;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.requireAgreement) {
+      _scrollController.addListener(_handleScroll);
+      // If the terms happen to fit on screen without overflowing (very
+      // tall dialog, very short content, a big display, etc.) there is
+      // nothing to scroll through -- don't leave the user stuck unable
+      // to ever satisfy a scroll event that will never fire.
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _checkInitialOverflow(),
+      );
+    }
+  }
+
+  void _checkInitialOverflow() {
+    if (!mounted || _reachedEnd || !_scrollController.hasClients) return;
+    if (_scrollController.position.maxScrollExtent <= 0) {
+      setState(() => _reachedEnd = true);
+    }
+  }
+
+  void _handleScroll() {
+    if (_reachedEnd || !_scrollController.hasClients) return;
+    // Small tolerance so the user doesn't have to land on the exact last
+    // pixel of scroll extent for this to register as "reached the end".
+    const tolerance = 24.0;
+    final position = _scrollController.position;
+    if (position.pixels >= position.maxScrollExtent - tolerance) {
+      setState(() => _reachedEnd = true);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final loc = AppLocalizations.of(context)!;
+    final tl = Localizations.localeOf(context).languageCode == 'tl';
+
+    return SizedBox(
+      width: widget.width,
+      height: widget.height,
+      child: Column(
+        children: [
+          // Fixed header: title (+ close button, informational
+          // variant only) never scrolls away.
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: theme.dividerColor)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    loc.termsConditions,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                // The close (X) button only exists in the
+                // informational variant. When agreement is required,
+                // there must be no way to dismiss the dialog other
+                // than tapping "Agree" -- see class doc comment above.
+                if (!widget.requireAgreement)
+                  IconButton(
+                    icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
+                    tooltip: loc.closeButton,
+                    onPressed: () => Navigator.of(context).pop(false),
+                  ),
+              ],
+            ),
+          ),
+          // Scrollable body: only this part moves. Drives _reachedEnd
+          // for the mandatory variant via _scrollController above.
+          Expanded(
+            child: Scrollbar(
+              controller: _scrollController,
+              child: SingleChildScrollView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _termsLastUpdated,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    Text(
+                      _termsVersion,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      _termsIntro,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    for (final section in _termsSections) ...[
+                      Text(
+                        section.title,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      for (final block in section.blocks) ...[
+                        if (block.paragraph != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              block.paragraph!,
+                              style: TextStyle(
+                                fontSize: 14,
+                                height: 1.5,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                        if (block.bullets != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: block.bullets!.map((b) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 6, right: 8),
+                                        child: Container(
+                                          width: 4,
+                                          height: 4,
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.onSurfaceVariant,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          b,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            height: 1.5,
+                                            color: colorScheme.onSurface,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                      ],
+                      const SizedBox(height: 12),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Fixed footer: the single, mandatory "Agree" action.
+          // Informational variant has no footer at all -- reading the
+          // terms never required an explicit acknowledgement.
+          if (widget.requireAgreement)
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: theme.dividerColor)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Only shown while the button is still disabled --
+                  // tells the user why they can't proceed yet, rather
+                  // than leaving a grayed-out button unexplained.
+                  if (!_reachedEnd)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        tl
+                            ? 'Mag-scroll hanggang sa dulo upang magpatuloy.'
+                            : 'Scroll to the end to continue.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        disabledBackgroundColor:
+                            colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                        disabledForegroundColor:
+                            colorScheme.onPrimary.withValues(alpha: 0.7),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      // Grayed out and unclickable until _reachedEnd
+                      // flips true -- the only way out of a mandatory
+                      // dialog remains this single "Agree" action, but
+                      // now it can't fire before the user has actually
+                      // scrolled through the terms.
+                      onPressed:
+                          _reachedEnd ? () => Navigator.of(context).pop(true) : null,
+                      child: Text(
+                        loc.agreeButton,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Shows the Terms & Conditions in a modal card with a fixed width/height,
 /// a header that stays put, and only the body text scrolling underneath
 /// it. Follows the app's existing theme (light/dark) via [Theme.of], so it
@@ -458,24 +751,25 @@ final List<_TermsSection> _termsSections = [
 /// no close (X) button, no Skip/Cancel/Decline button, the barrier cannot
 /// be tapped away, and the hardware/system back gesture is suppressed.
 /// The ONLY way to leave the dialog is the single "Agree" button in the
-/// footer, which resolves the returned future to `true`. Everything else
-/// (dimensions, theming, header title, body content/scrolling) is shared
-/// with the informational variant so the two never visually diverge.
+/// footer, which resolves the returned future to `true` -- and that
+/// button is now disabled (grayed out, unclickable) until the user has
+/// scrolled the body to the end (see [_TermsDialogContentState]).
+/// Everything else (dimensions, theming, header title, body
+/// content/scrolling) is shared with the informational variant so the two
+/// never visually diverge.
 ///
 /// Returns `true` if the user tapped "Agree" (only possible when
-/// `requireAgreement` is true), `false` otherwise (dismissed, closed, or
-/// the informational variant was used).
+/// `requireAgreement` is true AND they've scrolled to the end), `false`
+/// otherwise (dismissed, closed, or the informational variant was used).
 Future<bool> showTermsAndConditionsDialog(
   BuildContext context, {
   bool requireAgreement = false,
 }) async {
-  final loc = AppLocalizations.of(context)!;
   final result = await showDialog<bool>(
     context: context,
     barrierDismissible: !requireAgreement,
     builder: (dialogContext) {
       final theme = Theme.of(dialogContext);
-      final colorScheme = theme.colorScheme;
       final screenSize = MediaQuery.of(dialogContext).size;
 
       // Fixed card dimensions regardless of how much text there is --
@@ -487,181 +781,10 @@ Future<bool> showTermsAndConditionsDialog(
         backgroundColor: theme.cardColor,
         insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: SizedBox(
+        child: _TermsDialogContent(
+          requireAgreement: requireAgreement,
           width: cardWidth,
           height: cardHeight,
-          child: Column(
-            children: [
-              // Fixed header: title (+ close button, informational
-              // variant only) never scrolls away.
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 18, 12, 14),
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: theme.dividerColor),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        loc.termsConditions,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                    // The close (X) button only exists in the
-                    // informational variant. When agreement is required,
-                    // there must be no way to dismiss the dialog other
-                    // than tapping "Agree" -- see doc comment above.
-                    if (!requireAgreement)
-                      IconButton(
-                        icon: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
-                        tooltip: loc.closeButton,
-                        onPressed: () => Navigator.of(dialogContext).pop(false),
-                      ),
-                  ],
-                ),
-              ),
-              // Scrollable body: only this part moves.
-              Expanded(
-                child: Scrollbar(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _termsLastUpdated,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        Text(
-                          _termsVersion,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                        Text(
-                          _termsIntro,
-                          style: TextStyle(
-                            fontSize: 14,
-                            height: 1.5,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        for (final section in _termsSections) ...[
-                          Text(
-                            section.title,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          for (final block in section.blocks) ...[
-                            if (block.paragraph != null)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Text(
-                                  block.paragraph!,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    height: 1.5,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                              ),
-                            if (block.bullets != null)
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: block.bullets!.map((b) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 4),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Padding(
-                                            padding: const EdgeInsets.only(top: 6, right: 8),
-                                            child: Container(
-                                              width: 4,
-                                              height: 4,
-                                              decoration: BoxDecoration(
-                                                color: colorScheme.onSurfaceVariant,
-                                                shape: BoxShape.circle,
-                                              ),
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: Text(
-                                              b,
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                height: 1.5,
-                                                color: colorScheme.onSurface,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                          ],
-                          const SizedBox(height: 12),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              // Fixed footer: the single, mandatory "Agree" action.
-              // Informational variant has no footer at all -- reading the
-              // terms never required an explicit acknowledgement.
-              if (requireAgreement)
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-                  decoration: BoxDecoration(
-                    border: Border(
-                      top: BorderSide(color: theme.dividerColor),
-                    ),
-                  ),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                      // The only way out of a mandatory dialog: pop `true`.
-                      onPressed: () => Navigator.of(dialogContext).pop(true),
-                      child: Text(
-                        loc.agreeButton,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
         ),
       );
 
