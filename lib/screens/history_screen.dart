@@ -819,11 +819,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final loc = AppLocalizations.of(context)!;
-    // Active nav item uses a white pill in dark mode so it stands out
+    // Active nav item uses a light pill in dark mode so it stands out
     // against the dark bottom bar background; the icon/text stay in
     // colorScheme.primary (a saturated red), which reads clearly on white.
+    // Matches HomeScreen's _buildBottomNav navPillColor exactly for
+    // dark-mode consistency across the app.
     final navPillColor = theme.brightness == Brightness.dark
-        ? Colors.white
+        ? Colors.grey.withValues(alpha: 0.3)
         : const Color(0xFFF6CDCD);
 
     final items = [
@@ -979,18 +981,41 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             color: colorScheme.onSurface),
                       ),
                     ),
+                    // Clear All button -- styled the same as
+                    // GroupDetailsScreen's Delete Group button
+                    // (OutlinedButton.icon, rounded border, delete icon),
+                    // sized compactly to fit inline with the title. Logic
+                    // is unchanged: still haptic + _showClearAllDialog().
                     if (_activeTab != 'Mga Ulat')
-                      GestureDetector(
-                        onTap: () {
+                      OutlinedButton.icon(
+                        onPressed: () {
                           HapticService().vibrate();
                           _showClearAllDialog();
                         },
-                        child: Text(
+                        icon: Icon(
+                          Icons.delete_outline,
+                          color: colorScheme.primary,
+                          size: 18,
+                        ),
+                        label: Text(
                           loc.clearAll,
                           style: GoogleFonts.inter(
                               fontSize: 12,
                               color: colorScheme.primary,
                               fontWeight: FontWeight.w500),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colorScheme.primary,
+                          side: BorderSide(color: colorScheme.primary),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                   ],
