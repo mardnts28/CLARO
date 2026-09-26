@@ -124,11 +124,10 @@ a {
 
 .doc-container {
   width: 100%;
-  max-width: var(--doc-container-width);
+  max-width: var(--container-max-width);
   margin: 0 auto;
   padding: 0 1.5rem;
 }
-
 /* Page Layout Wrappers */
 .main-content {
   flex: 1;

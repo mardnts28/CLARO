@@ -20,8 +20,55 @@
 
 /* Home Hero Section */
 .hero-section {
+  position: relative;
   padding: 4rem 0 5rem;
-  background: linear-gradient(180deg, rgba(139, 26, 26, 0.03) 0%, rgba(250, 243, 239, 0) 100%);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  isolation: isolate; /* keeps the overlay contained to this section */
+}
+
+/* Add blur to hero background */
+.hero-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(8px);
+  z-index: 0;
+}
+
+.hero-section .hero-grid {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55); /* dark overlay — tune opacity to taste */
+  z-index: 0;
+}
+
+.hero-section .hero-grid {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-section .hero-title,
+.hero-section .hero-subtitle,
+.hero-section .hero-download-note {
+  color: #ffffff;
+  position: relative;
+  z-index: 3;
+}
+
+.hero-section .hero-title-accent {
+  color: #ff8080;
 }
 
 .hero-grid {
@@ -33,6 +80,141 @@
 
 .hero-badge-wrap {
   margin-bottom: 1.25rem;
+}
+
+.hero-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Hero Logo Launch Animation */
+.hero-logo-launch {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  margin: 0 0 2rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.logo-border-container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: borderPulse 1.2s ease-in-out infinite;
+}
+
+.logo-border {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.logo-can-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 72%;
+  height: 72%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo-can {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: canAppear 2.5s ease-in-out infinite;
+}
+
+@keyframes borderPulse {
+  0%, 100% {
+    transform: scale(0.94);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
+@keyframes canAppear {
+  0% {
+    opacity: 0;
+    filter: blur(12px);
+    transform: scale(0.95);
+  }
+  20% {
+    opacity: 0.3;
+    filter: blur(8px);
+    transform: scale(0.98);
+  }
+  40% {
+    opacity: 0.7;
+    filter: blur(4px);
+    transform: scale(1);
+  }
+  60% {
+    opacity: 1;
+    filter: blur(0px);
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    filter: blur(0px);
+    transform: scale(1);
+  }
+  90% {
+    opacity: 0.8;
+    filter: blur(2px);
+    transform: scale(0.98);
+  }
+  100% {
+    opacity: 0;
+    filter: blur(12px);
+    transform: scale(0.95);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .logo-border-container,
+  .logo-can {
+    animation: none;
+  }
+  
+  .logo-can {
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  .hero-section::before {
+    filter: none;
+  }
+}
+
+/* Responsive logo sizing */
+@media (max-width: 768px) {
+  .hero-logo-launch {
+    width: 150px;
+    height: 150px;
+    margin: 0 auto 1.5rem auto;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-logo-launch {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 1.25rem auto;
+    justify-content: center;
+  }
 }
 
 .hero-title {
@@ -136,41 +318,6 @@
 .feature-title {
   font-size: 1.2rem;
   font-weight: 600;
-}
-
-/* Workflow Step Cards */
-.workflow-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 2rem;
-  position: relative;
-}
-
-.step-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.step-number {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--primary-red);
-  opacity: 0.85;
-}
-
-.step-details-list {
-  margin-left: 1.2rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.95rem;
-  color: var(--text-secondary);
-}
-
-.step-details-list li {
-  line-height: 1.45;
 }
 
 /* Call to action section */
@@ -695,6 +842,13 @@
     text-align: center;
     gap: 2.5rem;
   }
+  .hero-content {
+    align-items: center;
+  }
+  .hero-logo-launch {
+    margin: 0 auto 1.5rem auto;
+    justify-content: center;
+  }
   .hero-subtitle {
     margin: 0 auto 2rem;
   }
@@ -704,13 +858,18 @@
   .download-tooltip-note {
     justify-content: center;
   }
-  .cards-grid-3, .workflow-grid, .developers-grid {
+  .cards-grid-3, .developers-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Reduce blur on tablet for better performance */
+  .hero-section::before {
+    filter: blur(4px);
   }
 }
 
 @media (max-width: 640px) {
-  .cards-grid-3, .cards-grid-2, .workflow-grid, .developers-grid {
+  .cards-grid-3, .cards-grid-2, .developers-grid {
     grid-template-columns: 1fr;
   }
   .doc-card {
@@ -721,5 +880,10 @@
   }
   .cta-banner {
     padding: 2.5rem 1.5rem;
+  }
+
+  /* Reduce blur on mobile for better performance */
+  .hero-section::before {
+    filter: blur(2px);
   }
 }

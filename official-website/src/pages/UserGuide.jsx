@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Camera, BarChart2, GitCompare, Mic, ChevronDown, ChevronUp, PackageSearch } from 'lucide-react';
+import { Camera, BarChart2, GitCompare, Mic, ChevronDown, ChevronUp, PackageSearch, ClipboardList } from 'lucide-react';
 import './Pages.css';
 
 export default function UserGuide() {
@@ -366,28 +366,34 @@ export default function UserGuide() {
               <li>Continuously improves CLARO's product database and recognition capabilities.</li>
             </ul>
           </div>
-
-          <div className="result-section">
-            <h5>Products Currently Supported by the Recognition Model — As of September 21, 2026</h5>
-            <p className="supported-products-date">
-              The list below reflects the products CLARO's recognition model can currently identify, as of <strong>September 21, 2026</strong>. These products were sourced from <strong>Ever Plus Superstore Inc., Dela Fuente St., Sampaloc, Manila</strong> in the early week of August 2026 with the consent and supervision of the store branch's supervisor and manager. If a product isn't listed here, please submit a report so we can add it.
-            </p>
-            <div className="supported-products-grid">
-              {supportedProducts.map((group) => (
-                <div className="command-category" key={group.category}>
-                  <h6>{group.category}</h6>
-                  {group.products.length > 0 ? (
-                    <ul>
-                      {group.products.map((product) => (
-                        <li key={product}>{product}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="supported-products-empty">List pending — no products confirmed yet.</p>
-                  )}
-                </div>
-              ))}
-            </div>
+        </div>
+      )
+    },
+    {
+      id: 6,
+      title: 'Products Currently Supported by the Recognition Model',
+      icon: <ClipboardList size={24} />,
+      content: (
+        <div className="guide-content">
+          <h4>Products Currently Supported by the Recognition Model — As of September 21, 2026</h4>
+          <p className="supported-products-date">
+            The list below reflects the products CLARO's recognition model can currently identify, as of <strong>September 21, 2026</strong>. These products were sourced from <strong>Ever Plus Superstore Inc., Dela Fuente St., Sampaloc, Manila</strong> in the early week of August 2026 with the consent and supervision of the store branch's supervisor and manager. If a product isn't listed here, please submit a report so we can add it.
+          </p>
+          <div className="supported-products-grid">
+            {supportedProducts.map((group) => (
+              <div className="command-category" key={group.category}>
+                <h6>{group.category}</h6>
+                {group.products.length > 0 ? (
+                  <ul>
+                    {group.products.map((product) => (
+                      <li key={product}>{product}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="supported-products-empty">List pending — no products confirmed yet.</p>
+                )}
+              </div>
+            ))}
           </div>
         </div>
       )

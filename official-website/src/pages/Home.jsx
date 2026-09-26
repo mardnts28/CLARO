@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Download, Scan, FileText, ShieldCheck, HeartPulse, GitCompare, Mic } from 'lucide-react';
 import logoImg from '../assets/images/logoII.png';
+import logoBorder from '../assets/images/logo-border.png';
+import logoCan from '../assets/images/logo-can.png';
 import appPreviewImg1 from '../assets/images/preview1.png';
 import appPreviewImg2 from '../assets/images/preview2.png';
+import heroBgImg from '../assets/images/hero-bg.jpg'; // TODO: point this at your actual hero background image
+import AboutClaro from '../components/AboutClaro';
+import HowClaroWorks from '../components/HowClaroWorks';
 import './Pages.css';
 
 // TODO: update this to wherever the APK is actually hosted (Firebase Hosting,
 // your own server, etc). Use the arm64-v8a build — it covers the vast
 // majority of modern Android phones.
-   const APK_DOWNLOAD_URL = '/downloads/claro-app-release.apk';
+   const APK_DOWNLOAD_URL = '';
 
 export default function Home() {
   const [isAndroid, setIsAndroid] = useState(false);
@@ -29,9 +34,17 @@ export default function Home() {
   return (
     <div className="home-page">
       {/* Hero Section */}
-      <section className="hero-section">
+      <section className="hero-section" style={{ backgroundImage: `url(${heroBgImg})` }}>
         <div className="container hero-grid">
           <div className="hero-content">
+            <div className="hero-logo-launch">
+              <div className="logo-border-container">
+                <img src={logoBorder} alt="CLARO Logo Border" className="logo-border" />
+              </div>
+              <div className="logo-can-container">
+                <img src={logoCan} alt="CLARO Logo Can" className="logo-can" />
+              </div>
+            </div>
             <h1 className="hero-title">
               <span className="hero-title-accent">CLARO</span>
             </h1>
@@ -48,13 +61,8 @@ export default function Home() {
                 aria-label={isAndroid ? 'Install CLARO App' : 'Available on Android devices only'}
               >
                 <Download size={18} />
-                <span>{isAndroid ? 'Install CLARO App' : 'Available on Android only'}</span>
+                <span>{isAndroid ? 'Install CLARO App' : 'Android compatible only'}</span>
               </button>
-              {!isAndroid && (
-                <p className="hero-download-note">
-                  Open this page on an Android phone to download the app.
-                </p>
-              )}
             </div>
           </div>
 
@@ -67,16 +75,10 @@ export default function Home() {
       </section>
 
       {/* About CLARO Section */}
-      <section className="page-section">
-        <div className="container">
-          <div className="cta-banner">
-            <h2 className="section-title">About CLARO</h2>
-            <p className="section-subtitle">
-              CLARO is an AI-powered mobile app that helps grocery shoppers understand nutrition information for local canned foods. By scanning a product, users see simplified nutrition summaries, health advisories, allergen warnings, product comparisons, and accessibility features such as voice assistance to make smarter and healthier buying decisions.
-            </p>
-          </div>
-        </div>
-      </section>
+      <AboutClaro />
+
+      {/* How CLARO Works Section */}
+      <HowClaroWorks />
 
       {/* Features Overview Section */}
       <section className="page-section">
@@ -95,7 +97,7 @@ export default function Home() {
               </div>
               <h3 className="feature-title">AI Food Recognition</h3>
               <p>
-                Identifies local canned food and instant noodle products using a trained YOLOv8 image scanning model with auto-detection and capture.
+                Identifies local canned food and instant noodle products using a trained YOLOv8 image scanning model.
               </p>
             </div>
 
@@ -125,7 +127,7 @@ export default function Home() {
               </div>
               <h3 className="feature-title">Health Profile & Advisory</h3>
               <p>
-                Provides a health advisory based on conditions such as hypertension, diabetes, heart disease, and food allergies, using Food and Drug Association (FDA) nutrition label reading guidance, and Word Health Organization (WHO) daily nutrition intake guidance.
+                Provides a health advisory based on common conditions such as hypertension, diabetes, heart disease, GERD, Chronic kidney disease, and food allergies, using Food and Drug Association (FDA) nutrition label reading guidance, and Word Health Organization (WHO) daily nutrition intake guidance.
               </p>
             </div>
 
@@ -135,7 +137,7 @@ export default function Home() {
               </div>
               <h3 className="feature-title">Product Comparison & Ranking</h3>
               <p>
-                Compares and ranks up to five products based on their suitability to the user’s health profile, recommending the best choice for your health condition.
+                Compares and ranks up to multiple products based on their suitability to your health profile, recommending the best choice for your health condition.
               </p>
             </div>
 
@@ -145,48 +147,7 @@ export default function Home() {
               </div>
               <h3 className="feature-title">Voice Assistance</h3>
               <p>
-                Offers hands-free navigation, and screen reading for accessibility through voice commands, supporting English and Tagalog Language.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How CLARO Works Section */}
-      <section className="page-section" style={{ backgroundColor: 'var(--card-bg-alt)' }}>
-        <div className="container">
-          <div className="section-header">
-            <h2 className="section-title">How CLARO Works</h2>
-          </div>
-
-          <div className="workflow-grid">
-            <div className="card step-card">
-              <span className="step-number">01</span>
-              <h3>Point and Capture</h3>
-              <p>
-                Aim the camera at a Philippine brand canned food or instant noodles. The app auto-detects the object and captures when the product is properly framed.
-              </p>
-            </div>
-
-            <div className="card step-card">
-              <span className="step-number">02</span>
-              <h3>Receive Analysis</h3>
-              <p style={{ marginBottom: '0.5rem' }}>
-                once the product has been recognized, you may instantly view:
-              </p>
-              <ul className="step-details-list">
-                <li>Product's Information and FDA Registration number and its expiry date</li>
-                <li>Complete ingredients and Nutrition Facts</li>
-                <li>Nutri-Score and NOVA Classification</li>
-                <li>Health Advisory</li>
-              </ul>
-            </div>
-
-            <div className="card step-card">
-              <span className="step-number">03</span>
-              <h3>Compare Products</h3>
-              <p>
-                scan multiple products or tap the compare button to view ranked list and recommendation
+                Offers hands-free navigation through voice commands supporting English and Tagalog languge, read-aloud, text size adjustment, color theme, and haptic feedback features to support accessibility.
               </p>
             </div>
           </div>

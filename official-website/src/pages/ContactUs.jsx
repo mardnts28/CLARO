@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import emailjs from '@emailjs/browser';
 import { User, Send, Mail } from 'lucide-react';
-import ImageCarousel from '../components/ImageCarousel';
 import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, CONTACT_RECIPIENT_EMAIL } from '../config/emailConfig';
 import './Pages.css';
 
@@ -207,13 +206,6 @@ export default function ContactUs() {
           ))}
         </div>
 
-        {/* Journey Section */}
-        <div className="section-header" style={{ marginTop: '4rem' }}>
-          <h2 className="section-title">Journey</h2>
-        </div>
-
-        {/* Auto-scrolling image header banner */}
-        <ImageCarousel />
       </div>
     </div>
   );

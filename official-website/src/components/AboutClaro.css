@@ -1,0 +1,51 @@
+/* About CLARO - standalone centered section */
+
+.about-claro-section.page-section {
+  padding: 4rem 0 3rem;
+}
+
+.about-claro-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.about-claro-title {
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.about-claro-text {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  line-height: 1.8;
+  max-width: 60ch;
+  margin: 0 auto;
+}
+
+/* Responsive: tablet */
+@media (max-width: 1024px) {
+  .about-claro-section.page-section {
+    padding: 3rem 0 2.5rem;
+  }
+
+  .about-claro-text {
+    font-size: 1.05rem;
+    max-width: 55ch;
+  }
+}
+
+/* Responsive: mobile */
+@media (max-width: 640px) {
+  .about-claro-section.page-section {
+    padding: 2.5rem 0 2rem;
+  }
+
+  .about-claro-text {
+    font-size: 1rem;
+    max-width: 50ch;
+  }
+}
