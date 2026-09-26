@@ -13,7 +13,7 @@ import './Pages.css';
 // TODO: update this to wherever the APK is actually hosted (Firebase Hosting,
 // your own server, etc). Use the arm64-v8a build — it covers the vast
 // majority of modern Android phones.
-   const APK_DOWNLOAD_URL = '';
+   const APK_DOWNLOAD_URL = 'https://github.com/mardnts28/CLARO/releases/download/v1.0.0/app-release.apk';
 
 export default function Home() {
   const [isAndroid, setIsAndroid] = useState(false);

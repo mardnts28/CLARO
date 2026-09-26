@@ -251,8 +251,8 @@ service cloud.firestore {
                           || (isThisUser() && isLinkedMember() 
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'displayName'])));
         
-        // Allow delete: owner can delete managed members
-        allow delete: if request.auth != null && isGroupOwner();
+        // Allow delete: owner can delete any member, or linked members can delete their own record (to leave group)
+        allow delete: if request.auth != null && (isGroupOwner() || (isThisUser() && resource.data.sourceType == 'linked'));
       }
       
       // ─── Group Invites ───────────────────────────────────────
