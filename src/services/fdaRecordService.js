@@ -25,6 +25,7 @@ const CLOUDINARY_CLOUD_NAME = sanitizeEnvValue(import.meta.env.VITE_CLOUDINARY_C
 const CLOUDINARY_UPLOAD_PRESET = sanitizeEnvValue(import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
 const GEMINI_PROXY_URL = sanitizeEnvValue(import.meta.env.VITE_GEMINI_PROXY_URL);
 const APP_SHARED_SECRET = sanitizeEnvValue(import.meta.env.VITE_APP_SHARED_SECRET);
+const GEMINI_API_KEY = sanitizeEnvValue(import.meta.env.VITE_GEMINI_API_KEY);
 const GEMINI_MODEL = sanitizeEnvValue(import.meta.env.VITE_GEMINI_MODEL, "gemini-3.5-flash");
 
 export const MAX_FDA_SCREENSHOT_SIZE_MB = 10;
@@ -103,9 +104,12 @@ async function urlToBase64(url) {
 // }
 // ---------------------------------------------------------------------------
 export async function extractFdaDataWithGemini(imageFile, targetProduct = null) {
-  if (!GEMINI_PROXY_URL || !APP_SHARED_SECRET) {
+  const hasProxy = Boolean(GEMINI_PROXY_URL && APP_SHARED_SECRET);
+  const hasDirectKey = Boolean(GEMINI_API_KEY);
+
+  if (!hasProxy && !hasDirectKey) {
     throw new Error(
-      "Gemini proxy is not configured. Please set VITE_GEMINI_PROXY_URL and VITE_APP_SHARED_SECRET in your environment variables, or enter CPR details manually."
+      "Gemini is not configured. Please set VITE_GEMINI_PROXY_URL and VITE_APP_SHARED_SECRET, or VITE_GEMINI_API_KEY in your environment variables, or enter CPR details manually."
     );
   }
 
@@ -183,41 +187,81 @@ Return ONLY the JSON object. Do not include markdown code block backticks or exp
     },
   };
 
-  const res = await fetch(
-    GEMINI_PROXY_URL,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-App-Secret": APP_SHARED_SECRET,
-      },
-      body: JSON.stringify({
-        model: GEMINI_MODEL,
-        ...body,
-      }),
+  let data = null;
+
+  // 1. Try Cloudflare Worker proxy first if configured
+  if (hasProxy) {
+    try {
+      const res = await fetch(GEMINI_PROXY_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-App-Secret": APP_SHARED_SECRET,
+        },
+        body: JSON.stringify({
+          model: GEMINI_MODEL,
+          ...body,
+        }),
+      });
+
+      if (res.ok) {
+        data = await res.json();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        const errorMsg = err.error?.message || err.error || "";
+        if (!hasDirectKey) {
+          if (res.status === 401 || res.status === 403) {
+            throw new Error(`Gemini proxy authentication failed: ${errorMsg || "Please verify your VITE_APP_SHARED_SECRET in .env."}`);
+          }
+          throw new Error(errorMsg || `Gemini proxy request failed with status ${res.status}.`);
+        }
+        console.warn("[fdaRecordService] Proxy returned error, attempting direct API fallback:", errorMsg || res.status);
+      }
+    } catch (proxyErr) {
+      if (!hasDirectKey) throw proxyErr;
+      console.warn("[fdaRecordService] Proxy network error, attempting direct API fallback:", proxyErr);
     }
-  );
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const errorMsg = err.error?.message || "";
-
-    if (res.status === 401 || res.status === 403) {
-      throw new Error(
-        `Gemini proxy authentication failed: ${errorMsg || "Please verify your VITE_GEMINI_PROXY_URL and VITE_APP_SHARED_SECRET in .env, or use manual entry below."}`
-      );
-    }
-
-    if (res.status === 429 || res.status === 503) {
-      throw new Error(
-        `Gemini service is temporarily busy (${res.status}): ${errorMsg || "Please wait a moment and try again, or enter CPR details manually."}`
-      );
-    }
-
-    throw new Error(errorMsg || "Gemini proxy request failed. Please try again or enter details manually.");
   }
 
-  const data = await res.json();
+  // 2. Direct Gemini API fallback (used if proxy is unconfigured or failed with region error)
+  if (!data && hasDirectKey) {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const errorMsg = err.error?.message || "";
+
+      if (res.status === 400 || res.status === 403) {
+        if (/location|region|country|unsupported/i.test(errorMsg)) {
+          throw new Error(
+            `Gemini is not supported in your location/network (${errorMsg}). Please use the Cloudflare Worker proxy or a VPN.`
+          );
+        }
+        throw new Error(
+          `Gemini API authentication failed: ${errorMsg || "Please verify your VITE_GEMINI_API_KEY in .env, or use manual entry below."}`
+        );
+      }
+
+      if (res.status === 429 || res.status === 503) {
+        throw new Error(
+          `Gemini service is temporarily busy (${res.status}): ${errorMsg || "Please wait a moment and try again, or enter CPR details manually."}`
+        );
+      }
+
+      throw new Error(errorMsg || "Gemini OCR request failed. Please try again or enter details manually.");
+    }
+
+    data = await res.json();
+  }
+
+
   const parts = data?.candidates?.[0]?.content?.parts || [];
   // In Gemini 3.5 Flash, parts[0] may contain the internal reasoning ({ thought: true }).
   // Extract the actual final output part.
@@ -448,9 +492,12 @@ export function getCprExpirationSummary(products = [], daysThreshold = 60) {
 // Retry OCR extraction for a report using its image URLs
 // ---------------------------------------------------------------------------
 export async function retryReportExtraction(reportId, frontImageUrl, backImageUrl, additionalBackImageUrls = []) {
-  if (!GEMINI_PROXY_URL || !APP_SHARED_SECRET) {
+  const hasProxy = Boolean(GEMINI_PROXY_URL && APP_SHARED_SECRET);
+  const hasDirectKey = Boolean(GEMINI_API_KEY);
+
+  if (!hasProxy && !hasDirectKey) {
     throw new Error(
-      "Gemini proxy is not configured. Please set VITE_GEMINI_PROXY_URL and VITE_APP_SHARED_SECRET in your environment variables."
+      "Gemini is not configured. Please set VITE_GEMINI_PROXY_URL and VITE_APP_SHARED_SECRET, or VITE_GEMINI_API_KEY in your environment variables."
     );
   }
 
@@ -555,22 +602,58 @@ Rules:
       },
     };
 
-    // Call Cloudflare worker
-    const res = await fetch(GEMINI_PROXY_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-App-Secret": APP_SHARED_SECRET,
-      },
-      body: JSON.stringify(body),
-    });
+    let data = null;
 
-    if (!res.ok) {
-      const errorMsg = await res.text();
-      throw new Error(`Gemini proxy request failed: ${errorMsg}`);
+    // 1. Call Cloudflare worker proxy first if configured
+    if (hasProxy) {
+      try {
+        const res = await fetch(GEMINI_PROXY_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-App-Secret": APP_SHARED_SECRET,
+          },
+          body: JSON.stringify(body),
+        });
+
+        if (res.ok) {
+          data = await res.json();
+        } else {
+          const errorMsg = await res.text();
+          if (!hasDirectKey) {
+            throw new Error(`Gemini proxy request failed: ${errorMsg}`);
+          }
+          console.warn("[fdaRecordService] Proxy returned error, attempting direct API fallback:", errorMsg);
+        }
+      } catch (proxyErr) {
+        if (!hasDirectKey) throw proxyErr;
+        console.warn("[fdaRecordService] Proxy network error, attempting direct API fallback:", proxyErr);
+      }
     }
 
-    const data = await res.json();
+    // 2. Direct Gemini API fallback
+    if (!data && hasDirectKey) {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: body.contents,
+            generationConfig: body.generationConfig,
+          }),
+        }
+      );
+
+      if (!res.ok) {
+        const errorMsg = await res.text();
+        throw new Error(`Gemini direct API request failed: ${errorMsg}`);
+      }
+
+      data = await res.json();
+    }
+
+
     const candidates = data?.candidates;
     const content = candidates?.[0]?.content;
     const resultParts = content?.parts;
