@@ -3,8 +3,7 @@ import { Download, Scan, FileText, ShieldCheck, HeartPulse, GitCompare, Mic } fr
 import logoImg from '../assets/images/logoII.png';
 import logoBorder from '../assets/images/logo-border.png';
 import logoCan from '../assets/images/logo-can.png';
-import appPreviewImg1 from '../assets/images/preview1.png';
-import appPreviewImg2 from '../assets/images/preview2.png';
+import appPreviewVideo from '../assets/images/appPreview.webm';
 import heroBgImg from '../assets/images/hero-bg.jpg'; // TODO: point this at your actual hero background image
 import AboutClaro from '../components/AboutClaro';
 import HowClaroWorks from '../components/HowClaroWorks';
@@ -66,10 +65,19 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Hero Visual - App Preview Image */}
+         {/* Hero Visual - App Preview Video */}
           <div className="hero-visual">
-            <img src={appPreviewImg1} alt="CLARO App Preview" className="app-preview-image" />
-            <img src={appPreviewImg2} alt="CLARO App Preview" className="app-preview-image" />
+            <video
+              className="app-preview-video"
+              src={appPreviewVideo}
+              autoPlay
+              loop
+              muted
+              playsInline
+              preload="auto"
+              disablePictureInPicture
+              aria-label="CLARO app preview showing the app being used on a smartphone"
+            />
           </div>
         </div>
       </section>

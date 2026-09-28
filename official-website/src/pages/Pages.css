@@ -41,11 +41,6 @@
   z-index: 0;
 }
 
-.hero-section .hero-grid {
-  position: relative;
-  z-index: 2;
-}
-
 .hero-section::after {
   content: '';
   position: absolute;
@@ -187,7 +182,7 @@
   .logo-can {
     animation: none;
   }
-  
+
   .logo-can {
     opacity: 1;
     filter: blur(0);
@@ -253,19 +248,61 @@
   gap: 0.4rem;
 }
 
-/* Hero Visual */
-.hero-visual {
-  position: relative;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+/* Hero Visual (video)
+   One placement for every screen size: bottom-right corner of the hero, flush with
+   the screen's right edge and the hero's bottom edge.
+   - .hero-grid is made static so `right: 0` is measured from the full-width
+     .hero-section instead of the 85%-wide container.
+   - .hero-content is lifted above the dark overlay in place of .hero-grid's z-index.
+   - Below 993px the video sits under the text, so the hero reserves that space
+     with padding-bottom (--hero-video-size). */
+.hero-section {
+  --hero-video-size: clamp(240px, 62vw, 420px); /* tablet / mobile video size */
+  padding-bottom: var(--hero-video-size);
 }
 
-.app-preview-image {
+.hero-section .hero-grid {
+  position: static;
+}
+
+.hero-section .hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+.hero-visual {
+  position: absolute;
+  right: 10%;
+  bottom: 0;
+  z-index: 2;
+  width: var(--hero-video-size);
+  height: var(--hero-video-size);
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.app-preview-video {
+  display: block;
   width: 100%;
-  max-width: 440px;
-  height: 60%;
+  height: auto;
   object-fit: contain;
+  background: transparent;
+  pointer-events: none; /* prevents accidental interaction / context-menu controls on touch */
+}
+
+/* Desktop: video is as tall as the hero, next to the text */
+@media (min-width: 993px) {
+  .hero-section {
+    padding-bottom: 5rem;
+  }
+
+  .hero-visual {
+    width: auto;
+    height: 100%;           /* video height = hero background height; change to resize */
+    max-width: 46vw;        /* keeps it off the text on narrow desktops */
+    aspect-ratio: 1 / 1;
+  }
 }
 
 /* Grid Sections (Features / Guides) */

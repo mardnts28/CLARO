@@ -13,7 +13,7 @@ export default function ContactUs() {
       name: 'Mary Faith Ardientes',
       email: 'maryfaithardientes13@gmail.com',
       role: 'Project Manager & Machine Learning Engineer',
-      image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1786704181/ardientes_wrfpjz.jpg',
+      image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1790561727/mary_ayycpy.png',
       icon: <User size={36} />,
       bio: 'Lead project manager overseeing strategic execution, team coordination, system requirements, and capstone milestone deliverables. Also, Machine Learning Engineer responsible for model training, validation, evaluation, and integration.',
       socials: {
@@ -27,7 +27,7 @@ export default function ContactUs() {
       name: 'Jay Bhie Bite',
       email: 'bitejb6@gmail.com',
       role: 'UI/UX Designer & Developer',
-      image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1786704181/bite_vbnfzg.jpg',
+      image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1790561724/jb_byissn.jpg',
       bio: 'UI/UX Designer focusing on user research, wireframing, interface design, and a consistent mobile/web experience. Also responsible for accessibility features for low-vision users, including light/dark themes, adjustable text size and speech volume, and English and Tagalog language support',
       socials: {
         facebook: 'https://www.facebook.com/share/1HWeEZRHYK/',
@@ -40,7 +40,7 @@ export default function ContactUs() {
       name: 'Rochelle Ann C. Salucop',
       email: 'poculas.nna@gmail.com',
       role: 'Backend Developer & Quality Tester',
-      image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1786704183/salucop_mvd2zk.jpg',
+      image: 'https://res.cloudinary.com/dn64fatsy/image/upload/v1790561725/salucop_rsea1u.jpg',
       bio: 'Backend Developer responsible for developing and maintaining the application\'s backend services, database operations, nutrition data integration, server-side processing, and conducting quality testing to identify and resolve system issues',
       socials: {
         facebook: 'https://www.facebook.com/share/1b3eKUXKbK/',
