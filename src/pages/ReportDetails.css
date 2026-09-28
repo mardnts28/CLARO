@@ -340,13 +340,68 @@
   border-top: 1px solid #efe6e4;
 }
 
+.extraction-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
 .extraction-section-title {
-  margin: 0 0 3px;
+  margin: 0;
 
   font-size: 16px;
   font-weight: 800;
 
   color: #1a1a1a;
+}
+
+.retry-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 6px 12px;
+
+  border-radius: 6px;
+
+  border: 1px solid #8b1e24;
+
+  background: #ffffff;
+
+  color: #8b1e24;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition: all 0.2s ease;
+}
+
+.retry-btn:hover:not(:disabled) {
+  background: #8b1e24;
+
+  color: #ffffff;
+}
+
+.retry-btn:disabled {
+  opacity: 0.5;
+
+  cursor: not-allowed;
+}
+
+.retry-btn .spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .extraction-pending-note,

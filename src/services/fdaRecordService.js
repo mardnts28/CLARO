@@ -23,7 +23,8 @@ function sanitizeEnvValue(val, fallback = "") {
 
 const CLOUDINARY_CLOUD_NAME = sanitizeEnvValue(import.meta.env.VITE_CLOUDINARY_CLOUD_NAME);
 const CLOUDINARY_UPLOAD_PRESET = sanitizeEnvValue(import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET);
-const GEMINI_API_KEY = sanitizeEnvValue(import.meta.env.VITE_GEMINI_API_KEY);
+const GEMINI_PROXY_URL = sanitizeEnvValue(import.meta.env.VITE_GEMINI_PROXY_URL);
+const APP_SHARED_SECRET = sanitizeEnvValue(import.meta.env.VITE_APP_SHARED_SECRET);
 const GEMINI_MODEL = sanitizeEnvValue(import.meta.env.VITE_GEMINI_MODEL, "gemini-3.5-flash");
 
 export const MAX_FDA_SCREENSHOT_SIZE_MB = 10;
@@ -75,6 +76,20 @@ function fileToBase64(file) {
 }
 
 // ---------------------------------------------------------------------------
+// Download image from URL and convert to base64
+// ---------------------------------------------------------------------------
+async function urlToBase64(url) {
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return await fileToBase64(blob);
+  } catch (error) {
+    console.error("Failed to download image:", error);
+    throw new Error("Failed to download image for extraction");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Use Gemini Vision to extract CPR number, validity date, and verify alignment
 // with the selected target product from an FDA Philippine Verification Portal screenshot.
 //
@@ -88,9 +103,9 @@ function fileToBase64(file) {
 // }
 // ---------------------------------------------------------------------------
 export async function extractFdaDataWithGemini(imageFile, targetProduct = null) {
-  if (!GEMINI_API_KEY) {
+  if (!GEMINI_PROXY_URL || !APP_SHARED_SECRET) {
     throw new Error(
-      "Gemini API key is not configured. Please set VITE_GEMINI_API_KEY in your environment variables, or enter CPR details manually."
+      "Gemini proxy is not configured. Please set VITE_GEMINI_PROXY_URL and VITE_APP_SHARED_SECRET in your environment variables, or enter CPR details manually."
     );
   }
 
@@ -169,13 +184,17 @@ Return ONLY the JSON object. Do not include markdown code block backticks or exp
   };
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`,
+    GEMINI_PROXY_URL,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "X-App-Secret": APP_SHARED_SECRET,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        model: GEMINI_MODEL,
+        ...body,
+      }),
     }
   );
 
@@ -185,7 +204,7 @@ Return ONLY the JSON object. Do not include markdown code block backticks or exp
 
     if (res.status === 401 || res.status === 403) {
       throw new Error(
-        `Gemini API authentication failed: ${errorMsg || "Please verify your VITE_GEMINI_API_KEY in .env, or use manual entry below."}`
+        `Gemini proxy authentication failed: ${errorMsg || "Please verify your VITE_GEMINI_PROXY_URL and VITE_APP_SHARED_SECRET in .env, or use manual entry below."}`
       );
     }
 
@@ -195,7 +214,7 @@ Return ONLY the JSON object. Do not include markdown code block backticks or exp
       );
     }
 
-    throw new Error(errorMsg || "Gemini OCR request failed. Please try again or enter details manually.");
+    throw new Error(errorMsg || "Gemini proxy request failed. Please try again or enter details manually.");
   }
 
   const data = await res.json();
@@ -423,4 +442,175 @@ export function getCprExpirationSummary(products = [], daysThreshold = 60) {
     attentionCount: attentionList.length,
     hasAttentionNeeded: attentionList.length > 0,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Retry OCR extraction for a report using its image URLs
+// ---------------------------------------------------------------------------
+export async function retryReportExtraction(reportId, frontImageUrl, backImageUrl, additionalBackImageUrls = []) {
+  if (!GEMINI_PROXY_URL || !APP_SHARED_SECRET) {
+    throw new Error(
+      "Gemini proxy is not configured. Please set VITE_GEMINI_PROXY_URL and VITE_APP_SHARED_SECRET in your environment variables."
+    );
+  }
+
+  try {
+    // Download images and convert to base64
+    let frontBytes = "";
+    let backBytes = "";
+    let additionalBackBytesList = [];
+
+    if (frontImageUrl) {
+      frontBytes = await urlToBase64(frontImageUrl);
+    }
+
+    if (backImageUrl) {
+      backBytes = await urlToBase64(backImageUrl);
+    }
+
+    for (const url of additionalBackImageUrls) {
+      if (url) {
+        const bytes = await urlToBase64(url);
+        additionalBackBytesList.push(bytes);
+      }
+    }
+
+    // Build prompt for product extraction
+    const prompt = `You are reading two photos of a packaged food product sold in the Philippines: the FRONT of the package (first image) and the BACK/nutrition label (second image). Extract the following as strict JSON -- no markdown fences, no commentary, just the JSON object.
+
+Return exactly this shape:
+{
+  "brand": "",
+  "product_name": "",
+  "size": "",
+  "serving_size": "",
+  "ingredients": [],
+  "nutrition_per_100g": {
+    "energy_kcal": null,
+    "protein_g": null,
+    "carbs_g": null,
+    "fat_total_g": null,
+    "fat_saturated_g": null,
+    "fat_trans_g": null,
+    "sodium_mg": null,
+    "potassium_mg": null,
+    "calcium_mg": null,
+    "iron_mg": null,
+    "fiber_g": null,
+    "sugars_g": null,
+    "added_sugars_g": null
+  },
+  "allergens": [],
+  "confidence_notes": ""
+}
+
+Rules:
+- "ingredients": split the ingredients list into individual items, in the order printed on the package. Keep each item as printed (don't translate).
+- "nutrition_per_100g": read values as printed. If the label states values per serving rather than per 100g, convert using the stated serving size. If a field is genuinely not visible/printed, use null -- do NOT guess or estimate a plausible-looking number.
+- "allergens": only choose from: Milk, Eggs, Fish, Shellfish, Tree Nuts, Peanuts, Wheat, Soy, Sesame based on TWO sources only: 1) The actual ingredients list, and 2) "May contain" or "May contain traces of" statements. DO NOT include allergens from facility warnings. If the label mentions an allergen-relevant ingredient not on this list, note it in "confidence_notes" instead.
+- "confidence_notes": briefly flag anything unclear, blurry, or ambiguous in either photo that a human reviewer should double-check against the actual package. Leave empty if nothing stood out.
+- If the back label is missing, blurry, or unreadable, still fill in what the front photo gives you (brand, product_name, size), leave nutrition/ingredients/allergens empty, and say so in "confidence_notes".`;
+
+    // Build request body
+    const parts = [{ text: prompt }];
+
+    if (frontBytes) {
+      parts.push({
+        inline_data: {
+          mime_type: "image/jpeg",
+          data: frontBytes,
+        },
+      });
+    }
+
+    if (backBytes) {
+      parts.push({
+        inline_data: {
+          mime_type: "image/jpeg",
+          data: backBytes,
+        },
+      });
+    }
+
+    for (const extraBytes of additionalBackBytesList) {
+      if (extraBytes) {
+        parts.push({
+          inline_data: {
+            mime_type: "image/jpeg",
+            data: extraBytes,
+          },
+        });
+      }
+    }
+
+    const body = {
+      model: GEMINI_MODEL,
+      contents: [
+        { parts: parts },
+      ],
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+      },
+    };
+
+    // Call Cloudflare worker
+    const res = await fetch(GEMINI_PROXY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-App-Secret": APP_SHARED_SECRET,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errorMsg = await res.text();
+      throw new Error(`Gemini proxy request failed: ${errorMsg}`);
+    }
+
+    const data = await res.json();
+    const candidates = data?.candidates;
+    const content = candidates?.[0]?.content;
+    const resultParts = content?.parts;
+    const text = resultParts?.[0]?.text;
+
+    if (!text) {
+      throw new Error("No response text from Gemini");
+    }
+
+    // Parse the JSON response
+    const cleaned = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    let parsed;
+    try {
+      parsed = JSON.parse(cleaned);
+    } catch (e) {
+      throw new Error("Failed to parse Gemini response as JSON");
+    }
+
+    // Convert to the expected format for Firestore
+    const extractedData = {
+      brand: parsed.brand || "",
+      productName: parsed.product_name || "",
+      size: parsed.size || "",
+      servingSize: parsed.serving_size || "",
+      ingredients: parsed.ingredients || [],
+      allergens: parsed.allergens || [],
+      nutrition: parsed.nutrition_per_100g || {},
+      hasNutritionData: Object.keys(parsed.nutrition_per_100g || {}).length > 0,
+      confidenceNotes: parsed.confidence_notes || "",
+    };
+
+    // Update the report in Firestore
+    const reportRef = doc(db, "reports", reportId);
+    await updateDoc(reportRef, {
+      extractedData: extractedData,
+    });
+
+    return extractedData;
+  } catch (error) {
+    console.error("Retry extraction error:", error);
+    throw error;
+  }
 }

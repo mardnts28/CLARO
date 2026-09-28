@@ -14,11 +14,11 @@ import {
   rejectReport,
 } from "../services/reportService";
 
-import { uploadFdaScreenshot } from "../services/fdaRecordService";
+import { uploadFdaScreenshot, retryReportExtraction } from "../services/fdaRecordService";
 
 import { CANONICAL_ALLERGENS } from "../constants/canonicalAllergens";
 
-import { FiArrowLeft } from "react-icons/fi";
+import { FiArrowLeft, FiRefreshCw } from "react-icons/fi";
 
 import { doc, getDoc } from "firebase/firestore";
 
@@ -130,6 +130,7 @@ export default function ReportDetails() {
   const [actionLoading, setActionLoading] = useState(false);
   const [lightbox, setLightbox] = useState(null);
   const [reporterName, setReporterName] = useState("");
+  const [retryLoading, setRetryLoading] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -302,6 +303,32 @@ export default function ReportDetails() {
       setModalType(null);
     } finally {
       setActionLoading(false);
+    }
+  }
+
+  async function handleRetryExtraction() {
+    setRetryLoading(true);
+    setError("");
+
+    try {
+      const extractedData = await retryReportExtraction(
+        id,
+        report.frontImageUrl,
+        report.backImageUrl,
+        report.additionalBackImageUrls || []
+      );
+
+      // Update the report and form with new extraction data
+      setReport((prev) => ({
+        ...prev,
+        extractedData: extractedData,
+      }));
+
+      setForm(buildFormState(extractedData, report.category));
+    } catch (err) {
+      setError(err.message || "Failed to retry extraction. Please try again.");
+    } finally {
+      setRetryLoading(false);
     }
   }
 
@@ -485,9 +512,21 @@ export default function ReportDetails() {
         {/* EXTRACTION SECTION */}
         <div className="extraction-section">
 
-          <h3 className="extraction-section-title">
-            Extracted Product Data
-          </h3>
+          <div className="extraction-section-header">
+            <h3 className="extraction-section-title">
+              Extracted Product Data
+            </h3>
+
+            <button
+              className="retry-btn"
+              onClick={handleRetryExtraction}
+              disabled={retryLoading || isResolved}
+              title="Retry OCR extraction"
+            >
+              <FiRefreshCw className={retryLoading ? "spinning" : ""} />
+              {retryLoading ? "Retrying..." : "Retry"}
+            </button>
+          </div>
 
           {!hasExtraction && (
             <p className="extraction-pending-note">
