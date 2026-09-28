@@ -211,54 +211,28 @@ class FallbackAdvisoryGenerator {
       return _kidneyAdvisory(evaluation, kidneyFacts, isTagalog);
     }
 
-    // IMPORTANT: this check must come AFTER `flagged` is computed, and
-    // must only fire when there is no flagged *nutrient* to report.
-    // `evaluation.scoredFactors` is populated for every scored condition
-    // (e.g. plain hypertension contributes a 'sodiumMg' scored factor),
-    // not just the GERD/Kidney awareness-only factors it was originally
-    // written for -- so `scoredFactors.isNotEmpty` is true for almost
-    // every user with any condition on file. Checking it BEFORE `flagged`
-    // (as this used to) meant the proper amount/impact/serving 3-sentence
-    // advisory below was skipped in favor of this generic factor-by-factor
-    // dump for nearly all single (non-group) users, even when a specific
-    // nutrient really was flagged for their condition. Awareness-only
-    // factors that have no nutrient-evaluation counterpart (GERD triggers,
-    // GERD total fat) are surfaced by the GERD warning card elsewhere in the
-    // UI (kidney phosphate additives are handled by the kidney branch
-    // above), so this fallback text is only needed when nothing else is
-    // available to say.
-    if (flagged.isEmpty && evaluation.scoredFactors.isNotEmpty) {
-      final factorText = evaluation.scoredFactors
-          .map((factor) {
-            final label = _factorLabel(factor.factorKey, isTagalog);
-            if (factor.isUnknown) {
-              return isTagalog
-                  ? '$label: kulang ang impormasyon para matukoy ito.'
-                  : '$label: not enough information to determine this.';
-            }
-            return '$label: ${factor.explanation}';
-          })
-          .join(' ');
-      return HealthAdvisory(
-        overallLevel: evaluation.overallLevel,
-        warningText: isTagalog
-            ? 'Suriin ang mga health factor'
-            : 'Review health factors',
-        explanation: factorText,
-        safeServingSize: null,
-        source: AdvisorySource.fallbackRuleBased,
-        generatedAt: DateTime.now(),
-      );
-    }
-
     if (flagged.isEmpty) {
+      // Calculate suggested serving size even for suitable products
+      final servingSizeG =
+          servingSizeGOverride ?? evaluation.product.servingSizeG;
+      final safeServing = ServingSizeCalculator.calculateCombinedNutrients(
+        nutritionPer100g: evaluation.product.nutritionPer100g,
+        servingSizeG: servingSizeG,
+      );
+      
+      print('Suitable product serving calculation: servingSizeG=$servingSizeG, safeServing=$safeServing');
+      
+      // If no restrictions needed, provide default serving suggestion
+      final servingSuggestion = safeServing ?? 
+        'Up to 1 full serving (${servingSizeG.toStringAsFixed(0)}g) is the suggested amount per meal';
+      
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.suitable,
         warningText: isTagalog ? 'Angkop' : 'Suitable',
         explanation: isTagalog
             ? 'Ang mga nutrients na sinuri namin para sa iyong kundisyon ay pasok sa inirerekomendang limitasyon.'
             : 'The nutrients we checked for your condition(s) are within the recommended range for this product.',
-        safeServingSize: null,
+        safeServingSize: servingSuggestion,
         source: AdvisorySource.fallbackRuleBased,
         generatedAt: DateTime.now(),
       );

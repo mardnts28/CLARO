@@ -142,6 +142,7 @@ class GeminiAdvisoryService {
     if (evaluation.overallLevel == AdvisoryLevel.suitable &&
         !evaluation.allergenAssessment.hasDirectAllergen &&
         !isComparison) {
+      print('Using fallback for suitable product: overallLevel=${evaluation.overallLevel}, hasAllergen=${evaluation.allergenAssessment.hasDirectAllergen}, isComparison=$isComparison');
       // Use combined nutrient calculation for users without health conditions
       final useCombinedNutrients = user.conditions.isEmpty;
       final hasNoConditionsAndNoAllergens = user.conditions.isEmpty;
@@ -157,6 +158,7 @@ class GeminiAdvisoryService {
       return advisory;
     }
 
+    print('Calling Gemini for advisory: overallLevel=${evaluation.overallLevel}, hasAllergen=${evaluation.allergenAssessment.hasDirectAllergen}, isComparison=$isComparison, userConditions=${user.conditions.length}');
     final prompt = AdvisoryPromptBuilder.build(
       evaluation: evaluation,
       user: user,
