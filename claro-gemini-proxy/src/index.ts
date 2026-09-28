@@ -14,11 +14,24 @@ export interface Env {
   EMAILJS_PASSWORD_RESET_TEMPLATE_ID: string;
 }
 
+function addCorsHeaders(response: Response): Response {
+  const newResponse = new Response(response.body, response);
+  newResponse.headers.set("Access-Control-Allow-Origin", "*");
+  newResponse.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  newResponse.headers.set("Access-Control-Allow-Headers", "Content-Type, X-App-Secret");
+  return newResponse;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    // Handle CORS preflight requests
+    if (request.method === "OPTIONS") {
+      return addCorsHeaders(new Response(null, { status: 204 }));
+    }
+
     // Only allow POST requests
     if (request.method !== "POST") {
-      return new Response("Method not allowed", { status: 405 });
+      return addCorsHeaders(new Response("Method not allowed", { status: 405 }));
     }
 
     // Shared secret header from the app -- so randoms on the internet
@@ -27,19 +40,26 @@ export default {
     // app build", not which route it's for.
     const appSecret = request.headers.get("X-App-Secret");
     if (appSecret !== env.APP_SHARED_SECRET) {
-      return new Response("Unauthorized", { status: 401 });
+      return addCorsHeaders(new Response("Unauthorized", { status: 401 }));
     }
 
     const url = new URL(request.url);
+    let response: Response;
     if (url.pathname === "/email") {
-      return handleEmail(request, env);
+      response = await handleEmail(request, env);
+    } else if (url.pathname === "/password-reset/request") {
+      response = await handlePasswordResetRequest(request, env);
+    } else if (url.pathname === "/password-reset/verify") {
+      response = await handlePasswordResetVerify(request, env);
+    } else if (url.pathname === "/password-reset/update") {
+      response = await handlePasswordResetUpdate(request, env);
+    } else if (url.pathname === "/password-reset") {
+      response = await handlePasswordReset(request, env);
+    } else {
+      response = await handleGemini(request, env);
     }
-    if (url.pathname === "/password-reset/request") return handlePasswordResetRequest(request, env);
-    if (url.pathname === "/password-reset/verify") return handlePasswordResetVerify(request, env);
-    if (url.pathname === "/password-reset/update") return handlePasswordResetUpdate(request, env);
-    if (url.pathname === "/password-reset") return handlePasswordReset(request, env);
 
-    return handleGemini(request, env);
+    return addCorsHeaders(response);
   },
 };
 
@@ -176,10 +196,11 @@ interface FirestoreFieldMap {
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200): Response {
-  return new Response(JSON.stringify(body), {
+  const response = new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json" },
   });
+  return addCorsHeaders(response);
 }
 
 function randomOtp(): string {

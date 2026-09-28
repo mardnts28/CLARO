@@ -158,12 +158,17 @@ service cloud.firestore {
     // `reportedBy == request.auth.uid` check naturally passes.
     // Update and delete are admin-only: users cannot retract or modify a
     // report once submitted, and admins approve/reject via the dashboard.
+    // Exception: Report creators can update extraction data fields only.
     match /reports/{reportId} {
       allow create: if request.auth != null
                     && request.resource.data.reportedBy == request.auth.uid;
       allow read:   if request.auth != null
                     && (resource.data.reportedBy == request.auth.uid || isAdmin());
-      allow update: if isAdmin();
+      allow update: if isAdmin()
+                    || (request.auth != null
+                        && resource.data.reportedBy == request.auth.uid
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['extractedData']));
       allow delete: if isAdmin();
     }
 
