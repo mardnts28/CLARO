@@ -1,4 +1,11 @@
 // lib/core/utils/advisory_prompt_builder.dart
+//
+// Builds the prompts sent to Gemini.
+//
+// Gemini's ONLY job here is to put values the app has already worked out into
+// short, friendly words. Every number, percentage, ingredient name, ranking
+// and serving amount is decided in Dart and handed over as a finished fact.
+// The prompts never ask the model to calculate, judge, or give medical advice.
 
 import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
@@ -9,7 +16,111 @@ import 'kidney_advisory_facts.dart';
 import 'serving_size_calculator.dart';
 import '../../models/product_model.dart';
 
+/// Wording for a percentage of the Recommended Daily Intake.
+/// Up to 100%: "X% of the Recommended Daily Intake".
+/// Over 100%: "(X-100)% above the Recommended Daily Intake".
+/// Done here so the model never has to subtract anything.
+String _formatPercentageWording(
+  double percentage,
+  bool isTagalog, {
+  bool forFreeSugars = false,
+}) {
+  final shown = AdvisoryPromptBuilder.displayedPercentage(
+    percentage,
+  ).toStringAsFixed(1);
+  final above = percentage > 100;
+  final reference = forFreeSugars
+      ? (isTagalog
+            ? 'Recommended Daily Intake para sa free sugars'
+            : 'Recommended Daily Intake for free sugars')
+      : 'Recommended Daily Intake';
+  if (isTagalog) {
+    return above ? '$shown% sa taas ng $reference' : '$shown% ng $reference';
+  }
+  return above ? '$shown% above the $reference' : '$shown% of the $reference';
+}
+
+/// Which kind of advisory is being written. Decided once, so the facts and
+/// the task instructions can never disagree about which case applies.
+enum _AdvisoryMode {
+  allergen,
+  kidney,
+  noConditions,
+  allSuitable,
+  factorsOnly,
+  nutrientOfConcern,
+}
+
 class AdvisoryPromptBuilder {
+  /// The percentage number that is actually shown to the user: the value
+  /// itself up to 100, otherwise how far above 100 it is. Anything that
+  /// checks the model's text for a percentage (e.g. the kidney validator in
+  /// GeminiAdvisoryService) must look for THIS number, not the raw one.
+  static double displayedPercentage(double percentage) =>
+      percentage <= 100 ? percentage : percentage - 100;
+
+  /// The suggested serving amount for this product and user, worked out by
+  /// the app. Public so GeminiAdvisoryService can attach it to the advisory
+  /// directly (the badge on the product screen) instead of trusting a copy
+  /// of it that came back from the model. Null when there is nothing to
+  /// suggest.
+  static String? suggestedServing({
+    required ProductEvaluation evaluation,
+    required UserHealthProfile user,
+  }) {
+    final product = evaluation.product;
+    // No health conditions and no allergens: the amount is based on sodium,
+    // total sugars and saturated fat combined.
+    final hasNoConditionsAndNoAllergens =
+        user.conditions.isEmpty &&
+        !evaluation.allergenAssessment.hasDirectAllergen;
+    if (hasNoConditionsAndNoAllergens) {
+      return ServingSizeCalculator.calculateCombinedNutrients(
+        nutritionPer100g: product.nutritionPer100g,
+        servingSizeG: product.servingSizeG,
+      );
+    }
+    final worst = _worstFlagged(evaluation);
+    if (worst == null) return null;
+    return ServingSizeCalculator.calculate(
+      nutrientKey: worst.nutrientKey,
+      valuePer100g: worst.valuePer100g,
+      servingSizeG: product.servingSizeG,
+    );
+  }
+
+  /// The most severe flagged nutrient, or null when nothing is flagged.
+  static NutrientEvaluation? _worstFlagged(ProductEvaluation evaluation) {
+    final flagged = evaluation.nutrientEvaluations
+        .where((e) => e.level != AdvisoryLevel.suitable)
+        .toList();
+    if (flagged.isEmpty) return null;
+    return flagged.reduce(
+      (a, b) => _severityRank(b.level) > _severityRank(a.level) ? b : a,
+    );
+  }
+
+  /// Rules shared by every prompt. Stated once, here, instead of being
+  /// repeated inside each branch.
+  static const String _styleRules = '''
+Rules:
+- Use only the values and names given in the facts. Never calculate, estimate, round, convert, or add any number or ingredient.
+- Stay factual and gentle. Do not make medical claims: never say the product causes, worsens, triggers, or treats anything, and never call an amount "safe", "unsafe", or "dangerous".
+- Do not tell the user what they must do or avoid. Soft wording such as "worth keeping in mind" is fine.
+- Use plain everyday words a grocery shopper would use. Do not mention scores, calculations, thresholds, algorithms, or how the app works.
+- Do not add disclaimers; the app shows those separately.''';
+
+  /// Rules for allergen and GERD-ingredient warnings. Cautious warning
+  /// wording is acceptable there, so the "no causes/triggers/avoid" lines of
+  /// [_styleRules] are replaced. Diagnosing or promising an outcome is still
+  /// not allowed.
+  static const String _warningStyleRules = '''
+Rules:
+- Use only the values and names given in the facts. Never calculate, estimate, round, convert, or add any number or ingredient.
+- Warning or cautious wording is fine for this allergen or GERD ingredient detection (for example "may cause an allergic reaction", "potential GERD trigger", "consume with caution or avoid"). Do not diagnose, do not promise or guarantee any outcome, and never call the product "safe".
+- Use plain everyday words a grocery shopper would use. Do not mention scores, calculations, thresholds, algorithms, or how the app works.
+- Do not add disclaimers; the app shows those separately.''';
+
   static String build({
     required ProductEvaluation evaluation,
     required UserHealthProfile user,
@@ -17,156 +128,202 @@ class AdvisoryPromptBuilder {
     SuitabilityRankLabel? rankLabel,
     String languageCode = 'en',
   }) {
+    final isTagalog = languageCode == 'tl';
     final product = evaluation.product;
     final allergen = evaluation.allergenAssessment;
     final scoredFactors = evaluation.scoredFactors;
 
-    final flagged = evaluation.nutrientEvaluations
-        .where((e) => e.level != AdvisoryLevel.suitable)
-        .toList();
-
-    // Kidney Disease has its own facts + instructions below (sodium and
-    // protein WHO percentages, detected phosphate additives), still within
-    // the same 3-sentence Health Advisory structure. Null for every other
-    // user, so all other conditions keep their existing prompt untouched.
+    // Kidney Disease has its own facts (sodium and protein percentages,
+    // detected phosphate additives). Null for every other user.
     final kidneyFacts = KidneyAdvisoryFacts.build(evaluation);
 
-    NutrientEvaluation? worst;
-    if (flagged.isNotEmpty) {
-      worst = flagged.reduce(
-        (a, b) => _severityRank(b.level) > _severityRank(a.level) ? b : a,
-      );
-    }
+    final worst = _worstFlagged(evaluation);
 
-    // For users with no health conditions and no allergens, use combined nutrient calculation
+    // No health conditions and no allergens: the suggested amount is
+    // worked out from sodium, total sugars and saturated fat combined.
     final hasNoConditionsAndNoAllergens =
         user.conditions.isEmpty && !allergen.hasDirectAllergen;
 
-    // Nutrients that, at this product's own FULL labeled serving size,
-    // deliver more than 100% of the WHO daily reference amount. Only
-    // meaningful (and only computed) for the no-conditions/no-allergens
-    // path above -- everyone else already gets a per-condition nutrient
-    // breakdown via `flagged`/`worst`. This never changes the "Suitable"
-    // decision word or the suggested-amount math already computed by
-    // `safeServing`; it only gives the model a fact to explain briefly
-    // *why* a smaller-than-full-serving amount was suggested.
+    // Nutrients that already exceed 100% of the Recommended Daily Intake at
+    // the product's full labeled serving. Only used to give the model a
+    // reason to mention for a smaller-than-full suggested amount.
     final exceededDailyLimitKeys = hasNoConditionsAndNoAllergens
         ? _exceededDailyLimitKeys(product)
         : const <String>[];
 
-    final safeServing = hasNoConditionsAndNoAllergens
-        ? ServingSizeCalculator.calculateCombinedNutrients(
-            nutritionPer100g: product.nutritionPer100g,
-            servingSizeG: product.servingSizeG,
-          )
-        : (worst == null
-              ? null
-              : ServingSizeCalculator.calculate(
-                  nutrientKey: worst.nutrientKey,
-                  valuePer100g: worst.valuePer100g,
-                  servingSizeG: product.servingSizeG,
-                ));
+    final safeServing = suggestedServing(evaluation: evaluation, user: user);
 
     final decisionWord = allergen.hasDirectAllergen
         ? 'Caution'
         : _levelLabel(evaluation.overallLevel);
 
-    final languageInstruction = languageCode == 'tl'
-        ? 'Respond in simple, conversational Tagalog.'
+    final languageInstruction = isTagalog
+        ? 'Respond in simple, conversational Tagalog. Keep numbers, units, and ingredient names exactly as supplied.'
         : 'Respond in simple, conversational English.';
 
-    String factsBlock;
+    final _AdvisoryMode mode;
     if (allergen.hasDirectAllergen) {
+      mode = _AdvisoryMode.allergen;
+    } else if (kidneyFacts != null) {
+      mode = _AdvisoryMode.kidney;
+    } else if (hasNoConditionsAndNoAllergens) {
+      mode = _AdvisoryMode.noConditions;
+    } else if (worst == null && scoredFactors.isEmpty) {
+      mode = _AdvisoryMode.allSuitable;
+    } else if (worst == null) {
+      mode = _AdvisoryMode.factorsOnly;
+    } else {
+      mode = _AdvisoryMode.nutrientOfConcern;
+    }
+
+    // `factsBlock` = what the model is given. `taskBlock` = what to write
+    // with it. Each mode fills in both.
+    final String factsBlock;
+    final String taskBlock;
+
+    if (mode == _AdvisoryMode.allergen) {
       final allergenLabels = allergen.matchedContains
           .map(_allergenLabel)
           .join(', ');
       // Per-allergen ingredient attribution, using ONLY what
-      // WhoCalculator.assessAllergens reliably established -- direct
-      // or derived. Never invent or guess an ingredient beyond this.
+      // WhoCalculator.assessAllergens reliably established.
       final sourceLines = allergen.ingredientSources
           .map((m) {
             final label = _allergenLabel(m.allergen);
             switch (m.matchType) {
               case AllergenMatchType.direct:
-                return '- $label: the ingredient "${m.ingredient}" directly IS/contains $label.';
+                return '- $label: the ingredient "${m.ingredient}" is or contains $label.';
               case AllergenMatchType.derived:
-                return '- $label: the ingredient "${m.ingredient}" is a confirmed $label derivative (not literally named "$label").';
+                return '- $label: the ingredient "${m.ingredient}" is derived from $label (not literally named "$label").';
               case AllergenMatchType.undetermined:
-                // This case should no longer occur since we removed undetermined matches
-                // from allergen assessment. Kept for safety but should never be hit.
-                return '- $label: flagged on the product, but NO specific ingredient in the list could be reliably confirmed as the source (e.g. only a generic "flavors"-type entry with no confirmed derivation). Do not guess or name any ingredient for this one.';
+                return '- $label: flagged on the product, but no specific ingredient could be confirmed. Do not name or guess one.';
             }
           })
           .join('\n');
       factsBlock =
-          'This product CONTAINS an allergen the user is allergic to: $allergenLabels.\n'
-          'Ingredient attribution (use exactly this, do not add, guess, or invent beyond it):\n$sourceLines';
-    } else if (kidneyFacts != null) {
-      final phosphateLine = kidneyFacts.hasPhosphateAdditives
-          ? 'Phosphate additive ingredients detected (name them exactly as written): "${kidneyFacts.phosphateIngredients}".'
-          : (kidneyFacts.ingredientDataKnown
-                ? 'Phosphate additive ingredients detected: none. Do NOT mention phosphate additives.'
-                : 'Phosphate additive ingredients: the ingredient list is unavailable, so this could not be checked. Do NOT mention phosphate additives.');
+          'This product contains an allergen the user is allergic to: $allergenLabels.\n'
+          'Ingredients (use exactly these, add nothing):\n$sourceLines';
+      taskBlock = '''
+Write a short note of about 20-50 words, in this order:
+1. Say which allergen(s) the product is flagged for.
+2. For each allergen, mention the ingredient given in the facts and whether it is the allergen itself or derived from it (for example "Detected ingredient: Tuna (fish)" or "Detected ingredient: Whey (dairy-derived)"). Do not mention ingredients that are not listed.
+3. Finish with one short line recommending that the user consume with caution or avoid this product.
+Do not mention daily intake amounts.
+
+warningText: at most 8 words, describing the allergen only (for example "Fish allergen detected"). Do not include the word "Caution"; the app shows that separately.''';
+    } else if (mode == _AdvisoryMode.kidney) {
+      final facts = kidneyFacts!;
+      final sodiumPhrase = _formatPercentageWording(
+        facts.sodiumPercentage,
+        isTagalog,
+      );
+      final proteinPhrase = _formatPercentageWording(
+        facts.proteinPercentage,
+        isTagalog,
+      );
+      final phosphateLine = facts.hasPhosphateAdditives
+          ? 'Phosphate additive ingredients found (name them exactly as written): "${facts.phosphateIngredients}".'
+          : 'Phosphate additives: none to report. Do not mention them.';
       final drivers = <String>[
-        if (kidneyFacts.sodiumFlagged)
-          'sodium (${_levelLabel(kidneyFacts.sodiumLevel)})',
-        if (kidneyFacts.hasPhosphateAdditives) 'phosphate additives detected',
+        if (facts.sodiumFlagged) 'sodium',
+        if (facts.hasPhosphateAdditives) 'phosphate additives',
       ];
+      factsBlock = [
+        'Health condition on file: kidney disease.',
+        'Sodium: ${facts.sodiumMg.toStringAsFixed(1)}mg, which is $sodiumPhrase.',
+        'Protein: ${facts.proteinG.toStringAsFixed(1)}g, which is $proteinPhrase.',
+        phosphateLine,
+        'Main points for the headline: ${drivers.isEmpty ? 'none' : drivers.join(', ')}.',
+      ].join('\n');
+      taskBlock = '''
+warningText: at most 8 words, describing only the "main points for the headline" (for example "High in sodium and phosphate additives"). Do not mention protein and do not repeat the decision word. If the main points are "none", use a short neutral phrase such as "Kidney health reminder".
+
+explanation: exactly 2 short sentences, under 45 words in total.
+1. Say what the product contains: the sodium amount and the protein amount, each followed in parentheses by its wording from the facts. Copy each percentage wording exactly as written in the facts.
+   English example: "This product contains 727.3mg of sodium (36.4% of the Recommended Daily Intake) and 5.0g of protein (6.7% of the Recommended Daily Intake)."
+2. If phosphate additive ingredients are listed, name them exactly and say they may be worth noting for kidney health. Otherwise say these amounts are worth keeping in mind with kidney disease.
+Do not mention the serving size or a suggested amount; the app shows that separately.''';
+    } else if (mode == _AdvisoryMode.noConditions) {
+      final exceededLabels = exceededDailyLimitKeys
+          .map(_nutrientLabel)
+          .join(', ');
+      factsBlock = [
+        'The user has no health conditions or allergens on file.',
+        safeServing != null
+            ? 'Suggested amount (already written by the app): "$safeServing".'
+            : 'No suggested serving amount was supplied.',
+        if (exceededDailyLimitKeys.isNotEmpty)
+          'At the full labeled serving (${product.servingSizeG.toStringAsFixed(0)}g), these already go above the daily reference amount: $exceededLabels. That is why a smaller amount is suggested.',
+      ].join('\n');
+      const suitableHeadline =
+          'warningText: at most 8 words. It must clearly say "Suitable"; a short phrase after it is optional.';
+      if (safeServing == null) {
+        taskBlock =
+            '''
+$suitableHeadline
+
+explanation: exactly 1 short sentence saying that no specific serving amount was suggested for this product. Do not add numbers.''';
+      } else if (exceededDailyLimitKeys.isEmpty) {
+        taskBlock =
+            '''
+$suitableHeadline
+
+explanation: exactly 1 short sentence. Restate the suggested amount from the facts in friendly words, keeping the amount and the grams exactly as written, and say it is for up to ${ServingSizeCalculator.mealsPerDay} meals a day.
+Do not repeat nutrient amounts or percentages.''';
+      } else {
+        taskBlock =
+            '''
+$suitableHeadline
+
+explanation: exactly 2 short sentences.
+1. Restate the suggested amount from the facts in friendly words, keeping the amount and the grams exactly as written, and say it is for up to ${ServingSizeCalculator.mealsPerDay} meals a day.
+2. Give a short, plain, non-alarming reason for the smaller amount, based on the note in the facts (for example "A full serving has more sodium than the daily reference amount."). Do not use numbers or percentages.''';
+      }
+    } else if (mode == _AdvisoryMode.allSuitable) {
       factsBlock =
-          'User has kidney disease.\n'
-          'Serving size: ${product.servingSizeG.toStringAsFixed(0)}g.\n'
-          'Sodium: ${kidneyFacts.sodiumMg.toStringAsFixed(1)}mg per serving = ${kidneyFacts.sodiumPercentage.toStringAsFixed(1)}% of the WHO daily reference amount.\n'
-          'Protein: ${kidneyFacts.proteinG.toStringAsFixed(1)}g per serving = ${kidneyFacts.proteinPercentage.toStringAsFixed(1)}% of the WHO daily reference amount.\n'
-          '$phosphateLine\n'
-          'Headline drivers: ${drivers.isEmpty ? 'none' : drivers.join(', ')}.\n'
-          '${safeServing != null ? 'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".' : 'No suggested serving amount was supplied.'}';
-    } else if (hasNoConditionsAndNoAllergens) {
-      final exceededNote = exceededDailyLimitKeys.isNotEmpty
-          ? '\nNote: at this product\'s full labeled serving size (${product.servingSizeG.toStringAsFixed(0)}g), the following nutrient(s) already exceed 100% of the WHO daily reference amount: ${exceededDailyLimitKeys.map(_nutrientLabel).join(', ')}. This is the reason a smaller suggested amount was calculated above -- briefly explain this to the user without restating exact numbers or percentages.'
-          : '';
-      factsBlock =
-          'User has no health conditions and no allergens.\n'
-          'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".$exceededNote';
-    } else if (worst == null && scoredFactors.isEmpty) {
-      factsBlock =
-          'All evaluated nutrients are within the suitable range for this user\'s condition(s).';
-    } else if (worst == null && scoredFactors.isNotEmpty) {
-      // Only reached when there is no flagged *nutrient* to report.
-      // `scoredFactors` is populated for every scored condition (e.g. plain
-      // hypertension contributes a 'sodiumMg' scored factor, not just the
-      // GERD/Kidney awareness-only factors this branch was written for), so
-      // checking it ahead of `worst` used to skip the proper amount/impact/
-      // serving facts below for nearly every user with any condition, even
-      // when a specific nutrient really was flagged. Factors with no
-      // nutrient-evaluation counterpart (GERD triggers, GERD total fat) are
-      // surfaced by the GERD warning card elsewhere in the UI; kidney
-      // phosphate additives are covered by the kidney branch above.
+          'All checked nutrients are within the suitable range for this user\'s health profile.';
+      taskBlock = '''
+warningText: at most 8 words. It must clearly say "Suitable".
+explanation: exactly 1 short sentence saying the checked nutrients look suitable for the user's profile. Do not add numbers.''';
+    } else if (mode == _AdvisoryMode.factorsOnly) {
+      // Only the plain-language result of each factor is shared. Point
+      // values are internal and are deliberately not sent to the model.
       final factorLines = scoredFactors
           .map((factor) {
-            final status = factor.isUnknown ? 'UNKNOWN' : 'KNOWN';
-            return '- ${_factorLabel(factor.factorKey)}: $status, ${factor.points} points. ${factor.explanation}';
+            final status = factor.isUnknown
+                ? 'not enough information'
+                : 'checked';
+            return '- ${_factorLabel(factor.factorKey)} ($status): ${factor.explanation}';
           })
           .join('\n');
-      factsBlock =
-          'Deterministic condition-factor results (source of truth):\n$factorLines\n'
-          'The risk score and classification have already been calculated by the application. '
-          'Do not change them or interpret unknown as clean.';
+      factsBlock = 'Results already worked out by the app:\n$factorLines';
+      taskBlock = '''
+warningText: at most 8 words, describing the main point. Do not repeat the decision word.
+explanation: 1-2 short sentences that put the results above into friendly words. Only mention factors listed in the facts.
+- If a factor says "not enough information", say there is not enough information about it. Never treat missing information as a good sign.
+- For GERD triggers, say "potential GERD trigger detected" and that reactions differ from person to person.''';
     } else {
       final nutrient = worst!;
-      final sugarsNote = nutrient.nutrientKey == 'sugarsG'
-          ? '\nData limitation: This app only records TOTAL sugars -- it cannot distinguish free/added sugars from naturally occurring sugars. '
-                'The WHO daily reference used here (50g/day) is the WHO reference for free sugars, but the percentage above was calculated using total sugars as a stand-in. '
-                'Never call this value "free sugars" or "added sugars" -- always call it "total sugars", and phrase the amount/percentage sentence using the wording given in the instructions below.'
-          : '';
-      factsBlock =
-          'Nutrient of concern: ${_nutrientLabel(nutrient.nutrientKey)}.\n'
-          'Exact amount per serving: ${nutrient.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(nutrient.nutrientKey)}.\n'
-          'Serving size: ${product.servingSizeG.toStringAsFixed(0)}g.\n'
-          'Supplied percentage of the daily reference amount from one serving: ${nutrient.whoDailyLimitPercentage.toStringAsFixed(1)}%.\n'
-          'Classification level for this nutrient: ${_levelLabel(nutrient.level)}.\n'
-          'Relevant health condition: ${_conditionLabel(nutrient.condition)}.\n'
-          '${safeServing != null ? 'Application-calculated suggested amount per meal (use this EXACT text, do not calculate, convert, or restate the math yourself): "$safeServing".' : 'No suggested serving amount was supplied for this nutrient.'}'
-          '$sugarsNote';
+      final isSugars = nutrient.nutrientKey == 'sugarsG';
+      final percentPhrase = _formatPercentageWording(
+        nutrient.whoDailyLimitPercentage,
+        isTagalog,
+        forFreeSugars: isSugars,
+      );
+      factsBlock = [
+        'Nutrient to mention: ${_nutrientLabel(nutrient.nutrientKey)}.',
+        'Amount: ${nutrient.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(nutrient.nutrientKey)}, which is $percentPhrase.',
+        'Related health condition: ${_conditionLabel(nutrient.condition)}.',
+        if (isSugars)
+          'Note: the app only records total sugars, and compares them with the reference for free sugars. Always say "total sugars"; never say "added sugars" or "free sugars" on their own.',
+      ].join('\n');
+      taskBlock = '''
+warningText: at most 8 words, naming the nutrient in a neutral way (for example "Sodium worth watching"). Do not repeat the decision word.
+
+explanation: exactly 2 short sentences, under 40 words in total.
+1. Start with "This product contains", give the amount, and put the percentage wording from the facts in parentheses. Copy the percentage wording exactly as written.
+   English example: "This product contains 727.3mg of sodium (36.4% of the Recommended Daily Intake)."${isSugars ? '\n   For total sugars, use: "This serving contains [amount] of total sugars, which is [percentage wording from the facts]."' : ''}
+2. In one sentence, say why this amount is worth keeping in mind for the related health condition. Do not mention the serving size or a suggested amount; the app shows that separately.''';
     }
 
     String comparisonBlock = '';
@@ -178,178 +335,50 @@ class AdvisoryPromptBuilder {
       comparisonBlock =
           '''
 
-Comparison context: This product is ranked "$rankText" among the products the user compared.
-Exact comparison numbers to cite: this product has ${comparisonFact.thisValue}$unit of $nutrientName per 100g.
-The lowest value in the compared set is ${comparisonFact.bestValueInSet}$unit. The highest value in the compared set is ${comparisonFact.worstValueInSet}$unit.
-${comparisonFact.thisIsBest ? 'This product has the LOWEST $nutrientName among all compared products.' : ''}
-${comparisonFact.thisIsWorst ? 'This product has the HIGHEST $nutrientName among all compared products.' : ''}
-Note: Product rankings are standardized using nutrient content per 100g to ensure fair comparisons regardless of serving size.
+Comparison context: this product is ranked "$rankText" among the products the user compared.
+Values per 100g of $nutrientName: this product ${comparisonFact.thisValue}$unit; lowest in the set ${comparisonFact.bestValueInSet}$unit; highest in the set ${comparisonFact.worstValueInSet}$unit.
+${comparisonFact.thisIsBest ? 'This product has the lowest $nutrientName in the set.' : ''}
+${comparisonFact.thisIsWorst ? 'This product has the highest $nutrientName in the set.' : ''}
 
-Also write a "comparisonExplanation" field: ONE short sentence explaining why this product is ranked "$rankText" compared to the others, citing the EXACT numbers above. Example style:
-"This product is most suitable compared to the others because it contains the least sodium (${comparisonFact.bestValueInSet}$unit vs up to ${comparisonFact.worstValueInSet}$unit in other options)."
-''';
+Also write "comparisonExplanation": one short sentence saying why this product is ranked "$rankText", using the exact per 100g values above.''';
     }
 
+    // The suggested amount is attached by the app (see suggestedServing), so
+    // the model is not asked to return it.
     final jsonFields = comparisonFact != null
         ? '''{
-  "warningText": "short headline, max 8 words",
-  "explanation": "the advisory text following the instructions above",
-  "safeServingSize": ${safeServing != null ? '"$safeServing"' : 'null'},
+  "warningText": "short headline",
+  "explanation": "the explanation described above",
   "comparisonExplanation": "the single comparison sentence described above"
 }'''
         : '''{
-  "warningText": "short headline, max 8 words",
-  "explanation": "the advisory text following the instructions above",
-  "safeServingSize": ${safeServing != null ? '"$safeServing"' : 'null'}
+  "warningText": "short headline",
+  "explanation": "the explanation described above"
 }''';
 
-    final instructionsBlock = allergen.hasDirectAllergen
-        ? '''Write a concise health advisory (20-50 words, short sentences) following this exact format:
-
-1. Open by naming the allergen(s) the product is flagged for
-2. For EACH allergen line in the ingredient attribution above, report it using ONLY what that line says:
-   - If it names an ingredient that directly contains the allergen, say so plainly (e.g. "Detected ingredient: Tuna (fish)")
-   - If it names a derived ingredient, say it's derived, not a direct match (e.g. "Detected ingredient: Whey (dairy-derived)")
-3. End with a short recommendation to consume with caution or avoid this product
-
-IMPORTANT: For the "warningText" field, do NOT include the decision word ("Caution") at the beginning. The UI already displays the decision separately. The warningText should only describe the allergen, e.g. "Fish allergen detected" not "Caution: Fish allergen detected".
-
-Do NOT mention: calculations, algorithms, risk scores, WHO, "recommended maximum daily intake"'''
-        : (kidneyFacts != null
-              ? '''IMPORTANT:
-- The application has already calculated all nutrient amounts, percentages, classification levels, and the suggested serving amount.
-- You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
-- Every number in the advisory must come directly from the supplied facts above.
-- The suggested serving amount is displayed separately as a badge -- do NOT mention it in the explanation text.
-- Never describe any amount as "safe." Use non-medical, non-diagnostic, and non-prescriptive language.
-
-WARNINGTEXT field:
-- Maximum 8 words.
-- Do NOT repeat the decision level ("Caution", "Moderate", "Suitable") -- the UI already displays that separately.
-- Describe only the "Headline drivers" listed in the facts above, e.g. "High in sodium and phosphate additives". Do NOT mention protein in the headline.
-- If the headline drivers are "none", use a short neutral phrase such as "Kidney health reminder".
-
-EXPLANATION field -- write EXACTLY 2 short sentences, preferably 20-30 words total:
-
-Sentence 1:
-- Start with "This product" and state BOTH the exact supplied sodium amount and the exact supplied protein amount, each with its supplied WHO percentage in parentheses. Do NOT mention serving size in this sentence.
-  Example: "This product contains 727.3mg of sodium (36.4% of the WHO daily reference amount) and 5.0g of protein (6.7% of the WHO daily reference amount)."
-
-Sentence 2:
-- Explain how these amounts relate to the user's health in 1 sentence. If phosphate additive ingredients are listed in the facts above, name them exactly as supplied and say they may be relevant to kidney health.
-  Example: "It also contains phosphate additives (Sodium Phosphate), which may be relevant to kidney health."
-- If none are listed, do NOT mention phosphate additives at all. Instead, simply say these amounts are worth watching for someone with kidney disease.
-- Be cautious and non-medical. Do not imply the product causes, worsens, aggravates, or triggers the condition.
-
-Do NOT include a sentence about the suggested serving amount -- the app displays that separately as a badge alongside the advisory, using the safeServingSize value supplied above.
-
-Do NOT add any "consult an expert" or disclaimer sentence -- the app shows that note separately below the advisory.
-
-WORDING:
-- Use simple language suitable for an ordinary grocery shopper.
-- Prefer "daily reference amount" over "daily limit."
-- Never invent or calculate numbers -- use only the supplied facts.
-- Keep the advisory concise.'''
-              : (worst == null && scoredFactors.isNotEmpty
-              ? '''IMPORTANT:
-    - Explain the supplied deterministic condition-factor results only.
-    - Do not invent thresholds, medical limits, points, classifications, or safety claims.
-    - Unknown factors must be described as insufficient information, never as clean or absent.
-    - For GERD triggers, say "potential GERD trigger detected" and explain that symptoms vary between people; never claim a guaranteed effect.
-    - Potassium, protein, natural phosphorus, and potassium chloride are informational only and are not scored risks.
-    - Keep the explanation concise and user-facing.'''
-              : (hasNoConditionsAndNoAllergens
-                    ? (exceededDailyLimitKeys.isEmpty
-                          ? '''IMPORTANT:
-- The application has already calculated the suggested serving amount.
-- You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
-- The suggested serving amount is for up to 3 meals per day.
-- Never describe any amount as "safe" or medically recommended.
-
-WARNINGTEXT field:
-- Maximum 8 words.
-- Must clearly state "Suitable".
-- May include a short descriptive phrase after it if needed.
-- Do not make the header unnecessarily long.
-
-EXPLANATION field -- write EXACTLY ONE short sentence:
-- Tell the user the suggested amount PER MEAL.
-- Use the exact suggested serving amount supplied above.
-- Preferred format: "Consider a [amount] serving per meal (for 3 meals a day)."
-- Do not explain the mathematical calculation.
-- Do not repeat nutrient amounts or WHO percentages.
-- Keep it very short and user-friendly.'''
-                          : '''IMPORTANT:
-- The application has already calculated the suggested serving amount.
-- You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
-- The suggested serving amount is for up to 3 meals per day.
-- Never describe any amount as "safe" or medically recommended.
-
-WARNINGTEXT field:
-- Maximum 8 words.
-- Must clearly state "Suitable".
-- May include a short descriptive phrase after it if needed.
-- Do not make the header unnecessarily long.
-
-EXPLANATION field -- write EXACTLY TWO short sentences:
-- Sentence 1: tell the user the suggested amount PER MEAL, using the exact suggested serving amount supplied above. Preferred format: "Consider a [amount] serving per meal (for 3 meals a day)."
-- Sentence 2: a short, user-friendly reason for the smaller amount, based on the note above about the nutrient(s) that exceed the daily reference amount at a full serving. Do not restate exact numbers or percentages -- keep it plain and non-alarming (e.g. "A full serving is higher in sodium than the recommended daily amount.").
-- Do not explain the mathematical calculation.
-- Keep it very short and user-friendly.''')
-                    : '''IMPORTANT:
-- The application has already calculated all nutrient amounts, percentages, classification levels, and suitable/recommended serving amounts.
-- You must NOT calculate, derive, estimate, reinterpret, or invent any numerical value.
-- Every number in the advisory must come directly from the supplied facts above.
-- Do not calculate daily limits, remaining amounts, maximum servings, nutrient amounts, percentages, or serving sizes.
-- The suggested serving amount is displayed separately as a badge -- do NOT mention it in the explanation text.
-- Never describe any amount as "safe." Use non-medical, non-diagnostic, and non-prescriptive language.
-
-WARNINGTEXT field:
-- Maximum 8 words.
-- Do NOT repeat the decision level ("Caution", "Moderate", "Suitable") -- the UI already displays that separately.
-- Use a short descriptive phrase instead. Example: "High in Sodium", NOT "Sodium Caution for Hypertension".
-
-EXPLANATION field -- write EXACTLY 2 short sentences, preferably 20-30 words total:
-
-Sentence 1:
-- List the nutrients associated with the user's health and their WHO daily percentage. Start with "This product" and state the exact supplied nutrient amount. Do NOT mention serving size in this sentence. Put the supplied WHO percentage in parentheses at the end.
-  Example: "This product contains 727.3mg of sodium (36.4% of the WHO daily reference amount)."
-- EXCEPTION: if a "Data limitation" note about sugars appears in the facts above, use this exact wording instead of the format above: "This serving contains [supplied amount] of total sugars, which is about [supplied percentage]% of the WHO reference for free sugars." Fill in only the exact supplied values. Never call this value "free sugars" or "added sugars" on its own.
-
-Sentence 2:
-- Explain how that amount relates to the user's health in 1 sentence. Simply explain what that amount means for the user's specific health condition.
-- Be cautious and non-medical. Do not imply the product causes, worsens, or triggers the condition.
-
-Do NOT include a sentence about the suggested serving amount -- the app displays that separately as a badge alongside the advisory, using the safeServingSize value supplied above.
-
-WORDING:
-- Use simple language suitable for an ordinary grocery shopper.
-- Prefer "daily reference amount" over "daily limit."
-- Never describe any amount as "safe."
-- Never invent or calculate numbers -- use only the supplied facts.
-- Avoid repetition and unnecessary disclaimers.
-- For sugars specifically: always say "total sugars", never "free sugars" or "added sugars" as a standalone label.
-- Keep the advisory concise.''')));
-
-    final introBlock = allergen.hasDirectAllergen
-        ? 'You are a friendly grocery assistant inside a Filipino grocery app called CLARO, writing a quick health tip for a scanned product.'
-        : 'You are a wording assistant for the non-allergen Health Advisory card in a Filipino grocery app called CLARO. '
-              'Generate a short, clear, cautious, user-friendly health advisory using ONLY the nutrient and health facts supplied below.';
+    // Allergen and GERD-ingredient warnings may use cautious warning wording.
+    final usesWarningWording =
+        mode == _AdvisoryMode.allergen ||
+        (mode == _AdvisoryMode.factorsOnly &&
+            scoredFactors.any((f) => f.factorKey.startsWith('gerd')));
+    final styleRules = usesWarningWording ? _warningStyleRules : _styleRules;
 
     return '''
-$introBlock
+You are a friendly wording assistant inside a Filipino grocery app called CLARO. The app has already done all the checking and calculating. Your only job is to put the facts below into short, friendly, plain words.
 
-Decision: $decisionWord
-Facts: $factsBlock
+Decision (shown separately by the app): $decisionWord
+
+Facts:
+$factsBlock
 $comparisonBlock
 
 $languageInstruction
 
-$instructionsBlock
+$taskBlock
 
-Use ONLY the exact numbers/ingredients provided in the facts. Do not calculate, change, invent, or guess any values or ingredient names beyond what's given.
+$styleRules
 
-Return ONLY valid JSON, no markdown, matching exactly this shape:
+Return only JSON in exactly this shape:
 $jsonFields
 ''';
   }
@@ -368,7 +397,7 @@ $jsonFields
   }
 
   // Sodium/total sugars/saturated fat whose value at the product's own
-  // full labeled serving size exceeds 100% of the WHO daily reference
+  // full labeled serving size exceeds 100% of the Recommended Daily Intake
   // amount (WhoDailyLimits). Uses raw per-100g values directly rather
   // than `evaluation.nutrientEvaluations` because that list is only
   // populated per-condition -- this path is for users with none.
@@ -495,11 +524,12 @@ $jsonFields
   }
 
   /// [healthCondition] is the user's condition name (e.g. "hypertension",
-  /// or a comma-joined list like "diabetes, heart condition" for multiple
-  /// conditions). Passed through so the ranking explanation ties the
-  /// nutrient back to why it matters for THIS user, not just the raw
-  /// per-100g numbers. May be empty when the user has no conditions on
-  /// file, in which case the prompt just omits the condition framing.
+  /// or a comma-joined list like "diabetes, heart condition"). May be empty
+  /// when the user has no conditions on file.
+  ///
+  /// The ranking position and how the nutrient compares are decided here in
+  /// Dart and passed as one finished fact, so the model only has to word it
+  /// and can never contradict the rank badge the user already sees.
   static String buildRankingExplanation({
     required String nutrientName,
     required String nutrientUnit,
@@ -514,78 +544,56 @@ $jsonFields
     String languageCode = 'en',
   }) {
     final languageInstruction = languageCode == 'tl'
-        ? 'Respond in simple, conversational Tagalog.'
+        ? 'Respond in simple, conversational Tagalog. Keep numbers, units, and ingredient names exactly as supplied.'
         : 'Respond in simple, conversational English.';
 
     final conditionLine = healthCondition.isNotEmpty
         ? 'User\'s health condition(s): $healthCondition.'
-        : 'User has no specific health condition on file.';
+        : 'No specific health condition on file.';
 
-    final conditionInstruction = healthCondition.isNotEmpty
-        ? '7. Briefly connect the $nutrientName level to the user\'s $healthCondition (e.g. why it matters for that condition), without sounding clinical'
-        : '';
+    final nutrientRelation = thisIsBestNutrient
+        ? 'the lowest $nutrientName'
+        : 'more $nutrientName than the lowest';
 
-    // isBestRank/isWorstRank are derived from rank/totalProducts ONLY --
-    // this is the same numbered position shown on the ranking list the
-    // user already saw, so the wording below can never contradict the
-    // badge itself.
-    //
-    // thisIsBestNutrient IS the separately-computed "is this the best
-    // nutrient value" flag -- and unlike the rank badge, this one WE DO
-    // pass in, explicitly, so the model can tell the two concepts apart.
-    // The original bug was exactly this gap: a product can win on rank
-    // overall (across every condition + allergens) while not having the
-    // single best value for just one nutrient. Instruction 4 below used
-    // to say "include the percentage difference from the best option
-    // when applicable" with no gate on this, so the model would produce
-    // sentences like "ranks 1 of 4 (top choice) ... which is 31% more
-    // than the best option" -- contradicting the very rank it just
-    // stated. Instruction 4 is now gated on thisIsBestNutrient.
-    final isBestRank = rank == 1;
-    final isWorstRank = rank == totalProducts;
-
-    // Only meaningful when isBestRank is true and thisIsBestNutrient is
-    // false -- an already-worded fact about a DIFFERENT nutrient where
-    // this product genuinely is the lowest in the set, so instruction 4
-    // below can point to something concrete instead of hand-waving.
-    final supportingReasonLine = supportingReason != null
-        ? 'A concrete reason this product still ranks #1 overall despite not being the lowest in $nutrientName: $supportingReason.'
-        : (isBestRank && !thisIsBestNutrient
-              ? 'No single other nutrient explains the #1 rank on its own -- if you need to say why it still wins, speak generally about its combined nutrient profile for the user\'s conditions, without inventing a specific number.'
-              : '');
+    final String rankFact;
+    if (rank == 1 && thisIsBestNutrient) {
+      rankFact =
+          'It ranks 1 of $totalProducts and has the lowest $nutrientName in this comparison.';
+    } else if (rank == 1) {
+      final reason = supportingReason != null
+          ? 'Reason it still ranks first: $supportingReason.'
+          : 'No single reason is available, so say only that its overall nutrient profile ranks best. Do not add numbers.';
+      rankFact =
+          'It ranks 1 of $totalProducts overall, although it does not have the lowest $nutrientName. $reason Do not describe it as losing, lacking, or worse.';
+    } else if (rank == totalProducts) {
+      rankFact =
+          'It ranks last ($rank of $totalProducts) and has $nutrientRelation in this comparison.';
+    } else {
+      rankFact =
+          'It ranks $rank of $totalProducts and has $nutrientRelation in this comparison.';
+    }
 
     return '''
-You are a nutrition assistant inside a Filipino grocery app called CLARO, writing a short ranking explanation for a product.
+You are a friendly wording assistant inside a Filipino grocery app called CLARO. The app has already done all the ranking and calculating. Your only job is to put the facts below into one or two short, plain sentences.
 
-Nutrient: $nutrientName
-Unit: $nutrientUnit
-This product value: $thisValue
-Lowest (best) value in comparison: $bestValue
-Highest (worst) value in comparison: $worstValue
-This product's overall rank: $rank of $totalProducts (based on the user's full health profile -- every relevant condition, nutrient, and factor together -- not on this one nutrient alone)
-Is this product ranked #1 overall: $isBestRank
-Is this product ranked last overall: $isWorstRank
-Does this product ALSO happen to have the single lowest $nutrientName value in this comparison: $thisIsBestNutrient
-$supportingReasonLine
-
-$conditionLine
+Facts (values are per 100g):
+- Nutrient: $nutrientName, in $nutrientUnit.
+- This product: $thisValue.
+- Lowest in the comparison: $bestValue.
+- Highest in the comparison: $worstValue.
+- $rankFact
+- $conditionLine
 
 $languageInstruction
 
-Write a concise ranking explanation (1-2 sentences, maximum 50 words) that:
-1. States the product's overall rank ($rank of $totalProducts) and explains it primarily through the $nutrientName content as the most relevant contributing nutrient
-2. Compares this product against others using per 100g values only
-3. States whether this product contains more or less of $nutrientName than other products
-4. Only mentions a percentage/amount difference from the lowest value in this comparison when thisIsBestNutrient is false OR when this product is not ranked #1 overall. If this product IS ranked #1 overall (isBestRank is true) but thisIsBestNutrient is false, you MUST NOT phrase this as the product losing, lacking, or being worse -- instead explain, in one clause, that it is not the single lowest in $nutrientName but still ranks #1. If a concrete reason is given above, use that specific reason (name the other nutrient and its value); otherwise speak generally about the combined profile, per the note above -- do not invent a specific number. Never call a #1-ranked product "more than the best option" or similar -- there is no other "best option" to lose to when this product IS the top overall choice.
-5. Uses clear, natural, user-friendly language
-6. Does not mention risk scores, internal calculations, variable names, or implementation details
-7. Must never describe this product as "top choice", "best", "first place", etc. unless rank is 1, and never as "worst" or "least recommended" unless rank equals $totalProducts -- always stay consistent with rank $rank of $totalProducts, and never let the $nutrientName comparison in this explanation contradict that rank
-8. Do not say or imply that the product is dangerous, harmful, unsafe, toxic, or medically contraindicated.
-9. Do not say or imply that the product will cause, worsen, aggravate, or trigger a health condition. State only that the nutrient level is relevant to or worth monitoring for the user's condition.
-10. Do not diagnose, prescribe, or claim a guaranteed medical outcome. Use neutral wording such as "has a higher sodium value in this comparison" or "this amount may be worth monitoring."
-$conditionInstruction
+Write 1-2 sentences, at most 50 words:
+1. Say where the product ranks and how its $nutrientName compares, using only the per 100g values above.
+2. If a health condition is listed, add a few words on why $nutrientName is worth keeping in mind for it.
+Only call the product the top choice if it ranks 1, and only call it last or least suitable if it ranks $totalProducts.
 
-Return ONLY valid JSON, no markdown, matching exactly this shape:
+$_styleRules
+
+Return only JSON in exactly this shape:
 {
   "explanation": "the ranking explanation"
 }

@@ -1,7 +1,7 @@
 // lib/core/utils/serving_size_calculator.dart
 //
 // Computes the suggested serving amount deterministically, based on the
-// WHO daily reference limit for the flagged nutrient (see WhoDailyLimits in
+// Recommended Daily Intake limit for the flagged nutrient (see WhoDailyLimits in
 // who_fda_thresholds.dart), split evenly across 3 meals per day. This is a
 // per-meal guideline, not a threshold derived from ConditionThresholds --
 // those Suitable/Moderate/Caution bands are used only for classification
@@ -57,7 +57,7 @@ class ServingSizeCalculator {
 
     final dailyLimit = WhoCalculator.getWhoDailyLimit(nutrientKey);
 
-    // Per-meal share of the WHO daily reference limit.
+    // Per-meal share of the Recommended Daily Intake limit.
     final perMealLimit = dailyLimit / mealsPerDay;
 
     // Grams of THIS product that would deliver exactly the per-meal limit
@@ -85,7 +85,7 @@ class ServingSizeCalculator {
   /// 
   /// The calculation finds the most restrictive nutrient (the one that
   /// allows the smallest serving size) to ensure all three nutrients
-  /// stay within per-meal WHO limits.
+  /// stay within per-meal Recommended Daily Intake limits.
   static String? calculateCombinedNutrients({
     required NutritionInfo nutritionPer100g,
     required double servingSizeG,

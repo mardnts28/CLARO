@@ -33,7 +33,7 @@ class GeminiAdvisoryService {
   final String _proxyUrl;
   final String _appSecret;
   final String _model;
-  static const _timeout = Duration(seconds: 10);
+  static const _timeout = Duration(seconds: 30);
 
   final Map<String, HealthAdvisory> _cache = {};
 
@@ -64,7 +64,7 @@ class GeminiAdvisoryService {
             'generationConfig': {
               'responseMimeType': 'application/json',
               'temperature': 0.4,
-              'maxOutputTokens': 2048,
+              'maxOutputTokens': 4096,
             },
           }),
         )
@@ -95,9 +95,11 @@ class GeminiAdvisoryService {
   }) =>
       // Kidney Disease advisories were rewritten (sodium + protein WHO %s and
       // phosphate additives, replacing the old Kidney Disease Warning card),
-      // so their cache keys get a version suffix to drop previously cached
-      // text. Every other profile keeps its existing key and cache.
-      'advisory_cache_${fingerprint}_${productId}_$languageCode${isComparison ? '_cmp' : ''}${fingerprint.contains(HealthCondition.kidneyDisease.name) ? '_kd2' : ''}';
+      // so their cache keys carry a '_kd2' suffix. The trailing '_v2' marks
+      // the prompt rewrite (Gemini now only rewords finished facts), which
+      // drops every previously cached advisory. Bump it again whenever the
+      // prompt wording changes and old cached text should not be reused.
+      'advisory_cache_${fingerprint}_${productId}_$languageCode${isComparison ? '_cmp' : ''}${fingerprint.contains(HealthCondition.kidneyDisease.name) ? '_kd2' : ''}_v2';
 
   Future<HealthAdvisory> generateAdvisory({
     required String scanEventId,
@@ -169,6 +171,11 @@ class GeminiAdvisoryService {
     final hasNoConditionsAndNoAllergens =
         user.conditions.isEmpty &&
         !evaluation.allergenAssessment.hasDirectAllergen;
+    // The suggested amount comes from the app, never from Gemini's reply.
+    final suggestedServing = AdvisoryPromptBuilder.suggestedServing(
+      evaluation: evaluation,
+      user: user,
+    );
     try {
       final text = await _callGemini(prompt, timeout: _timeout);
 
@@ -178,6 +185,7 @@ class GeminiAdvisoryService {
         languageCode,
         useCombinedNutrients,
         hasNoConditionsAndNoAllergens,
+        suggestedServing,
       );
     } on TimeoutException catch (e) {
       print('GEMINI TIMEOUT: $e');
@@ -201,7 +209,11 @@ class GeminiAdvisoryService {
     }
 
     _cache[pKey] = advisory;
-    _persistAdvisory(pKey, advisory);
+    // Only persist AI text -- a fallback caused by a timeout, API error or
+    // parse error shouldn't stick around for weeks just because Gemini was
+    // briefly unreachable or returned something unusable. (The "nothing
+    // flagged" fallback above is intentional and is still persisted.)
+    if (!advisory.isFallback) _persistAdvisory(pKey, advisory);
     return advisory;
   }
 
@@ -222,7 +234,9 @@ class GeminiAdvisoryService {
     String languageCode = 'en',
   }) async {
     final key =
-        'group_advisory_${GroupAdvisoryBuilder.fingerprint(productId, servingSizeG, facts)}_$languageCode';
+        // '_v2' marks the group prompt rewrite; bump it whenever the prompt
+        // wording changes so previously cached group text isn't reused.
+        'group_advisory_${GroupAdvisoryBuilder.fingerprint(productId, servingSizeG, facts)}_${languageCode}_v2';
 
     final cached = _cache[key];
     if (cached != null) return cached;
@@ -317,6 +331,17 @@ class GeminiAdvisoryService {
       final explanation = json['explanation'] as String?;
       if (warning == null || explanation == null) return null;
 
+      // Same backstop as the single-product advisory: risky medical wording
+      // means we use the deterministic group fallback text instead. Skipped
+      // when any member is flagged for an allergen, where cautious warning
+      // wording is acceptable.
+      if (!facts.any((f) => f.allergens.isNotEmpty) &&
+          (_containsProhibitedAdvisoryMedicalClaim(warning) ||
+              _containsProhibitedAdvisoryMedicalClaim(explanation))) {
+        print('GROUP PARSE ERROR: advisory contains prohibited medical wording');
+        return null;
+      }
+
       final w = GroupAdvisoryBuilder.restoreNames(warning, facts, languageCode);
       final e = GroupAdvisoryBuilder.restoreNames(
         explanation,
@@ -369,6 +394,7 @@ class GeminiAdvisoryService {
     String languageCode,
     bool useCombinedNutrients,
     bool hasNoConditionsAndNoAllergens,
+    String? suggestedServing,
   ) {
     if (text == null || text.trim().isEmpty) {
       print('EMPTY RESPONSE from Gemini');
@@ -395,11 +421,25 @@ class GeminiAdvisoryService {
       final json = jsonDecode(cleaned) as Map<String, dynamic>;
       final warningText = json['warningText'] as String?;
       final explanation = json['explanation'] as String?;
-      final safeServingSize = json['safeServingSize'] as String?;
       final comparisonExplanation = json['comparisonExplanation'] as String?;
 
       if (warningText == null || explanation == null) {
         throw const FormatException('Missing required fields');
+      }
+
+      // Backstop for the prompt's "no medical claims" rule: a prompt can't
+      // guarantee the model follows it, so reject risky wording and use the
+      // rule-based fallback text instead. Allergen and GERD ingredient
+      // warnings are exempt: cautious warning wording is acceptable there.
+      final allowsWarningWording =
+          evaluation.allergenAssessment.hasDirectAllergen ||
+          evaluation.scoredFactors.any((f) => f.factorKey.startsWith('gerd'));
+      if (!allowsWarningWording &&
+          (_containsProhibitedAdvisoryMedicalClaim(warningText) ||
+              _containsProhibitedAdvisoryMedicalClaim(explanation))) {
+        throw const FormatException(
+          'Advisory contains prohibited medical wording',
+        );
       }
 
       // Kidney Disease advisories must state both supplied WHO percentages
@@ -408,10 +448,12 @@ class GeminiAdvisoryService {
       // half-correct advisory.
       final kidneyFacts = KidneyAdvisoryFacts.build(evaluation);
       if (kidneyFacts != null) {
+        // The prompt supplies the DISPLAYED number (the percentage itself up
+        // to 100, otherwise how far above 100 it is), so look for that.
         final sodiumToken =
-            '${kidneyFacts.sodiumPercentage.toStringAsFixed(1)}%';
+            '${AdvisoryPromptBuilder.displayedPercentage(kidneyFacts.sodiumPercentage).toStringAsFixed(1)}%';
         final proteinToken =
-            '${kidneyFacts.proteinPercentage.toStringAsFixed(1)}%';
+            '${AdvisoryPromptBuilder.displayedPercentage(kidneyFacts.proteinPercentage).toStringAsFixed(1)}%';
         if (!explanation.contains(sodiumToken) ||
             !explanation.contains(proteinToken)) {
           throw const FormatException(
@@ -424,7 +466,7 @@ class GeminiAdvisoryService {
         overallLevel: evaluation.overallLevel,
         warningText: warningText,
         explanation: explanation,
-        safeServingSize: safeServingSize,
+        safeServingSize: suggestedServing,
         comparisonExplanation: comparisonExplanation,
         source: AdvisorySource.aiGenerated,
         generatedAt: DateTime.now(),
@@ -551,6 +593,17 @@ class GeminiAdvisoryService {
       print('RAW RESPONSE: $text');
       rethrow;
     }
+  }
+
+  /// Same idea as the ranking check below, minus "trigger". Callers skip this
+  /// check for allergen and GERD ingredient warnings, where cautious warning
+  /// wording is acceptable. English wording only; Tagalog output is not
+  /// covered by this check.
+  bool _containsProhibitedAdvisoryMedicalClaim(String text) {
+    return RegExp(
+      r'\b(?:dangerous|harmful|unsafe|toxic|contraindicated|worsen(?:s|ed|ing)?|aggravat(?:e|es|ed|ing)?|cause(?:s|d)?)\b',
+      caseSensitive: false,
+    ).hasMatch(text);
   }
 
   bool _containsProhibitedRankingMedicalClaim(String explanation) {

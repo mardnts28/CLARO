@@ -14,6 +14,22 @@ import 'serving_size_calculator.dart';
 import 'who_calculator.dart';
 import '../../models/product_model.dart';
 
+/// Formats percentage wording for health advisories.
+/// If percentage <= 100%, returns "X% of the Recommended Daily Intake"
+/// If percentage > 100%, returns "(X-100)% above the Recommended Daily Intake"
+String _formatPercentageWording(double percentage, bool isTagalog) {
+  if (percentage <= 100) {
+    return isTagalog
+        ? '${percentage.toStringAsFixed(1)}% ng inererekomendang pang araw-araw na pagkain'
+        : 'takes up ${percentage.toStringAsFixed(1)}% of the recommended daily intake';
+  } else {
+    final above = percentage - 100;
+    return isTagalog
+        ? 'Lumagpas sa ${above.toStringAsFixed(1)}% ng inererekomendang pang araw-araw na pagkain'
+        : '${above.toStringAsFixed(1)}% exceeding the recommended daily intake';
+  }
+}
+
 // notNeeded added for Phase 3 (product_ranking_service.dart): used when a
 // product falls below the top-N cutoff and deliberately skips the AI call
 // for cost reasons, rather than the AI having failed.
@@ -29,7 +45,7 @@ class FallbackAdvisoryGenerator {
     // `evaluation.product.servingSizeG`. Lets a UI keep its advisory text
     // in lockstep with a badge/level the user has already recomputed for
     // a size they picked on a dropdown -- without an extra AI call, and
-    // without duplicating the WHO-percentage math (reuses the exact same
+    // without duplicating the Recommended Daily Intake percentage math (reuses the exact same
     // WhoCalculator functions the backend used to build `evaluation` in
     // the first place, so it can't silently drift out of sync).
     double? servingSizeGOverride,
@@ -70,7 +86,7 @@ class FallbackAdvisoryGenerator {
       final explanation = servingAmount != null
           ? (isTagalog
                 ? 'Isipin ang $servingAmount serving per meal (para sa 3 beses na pagkain sa isang araw).'
-                : 'Consider a $servingAmount serving per meal (for 3 meals a day).')
+                : 'Consider a $servingAmount amount per meal (for 3 meals a day).')
           : (isTagalog
                 ? 'Mainit ito nang maayos bilang bahagi ng balanced na pagkain.'
                 : 'Enjoy this in moderation as part of a balanced diet.');
@@ -79,7 +95,7 @@ class FallbackAdvisoryGenerator {
       // reached for users with no health conditions and no allergens, and
       // "Suitable" here reflects that nothing was flagged *against a
       // condition*. But a full labeled serving can still deliver more
-      // than 100% of the WHO daily reference amount for sodium, total
+      // than 100% of the Recommended Daily Intake for sodium, total
       // sugars, and/or saturated fat even for someone with no diagnosed
       // condition -- worth surfacing so the suggested per-meal amount
       // above doesn't read as an arbitrary downsize. Checked at the
@@ -184,7 +200,7 @@ class FallbackAdvisoryGenerator {
         .toList();
 
     // Kidney Disease: same 3-sentence structure as every other condition,
-    // but narrating sodium + protein (each as a % of the WHO daily reference
+    // but narrating sodium + protein (each as a % of the Recommended Daily Intake
     // amount) and any detected phosphate additives. Null for everyone else,
     // so no other condition's advisory changes.
     final kidneyFacts = KidneyAdvisoryFacts.build(
@@ -279,27 +295,27 @@ class FallbackAdvisoryGenerator {
             servingSizeG: servingSizeG,
           );
 
-    // Sentence 1: "This product contains [amount] ([% of WHO daily
-    // reference amount])." -- no serving size mentioned here. Sugars
+    // Sentence 1: "This product contains [amount] ([% of Recommended Daily
+    // Intake])." -- no serving size mentioned here. Sugars
     // keeps its own exact wording -- the app only records TOTAL sugars
-    // (no free/added sugars breakdown), but the WHO 50g/day reference
+    // (no free/added sugars breakdown), but the Recommended Daily Intake 50g/day reference
     // it's compared against is specifically for free sugars. This
     // sentence must be explicit about that so we never imply the app
     // measured free/added sugars directly.
     final isSugars = worst.nutrientKey == 'sugarsG';
     final amountSentence = isSugars
         ? (isTagalog
-              ? 'Naglalaman ang serving na ito ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng total sugars, na humigit-kumulang ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng WHO reference para sa free sugars.'
-              : 'This serving contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of total sugars, which is about ${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the WHO reference for free sugars.')
+              ? 'Naglalaman ang serving na ito ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng total sugars, na humigit-kumulang ${_formatPercentageWording(worst.whoDailyLimitPercentage, true)} para sa free sugars.'
+              : 'This serving contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of total sugars, which ${_formatPercentageWording(worst.whoDailyLimitPercentage, false)} for free sugars.')
         : (isTagalog
               ? 'Naglalaman ang produktong ito ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} na $nutrientName '
-                    '(${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% ng WHO daily reference amount).'
+                    '(${_formatPercentageWording(worst.whoDailyLimitPercentage, true)}).'
               : 'This product contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of $nutrientName '
-                    '(${worst.whoDailyLimitPercentage.toStringAsFixed(1)}% of the WHO daily reference amount).');
+                    '(${_formatPercentageWording(worst.whoDailyLimitPercentage, false)}).');
 
     // Build concise advisory in exactly 2 sentences (mirrors the Gemini
     // prompt's structure -- see AdvisoryPromptBuilder):
-    // 1. Nutrient amount + % of WHO daily reference amount (no serving
+    // 1. Nutrient amount + % of Recommended Daily Intake (no serving
     //    size, no math explanation).
     // 2. What that means for the user's condition, without implying this
     //    product causes/worsens/triggers it.
@@ -329,8 +345,8 @@ class FallbackAdvisoryGenerator {
   // Builds the Kidney Disease advisory in the same exactly-3-sentence shape
   // the other conditions use (mirrors the kidney branch of
   // AdvisoryPromptBuilder):
-  //   1. Sodium and protein amounts, each with its % of the WHO daily
-  //      reference amount.
+  //   1. Sodium and protein amounts, each with its % of the Recommended Daily
+  //      Intake.
   //   2. Detected phosphate additive ingredients -- or, when there are none,
   //      a short "worth watching" note (phosphate additives are never
   //      mentioned unless actually detected).
@@ -351,11 +367,11 @@ class FallbackAdvisoryGenerator {
 
     final amountSentence = isTagalog
         ? 'Naglalaman ang produktong ito ng $sodiumAmount na sodium '
-              '($sodiumPct% ng WHO daily reference amount) at $proteinAmount na protein '
-              '($proteinPct% ng WHO daily reference amount).'
+              '(${_formatPercentageWording(k.sodiumPercentage, true)}) at $proteinAmount na protein '
+              '(${_formatPercentageWording(k.proteinPercentage, true)}).'
         : 'This product contains $sodiumAmount of sodium '
-              '($sodiumPct% of the WHO daily reference amount) and $proteinAmount of protein '
-              '($proteinPct% of the WHO daily reference amount).';
+              '(${_formatPercentageWording(k.sodiumPercentage, false)}) and $proteinAmount of protein '
+              '(${_formatPercentageWording(k.proteinPercentage, false)}).';
 
     final meaningSentence = k.hasPhosphateAdditives
         ? (isTagalog

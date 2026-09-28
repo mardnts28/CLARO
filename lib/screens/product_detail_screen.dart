@@ -671,6 +671,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         _rankingExplanation = detail.rankingExplanation;
         _advisoryLoading = false;
       });
+      
+      // Debug: log advisory source
+      if (_advisory != null) {
+        debugPrint('Advisory source: ${_advisory!.source.name} (${_advisory!.isFallback ? "Fallback" : "AI Generated"})');
+      }
+      
       // Voice summary + auto-announce happen in _finishGroup() so a group
       // user hears the GROUP verdict instead of the solo one.
     }
@@ -879,6 +885,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _evaluation = self.evaluation;
       _groupChecking = false;
     });
+    
+    // Debug: log group advisory source
+    debugPrint('Group advisory source: ${advisory.source.name} (${advisory.isFallback ? "Fallback" : "AI Generated"})');
     _groupOptionsTick.value++;
     _finishVoice();
 
@@ -923,6 +932,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _groupAdvisory = cached;
       _groupAdvisoryLoading = cached == null;
     });
+    
+    // Debug: log cached group advisory source
+    if (cached != null) {
+      debugPrint('Cached group advisory source: ${cached.source.name} (${cached.isFallback ? "Fallback" : "AI Generated"})');
+    }
     _groupOptionsTick.value++;
 
     final uid = _authService.currentUser?.uid;

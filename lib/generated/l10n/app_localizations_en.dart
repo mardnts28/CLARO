@@ -1150,7 +1150,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String analysisBasisSubtitle(String servingSize) {
-    return 'Based on WHO reference, per 1 serving ($servingSize)';
+    return 'Referenced from W.H.O. Healthy Diet Fact Sheet, per 1 serving ($servingSize)';
   }
 
   @override
@@ -1181,10 +1181,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dailySuffix => 'reference';
 
   @override
-  String get ofWhoLimit => 'of WHO reference';
+  String get ofWhoLimit => 'of Recommended Daily Intake';
 
   @override
-  String get ofWhoFreeSugarReference => 'of WHO free-sugar reference';
+  String get ofWhoFreeSugarReference => 'of Recommended Daily Intake for free sugars';
 
   @override
   String get allergenDetectedBadge => 'Allergen Detected';
@@ -1243,7 +1243,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get calculationFormula =>
-      'Product amount per serving ÷ WHO reference × 100 = % of WHO reference';
+      'Product amount per serving ÷ Recommended Daily Intake × 100 = % of Recommended Daily Intake';
 
   @override
   String get howClaroExampleTitle => 'Example from this product';
@@ -1256,10 +1256,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get productAmountPerServingLabel => 'Product amount';
 
   @override
-  String get whoReferenceLabel => 'WHO reference';
+  String get whoReferenceLabel => 'Recommended Daily Intake';
 
   @override
-  String get whoFreeSugarReferenceLabel => 'WHO Free sugar reference';
+  String get whoFreeSugarReferenceLabel => 'Recommended Daily Intake for free sugars';
 
   @override
   String get howClaroClassificationTitle => 'How CLARO classifies it';

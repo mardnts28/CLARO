@@ -887,45 +887,6 @@ class AuthService {
     }
   }
 
-  Future<String?> sendPasswordResetEmail({required String email}) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_proxyBaseUrl/password-reset'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-App-Secret': _appSharedSecret,
-        },
-        body: jsonEncode({'email': email}),
-      );
-
-      debugPrint(
-        'Password reset response: ${response.statusCode} - ${response.body}',
-      );
-
-      if (response.statusCode != 200) {
-        final errorData = jsonDecode(response.body) as Map<String, dynamic>;
-        final errorCode = errorData['error'] as String?;
-
-        // Map worker error codes to user-friendly messages
-        switch (errorCode) {
-          case 'user-not-found':
-            return 'No account found with this email address.';
-          case 'invalid-email':
-            return 'Please enter a valid email address.';
-          case 'email-send-failed':
-            return 'Failed to send password reset email. Please try again.';
-          default:
-            return 'An error occurred while sending the password reset email. Please try again.';
-        }
-      }
-
-      return null;
-    } catch (e) {
-      debugPrint('Password reset error: $e');
-      return 'An error occurred while sending the password reset email. Please try again.';
-    }
-  }
-
   Future<void> signOut() async {
     isAuthenticating.value = false;
     HomeTabController.switchToTab(0);

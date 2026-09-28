@@ -32,11 +32,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _emailError = null);
 
     setState(() => _isLoading = true);
-    final error = await _authService.sendPasswordResetEmail(email: email);
+    final result = await _authService.requestPasswordResetOtp(email: email);
     if (!mounted) return;
     setState(() => _isLoading = false);
-    if (error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+    if (result.containsKey('error')) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['error'])));
       return;
     }
 

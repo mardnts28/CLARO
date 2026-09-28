@@ -19,6 +19,22 @@ import '../constants/who_fda_thresholds.dart';
 import 'serving_size_calculator.dart';
 import 'who_calculator.dart';
 
+/// Formats percentage wording for health advisories.
+/// If percentage <= 100%, returns "X% of the Recommended Daily Intake"
+/// If percentage > 100%, returns "(X-100)% above the Recommended Daily Intake"
+String _formatPercentageWording(double percentage, bool isTagalog) {
+  if (percentage <= 100) {
+    return isTagalog
+        ? '${percentage.toStringAsFixed(1)}% ng Recommended Daily Intake'
+        : '${percentage.toStringAsFixed(1)}% of the Recommended Daily Intake';
+  } else {
+    final above = percentage - 100;
+    return isTagalog
+        ? '${above.toStringAsFixed(1)}% sa taas ng Recommended Daily Intake'
+        : '${above.toStringAsFixed(1)}% above the Recommended Daily Intake';
+  }
+}
+
 class GroupMemberFacts {
   final String alias; // '[M1]' ... or '[YOU]' -- what Gemini sees
   final String name; // display name -- NEVER sent to Gemini
@@ -303,7 +319,7 @@ class GroupAdvisoryBuilder {
             b.write(
               ' Main nutrient of concern: ${_nutrientLabel(f.nutrientKey!)}, '
               '${f.amountPerServing!.toStringAsFixed(1)}${_nutrientUnit(f.nutrientKey!)} per serving '
-              '(${f.percentOfDaily!.toStringAsFixed(1)}% of the WHO daily reference amount).',
+              '(${_formatPercentageWording(f.percentOfDaily!, false)}).',
             );
           }
           return '- ${b.toString()}';
@@ -339,7 +355,8 @@ IMPORTANT:
 - [YOU] is the person using the app: address them as "you" and do not write the tag itself.
 - The application already calculated every amount, percentage and level. You must NOT calculate, derive, estimate, or invent any number. Use only the numbers supplied above.
 - Never describe anything as "safe" or medically recommended. Use non-medical, non-diagnostic, cautious language.
-- Do not mention calculations, algorithms, risk scores, or WHO by name.
+- Do not say the product causes, worsens, or triggers any condition, and do not tell anyone what they must do or avoid. Allergen warnings are the exception: cautious wording such as "may cause an allergic reaction" or "consume with caution or avoid" is fine for members flagged for an allergen.
+- Do not mention calculations, algorithms, or risk scores.
 
 WARNINGTEXT field:
 - Maximum 8 words.
@@ -348,7 +365,7 @@ WARNINGTEXT field:
 
 EXPLANATION field -- at most 2 short sentences, about 30-45 words in total:
 - Sentence 1: say who is flagged (by tag) and the main reason for each, using only the supplied nutrient or allergen facts.
-- Sentence 2: one short line for everyone else (for example that the others are not flagged), or a general cautious suggestion. Do not invent serving amounts.
+- Sentence 2 (only if some members are not flagged): one short line saying the others are not flagged. If everyone is flagged, write only sentence 1. Do not give advice and do not invent serving amounts.
 - If nobody is flagged, write one short sentence saying the product looks suitable for the whole group.
 $amountRule
 
@@ -413,8 +430,8 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
                 : 'contains an allergen (${f.allergens.map(_stripDetail).join(", ")})';
           } else if (f.nutrientKey != null) {
             why = tl
-                ? '${_nutrientLabelTl(f.nutrientKey!)} - ${f.percentOfDaily!.toStringAsFixed(0)}% ng daily reference'
-                : '${_nutrientLabel(f.nutrientKey!)} - ${f.percentOfDaily!.toStringAsFixed(0)}% of the daily reference';
+                ? '${_nutrientLabelTl(f.nutrientKey!)} - ${_formatPercentageWording(f.percentOfDaily!, true)}'
+                : '${_nutrientLabel(f.nutrientKey!)} - ${_formatPercentageWording(f.percentOfDaily!, false)}';
           } else {
             why = tl ? 'kailangang bantayan' : 'worth watching';
           }
