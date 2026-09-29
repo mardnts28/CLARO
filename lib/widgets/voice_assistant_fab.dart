@@ -9,11 +9,7 @@ class VoiceAssistantFab extends StatefulWidget {
   final VoidCallback? onPressed;
   final bool draggable;
 
-  const VoiceAssistantFab({
-    super.key,
-    this.onPressed,
-    this.draggable = true,
-  });
+  const VoiceAssistantFab({super.key, this.onPressed, this.draggable = true});
 
   @override
   State<VoiceAssistantFab> createState() => _VoiceAssistantFabState();
@@ -127,19 +123,65 @@ class _VoiceAssistantFabState extends State<VoiceAssistantFab>
                   _breathingController,
                 ]),
                 builder: (context, child) {
-                  final breathing =
-                      math.sin(_breathingController.value * math.pi);
+                  final breathing = math.sin(
+                    _breathingController.value * math.pi,
+                  );
 
                   return Stack(
                     alignment: Alignment.center,
                     clipBehavior: Clip.none,
                     children: [
-                      // Large soft glow behind the microphone
                       if (isListening)
-                        _buildGlow(
-                          theme,
-                          breathing,
+                        Positioned(
+                          right: 0,
+                          bottom: 68,
+                          child: ValueListenableBuilder<String>(
+                            valueListenable:
+                                VoiceAssistantService.liveTranscriptNotifier,
+                            builder: (context, transcript, _) {
+                              if (transcript.trim().isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return ConstrainedBox(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 270,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 9,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surface,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: theme.colorScheme.outlineVariant,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: theme.shadowColor.withValues(
+                                          alpha: 0.16,
+                                        ),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Text(
+                                    transcript,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ),
+                      // Large soft glow behind the microphone
+                      if (isListening) _buildGlow(theme, breathing),
 
                       // Expanding circular pulses
                       if (isListening)
@@ -151,10 +193,7 @@ class _VoiceAssistantFabState extends State<VoiceAssistantFab>
 
                       // Moving audio-wave effect
                       if (isListening)
-                        _buildListeningWave(
-                          theme,
-                          _waveController.value,
-                        ),
+                        _buildListeningWave(theme, _waveController.value),
 
                       // Microphone button
                       child!,
@@ -178,10 +217,7 @@ class _VoiceAssistantFabState extends State<VoiceAssistantFab>
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 180),
                     transitionBuilder: (child, animation) {
-                      return ScaleTransition(
-                        scale: animation,
-                        child: child,
-                      );
+                      return ScaleTransition(scale: animation, child: child);
                     },
                     child: Icon(
                       isListening ? Icons.mic : Icons.mic_none,
@@ -204,14 +240,8 @@ class _VoiceAssistantFabState extends State<VoiceAssistantFab>
             return Draggable<String>(
               data: 'voice-mic',
               maxSimultaneousDrags: 1,
-              feedback: Material(
-                color: Colors.transparent,
-                child: button,
-              ),
-              childWhenDragging: Opacity(
-                opacity: 0.25,
-                child: button,
-              ),
+              feedback: Material(color: Colors.transparent, child: button),
+              childWhenDragging: Opacity(opacity: 0.25, child: button),
               onDragStarted: () {
                 _activeDragDelta = Offset.zero;
               },
@@ -233,10 +263,7 @@ class _VoiceAssistantFabState extends State<VoiceAssistantFab>
   }
 
   /// Soft glow that gently expands and contracts while listening.
-  Widget _buildGlow(
-    ThemeData theme,
-    double breathing,
-  ) {
+  Widget _buildGlow(ThemeData theme, double breathing) {
     final size = 66.0 + (breathing * 12.0);
     final opacity = 0.10 + (breathing * 0.10);
 
@@ -246,9 +273,7 @@ class _VoiceAssistantFabState extends State<VoiceAssistantFab>
         height: size,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: theme.colorScheme.primary.withValues(
-            alpha: opacity,
-          ),
+          color: theme.colorScheme.primary.withValues(alpha: opacity),
           boxShadow: [
             BoxShadow(
               color: theme.colorScheme.primary.withValues(
@@ -264,10 +289,7 @@ class _VoiceAssistantFabState extends State<VoiceAssistantFab>
   }
 
   /// Expanding pulse rings.
-  Widget _buildRipple(
-    ThemeData theme,
-    double progress,
-  ) {
+  Widget _buildRipple(ThemeData theme, double progress) {
     final easedProgress = Curves.easeOut.transform(progress);
 
     final size = 56.0 + (easedProgress * 82.0);
@@ -283,9 +305,7 @@ class _VoiceAssistantFabState extends State<VoiceAssistantFab>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           border: Border.all(
-            color: theme.colorScheme.primary.withValues(
-              alpha: opacity,
-            ),
+            color: theme.colorScheme.primary.withValues(alpha: opacity),
             width: strokeWidth,
           ),
         ),
@@ -298,10 +318,7 @@ class _VoiceAssistantFabState extends State<VoiceAssistantFab>
   /// This creates a moving wave around the microphone.
   /// If the voice service later exposes microphone amplitude,
   /// the `intensity` value can be connected to the real audio level.
-  Widget _buildListeningWave(
-    ThemeData theme,
-    double progress,
-  ) {
+  Widget _buildListeningWave(ThemeData theme, double progress) {
     return IgnorePointer(
       child: SizedBox(
         width: 160,
@@ -321,10 +338,7 @@ class _ListeningWavePainter extends CustomPainter {
   final Color color;
   final double progress;
 
-  const _ListeningWavePainter({
-    required this.color,
-    required this.progress,
-  });
+  const _ListeningWavePainter({required this.color, required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -344,34 +358,25 @@ class _ListeningWavePainter extends CustomPainter {
       final fade = 1.0 - ringProgress;
 
       // Make the wave stronger in the middle of its movement.
-      final waveStrength =
-          math.sin(ringProgress * math.pi) * 5.0;
+      final waveStrength = math.sin(ringProgress * math.pi) * 5.0;
 
       paint
         ..strokeWidth = 1.5 + (fade * 1.2)
-        ..color = color.withValues(
-          alpha: 0.08 + (fade * 0.18),
-        );
+        ..color = color.withValues(alpha: 0.08 + (fade * 0.18));
 
       final path = Path();
 
       const points = 120;
 
       for (var point = 0; point <= points; point++) {
-        final angle =
-            (point / points) * math.pi * 2;
+        final angle = (point / points) * math.pi * 2;
 
         // Multiple sine waves create an organic audio-wave appearance.
-        final wave1 = math.sin(
-              angle * 5 +
-                  progress * math.pi * 2,
-            ) *
-            waveStrength;
+        final wave1 =
+            math.sin(angle * 5 + progress * math.pi * 2) * waveStrength;
 
-        final wave2 = math.sin(
-              angle * 9 -
-                  progress * math.pi * 3,
-            ) *
+        final wave2 =
+            math.sin(angle * 9 - progress * math.pi * 3) *
             (waveStrength * 0.35);
 
         final waveOffset = wave1 + wave2;
@@ -384,15 +389,9 @@ class _ListeningWavePainter extends CustomPainter {
         );
 
         if (point == 0) {
-          path.moveTo(
-            pointOffset.dx,
-            pointOffset.dy,
-          );
+          path.moveTo(pointOffset.dx, pointOffset.dy);
         } else {
-          path.lineTo(
-            pointOffset.dx,
-            pointOffset.dy,
-          );
+          path.lineTo(pointOffset.dx, pointOffset.dy);
         }
       }
 
@@ -402,10 +401,7 @@ class _ListeningWavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(
-    _ListeningWavePainter oldDelegate,
-  ) {
-    return oldDelegate.color != color ||
-        oldDelegate.progress != progress;
+  bool shouldRepaint(_ListeningWavePainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.progress != progress;
   }
 }

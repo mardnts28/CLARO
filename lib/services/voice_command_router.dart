@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -26,6 +27,9 @@ import '../core/utils/success_feedback_utils.dart';
 import '../generated/l10n/app_localizations.dart';
 import 'theme_service.dart';
 
+typedef VoiceCommandInterpreter =
+    Future<VoiceCommand> Function(String transcript);
+
 const String claroWebsiteUrl = 'https://claro-52ia.onrender.com/';
 const String privacyPolicyUrl =
     'https://claro-52ia.onrender.com/privacy-policy';
@@ -34,7 +38,15 @@ const String termsConditionsUrl =
 const String userGuideUrl = 'https://claro-52ia.onrender.com/user-guide';
 
 class VoiceCommandRouter {
-  VoiceCommandRouter._();
+  VoiceCommandRouter._({this._interpreter});
+
+  @visibleForTesting
+  VoiceCommandRouter.forTesting({required VoiceCommandInterpreter interpreter})
+    : this._(interpreter: interpreter);
+
+  final VoiceCommandInterpreter? _interpreter;
+  String? _lastUtterance;
+  String? _lastIntent;
 
   static final VoiceCommandRouter _instance = VoiceCommandRouter._();
 
@@ -51,6 +63,7 @@ class VoiceCommandRouter {
   };
 
   Future<void> handleMicTap(BuildContext context) async {
+    if (VoiceAssistantService.isListeningNotifier.value) return;
     final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
     if (!hasInternet) {
       if (context.mounted) {
@@ -61,30 +74,47 @@ class VoiceCommandRouter {
           message: loc.noInternetVoiceMessage,
           buttonText: loc.gotIt,
         );
+        await VoiceAssistantService.instance.speak(loc.noInternetVoiceMessage);
       }
       return;
     }
 
-    await VoiceAssistantService.instance.stopAudio();
-
-    final transcript =
-        await VoiceAssistantService.instance.listenOnce();
+    final result = await VoiceAssistantService.instance.listenOnce();
 
     if (!context.mounted) return;
+    if (result.status == VoiceListenStatus.recognized) {
+      await _handleTranscript(context, result.transcript);
+      return;
+    }
+    if (result.status != VoiceListenStatus.alreadyListening) {
+      await VoiceAssistantService.instance.speak(
+        VoiceAssistantService.messageForListenStatus(
+          result.status,
+          VoiceAssistantService.languageNotifier.value,
+        ),
+      );
+    }
+  }
 
-    final language =
-        VoiceAssistantService.languageNotifier.value;
+  @visibleForTesting
+  Future<void> handleTranscriptForTesting(
+    BuildContext context,
+    String? transcript,
+  ) => _handleTranscript(context, transcript);
 
-    final localeKey =
-        language == VoiceLang.tagalog ? 'fil' : 'en';
+  Future<void> _handleTranscript(
+    BuildContext context,
+    String? transcript,
+  ) async {
+    final language = VoiceAssistantService.languageNotifier.value;
+
+    final localeKey = language == VoiceLang.tagalog ? 'fil' : 'en';
 
     // ============================================================
     // 1. NO SPEECH DETECTED
     // ============================================================
     if (transcript == null || transcript.trim().isEmpty) {
-      debugPrint(
-        'Voice command: speech recognition returned no transcript.',
-      );
+      debugPrint('Voice command: speech recognition returned no transcript.');
 
       await VoiceAssistantService.instance.speak(
         localeKey == 'fil'
@@ -95,14 +125,13 @@ class VoiceCommandRouter {
       return;
     }
 
-    debugPrint(
-      'Voice command transcript: "$transcript"',
-    );
+    debugPrint('Voice command transcript: "$transcript"');
 
     // ============================================================
     // 2. SUMMARY REQUEST
     // ============================================================
     if (_isSummaryRequest(transcript)) {
+      _rememberTurn(transcript, 'summarize');
       debugPrint(
         'Voice command intent: type=VoiceIntentType.summarizeScan '
         '(local match)',
@@ -111,9 +140,7 @@ class VoiceCommandRouter {
       try {
         await _handleSummarizeIntent(language);
       } catch (error, stackTrace) {
-        debugPrint(
-          'Voice summary failed: $error',
-        );
+        debugPrint('Voice summary failed: $error');
         debugPrint('$stackTrace');
 
         await VoiceAssistantService.instance.speak(
@@ -129,18 +156,16 @@ class VoiceCommandRouter {
     // ============================================================
     // 3. PRODUCT SEARCH
     // ============================================================
-    final productSearchQuery =
-        _extractProductSearchQuery(transcript);
+    final productSearchQuery = _extractProductSearchQuery(transcript);
 
-    if (productSearchQuery != null &&
-        productSearchQuery.isNotEmpty) {
+    if (productSearchQuery != null && productSearchQuery.isNotEmpty) {
+      _rememberTurn(transcript, 'find_product');
       debugPrint(
         'Voice command intent: product search for '
         '"$productSearchQuery"',
       );
 
-      final handled =
-          await _handleProductSearch(
+      final handled = await _handleProductSearch(
         context,
         productSearchQuery,
         language,
@@ -150,181 +175,292 @@ class VoiceCommandRouter {
       if (!context.mounted) return;
     }
 
+    final activeProduct =
+        VoiceAssistantService.activeResultProductNotifier.value;
+    final appLanguage = LocaleService.localeNotifier.value.languageCode == 'tl'
+        ? 'tl'
+        : 'en';
+
     // ============================================================
-    // 4. FAST LOCAL NAVIGATION
+    // 4. DIRECT PRODUCT QUESTIONS
     // ============================================================
-    final localTarget =
-        _targetFromTranscript(transcript);
+    if (activeProduct != null && _looksLikeProductQuestion(transcript)) {
+      final productData = jsonEncode({
+        'product': activeProduct.toJson(),
+        'on_screen_health_advice':
+            VoiceAssistantService.latestScanSummaryNotifier.value ?? '',
+      });
+      final reply = await GeminiService.instance.askChat(
+        question: transcript,
+        appLanguage: appLanguage,
+        productData: productData,
+        history: const [],
+      );
+      if (reply.inScope && reply.topic == 'product') {
+        await VoiceAssistantService.instance.speak(reply.answer);
+        return;
+      }
+    }
+
+    // ============================================================
+    // 5. FAST LOCAL NAVIGATION
+    // ============================================================
+    final localTarget = _targetFromTranscript(transcript);
 
     if (localTarget != null) {
-      debugPrint(
-        'Voice command intent: fast local navigation -> $localTarget',
-      );
+      _rememberTurn(transcript, _intentForLocalTarget(localTarget));
+      debugPrint('Voice command intent: fast local navigation -> $localTarget');
 
-      final resolvedIntent = VoiceIntent(
+      if (_requiresActiveProduct(localTarget) &&
+          VoiceAssistantService.activeResultProductNotifier.value == null) {
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Magbukas muna ng produkto para magawa ito.'
+              : 'Please open a product first so I can do that.',
+        );
+        return;
+      }
+
+      final resolvedIntent = LegacyVoiceIntent(
         type: VoiceIntentType.navigate,
         targetPage: localTarget,
-        spokenReply:
-            _navigationReply(localTarget, localeKey),
+        spokenReply: _navigationReply(localTarget, localeKey),
       );
 
-      await _handleNavigationIntent(
-        context,
-        resolvedIntent,
-        localeKey,
-      );
+      await _handleNavigationIntent(context, resolvedIntent, localeKey);
 
       return;
     }
 
-    // ============================================================
-    // 5. STILL LOADING? (product detail screen, advisory not ready yet)
-    // ============================================================
-    // A product is open but its evaluation/advisory hasn't finished
-    // loading, so there's nothing grounded to answer with yet. Say so
-    // instead of silently sending Gemini stale/empty context.
-    final hasActiveProduct =
-        VoiceAssistantService.activeResultProductNotifier.value != null;
-    final hasLoadedSummary =
-        (VoiceAssistantService.latestScanSummaryNotifier.value ?? '')
-            .trim()
-            .isNotEmpty;
+    final currentTab = HomeTabController.tabNotifier.value;
+    final screen = activeProduct != null
+        ? 'product_detail'
+        : switch (currentTab) {
+            1 => 'scan',
+            2 => 'history',
+            3 => 'profile',
+            _ => 'home',
+          };
+    final productData = activeProduct == null
+        ? null
+        : jsonEncode({
+            'product': activeProduct.toJson(),
+            'advisory': VoiceAssistantService.latestScanSummaryNotifier.value,
+          });
+    final command =
+        await (_interpreter?.call(transcript) ??
+            GeminiService.instance.interpret(
+              transcript: transcript,
+              screen: screen,
+              appLanguage: appLanguage,
+              darkMode: themeModeNotifier.value == ThemeMode.dark,
+              voiceOn: VoiceAssistantService.instance.isEnabled,
+              mfaOn: AuthService.mfaNotifier.value,
+              lastUtterance: _lastUtterance,
+              lastIntent: _lastIntent,
+              productData: productData,
+            ));
+    if (!context.mounted) return;
+    _lastUtterance = transcript;
+    _lastIntent = command.intent.jsonValue;
+    await _handleVoiceCommand(context, command);
+  }
 
-    if (hasActiveProduct && !hasLoadedSummary) {
+  void _rememberTurn(String transcript, String intent) {
+    _lastUtterance = transcript;
+    _lastIntent = intent;
+  }
+
+  String _intentForLocalTarget(String target) => switch (target) {
+    'favorite_product' => 'add_favorite',
+    'unfavorite_product' => 'remove_favorite',
+    'compare_products' => 'compare_product',
+    'more_details' => 'show_more_details',
+    'report_product' => 'report_product',
+    'dark_mode' || 'light_mode' => 'set_theme',
+    'language' || 'language_english' || 'language_tagalog' => 'set_language',
+    'voice_assistant_on' || 'voice_assistant_off' => 'set_voice_assistant',
+    'mfa' || 'mfa_on' || 'mfa_off' => 'set_mfa',
+    'logout' => 'logout',
+    'clear_history' => 'guided_clear_history',
+    'clear_favorites' => 'guided_clear_favorites',
+    'delete_account' => 'guided_delete_account',
+    _ => 'navigate',
+  };
+
+  Future<void> _handleVoiceCommand(
+    BuildContext context,
+    VoiceCommand command,
+  ) async {
+    final localeKey = command.replyLanguage == 'tl' ? 'fil' : 'en';
+    if ((command.intent == VoiceIntent.readResults ||
+            command.intent == VoiceIntent.summarize ||
+            command.intent == VoiceIntent.askProductQuestion) &&
+        VoiceAssistantService.activeResultProductNotifier.value == null) {
       await VoiceAssistantService.instance.speak(
         localeKey == 'fil'
-            ? 'Sandali lang, sinusuri pa ang produktong ito.'
-            : 'Still analyzing this product, one moment.',
+            ? 'Mag-scan o magbukas muna ng produkto para mabasa ko ang impormasyon nito.'
+            : 'Please scan or open a product first so I can read its information.',
+      );
+      return;
+    }
+    if (command.intent == VoiceIntent.clarify ||
+        command.intent == VoiceIntent.unsupported ||
+        command.intent == VoiceIntent.help ||
+        command.intent == VoiceIntent.readResults ||
+        command.intent == VoiceIntent.summarize ||
+        command.intent == VoiceIntent.askProductQuestion) {
+      await VoiceAssistantService.instance.speak(command.speech);
+      return;
+    }
+
+    if (_requiresActiveProductIntent(command.intent) &&
+        VoiceAssistantService.activeResultProductNotifier.value == null) {
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Magbukas muna ng produkto para magawa ito.'
+            : 'Please open a product first so I can do that.',
       );
       return;
     }
 
-    // ============================================================
-    // 6. GEMINI INTENT CLASSIFICATION
-    // ============================================================
-    // Only attach context when the user is CURRENTLY on the product
-    // screen with a finished advisory -- notjust because a summary from
-    // an earlier visit happens to still be cached, which could otherwise
-    // ground an unrelated question (asked elsewhere in the app) in a
-    // stale product's data.
-    final screenContext =
-        (hasActiveProduct && hasLoadedSummary)
-            ? VoiceAssistantService.latestScanSummaryNotifier.value
-            : null;
-
-    final intent =
-        await GeminiService.instance.classifyIntent(
-      transcript: transcript,
-      language: language,
-      screenContext: screenContext,
-    );
-
-    if (!context.mounted) return;
-
-    final target =
-        _targetFromTranscript(transcript) ??
-        intent.targetPage;
-
-    final resolvedIntent =
-        target != null &&
-                intent.type != VoiceIntentType.summarizeScan &&
-                intent.type != VoiceIntentType.answerQuestion &&
-                intent.type != VoiceIntentType.processingError
-            ? VoiceIntent(
-                type: VoiceIntentType.navigate,
-                targetPage: target,
-                spokenReply:
-                    _navigationReply(
-                  target,
-                  localeKey,
-                ),
-              )
-            : intent;
-
-    debugPrint(
-      'Voice command intent: '
-      'type=${resolvedIntent.type} '
-      'target=${resolvedIntent.targetPage}',
-    );
-
-    // ============================================================
-    // 7. HANDLE INTENT
-    // ============================================================
-    switch (resolvedIntent.type) {
-      case VoiceIntentType.navigate:
-        await _handleNavigationIntent(
-          context,
-          resolvedIntent,
-          localeKey,
-        );
-        break;
-
-      case VoiceIntentType.summarizeScan:
-        try {
-          await _handleSummarizeIntent(language);
-        } catch (error, stackTrace) {
-          debugPrint(
-            'Voice summary failed: $error',
-          );
-          debugPrint('$stackTrace');
-
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Narinig ko ang iyong kahilingan, pero nagkaroon ng problema habang kinukuha ang resulta. Pakisubukan muli.'
-                : 'I heard your request, but there was a problem retrieving the results. Please try again.',
-          );
-        }
-        break;
-
-      case VoiceIntentType.answerQuestion:
+    if (command.intent == VoiceIntent.findProduct) {
+      final query = command.entity?.trim() ?? '';
+      if (query.isEmpty) {
         await VoiceAssistantService.instance.speak(
-          resolvedIntent.spokenReply.isNotEmpty
-              ? resolvedIntent.spokenReply
-              : localeKey == 'fil'
-                  ? 'Narinig ko ang tanong mo, pero wala akong sapat na impormasyon para sagutin ito.'
-                  : 'I heard your question, but I don\'t have enough information to answer it.',
+          localeKey == 'fil'
+              ? 'Anong produkto ang gusto mong hanapin sa scan history?'
+              : 'Which product should I find in your scan history?',
         );
-        break;
-
-      case VoiceIntentType.outOfScope:
-        await VoiceAssistantService.instance.speak(
-          resolvedIntent.spokenReply.isNotEmpty
-              ? resolvedIntent.spokenReply
-              : localeKey == 'fil'
-                  ? 'Narinig ko ang iyong sinabi, pero ang kahilingang iyon ay wala sa mga function ng CLARO.'
-                  : 'I heard your request, but that action is outside the functions supported by CLARO.',
-        );
-        break;
-
-      case VoiceIntentType.unclear:
-        await VoiceAssistantService.instance.speak(
-          resolvedIntent.spokenReply.isNotEmpty
-              ? resolvedIntent.spokenReply
-              : localeKey == 'fil'
-                  ? 'Narinig ko ang sinabi mo, pero hindi ko matukoy kung anong aksyon ang gusto mong gawin. Pakisubukan gamit ang mas simpleng utos.'
-                  : 'I heard what you said, but I could not determine what action you want me to perform. Please try a simpler command.',
-        );
-        break;
-
-      case VoiceIntentType.processingError:
-        await VoiceAssistantService.instance.speak(
-          resolvedIntent.spokenReply.isNotEmpty
-              ? resolvedIntent.spokenReply
-              : localeKey == 'fil'
-                  ? 'Narinig ko ang iyong utos, pero nagkaroon ng problema sa pagproseso nito. Pakisubukan muli.'
-                  : 'I heard your command, but there was a problem processing it. Please try again.',
-        );
-        break;
+        return;
+      }
+      await _handleProductSearch(
+        context,
+        query,
+        command.replyLanguage == 'tl' ? VoiceLang.tagalog : VoiceLang.english,
+      );
+      return;
     }
+
+    final target = _targetForCommand(command);
+
+    if (target == null) {
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Hindi ko matukoy ang hinihinging aksyon. Maaari mo bang linawin?'
+            : 'I could not determine that action. Could you clarify?',
+      );
+      return;
+    }
+
+    if (command.alreadySet) {
+      await VoiceAssistantService.instance.speak(command.speech);
+      return;
+    }
+
+    await _handleNavigationIntent(
+      context,
+      LegacyVoiceIntent(
+        type: VoiceIntentType.navigate,
+        targetPage: target,
+        spokenReply: command.speech,
+      ),
+      localeKey,
+      commandSpeech: command.speech,
+    );
   }
+
+  @visibleForTesting
+  String? testTargetForCommand(VoiceCommand command) =>
+      _targetForCommand(command);
+
+  String? _targetForCommand(VoiceCommand command) => switch (command.intent) {
+    VoiceIntent.navigate => _allowedNavigationTarget(command.target),
+    VoiceIntent.compareProduct => 'compare_products',
+    VoiceIntent.showMoreDetails => 'more_details',
+    VoiceIntent.addFavorite => 'favorite_product',
+    VoiceIntent.removeFavorite => 'unfavorite_product',
+    VoiceIntent.reportProduct => 'report_product',
+    VoiceIntent.setTheme =>
+      command.value == 'dark'
+          ? 'dark_mode'
+          : command.value == 'light'
+          ? 'light_mode'
+          : null,
+    VoiceIntent.setLanguage =>
+      command.value == 'tl'
+          ? 'language_tagalog'
+          : command.value == 'en'
+          ? 'language_english'
+          : null,
+    VoiceIntent.setVoiceAssistant =>
+      command.value == 'on'
+          ? 'voice_assistant_on'
+          : command.value == 'off'
+          ? 'voice_assistant_off'
+          : null,
+    VoiceIntent.setMfa =>
+      command.value == 'on'
+          ? 'mfa_on'
+          : command.value == 'off'
+          ? 'mfa_off'
+          : null,
+    VoiceIntent.logout => 'logout',
+    VoiceIntent.guidedClearHistory => 'clear_history',
+    VoiceIntent.guidedClearFavorites => 'clear_favorites',
+    VoiceIntent.guidedDeleteAccount => 'delete_account',
+    _ => null,
+  };
+
+  String? _allowedNavigationTarget(String? target) {
+    const targets = {
+      'home',
+      'scan',
+      'history',
+      'profile',
+      'personal_info',
+      'preferences',
+      'theme',
+      'password_settings',
+      'feedback',
+      'reviews',
+      'about_claro',
+      'privacy_policy',
+      'terms',
+      'user_guide',
+    };
+    if (target == null || !targets.contains(target)) return null;
+    return switch (target) {
+      'preferences' => 'preference',
+      'password_settings' => 'change_password',
+      'feedback' => 'suggestion',
+      'reviews' => 'review_history',
+      'terms' => 'terms_conditions',
+      _ => target,
+    };
+  }
+
+  bool _requiresActiveProduct(String target) => const {
+    'compare_products',
+    'more_details',
+    'favorite_product',
+    'unfavorite_product',
+  }.contains(target);
+
+  bool _requiresActiveProductIntent(VoiceIntent intent) => const {
+    VoiceIntent.compareProduct,
+    VoiceIntent.showMoreDetails,
+    VoiceIntent.addFavorite,
+    VoiceIntent.removeFavorite,
+  }.contains(intent);
 
   Future<void> _handleNavigationIntent(
     BuildContext context,
-    VoiceIntent intent,
-    String localeKey,
-  ) async {
-    final target =
-        _canonicalTarget(intent.targetPage);
+    LegacyVoiceIntent intent,
+    String localeKey, {
+    String? commandSpeech,
+  }) async {
+    final target = _canonicalTarget(intent.targetPage);
 
     if (target == null || target.isEmpty) {
       await VoiceAssistantService.instance.speak(
@@ -340,17 +476,13 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'favorite_product') {
       final currentProduct =
-          VoiceAssistantService
-              .latestScanProductNotifier
-              .value;
+          VoiceAssistantService.latestScanProductNotifier.value;
 
-      final user =
-          FirebaseAuth.instance.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
 
       if (currentProduct != null && user != null) {
         try {
-          await BackendLocator.favoritesService
-              .addFavorite(
+          await BackendLocator.favoritesService.addFavorite(
             userId: user.uid,
             productId: currentProduct.id,
           );
@@ -359,24 +491,19 @@ class VoiceCommandRouter {
               ? 'Naidagdag ang ${currentProduct.name} sa iyong mga paborito.'
               : 'Added ${currentProduct.name} to your favorites.';
 
-          await VoiceAssistantService.instance
-              .speak(msg);
+          await VoiceAssistantService.instance.speak(commandSpeech ?? msg);
         } catch (error, stackTrace) {
-          debugPrint(
-            'Favorite product failed: $error',
-          );
+          debugPrint('Favorite product failed: $error');
           debugPrint('$stackTrace');
 
-          await VoiceAssistantService.instance
-              .speak(
+          await VoiceAssistantService.instance.speak(
             localeKey == 'fil'
                 ? 'Narinig ko ang iyong utos, pero hindi ko ma-save ang produkto sa iyong mga paborito dahil nagkaroon ng problema sa pag-save.'
                 : 'I heard your command, but I could not add the product to your favorites because the save operation failed.',
           );
         }
       } else {
-        await VoiceAssistantService.instance
-            .speak(
+        await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
               ? 'Walang aktibong produkto para i-save. Mag-scan muna ng produkto.'
               : 'There is no active product to save. Please scan a product first.',
@@ -391,17 +518,13 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'unfavorite_product') {
       final currentProduct =
-          VoiceAssistantService
-              .latestScanProductNotifier
-              .value;
+          VoiceAssistantService.latestScanProductNotifier.value;
 
-      final user =
-          FirebaseAuth.instance.currentUser;
+      final user = FirebaseAuth.instance.currentUser;
 
       if (currentProduct != null && user != null) {
         try {
-          await BackendLocator.favoritesService
-              .removeFavorite(
+          await BackendLocator.favoritesService.removeFavorite(
             userId: user.uid,
             productId: currentProduct.id,
           );
@@ -410,24 +533,19 @@ class VoiceCommandRouter {
               ? 'Inalis ang ${currentProduct.name} sa iyong mga paborito.'
               : 'Removed ${currentProduct.name} from your favorites.';
 
-          await VoiceAssistantService.instance
-              .speak(msg);
+          await VoiceAssistantService.instance.speak(commandSpeech ?? msg);
         } catch (error, stackTrace) {
-          debugPrint(
-            'Unfavorite product failed: $error',
-          );
+          debugPrint('Unfavorite product failed: $error');
           debugPrint('$stackTrace');
 
-          await VoiceAssistantService.instance
-              .speak(
+          await VoiceAssistantService.instance.speak(
             localeKey == 'fil'
                 ? 'Narinig ko ang iyong utos, pero hindi ko maalis ang produkto sa iyong mga paborito dahil nagkaroon ng problema sa pag-save.'
                 : 'I heard your command, but I could not remove the product from your favorites because the save operation failed.',
           );
         }
       } else {
-        await VoiceAssistantService.instance
-            .speak(
+        await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
               ? 'Walang aktibong produkto para alisin sa mga paborito.'
               : 'There is no active product to remove from your favorites.',
@@ -446,21 +564,18 @@ class VoiceCommandRouter {
           context,
           MaterialPageRoute(
             builder: (_) =>
-                const UnknownProductSubmissionScreen(
-              capturedImagePath: null,
-            ),
+                const UnknownProductSubmissionScreen(capturedImagePath: null),
           ),
         );
 
         await VoiceAssistantService.instance.speak(
-          localeKey == 'fil'
-              ? 'Binubuksan ang screen para sa pag-uulat ng produkto.'
-              : 'Opening the product report screen.',
+          commandSpeech ??
+              (localeKey == 'fil'
+                  ? 'Binubuksan ang screen para sa pag-uulat ng produkto.'
+                  : 'Opening the product report screen.'),
         );
       } catch (error, stackTrace) {
-        debugPrint(
-          'Report screen failed: $error',
-        );
+        debugPrint('Report screen failed: $error');
         debugPrint('$stackTrace');
 
         await VoiceAssistantService.instance.speak(
@@ -478,34 +593,25 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'dark_mode') {
       try {
-        await setAppThemeMode(
-          ThemeMode.dark,
-        );
+        await setAppThemeMode(ThemeMode.dark);
 
         try {
-          await AuthService().updateUserData({
-            'theme': 'Dark Mode',
-          });
+          await AuthService().updateUserData({'theme': 'Dark Mode'});
         } catch (error) {
-          debugPrint(
-            'Theme preference save failed: $error',
-          );
+          debugPrint('Theme preference save failed: $error');
         }
 
-        await VoiceAssistantService.instance
-            .speak(
-          localeKey == 'fil'
-              ? 'Naka-on na ang dark mode.'
-              : 'Dark mode turned on.',
+        await VoiceAssistantService.instance.speak(
+          commandSpeech ??
+              (localeKey == 'fil'
+                  ? 'Naka-on na ang dark mode.'
+                  : 'Dark mode turned on.'),
         );
       } catch (error, stackTrace) {
-        debugPrint(
-          'Dark mode failed: $error',
-        );
+        debugPrint('Dark mode failed: $error');
         debugPrint('$stackTrace');
 
-        await VoiceAssistantService.instance
-            .speak(
+        await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
               ? 'Narinig ko ang iyong utos, pero hindi ko ma-on ang dark mode.'
               : 'I heard your command, but I could not turn on dark mode.',
@@ -520,34 +626,25 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'light_mode') {
       try {
-        await setAppThemeMode(
-          ThemeMode.light,
-        );
+        await setAppThemeMode(ThemeMode.light);
 
         try {
-          await AuthService().updateUserData({
-            'theme': 'Default',
-          });
+          await AuthService().updateUserData({'theme': 'Default'});
         } catch (error) {
-          debugPrint(
-            'Theme preference save failed: $error',
-          );
+          debugPrint('Theme preference save failed: $error');
         }
 
-        await VoiceAssistantService.instance
-            .speak(
-          localeKey == 'fil'
-              ? 'Naka-on na ang light mode.'
-              : 'Light mode turned on.',
+        await VoiceAssistantService.instance.speak(
+          commandSpeech ??
+              (localeKey == 'fil'
+                  ? 'Naka-on na ang light mode.'
+                  : 'Light mode turned on.'),
         );
       } catch (error, stackTrace) {
-        debugPrint(
-          'Light mode failed: $error',
-        );
+        debugPrint('Light mode failed: $error');
         debugPrint('$stackTrace');
 
-        await VoiceAssistantService.instance
-            .speak(
+        await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
               ? 'Narinig ko ang iyong utos, pero hindi ko ma-on ang light mode.'
               : 'I heard your command, but I could not turn on light mode.',
@@ -567,13 +664,10 @@ class VoiceCommandRouter {
             : 'Voice assistant disabled.',
       );
 
-      await VoiceAssistantService.instance
-          .updateEnabled(false);
+      await VoiceAssistantService.instance.updateEnabled(false);
 
       try {
-        await AuthService().updateUserData({
-          'voiceAssistant': false,
-        });
+        await AuthService().updateUserData({'voiceAssistant': false});
       } catch (error) {
         debugPrint('Voice assistant preference save failed: $error');
       }
@@ -585,21 +679,19 @@ class VoiceCommandRouter {
     // VOICE ASSISTANT ON
     // ============================================================
     if (target == 'voice_assistant_on') {
-      await VoiceAssistantService.instance
-          .updateEnabled(true);
+      await VoiceAssistantService.instance.updateEnabled(true);
 
       try {
-        await AuthService().updateUserData({
-          'voiceAssistant': true,
-        });
+        await AuthService().updateUserData({'voiceAssistant': true});
       } catch (error) {
         debugPrint('Voice assistant preference save failed: $error');
       }
 
       await VoiceAssistantService.instance.speak(
-        localeKey == 'fil'
-            ? 'Naka-on na ang voice assistant.'
-            : 'Voice assistant enabled.',
+        commandSpeech ??
+            (localeKey == 'fil'
+                ? 'Naka-on na ang voice assistant.'
+                : 'Voice assistant enabled.'),
       );
 
       return;
@@ -611,16 +703,15 @@ class VoiceCommandRouter {
     if (target == 'mfa_on') {
       try {
         HomeTabController.switchToTab(3); // Profile tab
-        await AuthService().setMfaEnabled(
-          enabled: true,
-        );
+        await AuthService().setMfaEnabled(enabled: true);
 
         unawaited(() async {
           await Future.delayed(const Duration(milliseconds: 350));
           await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Naka-on na ang multi-factor authentication para sa iyong account.'
-                : 'Multi-factor authentication has been turned on for your account.',
+            commandSpeech ??
+                (localeKey == 'fil'
+                    ? 'Naka-on na ang multi-factor authentication para sa iyong account.'
+                    : 'Multi-factor authentication has been turned on for your account.'),
           );
         }());
       } catch (error, stackTrace) {
@@ -641,16 +732,15 @@ class VoiceCommandRouter {
     if (target == 'mfa_off') {
       try {
         HomeTabController.switchToTab(3); // Profile tab
-        await AuthService().setMfaEnabled(
-          enabled: false,
-        );
+        await AuthService().setMfaEnabled(enabled: false);
 
         unawaited(() async {
           await Future.delayed(const Duration(milliseconds: 350));
           await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Naka-off na ang multi-factor authentication.'
-                : 'Multi-factor authentication has been turned off.',
+            commandSpeech ??
+                (localeKey == 'fil'
+                    ? 'Naka-off na ang multi-factor authentication.'
+                    : 'Multi-factor authentication has been turned off.'),
           );
         }());
       } catch (error, stackTrace) {
@@ -677,15 +767,15 @@ class VoiceCommandRouter {
 
         final msg = newMfa
             ? (localeKey == 'fil'
-                ? 'Naka-on na ang multi-factor authentication para sa iyong account.'
-                : 'Multi-factor authentication has been turned on for your account.')
+                  ? 'Naka-on na ang multi-factor authentication para sa iyong account.'
+                  : 'Multi-factor authentication has been turned on for your account.')
             : (localeKey == 'fil'
-                ? 'Naka-off na ang multi-factor authentication.'
-                : 'Multi-factor authentication has been turned off.');
+                  ? 'Naka-off na ang multi-factor authentication.'
+                  : 'Multi-factor authentication has been turned off.');
 
         unawaited(() async {
           await Future.delayed(const Duration(milliseconds: 350));
-          await VoiceAssistantService.instance.speak(msg);
+          await VoiceAssistantService.instance.speak(commandSpeech ?? msg);
         }());
       } catch (error, stackTrace) {
         debugPrint('MFA toggle failed: $error\n$stackTrace');
@@ -712,9 +802,7 @@ class VoiceCommandRouter {
 
         await AuthService().signOut();
       } catch (error, stackTrace) {
-        debugPrint(
-          'Logout failed: $error',
-        );
+        debugPrint('Logout failed: $error');
         debugPrint('$stackTrace');
 
         await VoiceAssistantService.instance.speak(
@@ -733,22 +821,16 @@ class VoiceCommandRouter {
     if (target == 'language_tagalog') {
       try {
         await LocaleService.setAppLocale('tl');
-        await VoiceAssistantService.instance
-            .updateLanguage(
-          VoiceLang.tagalog,
-        );
+        await VoiceAssistantService.instance.updateLanguage(VoiceLang.tagalog);
 
         unawaited(() async {
           await Future.delayed(const Duration(milliseconds: 350));
-          await VoiceAssistantService.instance
-              .speak(
-            'Pinalitan ang wika sa Tagalog.',
+          await VoiceAssistantService.instance.speak(
+            commandSpeech ?? 'Pinalitan ang wika sa Tagalog.',
           );
         }());
       } catch (error, stackTrace) {
-        debugPrint(
-          'Tagalog language change failed: $error',
-        );
+        debugPrint('Tagalog language change failed: $error');
         debugPrint('$stackTrace');
 
         await VoiceAssistantService.instance.speak(
@@ -763,21 +845,16 @@ class VoiceCommandRouter {
       try {
         await LocaleService.setAppLocale('en');
 
-        await VoiceAssistantService.instance
-            .updateLanguage(
-          VoiceLang.english,
-        );
+        await VoiceAssistantService.instance.updateLanguage(VoiceLang.english);
 
         unawaited(() async {
           await Future.delayed(const Duration(milliseconds: 350));
           await VoiceAssistantService.instance.speak(
-            'Language changed to English.',
+            commandSpeech ?? 'Language changed to English.',
           );
         }());
       } catch (error, stackTrace) {
-        debugPrint(
-          'English language change failed: $error',
-        );
+        debugPrint('English language change failed: $error');
         debugPrint('$stackTrace');
 
         await VoiceAssistantService.instance.speak(
@@ -791,7 +868,9 @@ class VoiceCommandRouter {
     if (target == 'language') {
       final currentLang = LocaleService.localeNotifier.value.languageCode;
       final newLangCode = currentLang == 'tl' ? 'en' : 'tl';
-      final newVoiceLang = newLangCode == 'tl' ? VoiceLang.tagalog : VoiceLang.english;
+      final newVoiceLang = newLangCode == 'tl'
+          ? VoiceLang.tagalog
+          : VoiceLang.english;
 
       try {
         await LocaleService.setAppLocale(newLangCode);
@@ -824,16 +903,11 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'compare_products') {
       final currentProduct =
-          VoiceAssistantService
-                  .activeResultProductNotifier
-                  .value ??
-              VoiceAssistantService
-                  .latestScanProductNotifier
-                  .value;
+          VoiceAssistantService.activeResultProductNotifier.value ??
+          VoiceAssistantService.latestScanProductNotifier.value;
 
       if (currentProduct == null) {
-        await VoiceAssistantService.instance
-            .speak(
+        await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
               ? 'Walang produktong maihahambing. Mag-scan muna ng produkto.'
               : 'No product is available to compare. Please scan a product first.',
@@ -841,28 +915,24 @@ class VoiceCommandRouter {
         return;
       }
 
-      final msg = localeKey == 'fil'
-          ? 'Binubuksan ang paghahambing para sa ${currentProduct.name}.'
-          : 'Opening comparison for ${currentProduct.name}.';
+      final msg =
+          commandSpeech ??
+          (localeKey == 'fil'
+              ? 'Binubuksan ang paghahambing para sa ${currentProduct.name}.'
+              : 'Opening comparison for ${currentProduct.name}.');
 
-      unawaited(
-        VoiceAssistantService.instance.speak(msg),
-      );
+      unawaited(VoiceAssistantService.instance.speak(msg));
 
       try {
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) =>
-                CompareProductsScreen(
-              sourceProduct: currentProduct,
-            ),
+                CompareProductsScreen(sourceProduct: currentProduct),
           ),
         );
       } catch (error, stackTrace) {
-        debugPrint(
-          'Comparison screen failed: $error',
-        );
+        debugPrint('Comparison screen failed: $error');
         debugPrint('$stackTrace');
 
         await VoiceAssistantService.instance.speak(
@@ -880,16 +950,11 @@ class VoiceCommandRouter {
     // ============================================================
     if (target == 'more_details') {
       final currentProduct =
-          VoiceAssistantService
-                  .activeResultProductNotifier
-                  .value ??
-              VoiceAssistantService
-                  .latestScanProductNotifier
-                  .value;
+          VoiceAssistantService.activeResultProductNotifier.value ??
+          VoiceAssistantService.latestScanProductNotifier.value;
 
       if (currentProduct == null) {
-        await VoiceAssistantService.instance
-            .speak(
+        await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
               ? 'Walang produktong mabibigyan ng karagdagang detalye. Mag-scan muna ng produkto.'
               : 'No product is available for more details. Please scan a product first.',
@@ -897,28 +962,23 @@ class VoiceCommandRouter {
         return;
       }
 
-      final msg = localeKey == 'fil'
-          ? 'Binubuksan ang karagdagang detalye para sa ${currentProduct.name}.'
-          : 'Opening more details for ${currentProduct.name}.';
+      final msg =
+          commandSpeech ??
+          (localeKey == 'fil'
+              ? 'Binubuksan ang karagdagang detalye para sa ${currentProduct.name}.'
+              : 'Opening more details for ${currentProduct.name}.');
 
-      unawaited(
-        VoiceAssistantService.instance.speak(msg),
-      );
+      unawaited(VoiceAssistantService.instance.speak(msg));
 
       try {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                MoreDetailsScreen(
-              product: currentProduct,
-            ),
+            builder: (_) => MoreDetailsScreen(product: currentProduct),
           ),
         );
       } catch (error, stackTrace) {
-        debugPrint(
-          'More details screen failed: $error',
-        );
+        debugPrint('More details screen failed: $error');
         debugPrint('$stackTrace');
 
         await VoiceAssistantService.instance.speak(
@@ -935,17 +995,14 @@ class VoiceCommandRouter {
     // RETURN TO ROOT
     // ============================================================
     if (Navigator.of(context).canPop()) {
-      Navigator.of(context)
-          .popUntil((route) => route.isFirst);
+      Navigator.of(context).popUntil((route) => route.isFirst);
     }
 
     // ============================================================
     // CLEAR HISTORY
     // ============================================================
     if (target == 'clear_history') {
-      HomeTabController.switchToHistorySubTab(
-        'Lahat',
-      );
+      HomeTabController.switchToHistorySubTab('Lahat');
 
       final msg = localeKey == 'fil'
           ? 'Para burahin ang iyong kasaysayan ng scan, i-tap ang trash icon sa itaas ng History screen.'
@@ -963,9 +1020,7 @@ class VoiceCommandRouter {
     // CLEAR FAVORITES
     // ============================================================
     if (target == 'clear_favorites') {
-      HomeTabController.switchToHistorySubTab(
-        'Paborito',
-      );
+      HomeTabController.switchToHistorySubTab('Paborito');
 
       final msg = localeKey == 'fil'
           ? 'Para burahin ang iyong mga paborito, i-tap ang trash icon sa itaas ng screen.'
@@ -1001,9 +1056,7 @@ class VoiceCommandRouter {
     // HISTORY FAVORITES
     // ============================================================
     if (target == 'history_favorites') {
-      HomeTabController.switchToHistorySubTab(
-        'Paborito',
-      );
+      HomeTabController.switchToHistorySubTab('Paborito');
 
       unawaited(
         VoiceAssistantService.instance.announcePageWithPreamble(
@@ -1021,9 +1074,7 @@ class VoiceCommandRouter {
     // HISTORY COMPARISON
     // ============================================================
     if (target == 'history_compare') {
-      HomeTabController.switchToHistorySubTab(
-        'Kumpara',
-      );
+      HomeTabController.switchToHistorySubTab('Kumpara');
 
       unawaited(
         VoiceAssistantService.instance.announcePageWithPreamble(
@@ -1041,9 +1092,7 @@ class VoiceCommandRouter {
     // HISTORY REPORTS
     // ============================================================
     if (target == 'history_reports') {
-      HomeTabController.switchToHistorySubTab(
-        'Mga Ulat',
-      );
+      HomeTabController.switchToHistorySubTab('Mga Ulat');
 
       unawaited(
         VoiceAssistantService.instance.announcePageWithPreamble(
@@ -1062,22 +1111,14 @@ class VoiceCommandRouter {
     // ============================================================
     if (_tabPageKeys.containsKey(target)) {
       if (target == 'history') {
-        HomeTabController.switchToHistorySubTab(
-          'Lahat',
-        );
+        HomeTabController.switchToHistorySubTab('Lahat');
       } else {
-        HomeTabController.switchToTab(
-          _tabPageKeys[target]!,
-        );
+        HomeTabController.switchToTab(_tabPageKeys[target]!);
       }
 
-      final reply =
-          intent.spokenReply.isNotEmpty
-              ? intent.spokenReply
-              : _navigationReply(
-                  target,
-                  localeKey,
-                );
+      final reply = intent.spokenReply.isNotEmpty
+          ? intent.spokenReply
+          : commandSpeech ?? _navigationReply(target, localeKey);
 
       // For history, chain the short reply with the full page description.
       // For all other tabs the short reply is sufficient.
@@ -1089,9 +1130,7 @@ class VoiceCommandRouter {
           ),
         );
       } else {
-        unawaited(
-          VoiceAssistantService.instance.speak(reply),
-        );
+        unawaited(VoiceAssistantService.instance.speak(reply));
       }
 
       return;
@@ -1100,24 +1139,14 @@ class VoiceCommandRouter {
     // ============================================================
     // OTHER SCREENS
     // ============================================================
-    final reply =
-        intent.spokenReply.isNotEmpty
-            ? intent.spokenReply
-            : _navigationReply(
-                target,
-                localeKey,
-              );
+    final reply = intent.spokenReply.isNotEmpty
+        ? intent.spokenReply
+        : _navigationReply(target, localeKey);
 
-    unawaited(
-      VoiceAssistantService.instance.speak(reply),
-    );
+    unawaited(VoiceAssistantService.instance.speak(reply));
 
     try {
-      final navigatorResult =
-          await _navigateToScreen(
-        context,
-        target,
-      );
+      final navigatorResult = await _navigateToScreen(context, target);
 
       if (!navigatorResult) {
         await VoiceAssistantService.instance.speak(
@@ -1127,9 +1156,7 @@ class VoiceCommandRouter {
         );
       }
     } catch (error, stackTrace) {
-      debugPrint(
-        'Navigation failed: $error',
-      );
+      debugPrint('Navigation failed: $error');
       debugPrint('$stackTrace');
 
       await VoiceAssistantService.instance.speak(
@@ -1140,17 +1167,12 @@ class VoiceCommandRouter {
     }
   }
 
-  Future<void> _handleSummarizeIntent(
-    VoiceLang language,
-  ) async {
-    final summary =
-        await GeminiService.instance.summarizeScan(
+  Future<void> _handleSummarizeIntent(VoiceLang language) async {
+    final summary = await GeminiService.instance.summarizeScan(
       language: language,
     );
 
-    await VoiceAssistantService.instance.speak(
-      summary,
-    );
+    await VoiceAssistantService.instance.speak(summary);
   }
 
   Future<bool> _navigateToScreen(
@@ -1161,30 +1183,21 @@ class VoiceCommandRouter {
       case 'personal_info':
         await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) =>
-                const PersonalInfoScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
         );
         return true;
 
       case 'preference':
         await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) =>
-                const PreferenceScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const PreferenceScreen()),
         );
         return true;
 
       case 'suggestion':
         await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) =>
-                const SuggestionScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const SuggestionScreen()),
         );
         return true;
 
@@ -1192,13 +1205,10 @@ class VoiceCommandRouter {
         try {
           return await launchUrl(
             Uri.parse(claroWebsiteUrl),
-            mode:
-                LaunchMode.externalApplication,
+            mode: LaunchMode.externalApplication,
           );
         } catch (error) {
-          debugPrint(
-            'Open CLARO website failed: $error',
-          );
+          debugPrint('Open CLARO website failed: $error');
           return false;
         }
 
@@ -1206,13 +1216,10 @@ class VoiceCommandRouter {
         try {
           return await launchUrl(
             Uri.parse(privacyPolicyUrl),
-            mode:
-                LaunchMode.externalApplication,
+            mode: LaunchMode.externalApplication,
           );
         } catch (error) {
-          debugPrint(
-            'Open privacy policy failed: $error',
-          );
+          debugPrint('Open privacy policy failed: $error');
           return false;
         }
 
@@ -1220,13 +1227,10 @@ class VoiceCommandRouter {
         try {
           return await launchUrl(
             Uri.parse(termsConditionsUrl),
-            mode:
-                LaunchMode.externalApplication,
+            mode: LaunchMode.externalApplication,
           );
         } catch (error) {
-          debugPrint(
-            'Open terms failed: $error',
-          );
+          debugPrint('Open terms failed: $error');
           return false;
         }
 
@@ -1234,43 +1238,31 @@ class VoiceCommandRouter {
         try {
           return await launchUrl(
             Uri.parse(userGuideUrl),
-            mode:
-                LaunchMode.externalApplication,
+            mode: LaunchMode.externalApplication,
           );
         } catch (error) {
-          debugPrint(
-            'Open user guide failed: $error',
-          );
+          debugPrint('Open user guide failed: $error');
           return false;
         }
 
       case 'change_password':
         await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) =>
-                const ChangePasswordScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
         );
         return true;
 
       case 'theme':
         await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) =>
-                const ThemeScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const ThemeScreen()),
         );
         return true;
 
       case 'review_history':
         await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (_) =>
-                const ReviewHistoryScreen(),
-          ),
+          MaterialPageRoute(builder: (_) => const ReviewHistoryScreen()),
         );
         return true;
 
@@ -1280,19 +1272,43 @@ class VoiceCommandRouter {
   }
 
   @visibleForTesting
-  String? testTargetFromTranscript(String transcript) => _targetFromTranscript(transcript);
+  String? testTargetFromTranscript(String transcript) =>
+      _targetFromTranscript(transcript);
 
   @visibleForTesting
-  String? testExtractProductSearchQuery(String transcript) => _extractProductSearchQuery(transcript);
+  bool testLooksLikeProductQuestion(String transcript) =>
+      _looksLikeProductQuestion(transcript);
 
-  String? _targetFromTranscript(
-    String transcript,
-  ) {
-    final normalized =
-        transcript.toLowerCase().replaceAll(
-          RegExp(r'[^a-z0-9 ]'),
-          ' ',
-        );
+  @visibleForTesting
+  String? testExtractProductSearchQuery(String transcript) =>
+      _extractProductSearchQuery(transcript);
+
+  bool _looksLikeProductQuestion(String transcript) {
+    final normalized = transcript
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .trim();
+
+    if (normalized.isEmpty) return false;
+
+    final englishPatterns = [
+      r'\b(?:what|what are|what is|which|show|tell|read|give|say|can you tell|can you say|are there|is there)\b.*\b(?:allergen|allergens|ingredients|sugar|sugars|sodium|nutrition|health|healthy|safe to eat|okay to eat|warning|warnings)\b',
+      r'\b(?:allergen|allergens|ingredients|sugar|sugars|sodium|nutrition|health|healthy|safe to eat|okay to eat|warning|warnings)\b',
+    ];
+    final tagalogPatterns = [
+      r'\b(?:ano|anong|alin|alamin|sabihin|ipasabi|show|tignan|may|meron|meron ba|may mga|may ba)\b.*\b(?:allergen|allergens|allergen ba|sangkap|mga sangkap|asukal|sodium|sodium ba|nutrisyon|kalusugan|safe ba|okay ba|babala|mga babala)\b',
+      r'\b(?:allergen|allergens|sangkap|mga sangkap|asukal|sodium|nutrisyon|kalusugan|safe ba|okay ba|babala|mga babala)\b',
+    ];
+
+    final patterns = [...englishPatterns, ...tagalogPatterns];
+    return patterns.any((pattern) => RegExp(pattern).hasMatch(normalized));
+  }
+
+  String? _targetFromTranscript(String transcript) {
+    final normalized = transcript.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9 ]'),
+      ' ',
+    );
 
     // ============================================================
     // UNFAVORITE
@@ -1307,7 +1323,7 @@ class VoiceCommandRouter {
     // FAVORITE
     // ============================================================
     if (RegExp(
-      r'\b(favorite(?: this(?: product)?)?|favorite it|add to favorites|save to favorites|save this(?: product)?|save product|like(?: this(?: product)?)?|i\s*favorite(?: ito)?|i\s*paborito(?: ito)?|paborito ito|gusto ko ito|i\s*save(?: ito)?|isave(?: ito)?|idagdag sa (?:mga )?paborito|isama sa (?:mga )?paborito|gawing paborito|ilagay sa (?:mga )?paborito)\b',
+      r'\b(favorite(?: this(?: product)?)?|favorite it|add to favorites|save to favorites|save this(?: product)?|save product|like(?: this(?: product)?)?|i\s*favorite(?: ito)?|i\s*paborito(?: ito)?|paborito ito|gusto ko ito|i\s*save(?: ito)?|isave(?: ito)?|idagdag sa (?:mga )?paborito|isama sa (?:mga )?paborito|gawing paborito|ilagay sa (?:mga )?paborito|ilagay sa favorites|ilagay ito sa favorites)\b',
     ).hasMatch(normalized)) {
       return 'favorite_product';
     }
@@ -1334,7 +1350,7 @@ class VoiceCommandRouter {
     // COMPARE
     // ============================================================
     if (RegExp(
-      r'\b(compare(?: this(?: product)?)?|compare product|compare scanned product|compare with alternatives|compare with others|ihambing(?: ang produktong ito)?|paghambingin(?: ito)?|pagkumparahin(?: ito)?|ikumpera(?: ito)?|ikumpra(?: ito)?|ihambing ito|ihambing ang produkto|paghambingin ang (?:mga )?produkto|ikumpera sa iba|ihambing sa iba)\b',
+      r'\b(compare(?: this(?: product)?)?|compare product|compare scanned product|compare with alternatives|compare with others|paki\s*compare(?: nito| ito| ang produkto)?|ihambing(?: ang produktong ito)?|paghambingin(?: ito)?|pagkumparahin(?: ito)?|ikumpera(?: ito)?|ikumpra(?: ito)?|ihambing ito|ihambing ang produkto|paghambingin ang (?:mga )?produkto|ikumpera sa iba|ihambing sa iba)\b',
     ).hasMatch(normalized)) {
       return 'compare_products';
     }
@@ -1378,10 +1394,7 @@ class VoiceCommandRouter {
     if (RegExp(
       r'\b(compare|comparison|comparisons|compared|kumpara|ihambing|paghambingin|ikumpra|ikumpera)\b',
     ).hasMatch(normalized)) {
-      if (VoiceAssistantService
-              .activeResultProductNotifier
-              .value !=
-          null) {
+      if (VoiceAssistantService.activeResultProductNotifier.value != null) {
         return 'compare_products';
       }
 
@@ -1586,17 +1599,11 @@ class VoiceCommandRouter {
     return null;
   }
 
-  bool _isSummaryRequest(
-    String transcript,
-  ) {
-    final normalized =
-        transcript
-            .toLowerCase()
-            .replaceAll(
-              RegExp(r'[^a-z0-9 ]'),
-              ' ',
-            )
-            .trim();
+  bool _isSummaryRequest(String transcript) {
+    final normalized = transcript
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+        .trim();
 
     if (RegExp(
       r'\b(summarize|summarise|summary|summaries|ibuod|buod|ipaliwanag|paliwanag|recap|overview)\b',
@@ -1621,16 +1628,10 @@ class VoiceCommandRouter {
     ).hasMatch(normalized);
   }
 
-  String? _canonicalTarget(
-    String? target,
-  ) {
+  String? _canonicalTarget(String? target) {
     if (target == null) return null;
 
-    final normalized =
-        target.toLowerCase().replaceAll(
-          RegExp(r'[^a-z_]'),
-          '_',
-        );
+    final normalized = target.toLowerCase().replaceAll(RegExp(r'[^a-z_]'), '_');
 
     const aliases = {
       'dashboard': 'home',
@@ -1714,40 +1715,22 @@ class VoiceCommandRouter {
     return aliases[normalized] ?? normalized;
   }
 
-  String _navigationReply(
-    String target,
-    String localeKey,
-  ) {
+  String _navigationReply(String target, String localeKey) {
     final pageName = switch (target) {
       'personal_info' =>
-        localeKey == 'fil'
-            ? 'personal na impormasyon'
-            : 'personal information',
+        localeKey == 'fil' ? 'personal na impormasyon' : 'personal information',
 
-      'home' =>
-        localeKey == 'fil'
-            ? 'pangunahing screen'
-            : 'home page',
+      'home' => localeKey == 'fil' ? 'pangunahing screen' : 'home page',
 
-      'scan' =>
-        localeKey == 'fil'
-            ? 'scanner ng produkto'
-            : 'scanner',
+      'scan' => localeKey == 'fil' ? 'scanner ng produkto' : 'scanner',
 
       'history' =>
-        localeKey == 'fil'
-            ? 'kasaysayan ng pag-scan'
-            : 'scan history',
+        localeKey == 'fil' ? 'kasaysayan ng pag-scan' : 'scan history',
 
       'clear_history' =>
-        localeKey == 'fil'
-            ? 'kasaysayan ng pag-scan'
-            : 'scan history',
+        localeKey == 'fil' ? 'kasaysayan ng pag-scan' : 'scan history',
 
-      'clear_favorites' =>
-        localeKey == 'fil'
-            ? 'mga paborito'
-            : 'favorites',
+      'clear_favorites' => localeKey == 'fil' ? 'mga paborito' : 'favorites',
 
       'delete_account' =>
         localeKey == 'fil'
@@ -1759,10 +1742,7 @@ class VoiceCommandRouter {
             ? 'profile at mga setting ng account'
             : 'profile and account settings',
 
-      'theme' =>
-        localeKey == 'fil'
-            ? 'mga setting ng tema'
-            : 'theme settings',
+      'theme' => localeKey == 'fil' ? 'mga setting ng tema' : 'theme settings',
 
       'preference' =>
         localeKey == 'fil'
@@ -1780,34 +1760,23 @@ class VoiceCommandRouter {
             : 'password and security settings',
 
       'review_history' =>
-        localeKey == 'fil'
-            ? 'kasaysayan ng mga review'
-            : 'app reviews',
+        localeKey == 'fil' ? 'kasaysayan ng mga review' : 'app reviews',
 
       'about_claro' =>
-        localeKey == 'fil'
-            ? 'impormasyon tungkol sa CLARO'
-            : 'About CLARO',
+        localeKey == 'fil' ? 'impormasyon tungkol sa CLARO' : 'About CLARO',
 
       'privacy_policy' =>
-        localeKey == 'fil'
-            ? 'Patakaran sa Privacy'
-            : 'Privacy Policy',
+        localeKey == 'fil' ? 'Patakaran sa Privacy' : 'Privacy Policy',
 
       'terms_conditions' =>
         localeKey == 'fil'
             ? 'mga Tuntunin at Kundisyon'
             : 'Terms and Conditions',
 
-      'user_guide' =>
-        localeKey == 'fil'
-            ? 'Gabay sa Paggamit'
-            : 'User Guide',
+      'user_guide' => localeKey == 'fil' ? 'Gabay sa Paggamit' : 'User Guide',
 
       'compare_products' =>
-        localeKey == 'fil'
-            ? 'paghahambing ng produkto'
-            : 'product comparison',
+        localeKey == 'fil' ? 'paghahambing ng produkto' : 'product comparison',
 
       _ => target.replaceAll('_', ' '),
     };
@@ -1819,11 +1788,8 @@ class VoiceCommandRouter {
     return 'Opening your $pageName.';
   }
 
-  String? _extractProductSearchQuery(
-    String transcript,
-  ) {
-    final t =
-        transcript.trim().toLowerCase();
+  String? _extractProductSearchQuery(String transcript) {
+    final t = transcript.trim().toLowerCase();
 
     const excludedPages = {
       'home',
@@ -1924,13 +1890,10 @@ class VoiceCommandRouter {
     ];
 
     for (final pattern in patterns) {
-      final match =
-          pattern.firstMatch(t);
+      final match = pattern.firstMatch(t);
 
-      if (match != null &&
-          match.groupCount >= 1) {
-        String query =
-            match.group(1)?.trim() ?? '';
+      if (match != null && match.groupCount >= 1) {
+        String query = match.group(1)?.trim() ?? '';
 
         query = query.replaceAll(
           RegExp(
@@ -1941,10 +1904,7 @@ class VoiceCommandRouter {
         );
 
         query = query.replaceAll(
-          RegExp(
-            r'\s+sa\s+(?:aking\s+)?history.*$',
-            caseSensitive: false,
-          ),
+          RegExp(r'\s+sa\s+(?:aking\s+)?history.*$', caseSensitive: false),
           '',
         );
 
@@ -2016,29 +1976,23 @@ class VoiceCommandRouter {
     String query,
     VoiceLang language,
   ) async {
-    final isTagalog =
-        language == VoiceLang.tagalog;
+    final isTagalog = language == VoiceLang.tagalog;
 
-    final normalizedQuery =
-        query.toLowerCase().trim();
+    final normalizedQuery = query.toLowerCase().trim();
 
     Product? matchedProduct;
 
     try {
-      final localHistory =
-          ScanHistoryService().localHistory;
+      final localHistory = ScanHistoryService().localHistory;
 
       if (localHistory.isNotEmpty) {
         for (final p in localHistory) {
-          final pName =
-              p.name.toLowerCase();
+          final pName = p.name.toLowerCase();
 
-          final pBrand =
-              p.brand.toLowerCase();
+          final pBrand = p.brand.toLowerCase();
 
           if (pName.contains(normalizedQuery) ||
-              '$pBrand $pName'
-                  .contains(normalizedQuery)) {
+              '$pBrand $pName'.contains(normalizedQuery)) {
             matchedProduct = p;
             break;
           }
@@ -2046,11 +2000,9 @@ class VoiceCommandRouter {
       }
 
       if (matchedProduct == null) {
-        final historyService =
-            HistoryService();
+        final historyService = HistoryService();
 
-        final historyItems =
-            historyService.getItems(
+        final historyItems = historyService.getItems(
           filter: 'Lahat',
           searchQuery: query,
         );
@@ -2059,13 +2011,10 @@ class VoiceCommandRouter {
           for (final item in historyItems) {
             final pId = item.productId;
 
-            if (pId != null &&
-                pId.isNotEmpty) {
+            if (pId != null && pId.isNotEmpty) {
               try {
-                matchedProduct =
-                    await BackendLocator
-                        .productRepository
-                        .getProductById(pId);
+                matchedProduct = await BackendLocator.productRepository
+                    .getProductById(pId);
 
                 break;
               } catch (error) {
@@ -2078,13 +2027,10 @@ class VoiceCommandRouter {
         }
       }
     } catch (error, stackTrace) {
-      debugPrint(
-        'Voice product search failed: $error',
-      );
+      debugPrint('Voice product search failed: $error');
       debugPrint('$stackTrace');
 
-      await VoiceAssistantService.instance
-          .speak(
+      await VoiceAssistantService.instance.speak(
         isTagalog
             ? 'Narinig ko ang pangalan ng produkto, pero nagkaroon ng problema habang hinahanap ito sa iyong scan history.'
             : 'I heard the product name, but there was a problem searching for it in your scan history.',
@@ -2096,48 +2042,32 @@ class VoiceCommandRouter {
     if (!context.mounted) return true;
 
     if (matchedProduct != null) {
-      final targetProduct =
-          matchedProduct;
+      final targetProduct = matchedProduct;
 
-      VoiceAssistantService
-          .setLatestScanProduct(
-        targetProduct,
-      );
+      VoiceAssistantService.setLatestScanProduct(targetProduct);
 
       final reply = isTagalog
           ? 'Nahanap ang ${targetProduct.name} mula sa iyong mga na-scan na produkto. Binubuksan ang mga detalye.'
           : 'Found ${targetProduct.name} from your scan records. Opening product details.';
 
       if (Navigator.of(context).canPop()) {
-        Navigator.of(context)
-            .popUntil(
-          (route) => route.isFirst,
-        );
+        Navigator.of(context).popUntil((route) => route.isFirst);
       }
 
-      unawaited(
-        VoiceAssistantService.instance
-            .speak(reply),
-      );
+      unawaited(VoiceAssistantService.instance.speak(reply));
 
       try {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                ProductDetailScreen(
-              product: targetProduct,
-            ),
+            builder: (_) => ProductDetailScreen(product: targetProduct),
           ),
         );
       } catch (error, stackTrace) {
-        debugPrint(
-          'Product details navigation failed: $error',
-        );
+        debugPrint('Product details navigation failed: $error');
         debugPrint('$stackTrace');
 
-        await VoiceAssistantService.instance
-            .speak(
+        await VoiceAssistantService.instance.speak(
           isTagalog
               ? 'Nahanap ko ang produkto, pero hindi ko mabuksan ang mga detalye nito.'
               : 'I found the product, but I could not open its details.',
@@ -2151,8 +2081,7 @@ class VoiceCommandRouter {
         ? 'Narinig ko ang hinahanap mong produkto, pero wala akong nakitang produktong tulad niyan sa iyong mga na-scan. Pakisubukang i-scan muna ang produkto.'
         : 'I heard the product you are looking for, but I could not find a matching product in your scan records. Please scan the product first.';
 
-    await VoiceAssistantService.instance
-        .speak(notFoundReply);
+    await VoiceAssistantService.instance.speak(notFoundReply);
 
     return true;
   }

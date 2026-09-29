@@ -887,6 +887,19 @@ class AuthService {
     }
   }
 
+  Future<String?> sendPasswordResetEmail({required String email}) async {
+    try {
+      await _firebaseAuth.sendPasswordResetEmail(email: email.trim());
+      return null;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase password reset failed: ${e.code} - ${e.message}');
+      return getFriendlyAuthErrorMessage(e);
+    } catch (e) {
+      debugPrint('Password reset error: $e');
+      return 'An error occurred while sending the password reset email. Please try again.';
+    }
+  }
+
   Future<void> signOut() async {
     isAuthenticating.value = false;
     HomeTabController.switchToTab(0);

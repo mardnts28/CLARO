@@ -1,13 +1,388 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:claro/models/product_model.dart';
+import 'package:claro/services/gemini_service.dart';
 import 'package:claro/services/voice_assistant_service.dart';
 import 'package:claro/services/voice_command_router.dart';
+import 'package:claro/services/home_tab_controller.dart';
+import 'package:claro/services/theme_service.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:claro/data/repositories/favorites_repository.dart';
 import 'package:claro/data/repositories/product_repository.dart';
 import 'package:claro/data/services/favorites_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('Structured voice command routing', () {
+    tearDown(() {
+      GeminiService.interpretRequestOverride = null;
+      VoiceAssistantService.activeResultProductNotifier.value = null;
+      VoiceAssistantService.latestScanProductNotifier.value = null;
+      VoiceAssistantService.isEnabledNotifier.value = false;
+      HomeTabController.tabNotifier.value = 0;
+    });
+
+    http.Response responseFor(Object payload) => http.Response(
+      jsonEncode({
+        'candidates': [
+          {
+            'finishReason': 'STOP',
+            'content': {
+              'parts': [
+                {'text': payload is String ? payload : jsonEncode(payload)},
+              ],
+            },
+          },
+        ],
+      }),
+      200,
+    );
+
+    Map<String, dynamic> commandJson(
+      String intent, {
+      String? target,
+      String? entity,
+      String? value,
+      bool alreadySet = false,
+      double confidence = 0.95,
+      String speech = 'Opening.',
+    }) => {
+      'intent': intent,
+      'target': target,
+      'entity': entity,
+      'value': value,
+      'already_set': alreadySet,
+      'confidence': confidence,
+      'reply_language': 'en',
+      'speech': speech,
+    };
+
+    Future<VoiceCommand> interpretMock(
+      Map<String, dynamic> command, {
+      String? productData,
+    }) {
+      GeminiService.interpretRequestOverride = (_, _, _) async =>
+          responseFor(command);
+      return GeminiService.instance.interpret(
+        transcript: 'mock transcript',
+        screen: productData == null ? 'home' : 'product_detail',
+        appLanguage: 'en',
+        darkMode: false,
+        voiceOn: true,
+        mfaOn: false,
+        productData: productData,
+      );
+    }
+
+    test(
+      'parses supported commands and maps them to existing app actions',
+      () async {
+        final router = VoiceCommandRouter.forTesting(
+          interpreter: (_) async => const VoiceCommand(
+            intent: VoiceIntent.clarify,
+            confidence: 0.9,
+            replyLanguage: 'en',
+            speech: 'Please clarify.',
+          ),
+        );
+
+        final cases = [
+          (
+            commandJson('compare_product'),
+            VoiceIntent.compareProduct,
+            'compare_products',
+          ),
+          (
+            commandJson('add_favorite'),
+            VoiceIntent.addFavorite,
+            'favorite_product',
+          ),
+          (
+            commandJson('set_theme', value: 'dark'),
+            VoiceIntent.setTheme,
+            'dark_mode',
+          ),
+          (
+            commandJson('guided_clear_history'),
+            VoiceIntent.guidedClearHistory,
+            'clear_history',
+          ),
+          (commandJson('unsupported'), VoiceIntent.unsupported, null),
+          (
+            commandJson('navigate', target: 'scan'),
+            VoiceIntent.navigate,
+            'scan',
+          ),
+        ];
+
+        for (final (payload, expectedIntent, expectedTarget) in cases) {
+          final command = await interpretMock(payload);
+          expect(command.intent, expectedIntent);
+          expect(router.testTargetForCommand(command), expectedTarget);
+        }
+      },
+    );
+
+    test(
+      'asks to open a product before interpreting product-specific requests',
+      () async {
+        GeminiService.interpretRequestOverride = (_, _, body) async {
+          final request = jsonDecode(body) as Map<String, dynamic>;
+          final userText =
+              ((request['contents'] as List).single as Map)['parts'];
+          final text = ((userText as List).single as Map)['text'] as String;
+          expect(text, contains('paki-compare nito'));
+          expect(text, isNot(contains('PRODUCT DATA')));
+          return responseFor(
+            commandJson('clarify', speech: 'Please open a product first.'),
+          );
+        };
+        final command = await GeminiService.instance.interpret(
+          transcript: 'paki-compare nito',
+          screen: 'home',
+          appLanguage: 'en',
+          darkMode: false,
+          voiceOn: true,
+          mfaOn: false,
+        );
+        expect(command.intent, VoiceIntent.clarify);
+        expect(command.speech, 'Please open a product first.');
+      },
+    );
+
+    test(
+      'uses the requested prompt format and structured response schema',
+      () async {
+        Map<String, dynamic>? request;
+        GeminiService.interpretRequestOverride = (_, _, body) async {
+          request = jsonDecode(body) as Map<String, dynamic>;
+          return responseFor(
+            commandJson('help', speech: 'Try scan, history, or results.'),
+          );
+        };
+        await GeminiService.instance.interpret(
+          transcript: 'what can you do',
+          screen: 'home',
+          appLanguage: 'en',
+          darkMode: true,
+          voiceOn: false,
+          mfaOn: true,
+          lastUtterance: 'go to history',
+          lastIntent: 'navigate',
+        );
+        final captured = request!;
+        final content =
+            (captured['contents'] as List).single as Map<String, dynamic>;
+        final parts = content['parts'] as List;
+        final userText =
+            (parts.single as Map<String, dynamic>)['text'] as String;
+        expect(userText, contains('Screen: home\nApp language: en'));
+        expect(
+          userText,
+          contains('Dark mode: on | Voice assistant: off | MFA: on'),
+        );
+        expect(
+          userText,
+          contains('Previous turn: "go to history" -> navigate'),
+        );
+        expect(userText, contains('Transcript: "what can you do"'));
+        expect(captured['system_instruction'], isNotNull);
+        final generationConfig =
+            captured['generationConfig'] as Map<String, dynamic>;
+        expect(generationConfig['temperature'], 0.2);
+        expect(generationConfig['maxOutputTokens'], 300);
+        expect(generationConfig['responseMimeType'], 'application/json');
+        expect(generationConfig['responseSchema'], isA<Map<String, dynamic>>());
+      },
+    );
+
+    test('low confidence returns clarify fallback', () async {
+      final command = await interpretMock(
+        commandJson('navigate', target: 'history', confidence: 0.59),
+      );
+      expect(command.intent, VoiceIntent.clarify);
+      expect(command.speech, 'Sorry, could you say that again?');
+    });
+
+    test('malformed JSON returns clarify fallback', () async {
+      GeminiService.interpretRequestOverride = (_, _, _) async =>
+          responseFor('{bad json');
+      final command = await GeminiService.instance.interpret(
+        transcript: 'open history',
+        screen: 'home',
+        appLanguage: 'en',
+        darkMode: false,
+        voiceOn: true,
+        mfaOn: false,
+      );
+      expect(command.intent, VoiceIntent.clarify);
+    });
+
+    test('request exceptions return clarify fallback', () async {
+      GeminiService.interpretRequestOverride = (_, _, _) async =>
+          throw Exception('mock failure');
+      final command = await GeminiService.instance.interpret(
+        transcript: 'open history',
+        screen: 'home',
+        appLanguage: 'tl',
+        darkMode: false,
+        voiceOn: true,
+        mfaOn: false,
+      );
+      expect(command.intent, VoiceIntent.clarify);
+      expect(command.speech, 'Paumanhin, maaari mo bang ulitin?');
+    });
+
+    testWidgets('scan command only switches to the scan tab', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      BuildContext? pageContext;
+      var geminiCalls = 0;
+      final router = VoiceCommandRouter.forTesting(
+        interpreter: (_) async {
+          geminiCalls++;
+          return const VoiceCommand(
+            intent: VoiceIntent.navigate,
+            target: 'scan',
+            confidence: 0.95,
+            replyLanguage: 'en',
+            speech: 'Opening scan.',
+          );
+        },
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              pageContext = context;
+              return const Scaffold(body: Text('Home'));
+            },
+          ),
+        ),
+      );
+      await router.handleTranscriptForTesting(pageContext!, 'scan this for me');
+      expect(HomeTabController.tabNotifier.value, 1);
+      expect(geminiCalls, 0);
+    });
+
+    testWidgets('guided clear history opens history without clearing data', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      BuildContext? pageContext;
+      final router = VoiceCommandRouter.forTesting(
+        interpreter: (_) async => const VoiceCommand(
+          intent: VoiceIntent.guidedClearHistory,
+          confidence: 0.95,
+          replyLanguage: 'en',
+          speech: 'Opening history and explaining how to clear it.',
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              pageContext = context;
+              return const Scaffold(body: Text('Home'));
+            },
+          ),
+        ),
+      );
+      await router.handleTranscriptForTesting(
+        pageContext!,
+        'burahin lahat ng history',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(HomeTabController.tabNotifier.value, 2);
+      expect(HomeTabController.historySubTabNotifier.value, 'Lahat');
+    });
+
+    testWidgets(
+      'compare and favorite requests without an open product do not act',
+      (tester) async {
+        BuildContext? pageContext;
+        final router = VoiceCommandRouter.forTesting(
+          interpreter: (_) async => const VoiceCommand(
+            intent: VoiceIntent.clarify,
+            confidence: 0.95,
+            replyLanguage: 'en',
+            speech: 'Please open a product first.',
+          ),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) {
+                pageContext = context;
+                return const Scaffold(body: Text('Home'));
+              },
+            ),
+          ),
+        );
+        expect(
+          router.testTargetFromTranscript('paki-compare nito'),
+          'compare_products',
+        );
+        expect(
+          router.testTargetFromTranscript('ilagay sa favorites'),
+          'favorite_product',
+        );
+        await router.handleTranscriptForTesting(
+          pageContext!,
+          'paki-compare nito',
+        );
+        await router.handleTranscriptForTesting(
+          pageContext!,
+          'ilagay sa favorites',
+        );
+        expect(HomeTabController.tabNotifier.value, 0);
+      },
+    );
+
+    testWidgets(
+      'Gemini fallback applies theme and leaves unsupported requests idle',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        BuildContext? pageContext;
+        final router = VoiceCommandRouter.forTesting(
+          interpreter: (transcript) async => transcript == 'gawing madilim'
+              ? const VoiceCommand(
+                  intent: VoiceIntent.setTheme,
+                  value: 'dark',
+                  confidence: 0.95,
+                  replyLanguage: 'en',
+                  speech: 'Turning on dark mode.',
+                )
+              : const VoiceCommand(
+                  intent: VoiceIntent.unsupported,
+                  confidence: 0.95,
+                  replyLanguage: 'en',
+                  speech: 'I can help with product labels or app navigation.',
+                ),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) {
+                pageContext = context;
+                return const Scaffold(body: Text('Home'));
+              },
+            ),
+          ),
+        );
+        await router.handleTranscriptForTesting(pageContext!, 'gawing madilim');
+        expect(themeModeNotifier.value, ThemeMode.dark);
+        await router.handleTranscriptForTesting(
+          pageContext!,
+          "what's the weather",
+        );
+        expect(HomeTabController.tabNotifier.value, 0);
+      },
+    );
+  });
 
   group('Voice Compare Navigation Tests', () {
     test('latestScanProductNotifier stores active product for comparison', () {
@@ -36,324 +411,538 @@ void main() {
       );
 
       VoiceAssistantService.setLatestScanProduct(sampleProduct);
-      expect(VoiceAssistantService.latestScanProductNotifier.value, equals(sampleProduct));
-      expect(VoiceAssistantService.latestScanProductNotifier.value?.name, equals('Century Tuna Flakes in Oil'));
+      expect(
+        VoiceAssistantService.latestScanProductNotifier.value,
+        equals(sampleProduct),
+      );
+      expect(
+        VoiceAssistantService.latestScanProductNotifier.value?.name,
+        equals('Century Tuna Flakes in Oil'),
+      );
     });
 
-    test('Voice product search patterns correctly match English and Tagalog commands', () {
-      final patterns = [
-        RegExp(r'^(?:please\s+)?(?:find|search(?:\s+for)?|look\s+for|show|open)\s+(?:me\s+)?(.+?)(?:\s+(?:in|from)\s+(?:my\s+)?history|\s+from\s+last\s+week|\s+from\s+yesterday|\s+product|\s+details)?$', caseSensitive: false),
-        RegExp(r'^(?:paki-?)?(?:hanapin|hanap|pahanap|buksan|tingnan|ipakita)\s+(?:po\s+)?(?:ang|yung|ng)?\s*(.+?)(?:\s+sa\s+(?:aking\s+)?history|\s+sa\s+mga\s+na-?scan)?$', caseSensitive: false),
-      ];
+    test(
+      'Voice product search patterns correctly match English and Tagalog commands',
+      () {
+        final patterns = [
+          RegExp(
+            r'^(?:please\s+)?(?:find|search(?:\s+for)?|look\s+for|show|open)\s+(?:me\s+)?(.+?)(?:\s+(?:in|from)\s+(?:my\s+)?history|\s+from\s+last\s+week|\s+from\s+yesterday|\s+product|\s+details)?$',
+            caseSensitive: false,
+          ),
+          RegExp(
+            r'^(?:paki-?)?(?:hanapin|hanap|pahanap|buksan|tingnan|ipakita)\s+(?:po\s+)?(?:ang|yung|ng)?\s*(.+?)(?:\s+sa\s+(?:aking\s+)?history|\s+sa\s+mga\s+na-?scan)?$',
+            caseSensitive: false,
+          ),
+        ];
 
-      bool matchesAny(String input) => patterns.any((p) => p.hasMatch(input.trim()));
+        bool matchesAny(String input) =>
+            patterns.any((p) => p.hasMatch(input.trim()));
 
-      expect(matchesAny('find blue bay tuna from last week'), isTrue);
-      expect(matchesAny('search for century tuna in my history'), isTrue);
-      expect(matchesAny('look for lucky 7 carne norte'), isTrue);
-      expect(matchesAny('open star carne norte'), isTrue);
-      expect(matchesAny('hanapin ang blue bay tuna sa history'), isTrue);
-      expect(matchesAny('buksan ang 555 sardines'), isTrue);
-      expect(matchesAny('pahanap ng century tuna'), isTrue);
-    });
+        expect(matchesAny('find blue bay tuna from last week'), isTrue);
+        expect(matchesAny('search for century tuna in my history'), isTrue);
+        expect(matchesAny('look for lucky 7 carne norte'), isTrue);
+        expect(matchesAny('open star carne norte'), isTrue);
+        expect(matchesAny('hanapin ang blue bay tuna sa history'), isTrue);
+        expect(matchesAny('buksan ang 555 sardines'), isTrue);
+        expect(matchesAny('pahanap ng century tuna'), isTrue);
+      },
+    );
 
-    test('Voice navigation patterns resolve profile, preferences, theme/darkmode, suggestions, and sub-tabs', () {
-      String? targetFromTranscript(String transcript) {
-        final normalized = transcript.toLowerCase().replaceAll(RegExp(r'[^a-z0-9 ]'), ' ');
+    test(
+      'Voice navigation patterns resolve profile, preferences, theme/darkmode, suggestions, and sub-tabs',
+      () {
+        String? targetFromTranscript(String transcript) {
+          final normalized = transcript.toLowerCase().replaceAll(
+            RegExp(r'[^a-z0-9 ]'),
+            ' ',
+          );
 
-        // 1. Comparison Screen
-        if (RegExp(r'\b(compare products|compare product|product comparison|ihambing|paghambingin|pagkumparahin|ikumpera|ikumpra)\b')
-            .hasMatch(normalized)) {
-          return 'compare_products';
+          // 1. Comparison Screen
+          if (RegExp(
+            r'\b(compare products|compare product|product comparison|ihambing|paghambingin|pagkumparahin|ikumpera|ikumpra)\b',
+          ).hasMatch(normalized)) {
+            return 'compare_products';
+          }
+
+          // Guided actions: Clear History & Clear Favorites
+          if (RegExp(
+            r'\b(clear\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|delete\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|erase\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|wipe\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|remove\s+all\s+history|burahin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|tanggalin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|i\s*clear\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|i\s*delete\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan))\b',
+          ).hasMatch(normalized)) {
+            return 'clear_history';
+          }
+
+          if (RegExp(
+            r'\b(clear\s+(?:all\s+)?(?:my\s+)?favorites|delete\s+(?:all\s+)?(?:my\s+)?favorites|burahin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?paborito|tanggalin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?paborito|i\s*clear\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?paborito)\b',
+          ).hasMatch(normalized)) {
+            return 'clear_favorites';
+          }
+
+          if (RegExp(
+            r'\b(delete\s+(?:my\s+)?account|remove\s+(?:my\s+)?account|close\s+(?:my\s+)?account|erase\s+(?:my\s+)?account|burahin\s+(?:ang\s+)?(?:aking\s+)?account|tanggalin\s+(?:ang\s+)?(?:aking\s+)?account|isara\s+(?:ang\s+)?(?:aking\s+)?account|i\s*delete\s+(?:ang\s+)?(?:aking\s+)?account)\b',
+          ).hasMatch(normalized)) {
+            return 'delete_account';
+          }
+
+          // 2. Sub-tabs in History
+          if (RegExp(
+            r'\b(favorite|favorites|paborito|mga paborito|my favorites|paboritong produkto|saved products|saved product|saved items|saved)\b',
+          ).hasMatch(normalized)) {
+            return 'history_favorites';
+          }
+          if (RegExp(
+            r'\b(compare history|comparison history|comparison records|compared|history compare|kumpara|kasaysayan ng paghahambing|past comparisons)\b',
+          ).hasMatch(normalized)) {
+            return 'history_compare';
+          }
+          if (RegExp(
+            r'\b(reports|my reports|submitted reports|mga ulat|ulat|report history|view reports|show reports)\b',
+          ).hasMatch(normalized)) {
+            return 'history_reports';
+          }
+
+          // 3. Main Tabs
+          if (RegExp(
+            r'\b(home|main|dashboard|simula|home page|home screen)\b',
+          ).hasMatch(normalized)) {
+            return 'home';
+          }
+          if (RegExp(
+            r'\b(scan|scanner|camera|mag-scan|magscan|camera screen|scan screen)\b',
+          ).hasMatch(normalized)) {
+            return 'scan';
+          }
+          if (RegExp(
+            r'\b(history|records|previous scans|mga na-scan|kasaysayan|scan history)\b',
+          ).hasMatch(normalized)) {
+            return 'history';
+          }
+          if (RegExp(
+            r'\b(profile|my profile|account|my account|profile page|profile screen)\b',
+          ).hasMatch(normalized)) {
+            return 'profile';
+          }
+
+          // 4. Settings & Feature Screens
+          if (RegExp(
+            r'\b(personal information|personal info|my info|my information|account information|personal na impormasyon|personal details|profile details|personal)\b',
+          ).hasMatch(normalized)) {
+            return 'personal_info';
+          }
+          // Voice Assistant ON / OFF
+          if (RegExp(
+            r'\b(voice assistant off|voice off|turn off voice assistant|turn off voice|disable voice assistant|disable voice|i\s*off ang voice assistant|patayin ang boses|patayin ang voice assistant)\b',
+          ).hasMatch(normalized)) {
+            return 'voice_assistant_off';
+          }
+          if (RegExp(
+            r'\b(voice assistant on|voice on|turn on voice assistant|turn on voice|enable voice assistant|enable voice|i\s*on ang voice assistant|buhayin ang boses|buhayin ang voice assistant)\b',
+          ).hasMatch(normalized)) {
+            return 'voice_assistant_on';
+          }
+
+          // MFA ON / OFF
+          if (RegExp(
+            r'\b(turn off (?:mfa|multi factor|two factor|2fa)|disable (?:mfa|multi factor|two factor|2fa)|deactivate (?:mfa|multi factor|two factor|2fa)|switch off (?:mfa|2fa)|mfa off|2fa off|i\s*off ang (?:mfa|multi factor|two factor|2fa)|patayin ang (?:mfa|multi factor|two factor|2fa)|isara ang (?:mfa|multi factor|two factor|2fa)|i\s*disable ang (?:mfa|2fa)|i\s*deactivate ang (?:mfa|2fa))\b',
+          ).hasMatch(normalized)) {
+            return 'mfa_off';
+          }
+          if (RegExp(
+            r'\b(turn on (?:mfa|multi factor|two factor|2fa)|enable (?:mfa|multi factor|two factor|2fa)|activate (?:mfa|multi factor|two factor|2fa)|switch on (?:mfa|2fa)|mfa on|2fa on|i\s*on ang (?:mfa|multi factor|two factor|2fa)|buhayin ang (?:mfa|multi factor|two factor|2fa)|buksan ang (?:mfa|multi factor|two factor|2fa)|i\s*enable ang (?:mfa|2fa)|i\s*activate ang (?:mfa|2fa))\b',
+          ).hasMatch(normalized)) {
+            return 'mfa_on';
+          }
+          if (RegExp(
+            r'\b(multi factor authentication|two factor authentication|multi factor|two factor|mfa|2fa|dalawang yugtong pagpapatunay|mfa settings|2fa settings)\b',
+          ).hasMatch(normalized)) {
+            return 'mfa';
+          }
+
+          // Theme: Turn OFF Dark Mode -> Light Mode
+          if (RegExp(
+            r'\b(dark mode off|darkmode off|turn off dark mode|turn off darkmode|disable dark mode|disable darkmode|i\s*off ang dark mode|patayin ang dark mode)\b',
+          ).hasMatch(normalized)) {
+            return 'light_mode';
+          }
+
+          // Theme: Turn OFF Light Mode -> Dark Mode
+          if (RegExp(
+            r'\b(light mode off|lightmode off|turn off light mode|turn off lightmode|disable light mode|disable lightmode|i\s*off ang light mode|patayin ang light mode)\b',
+          ).hasMatch(normalized)) {
+            return 'dark_mode';
+          }
+
+          // Theme: Turn ON Dark Mode -> Dark Mode
+          if (RegExp(
+            r'\b(turn on dark mode|turn on darkmode|enable dark mode|enable darkmode|switch to dark mode|dark mode on|darkmode on|diliman ang tema|dark theme|i\s*dark mode|madilim na tema|diliman|darkmode|dark mode)\b',
+          ).hasMatch(normalized)) {
+            return 'dark_mode';
+          }
+
+          // Theme: Turn ON Light Mode -> Light Mode
+          if (RegExp(
+            r'\b(turn on light mode|turn on lightmode|enable light mode|enable lightmode|switch to light mode|light mode on|lightmode on|liwanagan ang tema|light theme|default theme|i\s*light mode|maliwanag na tema|liwanagan|lightmode|light mode)\b',
+          ).hasMatch(normalized)) {
+            return 'light_mode';
+          }
+
+          // Language switching
+          if (RegExp(
+            r'\b((?:change|switch|set|convert) (?:the\s+)?(?:language|voice|wika)?\s*(?:to|into|sa)?\s*(?:tagalog|filipino)|(?:palitan|magpalit|baguhin|gawin|ilipat|lumipat)\s*(?:ang\s+|ng\s+|nang\s+)?(?:wika|boses)?\s*(?:sa|ng|na|para sa)?\s*(?:tagalog|filipino)|mag\s*tagalog|magsalita\s+(?:ng|sa)\s+(?:tagalog|filipino)|gamitin\s+ang\s+(?:tagalog|filipino)|tagalog\s+(?:po|please|voice|wika|lang)|i\s*tagalog|speak\s+(?:in\s+)?(?:tagalog|filipino)|^tagalog$|^filipino$)\b',
+          ).hasMatch(normalized)) {
+            return 'language_tagalog';
+          }
+          if (RegExp(
+            r'\b((?:change|switch|set|convert) (?:the\s+)?(?:language|voice|wika)?\s*(?:to|into|sa)?\s*(?:english|ingles)|(?:palitan|magpalit|baguhin|gawin|ilipat|lumipat)\s*(?:ang\s+|ng\s+|nang\s+)?(?:wika|boses)?\s*(?:sa|ng|na)?\s*(?:english|ingles)|mag\s*english|magsalita\s+(?:ng|sa)\s+english|gamitin\s+ang\s+(?:english|ingles)|english\s+(?:po|please|voice|wika|lang)|i\s*english|speak\s+(?:in\s+)?english|^english$|^ingles$)\b',
+          ).hasMatch(normalized)) {
+            return 'language_english';
+          }
+          if (RegExp(
+            r'\b(language change|change language|switch language|language settings|language setting|wika|palitan ang wika|magpalit ng wika|baguhin ang wika)\b',
+          ).hasMatch(normalized)) {
+            return 'language';
+          }
+          if (RegExp(
+            r'\b(theme screen|theme settings|theme setting|open theme|mga setting ng tema|mga tema|tema|appearance)\b',
+          ).hasMatch(normalized)) {
+            return 'theme';
+          }
+          if (RegExp(
+            r'\b(preference|preferences|health preference|health preferences|dietary preferences|kagustuhan|mga kagustuhan|health conditions|medical conditions)\b',
+          ).hasMatch(normalized)) {
+            return 'preference';
+          }
+          if (RegExp(
+            r'\b(suggestion|suggestions|feedback|feedbacks|mungkahi|komento|comment|comments|suggest)\b',
+          ).hasMatch(normalized)) {
+            return 'suggestion';
+          }
+          if (RegExp(
+            r'\b(app reviews|app review|review history|reviews|mga review|kasaysayan ng review|pagsusuri ng app)\b',
+          ).hasMatch(normalized)) {
+            return 'review_history';
+          }
+          if (RegExp(
+            r'\b(change password|reset password|palitan ang password|baguhin ang password|update password|password|security settings)\b',
+          ).hasMatch(normalized)) {
+            return 'change_password';
+          }
+          if (RegExp(
+            r'\b(about claro|tungkol sa claro|about app|about the app|about us)\b',
+          ).hasMatch(normalized)) {
+            return 'about_claro';
+          }
+          if (RegExp(
+            r'\b(privacy policy|privacy|patakaran sa privacy|data privacy|patakaran sa data)\b',
+          ).hasMatch(normalized)) {
+            return 'privacy_policy';
+          }
+          if (RegExp(
+            r'\b(terms and conditions|terms and condition|terms of service|terms of use|terms|mga tuntunin at kundisyon|mga tuntunin|kundisyon)\b',
+          ).hasMatch(normalized)) {
+            return 'terms_conditions';
+          }
+          if (RegExp(
+            r'\b(user guide|app guide|manual|gabay sa paggamit|gabay ng gumagamit|gabay|how to use|nutrition guide)\b',
+          ).hasMatch(normalized)) {
+            return 'user_guide';
+          }
+          if (RegExp(
+            r'\b(log out|logout|sign out|signout|mag log out|maglog out|mag sign out|magsign out|lumabas sa account|i\s*log out)\b',
+          ).hasMatch(normalized)) {
+            return 'logout';
+          }
+
+          return null;
         }
 
-        // Guided actions: Clear History & Clear Favorites
-        if (RegExp(r'\b(clear\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|delete\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|erase\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|wipe\s+(?:all\s+)?(?:my\s+)?(?:scan\s+)?history|remove\s+all\s+history|burahin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|tanggalin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|i\s*clear\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan)|i\s*delete\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?(?:scan\s+)?(?:history|kasaysayan))\b')
-            .hasMatch(normalized)) {
-          return 'clear_history';
-        }
-
-        if (RegExp(r'\b(clear\s+(?:all\s+)?(?:my\s+)?favorites|delete\s+(?:all\s+)?(?:my\s+)?favorites|burahin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?paborito|tanggalin\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?paborito|i\s*clear\s+(?:ang\s+)?(?:lahat\s+ng\s+)?(?:aking\s+)?paborito)\b')
-            .hasMatch(normalized)) {
-          return 'clear_favorites';
-        }
-
-        if (RegExp(r'\b(delete\s+(?:my\s+)?account|remove\s+(?:my\s+)?account|close\s+(?:my\s+)?account|erase\s+(?:my\s+)?account|burahin\s+(?:ang\s+)?(?:aking\s+)?account|tanggalin\s+(?:ang\s+)?(?:aking\s+)?account|isara\s+(?:ang\s+)?(?:aking\s+)?account|i\s*delete\s+(?:ang\s+)?(?:aking\s+)?account)\b')
-            .hasMatch(normalized)) {
-          return 'delete_account';
-        }
-
-        // 2. Sub-tabs in History
-        if (RegExp(r'\b(favorite|favorites|paborito|mga paborito|my favorites|paboritong produkto|saved products|saved product|saved items|saved)\b')
-            .hasMatch(normalized)) {
-          return 'history_favorites';
-        }
-        if (RegExp(r'\b(compare history|comparison history|comparison records|compared|history compare|kumpara|kasaysayan ng paghahambing|past comparisons)\b')
-            .hasMatch(normalized)) {
-          return 'history_compare';
-        }
-        if (RegExp(r'\b(reports|my reports|submitted reports|mga ulat|ulat|report history|view reports|show reports)\b')
-            .hasMatch(normalized)) {
-          return 'history_reports';
-        }
-
-        // 3. Main Tabs
-        if (RegExp(r'\b(home|main|dashboard|simula|home page|home screen)\b').hasMatch(normalized)) {
-          return 'home';
-        }
-        if (RegExp(r'\b(scan|scanner|camera|mag-scan|magscan|camera screen|scan screen)\b').hasMatch(normalized)) {
-          return 'scan';
-        }
-        if (RegExp(r'\b(history|records|previous scans|mga na-scan|kasaysayan|scan history)\b').hasMatch(normalized)) {
-          return 'history';
-        }
-        if (RegExp(r'\b(profile|my profile|account|my account|profile page|profile screen)\b').hasMatch(normalized)) {
-          return 'profile';
-        }
-
-        // 4. Settings & Feature Screens
-        if (RegExp(r'\b(personal information|personal info|my info|my information|account information|personal na impormasyon|personal details|profile details|personal)\b')
-            .hasMatch(normalized)) {
-          return 'personal_info';
-        }
-        // Voice Assistant ON / OFF
-        if (RegExp(r'\b(voice assistant off|voice off|turn off voice assistant|turn off voice|disable voice assistant|disable voice|i\s*off ang voice assistant|patayin ang boses|patayin ang voice assistant)\b')
-            .hasMatch(normalized)) {
-          return 'voice_assistant_off';
-        }
-        if (RegExp(r'\b(voice assistant on|voice on|turn on voice assistant|turn on voice|enable voice assistant|enable voice|i\s*on ang voice assistant|buhayin ang boses|buhayin ang voice assistant)\b')
-            .hasMatch(normalized)) {
-          return 'voice_assistant_on';
-        }
-
-        // MFA ON / OFF
-        if (RegExp(r'\b(turn off (?:mfa|multi factor|two factor|2fa)|disable (?:mfa|multi factor|two factor|2fa)|deactivate (?:mfa|multi factor|two factor|2fa)|switch off (?:mfa|2fa)|mfa off|2fa off|i\s*off ang (?:mfa|multi factor|two factor|2fa)|patayin ang (?:mfa|multi factor|two factor|2fa)|isara ang (?:mfa|multi factor|two factor|2fa)|i\s*disable ang (?:mfa|2fa)|i\s*deactivate ang (?:mfa|2fa))\b')
-            .hasMatch(normalized)) {
-          return 'mfa_off';
-        }
-        if (RegExp(r'\b(turn on (?:mfa|multi factor|two factor|2fa)|enable (?:mfa|multi factor|two factor|2fa)|activate (?:mfa|multi factor|two factor|2fa)|switch on (?:mfa|2fa)|mfa on|2fa on|i\s*on ang (?:mfa|multi factor|two factor|2fa)|buhayin ang (?:mfa|multi factor|two factor|2fa)|buksan ang (?:mfa|multi factor|two factor|2fa)|i\s*enable ang (?:mfa|2fa)|i\s*activate ang (?:mfa|2fa))\b')
-            .hasMatch(normalized)) {
-          return 'mfa_on';
-        }
-        if (RegExp(r'\b(multi factor authentication|two factor authentication|multi factor|two factor|mfa|2fa|dalawang yugtong pagpapatunay|mfa settings|2fa settings)\b')
-            .hasMatch(normalized)) {
-          return 'mfa';
-        }
-
-        // Theme: Turn OFF Dark Mode -> Light Mode
-        if (RegExp(r'\b(dark mode off|darkmode off|turn off dark mode|turn off darkmode|disable dark mode|disable darkmode|i\s*off ang dark mode|patayin ang dark mode)\b')
-            .hasMatch(normalized)) {
-          return 'light_mode';
-        }
-
-        // Theme: Turn OFF Light Mode -> Dark Mode
-        if (RegExp(r'\b(light mode off|lightmode off|turn off light mode|turn off lightmode|disable light mode|disable lightmode|i\s*off ang light mode|patayin ang light mode)\b')
-            .hasMatch(normalized)) {
-          return 'dark_mode';
-        }
-
-        // Theme: Turn ON Dark Mode -> Dark Mode
-        if (RegExp(r'\b(turn on dark mode|turn on darkmode|enable dark mode|enable darkmode|switch to dark mode|dark mode on|darkmode on|diliman ang tema|dark theme|i\s*dark mode|madilim na tema|diliman|darkmode|dark mode)\b')
-            .hasMatch(normalized)) {
-          return 'dark_mode';
-        }
-
-        // Theme: Turn ON Light Mode -> Light Mode
-        if (RegExp(r'\b(turn on light mode|turn on lightmode|enable light mode|enable lightmode|switch to light mode|light mode on|lightmode on|liwanagan ang tema|light theme|default theme|i\s*light mode|maliwanag na tema|liwanagan|lightmode|light mode)\b')
-            .hasMatch(normalized)) {
-          return 'light_mode';
-        }
-
-        // Language switching
-        if (RegExp(r'\b((?:change|switch|set|convert) (?:the\s+)?(?:language|voice|wika)?\s*(?:to|into|sa)?\s*(?:tagalog|filipino)|(?:palitan|magpalit|baguhin|gawin|ilipat|lumipat)\s*(?:ang\s+|ng\s+|nang\s+)?(?:wika|boses)?\s*(?:sa|ng|na|para sa)?\s*(?:tagalog|filipino)|mag\s*tagalog|magsalita\s+(?:ng|sa)\s+(?:tagalog|filipino)|gamitin\s+ang\s+(?:tagalog|filipino)|tagalog\s+(?:po|please|voice|wika|lang)|i\s*tagalog|speak\s+(?:in\s+)?(?:tagalog|filipino)|^tagalog$|^filipino$)\b')
-            .hasMatch(normalized)) {
-          return 'language_tagalog';
-        }
-        if (RegExp(r'\b((?:change|switch|set|convert) (?:the\s+)?(?:language|voice|wika)?\s*(?:to|into|sa)?\s*(?:english|ingles)|(?:palitan|magpalit|baguhin|gawin|ilipat|lumipat)\s*(?:ang\s+|ng\s+|nang\s+)?(?:wika|boses)?\s*(?:sa|ng|na)?\s*(?:english|ingles)|mag\s*english|magsalita\s+(?:ng|sa)\s+english|gamitin\s+ang\s+(?:english|ingles)|english\s+(?:po|please|voice|wika|lang)|i\s*english|speak\s+(?:in\s+)?english|^english$|^ingles$)\b')
-            .hasMatch(normalized)) {
-          return 'language_english';
-        }
-        if (RegExp(r'\b(language change|change language|switch language|language settings|language setting|wika|palitan ang wika|magpalit ng wika|baguhin ang wika)\b')
-            .hasMatch(normalized)) {
-          return 'language';
-        }
-        if (RegExp(r'\b(theme screen|theme settings|theme setting|open theme|mga setting ng tema|mga tema|tema|appearance)\b')
-            .hasMatch(normalized)) {
-          return 'theme';
-        }
-        if (RegExp(r'\b(preference|preferences|health preference|health preferences|dietary preferences|kagustuhan|mga kagustuhan|health conditions|medical conditions)\b')
-            .hasMatch(normalized)) {
-          return 'preference';
-        }
-        if (RegExp(r'\b(suggestion|suggestions|feedback|feedbacks|mungkahi|komento|comment|comments|suggest)\b')
-            .hasMatch(normalized)) {
-          return 'suggestion';
-        }
-        if (RegExp(r'\b(app reviews|app review|review history|reviews|mga review|kasaysayan ng review|pagsusuri ng app)\b')
-            .hasMatch(normalized)) {
-          return 'review_history';
-        }
-        if (RegExp(r'\b(change password|reset password|palitan ang password|baguhin ang password|update password|password|security settings)\b')
-            .hasMatch(normalized)) {
-          return 'change_password';
-        }
-        if (RegExp(r'\b(about claro|tungkol sa claro|about app|about the app|about us)\b')
-            .hasMatch(normalized)) {
-          return 'about_claro';
-        }
-        if (RegExp(r'\b(privacy policy|privacy|patakaran sa privacy|data privacy|patakaran sa data)\b')
-            .hasMatch(normalized)) {
-          return 'privacy_policy';
-        }
-        if (RegExp(r'\b(terms and conditions|terms and condition|terms of service|terms of use|terms|mga tuntunin at kundisyon|mga tuntunin|kundisyon)\b')
-            .hasMatch(normalized)) {
-          return 'terms_conditions';
-        }
-        if (RegExp(r'\b(user guide|app guide|manual|gabay sa paggamit|gabay ng gumagamit|gabay|how to use|nutrition guide)\b')
-            .hasMatch(normalized)) {
-          return 'user_guide';
-        }
-        if (RegExp(r'\b(log out|logout|sign out|signout|mag log out|maglog out|mag sign out|magsign out|lumabas sa account|i\s*log out)\b')
-            .hasMatch(normalized)) {
-          return 'logout';
-        }
-
-        return null;
-      }
-
-      expect(targetFromTranscript('home'), equals('home'));
-      expect(targetFromTranscript('dashboard'), equals('home'));
-      expect(targetFromTranscript('scan'), equals('scan'));
-      expect(targetFromTranscript('camera'), equals('scan'));
-      expect(targetFromTranscript('favorites'), equals('history_favorites'));
-      expect(targetFromTranscript('my favorites'), equals('history_favorites'));
-      expect(targetFromTranscript('paborito'), equals('history_favorites'));
-      expect(targetFromTranscript('compare history'), equals('history_compare'));
-      expect(targetFromTranscript('reports'), equals('history_reports'));
-      expect(targetFromTranscript('mga ulat'), equals('history_reports'));
-      expect(targetFromTranscript('darkmode'), equals('dark_mode'));
-      expect(targetFromTranscript('dark mode off'), equals('light_mode'));
-      expect(targetFromTranscript('turn off dark mode'), equals('light_mode'));
-      expect(targetFromTranscript('light mode off'), equals('dark_mode'));
-      expect(targetFromTranscript('turn off light mode'), equals('dark_mode'));
-      expect(targetFromTranscript('open dark mode'), equals('dark_mode'));
-      expect(targetFromTranscript('theme settings'), equals('theme'));
-      expect(targetFromTranscript('go to preferences'), equals('preference'));
-      expect(targetFromTranscript('health preferences'), equals('preference'));
-      expect(targetFromTranscript('my profile'), equals('profile'));
-      expect(targetFromTranscript('personal information'), equals('personal_info'));
-      expect(targetFromTranscript('suggestions'), equals('suggestion'));
-      expect(targetFromTranscript('change password'), equals('change_password'));
-      expect(targetFromTranscript('mga paborito'), equals('history_favorites'));
-      expect(targetFromTranscript('kasaysayan ng paghahambing'), equals('history_compare'));
-      expect(targetFromTranscript('aking mga ulat'), equals('history_reports'));
-      expect(targetFromTranscript('diliman ang tema'), equals('dark_mode'));
-      expect(targetFromTranscript('liwanagan ang tema'), equals('light_mode'));
-      expect(targetFromTranscript('personal na impormasyon'), equals('personal_info'));
-      expect(targetFromTranscript('mga kagustuhan'), equals('preference'));
-      expect(targetFromTranscript('mungkahi at puna'), equals('suggestion'));
-      expect(targetFromTranscript('palitan ang password'), equals('change_password'));
-      expect(targetFromTranscript('tungkol sa claro'), equals('about_claro'));
-      expect(targetFromTranscript('multi factor authentication'), equals('mfa'));
-      expect(targetFromTranscript('two factor authentication'), equals('mfa'));
-      expect(targetFromTranscript('turn on mfa'), equals('mfa_on'));
-      expect(targetFromTranscript('enable two factor authentication'), equals('mfa_on'));
-      expect(targetFromTranscript('i-on ang mfa'), equals('mfa_on'));
-      expect(targetFromTranscript('mfa on'), equals('mfa_on'));
-      expect(targetFromTranscript('turn off mfa'), equals('mfa_off'));
-      expect(targetFromTranscript('disable 2fa'), equals('mfa_off'));
-      expect(targetFromTranscript('i-off ang multi factor authentication'), equals('mfa_off'));
-      expect(targetFromTranscript('mfa off'), equals('mfa_off'));
-      expect(targetFromTranscript('turn off voice assistant'), equals('voice_assistant_off'));
-      expect(targetFromTranscript('voice assistant off'), equals('voice_assistant_off'));
-      expect(targetFromTranscript('turn on voice assistant'), equals('voice_assistant_on'));
-      expect(targetFromTranscript('voice assistant on'), equals('voice_assistant_on'));
-      expect(targetFromTranscript('change language to tagalog'), equals('language_tagalog'));
-      expect(targetFromTranscript('change language to english'), equals('language_english'));
-      expect(targetFromTranscript('language settings'), equals('language'));
-      expect(targetFromTranscript('app reviews'), equals('review_history'));
-      expect(targetFromTranscript('privacy policy'), equals('privacy_policy'));
-      expect(targetFromTranscript('terms and conditions'), equals('terms_conditions'));
-      expect(targetFromTranscript('user guide'), equals('user_guide'));
-      expect(targetFromTranscript('log out'), equals('logout'));
-      expect(targetFromTranscript('sign out'), equals('logout'));
-      expect(targetFromTranscript('mag log out'), equals('logout'));
-      expect(targetFromTranscript('mag sign out'), equals('logout'));
-      expect(targetFromTranscript('turn off voice assistant'), equals('voice_assistant_off'));
-      expect(targetFromTranscript('voice assistant off'), equals('voice_assistant_off'));
-      expect(targetFromTranscript('turn on voice assistant'), equals('voice_assistant_on'));
-      expect(targetFromTranscript('voice assistant on'), equals('voice_assistant_on'));
-      expect(targetFromTranscript('change language to tagalog'), equals('language_tagalog'));
-      expect(targetFromTranscript('palitan ang wika sa tagalog'), equals('language_tagalog'));
-      expect(targetFromTranscript('magpalit ng wika sa tagalog'), equals('language_tagalog'));
-      expect(targetFromTranscript('mag tagalog'), equals('language_tagalog'));
-      expect(targetFromTranscript('tagalog'), equals('language_tagalog'));
-      expect(targetFromTranscript('speak tagalog'), equals('language_tagalog'));
-      expect(targetFromTranscript('change language to english'), equals('language_english'));
-      expect(targetFromTranscript('palitan ang wika sa english'), equals('language_english'));
-      expect(targetFromTranscript('mag english'), equals('language_english'));
-      expect(targetFromTranscript('english'), equals('language_english'));
-      expect(targetFromTranscript('language settings'), equals('language'));
-      expect(targetFromTranscript('mfa'), equals('mfa'));
-      expect(targetFromTranscript('app reviews'), equals('review_history'));
-      expect(targetFromTranscript('privacy policy'), equals('privacy_policy'));
-      expect(targetFromTranscript('terms and conditions'), equals('terms_conditions'));
-      expect(targetFromTranscript('user guide'), equals('user_guide'));
-      expect(targetFromTranscript('clear history'), equals('clear_history'));
-      expect(targetFromTranscript('clear all history'), equals('clear_history'));
-      expect(targetFromTranscript('delete my scan history'), equals('clear_history'));
-      expect(targetFromTranscript('burahin ang history'), equals('clear_history'));
-      expect(targetFromTranscript('burahin ang lahat ng kasaysayan'), equals('clear_history'));
-      expect(targetFromTranscript('clear favorites'), equals('clear_favorites'));
-      expect(targetFromTranscript('delete favorites'), equals('clear_favorites'));
-      expect(targetFromTranscript('burahin ang paborito'), equals('clear_favorites'));
-      expect(targetFromTranscript('delete my account'), equals('delete_account'));
-      expect(targetFromTranscript('delete account'), equals('delete_account'));
-      expect(targetFromTranscript('burahin ang aking account'), equals('delete_account'));
-      expect(targetFromTranscript('i-delete ang account'), equals('delete_account'));
-    });
+        expect(targetFromTranscript('home'), equals('home'));
+        expect(targetFromTranscript('dashboard'), equals('home'));
+        expect(targetFromTranscript('scan'), equals('scan'));
+        expect(targetFromTranscript('camera'), equals('scan'));
+        expect(targetFromTranscript('favorites'), equals('history_favorites'));
+        expect(
+          targetFromTranscript('my favorites'),
+          equals('history_favorites'),
+        );
+        expect(targetFromTranscript('paborito'), equals('history_favorites'));
+        expect(
+          targetFromTranscript('compare history'),
+          equals('history_compare'),
+        );
+        expect(targetFromTranscript('reports'), equals('history_reports'));
+        expect(targetFromTranscript('mga ulat'), equals('history_reports'));
+        expect(targetFromTranscript('darkmode'), equals('dark_mode'));
+        expect(targetFromTranscript('dark mode off'), equals('light_mode'));
+        expect(
+          targetFromTranscript('turn off dark mode'),
+          equals('light_mode'),
+        );
+        expect(targetFromTranscript('light mode off'), equals('dark_mode'));
+        expect(
+          targetFromTranscript('turn off light mode'),
+          equals('dark_mode'),
+        );
+        expect(targetFromTranscript('open dark mode'), equals('dark_mode'));
+        expect(targetFromTranscript('theme settings'), equals('theme'));
+        expect(targetFromTranscript('go to preferences'), equals('preference'));
+        expect(
+          targetFromTranscript('health preferences'),
+          equals('preference'),
+        );
+        expect(targetFromTranscript('my profile'), equals('profile'));
+        expect(
+          targetFromTranscript('personal information'),
+          equals('personal_info'),
+        );
+        expect(targetFromTranscript('suggestions'), equals('suggestion'));
+        expect(
+          targetFromTranscript('change password'),
+          equals('change_password'),
+        );
+        expect(
+          targetFromTranscript('mga paborito'),
+          equals('history_favorites'),
+        );
+        expect(
+          targetFromTranscript('kasaysayan ng paghahambing'),
+          equals('history_compare'),
+        );
+        expect(
+          targetFromTranscript('aking mga ulat'),
+          equals('history_reports'),
+        );
+        expect(targetFromTranscript('diliman ang tema'), equals('dark_mode'));
+        expect(
+          targetFromTranscript('liwanagan ang tema'),
+          equals('light_mode'),
+        );
+        expect(
+          targetFromTranscript('personal na impormasyon'),
+          equals('personal_info'),
+        );
+        expect(targetFromTranscript('mga kagustuhan'), equals('preference'));
+        expect(targetFromTranscript('mungkahi at puna'), equals('suggestion'));
+        expect(
+          targetFromTranscript('palitan ang password'),
+          equals('change_password'),
+        );
+        expect(targetFromTranscript('tungkol sa claro'), equals('about_claro'));
+        expect(
+          targetFromTranscript('multi factor authentication'),
+          equals('mfa'),
+        );
+        expect(
+          targetFromTranscript('two factor authentication'),
+          equals('mfa'),
+        );
+        expect(targetFromTranscript('turn on mfa'), equals('mfa_on'));
+        expect(
+          targetFromTranscript('enable two factor authentication'),
+          equals('mfa_on'),
+        );
+        expect(targetFromTranscript('i-on ang mfa'), equals('mfa_on'));
+        expect(targetFromTranscript('mfa on'), equals('mfa_on'));
+        expect(targetFromTranscript('turn off mfa'), equals('mfa_off'));
+        expect(targetFromTranscript('disable 2fa'), equals('mfa_off'));
+        expect(
+          targetFromTranscript('i-off ang multi factor authentication'),
+          equals('mfa_off'),
+        );
+        expect(targetFromTranscript('mfa off'), equals('mfa_off'));
+        expect(
+          targetFromTranscript('turn off voice assistant'),
+          equals('voice_assistant_off'),
+        );
+        expect(
+          targetFromTranscript('voice assistant off'),
+          equals('voice_assistant_off'),
+        );
+        expect(
+          targetFromTranscript('turn on voice assistant'),
+          equals('voice_assistant_on'),
+        );
+        expect(
+          targetFromTranscript('voice assistant on'),
+          equals('voice_assistant_on'),
+        );
+        expect(
+          targetFromTranscript('change language to tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(
+          targetFromTranscript('change language to english'),
+          equals('language_english'),
+        );
+        expect(targetFromTranscript('language settings'), equals('language'));
+        expect(targetFromTranscript('app reviews'), equals('review_history'));
+        expect(
+          targetFromTranscript('privacy policy'),
+          equals('privacy_policy'),
+        );
+        expect(
+          targetFromTranscript('terms and conditions'),
+          equals('terms_conditions'),
+        );
+        expect(targetFromTranscript('user guide'), equals('user_guide'));
+        expect(targetFromTranscript('log out'), equals('logout'));
+        expect(targetFromTranscript('sign out'), equals('logout'));
+        expect(targetFromTranscript('mag log out'), equals('logout'));
+        expect(targetFromTranscript('mag sign out'), equals('logout'));
+        expect(
+          targetFromTranscript('turn off voice assistant'),
+          equals('voice_assistant_off'),
+        );
+        expect(
+          targetFromTranscript('voice assistant off'),
+          equals('voice_assistant_off'),
+        );
+        expect(
+          targetFromTranscript('turn on voice assistant'),
+          equals('voice_assistant_on'),
+        );
+        expect(
+          targetFromTranscript('voice assistant on'),
+          equals('voice_assistant_on'),
+        );
+        expect(
+          targetFromTranscript('change language to tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(
+          targetFromTranscript('palitan ang wika sa tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(
+          targetFromTranscript('magpalit ng wika sa tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(targetFromTranscript('mag tagalog'), equals('language_tagalog'));
+        expect(targetFromTranscript('tagalog'), equals('language_tagalog'));
+        expect(
+          targetFromTranscript('speak tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(
+          targetFromTranscript('change language to english'),
+          equals('language_english'),
+        );
+        expect(
+          targetFromTranscript('palitan ang wika sa english'),
+          equals('language_english'),
+        );
+        expect(targetFromTranscript('mag english'), equals('language_english'));
+        expect(targetFromTranscript('english'), equals('language_english'));
+        expect(targetFromTranscript('language settings'), equals('language'));
+        expect(targetFromTranscript('mfa'), equals('mfa'));
+        expect(targetFromTranscript('app reviews'), equals('review_history'));
+        expect(
+          targetFromTranscript('privacy policy'),
+          equals('privacy_policy'),
+        );
+        expect(
+          targetFromTranscript('terms and conditions'),
+          equals('terms_conditions'),
+        );
+        expect(targetFromTranscript('user guide'), equals('user_guide'));
+        expect(targetFromTranscript('clear history'), equals('clear_history'));
+        expect(
+          targetFromTranscript('clear all history'),
+          equals('clear_history'),
+        );
+        expect(
+          targetFromTranscript('delete my scan history'),
+          equals('clear_history'),
+        );
+        expect(
+          targetFromTranscript('burahin ang history'),
+          equals('clear_history'),
+        );
+        expect(
+          targetFromTranscript('burahin ang lahat ng kasaysayan'),
+          equals('clear_history'),
+        );
+        expect(
+          targetFromTranscript('clear favorites'),
+          equals('clear_favorites'),
+        );
+        expect(
+          targetFromTranscript('delete favorites'),
+          equals('clear_favorites'),
+        );
+        expect(
+          targetFromTranscript('burahin ang paborito'),
+          equals('clear_favorites'),
+        );
+        expect(
+          targetFromTranscript('delete my account'),
+          equals('delete_account'),
+        );
+        expect(
+          targetFromTranscript('delete account'),
+          equals('delete_account'),
+        );
+        expect(
+          targetFromTranscript('burahin ang aking account'),
+          equals('delete_account'),
+        );
+        expect(
+          targetFromTranscript('i-delete ang account'),
+          equals('delete_account'),
+        );
+      },
+    );
 
     test('Voice navigation patterns resolve in-screen actions on result screen', () {
       String? targetFromTranscript(String transcript) {
-        final normalized = transcript.toLowerCase().replaceAll(RegExp(r'[^a-z0-9 ]'), ' ');
+        final normalized = transcript.toLowerCase().replaceAll(
+          RegExp(r'[^a-z0-9 ]'),
+          ' ',
+        );
 
         // 1. In-screen action: Unlike / Unfavorite active product
-        if (RegExp(r'\b(unfavorite this|unfavorite this product|unfavorite it|remove from favorites|unlike this product|unlike this|remove favorite|alisin sa paborito|tanggalin sa paborito|i\s*unfavorite ito|i\s*unfavorite)\b')
-            .hasMatch(normalized)) {
+        if (RegExp(
+          r'\b(unfavorite this|unfavorite this product|unfavorite it|remove from favorites|unlike this product|unlike this|remove favorite|alisin sa paborito|tanggalin sa paborito|i\s*unfavorite ito|i\s*unfavorite)\b',
+        ).hasMatch(normalized)) {
           return 'unfavorite_product';
         }
 
         // In-screen action: Like / Favorite active product
-        if (RegExp(r'\b(favorite this|favorite this product|favorite it|add to favorites|save to favorites|like this product|like this|i\s*favorite|i\s*paborito|paborito ito|gusto ko ito|i\s*save ito|isave ito|idagdag sa paborito|isama sa paborito)\b')
-            .hasMatch(normalized)) {
+        if (RegExp(
+          r'\b(favorite this|favorite this product|favorite it|add to favorites|save to favorites|like this product|like this|i\s*favorite|i\s*paborito|paborito ito|gusto ko ito|i\s*save ito|isave ito|idagdag sa paborito|isama sa paborito)\b',
+        ).hasMatch(normalized)) {
           return 'favorite_product';
         }
 
         // 2. In-screen action: Report product
-        if (RegExp(r'\b(report this product|report product|report issue|report error|i\s*report ito|ireport ito|i\s*report|ireport|i\s*ulat ito|iulat ito|i\s*ulat|iulat|mali ang impormasyon|maling produkto)\b')
-            .hasMatch(normalized)) {
+        if (RegExp(
+          r'\b(report this product|report product|report issue|report error|i\s*report ito|ireport ito|i\s*report|ireport|i\s*ulat ito|iulat ito|i\s*ulat|iulat|mali ang impormasyon|maling produkto)\b',
+        ).hasMatch(normalized)) {
           return 'report_product';
         }
 
         // In-screen action: More Details
-        if (RegExp(r'\b(more details|for more details|show more details|open more details|see more details|view more details|product details|ingredients|storage instructions|storage|karagdagang detalye|karagdagang impormasyon|mga sangkap|sangkap|paraan ng pag\s*imbak|imbak|detalye ng produkto|detalye)\b')
-            .hasMatch(normalized)) {
+        if (RegExp(
+          r'\b(more details|for more details|show more details|open more details|see more details|view more details|product details|ingredients|storage instructions|storage|karagdagang detalye|karagdagang impormasyon|mga sangkap|sangkap|paraan ng pag\s*imbak|imbak|detalye ng produkto|detalye)\b',
+        ).hasMatch(normalized)) {
           return 'more_details';
         }
 
         // 3. Comparison Screen for active product
-        if (RegExp(r'\b(compare this product|compare this|compare product|compare scanned product|compare with alternatives|compare with others|ihambing ang produktong ito|paghambingin ito|pagkumparahin ito|ikumpera ito|ikumpra ito|ihambing ito)\b')
-            .hasMatch(normalized)) {
+        if (RegExp(
+          r'\b(compare this product|compare this|compare product|compare scanned product|compare with alternatives|compare with others|ihambing ang produktong ito|paghambingin ito|pagkumparahin ito|ikumpera ito|ikumpra ito|ihambing ito)\b',
+        ).hasMatch(normalized)) {
           return 'compare_products';
         }
 
-        if (RegExp(r'\b(compare history|comparison history|comparison records|history compare|kasaysayan ng paghahambing|mga pinaghambing|mga kinumpara|past comparisons)\b')
-            .hasMatch(normalized)) {
+        if (RegExp(
+          r'\b(compare history|comparison history|comparison records|history compare|kasaysayan ng paghahambing|mga pinaghambing|mga kinumpara|past comparisons)\b',
+        ).hasMatch(normalized)) {
           return 'history_compare';
         }
 
-        if (RegExp(r'\b(compare|comparison|comparisons|compared|kumpara|ihambing|paghambingin|ikumpra|ikumpera)\b')
-            .hasMatch(normalized)) {
+        if (RegExp(
+          r'\b(compare|comparison|comparisons|compared|kumpara|ihambing|paghambingin|ikumpra|ikumpera)\b',
+        ).hasMatch(normalized)) {
           if (VoiceAssistantService.activeResultProductNotifier.value != null) {
             return 'compare_products';
           }
@@ -368,7 +957,10 @@ void main() {
       expect(targetFromTranscript('compare'), equals('history_compare'));
       expect(targetFromTranscript('comparison'), equals('history_compare'));
       expect(targetFromTranscript('kumpara'), equals('history_compare'));
-      expect(targetFromTranscript('compare history'), equals('history_compare'));
+      expect(
+        targetFromTranscript('compare history'),
+        equals('history_compare'),
+      );
 
       // Test when ON result screen (activeResultProductNotifier is set)
       final sampleProduct = Product(
@@ -399,25 +991,61 @@ void main() {
       expect(targetFromTranscript('compare'), equals('compare_products'));
       expect(targetFromTranscript('comparison'), equals('compare_products'));
       expect(targetFromTranscript('kumpara'), equals('compare_products'));
-      expect(targetFromTranscript('compare this product'), equals('compare_products'));
+      expect(
+        targetFromTranscript('compare this product'),
+        equals('compare_products'),
+      );
       expect(targetFromTranscript('compare this'), equals('compare_products'));
-      expect(targetFromTranscript('ihambing ang produktong ito'), equals('compare_products'));
+      expect(
+        targetFromTranscript('ihambing ang produktong ito'),
+        equals('compare_products'),
+      );
 
       expect(targetFromTranscript('more details'), equals('more_details'));
       expect(targetFromTranscript('for more details'), equals('more_details'));
       expect(targetFromTranscript('show more details'), equals('more_details'));
-      expect(targetFromTranscript('karagdagang detalye'), equals('more_details'));
+      expect(
+        targetFromTranscript('karagdagang detalye'),
+        equals('more_details'),
+      );
       expect(targetFromTranscript('mga sangkap'), equals('more_details'));
 
-      expect(targetFromTranscript('favorite this product'), equals('favorite_product'));
-      expect(targetFromTranscript('add to favorites'), equals('favorite_product'));
-      expect(targetFromTranscript('like this product'), equals('favorite_product'));
-      expect(targetFromTranscript('i-favorite ito'), equals('favorite_product'));
-      expect(targetFromTranscript('idagdag sa paborito'), equals('favorite_product'));
-      expect(targetFromTranscript('unfavorite this product'), equals('unfavorite_product'));
-      expect(targetFromTranscript('remove from favorites'), equals('unfavorite_product'));
-      expect(targetFromTranscript('alisin sa paborito'), equals('unfavorite_product'));
-      expect(targetFromTranscript('report this product'), equals('report_product'));
+      expect(
+        targetFromTranscript('favorite this product'),
+        equals('favorite_product'),
+      );
+      expect(
+        targetFromTranscript('add to favorites'),
+        equals('favorite_product'),
+      );
+      expect(
+        targetFromTranscript('like this product'),
+        equals('favorite_product'),
+      );
+      expect(
+        targetFromTranscript('i-favorite ito'),
+        equals('favorite_product'),
+      );
+      expect(
+        targetFromTranscript('idagdag sa paborito'),
+        equals('favorite_product'),
+      );
+      expect(
+        targetFromTranscript('unfavorite this product'),
+        equals('unfavorite_product'),
+      );
+      expect(
+        targetFromTranscript('remove from favorites'),
+        equals('unfavorite_product'),
+      );
+      expect(
+        targetFromTranscript('alisin sa paborito'),
+        equals('unfavorite_product'),
+      );
+      expect(
+        targetFromTranscript('report this product'),
+        equals('report_product'),
+      );
       expect(targetFromTranscript('report issue'), equals('report_product'));
       expect(targetFromTranscript('i-ulat ito'), equals('report_product'));
       expect(targetFromTranscript('ireport ito'), equals('report_product'));
@@ -426,143 +1054,357 @@ void main() {
       VoiceAssistantService.activeResultProductNotifier.value = null;
     });
 
-    test('isSummaryRequest correctly recognizes display results, advisory, and comparison commands in EN and FIL', () {
-      bool isSummaryRequest(String transcript) {
-        final normalized = transcript.toLowerCase().replaceAll(RegExp(r'[^a-z0-9 ]'), ' ').trim();
-        if (RegExp(r'\b(summarize|summarise|summary|summaries|ibuod|buod|ipaliwanag|paliwanag|recap|overview)\b').hasMatch(normalized)) {
-          return true;
+    test(
+      'isSummaryRequest correctly recognizes display results, advisory, and comparison commands in EN and FIL',
+      () {
+        bool isSummaryRequest(String transcript) {
+          final normalized = transcript
+              .toLowerCase()
+              .replaceAll(RegExp(r'[^a-z0-9 ]'), ' ')
+              .trim();
+          if (RegExp(
+            r'\b(summarize|summarise|summary|summaries|ibuod|buod|ipaliwanag|paliwanag|recap|overview)\b',
+          ).hasMatch(normalized)) {
+            return true;
+          }
+          if (RegExp(
+            r'\b(display results|show results|read results|tell results|what are the results|comparison results|compare results|display comparison|scan results|scan result|product results|nutrition results|resulta|mga resulta|advisory|health advisory|health advisories|summarize advisory|summary advisory|payo sa kalusugan|payo|anong payo|buod ng resulta)\b',
+          ).hasMatch(normalized)) {
+            return true;
+          }
+          if (RegExp(
+            r'^(?:the\s+)?(?:results|result|summary|resulta|advisory|health advisory|payo|buod)$',
+          ).hasMatch(normalized)) {
+            return true;
+          }
+          return RegExp(
+            r'\b(summarize|summarise|summary|explain|describe|display|show|read|tell|what are the|anong|sabihin|ipakita|ipaliwanag|buod)\b.*\b(result|results|scan|report|product|nutrition|comparison|ranking|score|scores|resulta|advisory|health advisory|payo|rekomendasyon|kalusugan)\b',
+          ).hasMatch(normalized);
         }
-        if (RegExp(r'\b(display results|show results|read results|tell results|what are the results|comparison results|compare results|display comparison|scan results|scan result|product results|nutrition results|resulta|mga resulta|advisory|health advisory|health advisories|summarize advisory|summary advisory|payo sa kalusugan|payo|anong payo|buod ng resulta)\b').hasMatch(normalized)) {
-          return true;
+
+        expect(isSummaryRequest('summarize'), isTrue);
+        expect(isSummaryRequest('summarize this'), isTrue);
+        expect(isSummaryRequest('can you summarize'), isTrue);
+        expect(isSummaryRequest('buod'), isTrue);
+        expect(isSummaryRequest('ibuod ito'), isTrue);
+        expect(isSummaryRequest('ipaliwanag'), isTrue);
+        expect(isSummaryRequest('display results'), isTrue);
+        expect(isSummaryRequest('show results'), isTrue);
+        expect(isSummaryRequest('read results'), isTrue);
+        expect(isSummaryRequest('summarize advisory'), isTrue);
+        expect(isSummaryRequest('health advisory'), isTrue);
+        expect(isSummaryRequest('payo sa kalusugan'), isTrue);
+        expect(isSummaryRequest('anong payo'), isTrue);
+        expect(isSummaryRequest('buod ng resulta'), isTrue);
+        expect(isSummaryRequest('ipaliwanag ang resulta'), isTrue);
+        expect(isSummaryRequest('comparison results'), isTrue);
+        expect(isSummaryRequest('compare results'), isTrue);
+        expect(isSummaryRequest('display comparison'), isTrue);
+        expect(isSummaryRequest('what are the results'), isTrue);
+        expect(isSummaryRequest('summarize the scan'), isTrue);
+        expect(isSummaryRequest('ipakita ang resulta'), isTrue);
+        expect(isSummaryRequest('sabihin ang resulta'), isTrue);
+      },
+    );
+
+    test(
+      'detects product questions like allergen and nutrition requests in English and Tagalog',
+      () {
+        final router = VoiceCommandRouter.instance;
+
+        expect(
+          router.testLooksLikeProductQuestion('what are the allergens'),
+          isTrue,
+        );
+        expect(
+          router.testLooksLikeProductQuestion('are there any allergens to avoid'),
+          isTrue,
+        );
+        expect(
+          router.testLooksLikeProductQuestion('what is the sugar content'),
+          isTrue,
+        );
+        expect(
+          router.testLooksLikeProductQuestion('what are the ingredients'),
+          isTrue,
+        );
+        expect(
+          router.testLooksLikeProductQuestion('may allergen ba ito'),
+          isTrue,
+        );
+        expect(
+          router.testLooksLikeProductQuestion('ano ang mga sangkap'),
+          isTrue,
+        );
+        expect(
+          router.testLooksLikeProductQuestion('open history'),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'Bilingual voice commands for MFA, Voice, Theme, and Language are fully aligned',
+      () {
+        final router = VoiceCommandRouter.instance;
+
+        // Voice assistant ON / OFF (EN & FIL)
+        expect(
+          router.testTargetFromTranscript('turn on voice assistant'),
+          equals('voice_assistant_on'),
+        );
+        expect(
+          router.testTargetFromTranscript('enable voice'),
+          equals('voice_assistant_on'),
+        );
+        expect(
+          router.testTargetFromTranscript('buhayin ang boses'),
+          equals('voice_assistant_on'),
+        );
+        expect(
+          router.testTargetFromTranscript('i-on ang voice assistant'),
+          equals('voice_assistant_on'),
+        );
+        expect(
+          router.testTargetFromTranscript('turn off voice assistant'),
+          equals('voice_assistant_off'),
+        );
+        expect(
+          router.testTargetFromTranscript('mute voice assistant'),
+          equals('voice_assistant_off'),
+        );
+        expect(
+          router.testTargetFromTranscript('patayin ang voice assistant'),
+          equals('voice_assistant_off'),
+        );
+        expect(
+          router.testTargetFromTranscript('patayin ang boses'),
+          equals('voice_assistant_off'),
+        );
+        expect(
+          router.testTargetFromTranscript('isara ang voice assistant'),
+          equals('voice_assistant_off'),
+        );
+
+        // MFA ON / OFF / TOGGLE (EN & FIL)
+        expect(
+          router.testTargetFromTranscript('turn on mfa'),
+          equals('mfa_on'),
+        );
+        expect(router.testTargetFromTranscript('enable mfa'), equals('mfa_on'));
+        expect(
+          router.testTargetFromTranscript('buksan ang mfa'),
+          equals('mfa_on'),
+        );
+        expect(
+          router.testTargetFromTranscript(
+            'buksan ang dalawang yugtong pagpapatunay',
+          ),
+          equals('mfa_on'),
+        );
+        expect(
+          router.testTargetFromTranscript('buhayin ang mfa'),
+          equals('mfa_on'),
+        );
+        expect(
+          router.testTargetFromTranscript('turn off mfa'),
+          equals('mfa_off'),
+        );
+        expect(
+          router.testTargetFromTranscript('disable mfa'),
+          equals('mfa_off'),
+        );
+        expect(
+          router.testTargetFromTranscript('patayin ang mfa'),
+          equals('mfa_off'),
+        );
+        expect(
+          router.testTargetFromTranscript(
+            'isara ang dalawang yugtong pagpapatunay',
+          ),
+          equals('mfa_off'),
+        );
+        expect(
+          router.testTargetFromTranscript('dalawang yugtong pagpapatunay'),
+          equals('mfa'),
+        );
+
+        // Theme / Dark Mode (EN & FIL)
+        expect(
+          router.testTargetFromTranscript('turn on dark mode'),
+          equals('dark_mode'),
+        );
+        expect(
+          router.testTargetFromTranscript('diliman ang tema'),
+          equals('dark_mode'),
+        );
+        expect(
+          router.testTargetFromTranscript('madilim na tema'),
+          equals('dark_mode'),
+        );
+        expect(
+          router.testTargetFromTranscript('gawing madilim ang tema'),
+          equals('dark_mode'),
+        );
+        expect(
+          router.testTargetFromTranscript('turn on light mode'),
+          equals('light_mode'),
+        );
+        expect(
+          router.testTargetFromTranscript('liwanagan ang tema'),
+          equals('light_mode'),
+        );
+        expect(
+          router.testTargetFromTranscript('maliwanag na tema'),
+          equals('light_mode'),
+        );
+        expect(
+          router.testTargetFromTranscript('gawing maliwanag ang tema'),
+          equals('light_mode'),
+        );
+
+        // Language (EN & FIL)
+        expect(
+          router.testTargetFromTranscript('change language to tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(
+          router.testTargetFromTranscript('palitan sa tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(
+          router.testTargetFromTranscript('mag-tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(
+          router.testTargetFromTranscript('speak in tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(
+          router.testTargetFromTranscript('boses sa tagalog'),
+          equals('language_tagalog'),
+        );
+        expect(
+          router.testTargetFromTranscript('change language to english'),
+          equals('language_english'),
+        );
+        expect(
+          router.testTargetFromTranscript('palitan sa english'),
+          equals('language_english'),
+        );
+        expect(
+          router.testTargetFromTranscript('mag-english'),
+          equals('language_english'),
+        );
+        expect(
+          router.testTargetFromTranscript('speak in english'),
+          equals('language_english'),
+        );
+        expect(
+          router.testTargetFromTranscript('boses sa english'),
+          equals('language_english'),
+        );
+        expect(
+          router.testTargetFromTranscript('palitan ang wika'),
+          equals('language'),
+        );
+        expect(
+          router.testTargetFromTranscript('mga setting ng wika'),
+          equals('language'),
+        );
+
+        // Favorites actions (EN & FIL)
+        expect(
+          router.testTargetFromTranscript('favorite this product'),
+          equals('favorite_product'),
+        );
+        expect(
+          router.testTargetFromTranscript('save to favorites'),
+          equals('favorite_product'),
+        );
+        expect(
+          router.testTargetFromTranscript('idagdag sa mga paborito'),
+          equals('favorite_product'),
+        );
+        expect(
+          router.testTargetFromTranscript('gawing paborito'),
+          equals('favorite_product'),
+        );
+        expect(
+          router.testTargetFromTranscript('unfavorite this product'),
+          equals('unfavorite_product'),
+        );
+        expect(
+          router.testTargetFromTranscript('remove from favorites'),
+          equals('unfavorite_product'),
+        );
+        expect(
+          router.testTargetFromTranscript('alisin sa mga paborito'),
+          equals('unfavorite_product'),
+        );
+        expect(
+          router.testTargetFromTranscript('tanggalin sa mga paborito'),
+          equals('unfavorite_product'),
+        );
+        expect(
+          router.testTargetFromTranscript('wag nang paborito'),
+          equals('unfavorite_product'),
+        );
+
+        // Search queries (EN & FIL)
+        expect(
+          router.testExtractProductSearchQuery('search for Century Tuna'),
+          equals('century tuna'),
+        );
+        expect(
+          router.testExtractProductSearchQuery('find Bear Brand in history'),
+          equals('bear brand'),
+        );
+        expect(
+          router.testExtractProductSearchQuery('hanapin ang Milo'),
+          equals('milo'),
+        );
+        expect(
+          router.testExtractProductSearchQuery('maghanap ng Century Tuna'),
+          equals('century tuna'),
+        );
+      },
+    );
+
+    test(
+      'FavoritesService favoriteActionNotifier broadcasts state immediately for reactive UI',
+      () async {
+        final mockRepo = MockFavoritesRepository();
+        final mockProdRepo = _DummyProductRepository();
+        final service = FavoritesService(
+          favoritesRepository: mockRepo,
+          productRepository: mockProdRepo,
+        );
+
+        Map<String, bool>? captured;
+        void listener() {
+          captured = FavoritesService.favoriteActionNotifier.value;
         }
-        if (RegExp(r'^(?:the\s+)?(?:results|result|summary|resulta|advisory|health advisory|payo|buod)$').hasMatch(normalized)) {
-          return true;
-        }
-        return RegExp(
-          r'\b(summarize|summarise|summary|explain|describe|display|show|read|tell|what are the|anong|sabihin|ipakita|ipaliwanag|buod)\b.*\b(result|results|scan|report|product|nutrition|comparison|ranking|score|scores|resulta|advisory|health advisory|payo|rekomendasyon|kalusugan)\b',
-        ).hasMatch(normalized);
-      }
 
-      expect(isSummaryRequest('summarize'), isTrue);
-      expect(isSummaryRequest('summarize this'), isTrue);
-      expect(isSummaryRequest('can you summarize'), isTrue);
-      expect(isSummaryRequest('buod'), isTrue);
-      expect(isSummaryRequest('ibuod ito'), isTrue);
-      expect(isSummaryRequest('ipaliwanag'), isTrue);
-      expect(isSummaryRequest('display results'), isTrue);
-      expect(isSummaryRequest('show results'), isTrue);
-      expect(isSummaryRequest('read results'), isTrue);
-      expect(isSummaryRequest('summarize advisory'), isTrue);
-      expect(isSummaryRequest('health advisory'), isTrue);
-      expect(isSummaryRequest('payo sa kalusugan'), isTrue);
-      expect(isSummaryRequest('anong payo'), isTrue);
-      expect(isSummaryRequest('buod ng resulta'), isTrue);
-      expect(isSummaryRequest('ipaliwanag ang resulta'), isTrue);
-      expect(isSummaryRequest('comparison results'), isTrue);
-      expect(isSummaryRequest('compare results'), isTrue);
-      expect(isSummaryRequest('display comparison'), isTrue);
-      expect(isSummaryRequest('what are the results'), isTrue);
-      expect(isSummaryRequest('summarize the scan'), isTrue);
-      expect(isSummaryRequest('ipakita ang resulta'), isTrue);
-      expect(isSummaryRequest('sabihin ang resulta'), isTrue);
-    });
+        FavoritesService.favoriteActionNotifier.addListener(listener);
 
-    test('Bilingual voice commands for MFA, Voice, Theme, and Language are fully aligned', () {
-      final router = VoiceCommandRouter.instance;
+        await service.addFavorite(userId: 'test-user', productId: 'p123');
+        expect(captured, isNotNull);
+        expect(captured!['p123'], isTrue);
 
-      // Voice assistant ON / OFF (EN & FIL)
-      expect(router.testTargetFromTranscript('turn on voice assistant'), equals('voice_assistant_on'));
-      expect(router.testTargetFromTranscript('enable voice'), equals('voice_assistant_on'));
-      expect(router.testTargetFromTranscript('buhayin ang boses'), equals('voice_assistant_on'));
-      expect(router.testTargetFromTranscript('i-on ang voice assistant'), equals('voice_assistant_on'));
-      expect(router.testTargetFromTranscript('turn off voice assistant'), equals('voice_assistant_off'));
-      expect(router.testTargetFromTranscript('mute voice assistant'), equals('voice_assistant_off'));
-      expect(router.testTargetFromTranscript('patayin ang voice assistant'), equals('voice_assistant_off'));
-      expect(router.testTargetFromTranscript('patayin ang boses'), equals('voice_assistant_off'));
-      expect(router.testTargetFromTranscript('isara ang voice assistant'), equals('voice_assistant_off'));
+        await service.removeFavorite(userId: 'test-user', productId: 'p123');
+        expect(captured!['p123'], isFalse);
 
-      // MFA ON / OFF / TOGGLE (EN & FIL)
-      expect(router.testTargetFromTranscript('turn on mfa'), equals('mfa_on'));
-      expect(router.testTargetFromTranscript('enable mfa'), equals('mfa_on'));
-      expect(router.testTargetFromTranscript('buksan ang mfa'), equals('mfa_on'));
-      expect(router.testTargetFromTranscript('buksan ang dalawang yugtong pagpapatunay'), equals('mfa_on'));
-      expect(router.testTargetFromTranscript('buhayin ang mfa'), equals('mfa_on'));
-      expect(router.testTargetFromTranscript('turn off mfa'), equals('mfa_off'));
-      expect(router.testTargetFromTranscript('disable mfa'), equals('mfa_off'));
-      expect(router.testTargetFromTranscript('patayin ang mfa'), equals('mfa_off'));
-      expect(router.testTargetFromTranscript('isara ang dalawang yugtong pagpapatunay'), equals('mfa_off'));
-      expect(router.testTargetFromTranscript('dalawang yugtong pagpapatunay'), equals('mfa'));
+        final toggled = await service.toggleFavorite(
+          userId: 'test-user',
+          productId: 'p123',
+        );
+        expect(toggled, isTrue);
+        expect(captured!['p123'], isTrue);
 
-      // Theme / Dark Mode (EN & FIL)
-      expect(router.testTargetFromTranscript('turn on dark mode'), equals('dark_mode'));
-      expect(router.testTargetFromTranscript('diliman ang tema'), equals('dark_mode'));
-      expect(router.testTargetFromTranscript('madilim na tema'), equals('dark_mode'));
-      expect(router.testTargetFromTranscript('gawing madilim ang tema'), equals('dark_mode'));
-      expect(router.testTargetFromTranscript('turn on light mode'), equals('light_mode'));
-      expect(router.testTargetFromTranscript('liwanagan ang tema'), equals('light_mode'));
-      expect(router.testTargetFromTranscript('maliwanag na tema'), equals('light_mode'));
-      expect(router.testTargetFromTranscript('gawing maliwanag ang tema'), equals('light_mode'));
-
-      // Language (EN & FIL)
-      expect(router.testTargetFromTranscript('change language to tagalog'), equals('language_tagalog'));
-      expect(router.testTargetFromTranscript('palitan sa tagalog'), equals('language_tagalog'));
-      expect(router.testTargetFromTranscript('mag-tagalog'), equals('language_tagalog'));
-      expect(router.testTargetFromTranscript('speak in tagalog'), equals('language_tagalog'));
-      expect(router.testTargetFromTranscript('boses sa tagalog'), equals('language_tagalog'));
-      expect(router.testTargetFromTranscript('change language to english'), equals('language_english'));
-      expect(router.testTargetFromTranscript('palitan sa english'), equals('language_english'));
-      expect(router.testTargetFromTranscript('mag-english'), equals('language_english'));
-      expect(router.testTargetFromTranscript('speak in english'), equals('language_english'));
-      expect(router.testTargetFromTranscript('boses sa english'), equals('language_english'));
-      expect(router.testTargetFromTranscript('palitan ang wika'), equals('language'));
-      expect(router.testTargetFromTranscript('mga setting ng wika'), equals('language'));
-
-      // Favorites actions (EN & FIL)
-      expect(router.testTargetFromTranscript('favorite this product'), equals('favorite_product'));
-      expect(router.testTargetFromTranscript('save to favorites'), equals('favorite_product'));
-      expect(router.testTargetFromTranscript('idagdag sa mga paborito'), equals('favorite_product'));
-      expect(router.testTargetFromTranscript('gawing paborito'), equals('favorite_product'));
-      expect(router.testTargetFromTranscript('unfavorite this product'), equals('unfavorite_product'));
-      expect(router.testTargetFromTranscript('remove from favorites'), equals('unfavorite_product'));
-      expect(router.testTargetFromTranscript('alisin sa mga paborito'), equals('unfavorite_product'));
-      expect(router.testTargetFromTranscript('tanggalin sa mga paborito'), equals('unfavorite_product'));
-      expect(router.testTargetFromTranscript('wag nang paborito'), equals('unfavorite_product'));
-
-      // Search queries (EN & FIL)
-      expect(router.testExtractProductSearchQuery('search for Century Tuna'), equals('century tuna'));
-      expect(router.testExtractProductSearchQuery('find Bear Brand in history'), equals('bear brand'));
-      expect(router.testExtractProductSearchQuery('hanapin ang Milo'), equals('milo'));
-      expect(router.testExtractProductSearchQuery('maghanap ng Century Tuna'), equals('century tuna'));
-    });
-
-    test('FavoritesService favoriteActionNotifier broadcasts state immediately for reactive UI', () async {
-      final mockRepo = MockFavoritesRepository();
-      final mockProdRepo = _DummyProductRepository();
-      final service = FavoritesService(
-        favoritesRepository: mockRepo,
-        productRepository: mockProdRepo,
-      );
-
-      Map<String, bool>? captured;
-      void listener() {
-        captured = FavoritesService.favoriteActionNotifier.value;
-      }
-
-      FavoritesService.favoriteActionNotifier.addListener(listener);
-
-      await service.addFavorite(userId: 'test-user', productId: 'p123');
-      expect(captured, isNotNull);
-      expect(captured!['p123'], isTrue);
-
-      await service.removeFavorite(userId: 'test-user', productId: 'p123');
-      expect(captured!['p123'], isFalse);
-
-      final toggled = await service.toggleFavorite(userId: 'test-user', productId: 'p123');
-      expect(toggled, isTrue);
-      expect(captured!['p123'], isTrue);
-
-      FavoritesService.favoriteActionNotifier.removeListener(listener);
-    });
+        FavoritesService.favoriteActionNotifier.removeListener(listener);
+      },
+    );
   });
 }
 
@@ -572,9 +1414,11 @@ class _DummyProductRepository implements ProductRepository {
   @override
   Future<List<Product>> getAllProducts() async => [];
   @override
-  Future<Product> getProductByYoloLabel(String yoloLabel) async => throw UnimplementedError();
+  Future<Product> getProductByYoloLabel(String yoloLabel) async =>
+      throw UnimplementedError();
   @override
-  Future<List<Product>> getSimilarProducts(String category, {String? excludeId}) async => [];
+  Future<List<Product>> getSimilarProducts(
+    String category, {
+    String? excludeId,
+  }) async => [];
 }
-
-

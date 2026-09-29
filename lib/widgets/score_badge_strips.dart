@@ -174,8 +174,8 @@ class ScoreBadgePanel extends StatelessWidget {
     required this.novaGroup,
     this.nutriColor,
     this.novaColor,
-    this.nutriLabel = 'Nutri-Score',
-    this.novaLabel = 'NOVA',
+    this.nutriLabel = 'Nutrition',
+    this.novaLabel = 'Processing',
   });
 
   /// 'A'..'E', or '' when there is no nutrition data (nothing is enlarged).
