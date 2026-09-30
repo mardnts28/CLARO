@@ -141,16 +141,21 @@ export default function ReportDetails() {
         setForm(buildFormState(data.extractedData, data.category));
 
         if (data.reportedBy) {
-          try {
-            const userSnap = await getDoc(
-              doc(db, "users", data.reportedBy)
-            );
+          // For guest users (reportedBy is 'anonymous'), use the userName from the report data
+          if (data.reportedBy === 'anonymous') {
+            setReporterName(data.userName || "Guest User");
+          } else {
+            try {
+              const userSnap = await getDoc(
+                doc(db, "users", data.reportedBy)
+              );
 
-            if (userSnap.exists()) {
-              setReporterName(userSnap.data().name || "");
+              if (userSnap.exists()) {
+                setReporterName(userSnap.data().name || "");
+              }
+            } catch (err) {
+              console.error("Failed to load reporter name:", err);
             }
-          } catch (err) {
-            console.error("Failed to load reporter name:", err);
           }
         }
       } catch (err) {
