@@ -15,6 +15,7 @@ import '../widgets/voice_assistant_fab.dart';
 import '../services/auth_service.dart';
 import '../services/haptic_service.dart';
 import '../services/home_tab_controller.dart';
+import '../services/guest_session.dart';
 import '../models/report_model.dart';
 import '../data/services/backend_locator.dart';
 
@@ -231,16 +232,22 @@ class _UnknownProductSubmissionScreenState
       final uid = user?.uid ?? 'anonymous';
       final email = user?.email ?? '';
       String name = email.isNotEmpty ? email.split('@').first : 'Anonymous';
-      try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .get();
-        final fetchedName = userDoc.data()?['name'] as String?;
-        if (fetchedName != null && fetchedName.trim().isNotEmpty) {
-          name = fetchedName.trim();
-        }
-      } catch (_) {}
+      
+      // Use "Guest User" for guest users
+      if (GuestSession.isGuest.value) {
+        name = 'Guest User';
+      } else {
+        try {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
+          final fetchedName = userDoc.data()?['name'] as String?;
+          if (fetchedName != null && fetchedName.trim().isNotEmpty) {
+            name = fetchedName.trim();
+          }
+        } catch (_) {}
+      }
 
       await BackendLocator.pendingReportsService.queueReport(
         productName: _nameController.text.trim(),
@@ -282,19 +289,25 @@ class _UnknownProductSubmissionScreenState
       // somehow missing (shouldn't happen for a signed-up user, but keeps
       // this from ever showing a raw UID if it does).
       String name = email.isNotEmpty ? email.split('@').first : 'Anonymous';
-      try {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(uid)
-            .get();
-        final fetchedName = userDoc.data()?['name'] as String?;
-        if (fetchedName != null && fetchedName.trim().isNotEmpty) {
-          name = fetchedName.trim();
+      
+      // Use "Guest User" for guest users
+      if (GuestSession.isGuest.value) {
+        name = 'Guest User';
+      } else {
+        try {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
+          final fetchedName = userDoc.data()?['name'] as String?;
+          if (fetchedName != null && fetchedName.trim().isNotEmpty) {
+            name = fetchedName.trim();
+          }
+        } catch (e) {
+          debugPrint('Could not fetch user name for report: $e');
+          // Keep the email-prefix fallback set above -- don't block
+          // submission over a profile lookup failure.
         }
-      } catch (e) {
-        debugPrint('Could not fetch user name for report: $e');
-        // Keep the email-prefix fallback set above -- don't block
-        // submission over a profile lookup failure.
       }
 
       // Read photos safely -- front photo is optional if capturedImagePath was not provided
@@ -394,16 +407,22 @@ class _UnknownProductSubmissionScreenState
           final uid = user?.uid ?? 'anonymous';
           final email = user?.email ?? '';
           String name = email.isNotEmpty ? email.split('@').first : 'Anonymous';
-          try {
-            final userDoc = await FirebaseFirestore.instance
-                .collection('users')
-                .doc(uid)
-                .get();
-            final fetchedName = userDoc.data()?['name'] as String?;
-            if (fetchedName != null && fetchedName.trim().isNotEmpty) {
-              name = fetchedName.trim();
-            }
-          } catch (_) {}
+          
+          // Use "Guest User" for guest users
+          if (GuestSession.isGuest.value) {
+            name = 'Guest User';
+          } else {
+            try {
+              final userDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(uid)
+                  .get();
+              final fetchedName = userDoc.data()?['name'] as String?;
+              if (fetchedName != null && fetchedName.trim().isNotEmpty) {
+                name = fetchedName.trim();
+              }
+            } catch (_) {}
+          }
 
           await BackendLocator.pendingReportsService.queueReport(
             productName: _nameController.text.trim(),

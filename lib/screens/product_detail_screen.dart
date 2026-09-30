@@ -1079,28 +1079,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ),
                           const SizedBox(width: 16),
-                          // Favorite button
-                          Semantics(
-                            button: true,
-                            label: _isFavorite
-                                ? 'Remove from favorites'
-                                : 'Add to favorites',
-                            child: GestureDetector(
-                              onTap: () {
-                                HapticService().vibrate();
-                                _toggleFavorite();
-                              },
-                              child: Icon(
-                                _isFavorite
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: _isFavorite
-                                    ? const Color(0xFFD32F2F)
-                                    : colorScheme.onSurfaceVariant,
-                                size: 24,
+                          // Favorite button - hidden for guest users
+                          if (!GuestSession.isGuest.value)
+                            Semantics(
+                              button: true,
+                              label: _isFavorite
+                                  ? 'Remove from favorites'
+                                  : 'Add to favorites',
+                              child: GestureDetector(
+                                onTap: () {
+                                  HapticService().vibrate();
+                                  _toggleFavorite();
+                                },
+                                child: Icon(
+                                  _isFavorite
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: _isFavorite
+                                      ? const Color(0xFFD32F2F)
+                                      : colorScheme.onSurfaceVariant,
+                                  size: 24,
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
