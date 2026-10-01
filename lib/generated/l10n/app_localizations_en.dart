@@ -117,13 +117,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fdaCardTitle => 'How to Read Nutrition Labels';
 
   @override
-  String get fdaCardSource => 'by FDA';
+  String get fdaCardSource => 'by Food and Drug Administration (FDA)';
 
   @override
   String get whoCardTitle => 'Daily Nutrient Limit Guidelines';
 
   @override
-  String get whoCardSource => 'by WHO';
+  String get whoCardSource => 'by World Health Organization (WHO)';
 
   @override
   String get healthConditionsSubtitle =>
@@ -133,13 +133,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get kidneyCardTitle => 'Healthy Eating for Kidney Disease';
 
   @override
-  String get kidneyCardSource => 'by NIDDK';
+  String get kidneyCardSource => 'by National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK)';
 
   @override
   String get gerdCardTitle => 'Eating, Diet, & Nutrition for GERD';
 
   @override
-  String get gerdCardSource => 'by NIDDK';
+  String get gerdCardSource => 'by National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK)';
 
   @override
   String get healthGradeTitle => 'Food health rating';
@@ -1150,7 +1150,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String analysisBasisSubtitle(String servingSize) {
-    return 'Referenced from W.H.O. Healthy Diet Fact Sheet, per 1 serving ($servingSize)';
+    return 'Referenced from World Health Organization (WHO) Healthy Diet Fact Sheet, per 1 serving ($servingSize)';
   }
 
   @override

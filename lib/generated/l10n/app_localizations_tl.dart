@@ -117,14 +117,14 @@ class AppLocalizationsTl extends AppLocalizations {
   String get fdaCardTitle => 'Paano Basahin ang Nutrition Label';
 
   @override
-  String get fdaCardSource => 'ng FDA';
+  String get fdaCardSource => 'ng Food and Drug Administration (FDA)';
 
   @override
   String get whoCardTitle =>
       'Gabay sa Pang-araw-araw na Limitasyon ng Sustansya';
 
   @override
-  String get whoCardSource => 'ng WHO';
+  String get whoCardSource => 'ng World Health Organization (WHO)';
 
   @override
   String get healthConditionsSubtitle =>
@@ -134,13 +134,13 @@ class AppLocalizationsTl extends AppLocalizations {
   String get kidneyCardTitle => 'Malusog na Pagkain para sa Sakit sa Bato';
 
   @override
-  String get kidneyCardSource => 'ng NIDDK';
+  String get kidneyCardSource => 'ng National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK)';
 
   @override
   String get gerdCardTitle => 'Pagkain, Diyeta, at Nutrisyon para sa GERD';
 
   @override
-  String get gerdCardSource => 'ng NIDDK';
+  String get gerdCardSource => 'ng National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK)';
 
   @override
   String get healthGradeTitle => 'Sukat ng kalusugan ng pagkain';
