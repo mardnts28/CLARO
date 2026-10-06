@@ -5,6 +5,38 @@
     <link rel="icon" type="image/png" href="/src/assets/images/logoll.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>claro-admin</title>
+    
+    <!-- Content Security Policy (CSP) -->
+    <!--
+      NOTE: This is a REPORT-ONLY policy for monitoring violations without blocking.
+      After monitoring for 1-2 weeks, switch to enforcing mode by removing "-Report-Only"
+      and changing Content-Security-Policy-Report-Only to Content-Security-Policy.
+
+      To monitor violations:
+      - Check browser console for CSP violation reports
+      - Review CSP report endpoint logs (if configured)
+
+      Before enforcing:
+      - Ensure all external resources are whitelisted
+      - Move any inline scripts to external files
+      - Test thoroughly in staging environment
+
+      Production domains: https://claro-admin.onrender.com, https://claro-52ia.onrender.com
+    -->
+    <meta http-equiv="Content-Security-Policy-Report-Only" content="
+      default-src 'self';
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://firebase.googleapis.com;
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      img-src 'self' data: blob: https://res.cloudinary.com https://firebasestorage.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com;
+      connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://api.cloudinary.com https://api.emailjs.com https://claro-admin.onrender.com https://claro-52ia.onrender.com https://claro-gemini-proxy.claro-app.workers.dev;
+      frame-src 'self' https://firebase.googleapis.com;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'self';
+      frame-ancestors 'none';
+      report-uri /csp-violation-report-endpoint
+    ">
   </head>
   <body>
     <div id="root"></div>
