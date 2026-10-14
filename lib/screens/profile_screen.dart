@@ -151,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               .collection('users')
               .doc(uid)
               .get(
-                GetOptions(source: Source.server),
+                GetOptions(source: Source.serverAndCache),
               );
 
           if (userDoc.exists) {
@@ -719,19 +719,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final dialogContext = context;
     final loc = AppLocalizations.of(dialogContext)!;
 
-    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
-    if (!hasInternet) {
-      if (dialogContext.mounted) {
-        await SuccessFeedbackUtils.showOfflineNoticeDialog(
-          dialogContext,
-          title: loc.noInternetTitle,
-          message: loc.noInternetActionMessage,
-          buttonText: loc.gotIt,
-        );
-      }
-      return;
-    }
-
     if (!dialogContext.mounted) return;
     final choice = await showDialog<String>(
       context: dialogContext,
@@ -762,12 +749,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _selectedLanguageCode = choice;
         });
 
-        await _updateUserPreference(
-          'language',
-          choice,
-        );
-
+        // Apply the locale locally FIRST so the switch is instant & works
+        // offline.  Firestore sync is best-effort afterwards.
         await LocaleService.setAppLocale(choice);
+
+        // Best-effort Firestore persistence – don't block the UI or
+        // re-load from the server (which would overwrite the fresh locale
+        // when offline).
+        _updateUserPreference('language', choice).catchError((_) => false);
       }
     }
   }
@@ -971,7 +960,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _showDeleteAccountDialog() {
+  Future<void> _showDeleteAccountDialog() async {
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!mounted) return;
+    if (!hasInternet) {
+      final loc = AppLocalizations.of(context)!;
+      await SuccessFeedbackUtils.showOfflineNoticeDialog(
+        context,
+        title: loc.noInternetTitle,
+        message: loc.noInternetActionMessage,
+        buttonText: loc.gotIt,
+      );
+      return;
+    }
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -1003,6 +1005,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }) async {
     if (!mounted) return;
 
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!mounted) return;
+    if (!hasInternet) {
+      final loc = AppLocalizations.of(context)!;
+      await SuccessFeedbackUtils.showOfflineNoticeDialog(
+        context,
+        title: loc.noInternetTitle,
+        message: loc.noInternetActionMessage,
+        buttonText: loc.gotIt,
+      );
+      return;
+    }
+
     setState(() {
       _isDeletingAccount = true;
     });
@@ -1025,15 +1040,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isDeletingAccount = false;
         });
 
-        final theme = Theme.of(context);
+        final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+            (result.message ?? '').toLowerCase().contains('network');
+        if (mounted && isNet) {
+          final loc = AppLocalizations.of(context)!;
+          await SuccessFeedbackUtils.showOfflineNoticeDialog(
+            context,
+            title: loc.noInternetTitle,
+            message: loc.noInternetActionMessage,
+            buttonText: loc.gotIt,
+          );
+          return;
+        }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result.message!),
-            backgroundColor:
-                theme.colorScheme.primary,
-          ),
-        );
+        if (mounted) {
+          final theme = Theme.of(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message!),
+              backgroundColor:
+                  theme.colorScheme.primary,
+            ),
+          );
+        }
 
         return;
 
@@ -1343,6 +1372,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 value: isVoiceEnabled,
                 onChanged: (value) async {
                   HapticService().vibrate();
+                  final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+                  if (!mounted) return;
+                  if (!hasInternet) {
+                    await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                      context,
+                      title: loc.noInternetTitle,
+                      message: loc.noInternetVoiceMessage,
+                      buttonText: loc.gotIt,
+                    );
+                    return;
+                  }
                   final previous = isVoiceEnabled;
                   setState(() => _voiceAssistantEnabled = value);
                   await VoiceAssistantService.instance.updateEnabled(value);

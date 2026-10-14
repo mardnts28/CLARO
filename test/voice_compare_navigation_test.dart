@@ -5,6 +5,7 @@ import 'package:claro/services/voice_command_router.dart';
 import 'package:claro/data/repositories/favorites_repository.dart';
 import 'package:claro/data/repositories/product_repository.dart';
 import 'package:claro/data/services/favorites_service.dart';
+import 'package:claro/screens/nutrition_guide_screen.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -562,6 +563,187 @@ void main() {
       expect(captured!['p123'], isTrue);
 
       FavoritesService.favoriteActionNotifier.removeListener(listener);
+    });
+
+    test('Offline slot queries match varied shopper synonyms in English and Tagalog', () {
+      final router = VoiceCommandRouter.instance;
+
+      // Allergens
+      expect(router.testMatchOfflineSlot('what are the allergens'), equals('read_allergens'));
+      expect(router.testMatchOfflineSlot('may allergy ba'), equals('read_allergens'));
+      expect(router.testMatchOfflineSlot('allergic alert'), equals('read_allergens'));
+      expect(router.testMatchOfflineSlot('bawal ba sa may allergy'), equals('read_allergens'));
+
+      // Ingredients
+      expect(router.testMatchOfflineSlot('what is in this'), equals('read_ingredients'));
+      expect(router.testMatchOfflineSlot('anong laman nito'), equals('read_ingredients'));
+      expect(router.testMatchOfflineSlot('basahin ang sangkap'), equals('read_ingredients'));
+
+      // Calories
+      expect(router.testMatchOfflineSlot('how many calories'), equals('read_calories'));
+      expect(router.testMatchOfflineSlot('ilang calorie'), equals('read_calories'));
+      expect(router.testMatchOfflineSlot('cals count'), equals('read_calories'));
+
+      // Sodium / Salt
+      expect(router.testMatchOfflineSlot('how much sodium'), equals('read_sodium'));
+      expect(router.testMatchOfflineSlot('how salty is this'), equals('read_sodium'));
+      expect(router.testMatchOfflineSlot('maalat ba ito'), equals('read_sodium'));
+      expect(router.testMatchOfflineSlot('dami ng asin'), equals('read_sodium'));
+
+      // Sugar
+      expect(router.testMatchOfflineSlot('how much sugar'), equals('read_sugar'));
+      expect(router.testMatchOfflineSlot('is this sweet'), equals('read_sugar'));
+      expect(router.testMatchOfflineSlot('matamis ba ito'), equals('read_sugar'));
+      expect(router.testMatchOfflineSlot('gaano katamis'), equals('read_sugar'));
+
+      // Fat
+      expect(router.testMatchOfflineSlot('read fat content'), equals('read_fat'));
+      expect(router.testMatchOfflineSlot('how oily is it'), equals('read_fat'));
+      expect(router.testMatchOfflineSlot('mataba ba ito'), equals('read_fat'));
+
+      // Serving size
+      expect(router.testMatchOfflineSlot('what is the serving size'), equals('read_serving_size'));
+      expect(router.testMatchOfflineSlot('sukat ng serving'), equals('read_serving_size'));
+      expect(router.testMatchOfflineSlot('gaano kalaki ang isang serving'), equals('read_serving_size'));
+
+      // Health / Verdict
+      expect(router.testMatchOfflineSlot('is this healthy'), equals('is_healthy'));
+      expect(router.testMatchOfflineSlot('safe ba to'), equals('is_healthy'));
+      expect(router.testMatchOfflineSlot('pwede ba to sa akin'), equals('is_healthy'));
+      expect(router.testMatchOfflineSlot('what is the verdict'), equals('read_verdict'));
+      expect(router.testMatchOfflineSlot('ano ang hatol nito'), equals('read_verdict'));
+    });
+
+    test('Nutrition guide queries match varied shopper synonyms in English and Tagalog', () {
+      final router = VoiceCommandRouter.instance;
+
+      // FDA Label reading
+      expect(router.testMatchNutritionGuideQuestion('how to read nutrition label'), equals(NutritionGuideType.fda));
+      expect(router.testMatchNutritionGuideQuestion('how do i read food labels'), equals(NutritionGuideType.fda));
+      expect(router.testMatchNutritionGuideQuestion('read nutrition label'), equals(NutritionGuideType.fda));
+      expect(router.testMatchNutritionGuideQuestion('paano basahin ang nutrition label'), equals(NutritionGuideType.fda));
+      expect(router.testMatchNutritionGuideQuestion('paano magbasa ng label'), equals(NutritionGuideType.fda));
+      expect(router.testMatchNutritionGuideQuestion('ipaliwanag ang nutrition label'), equals(NutritionGuideType.fda));
+
+      // WHO Daily guidelines & limits
+      expect(router.testMatchNutritionGuideQuestion('limits on who'), equals(NutritionGuideType.who));
+      expect(router.testMatchNutritionGuideQuestion('who limits'), equals(NutritionGuideType.who));
+      expect(router.testMatchNutritionGuideQuestion('who guidelines'), equals(NutritionGuideType.who));
+      expect(router.testMatchNutritionGuideQuestion('daily nutrient guidelines'), equals(NutritionGuideType.who));
+      expect(router.testMatchNutritionGuideQuestion('recommended daily intake'), equals(NutritionGuideType.who));
+      expect(router.testMatchNutritionGuideQuestion('how much sodium per day'), equals(NutritionGuideType.who));
+      expect(router.testMatchNutritionGuideQuestion('limit sa who'), equals(NutritionGuideType.who));
+      expect(router.testMatchNutritionGuideQuestion('mga limitasyon ng who'), equals(NutritionGuideType.who));
+      expect(router.testMatchNutritionGuideQuestion('pang araw araw na gabay sa sustansya'), equals(NutritionGuideType.who));
+      expect(router.testMatchNutritionGuideQuestion('gabay sa sustansya'), equals(NutritionGuideType.who));
+
+      // Kidney health
+      expect(router.testMatchNutritionGuideQuestion('healthy eating for kidney disease'), equals(NutritionGuideType.kidney));
+      expect(router.testMatchNutritionGuideQuestion('renal diet guide'), equals(NutritionGuideType.kidney));
+      expect(router.testMatchNutritionGuideQuestion('pagkain para sa sakit sa bato'), equals(NutritionGuideType.kidney));
+      expect(router.testMatchNutritionGuideQuestion('pagkain para sa may sakit sa bato'), equals(NutritionGuideType.kidney));
+      expect(router.testMatchNutritionGuideQuestion('problema sa bato diet'), equals(NutritionGuideType.kidney));
+
+      // GERD / Acid reflux
+      expect(router.testMatchNutritionGuideQuestion('eating diet and nutrition for gerd'), equals(NutritionGuideType.gerd));
+      expect(router.testMatchNutritionGuideQuestion('acid reflux diet'), equals(NutritionGuideType.gerd));
+      expect(router.testMatchNutritionGuideQuestion('gabay sa acid reflux'), equals(NutritionGuideType.gerd));
+      expect(router.testMatchNutritionGuideQuestion('pagkain para sa gerd'), equals(NutritionGuideType.gerd));
+      expect(router.testMatchNutritionGuideQuestion('asim ng sikmura pagkain'), equals(NutritionGuideType.gerd));
+
+      // Nutrition Guide Brief Explanations (Bilingual consistency)
+      // FDA
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.fda, 'en'), contains('Opening the nutrition facts label guide'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.fda, 'en'), contains('2,000-calorie'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.fda, 'fil'), contains('Binubuksan ang gabay sa nutrition facts label'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.fda, 'fil'), contains('2,000-calorie'));
+
+      // WHO
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.who, 'en'), contains('Opening daily nutrient guidelines'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.who, 'en'), contains('5 grams of salt'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.who, 'fil'), contains('Binubuksan ang pang-araw-araw na gabay sa sustansya'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.who, 'fil'), contains('5 gramo ng asin'));
+
+      // Kidney
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.kidney, 'en'), contains('Opening kidney disease nutrition guide'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.kidney, 'en'), contains('2,300 milligrams'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.kidney, 'fil'), contains('Binubuksan ang gabay sa nutrisyon para sa sakit sa bato'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.kidney, 'fil'), contains('2,300 milligrams'));
+
+      // GERD
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.gerd, 'en'), contains('Opening the GERD and acid reflux diet guide'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.gerd, 'en'), contains('smaller, frequent meals'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.gerd, 'fil'), contains('Binubuksan ang gabay sa pagkain para sa GERD at acid reflux'));
+      expect(router.testNutritionGuideExplanation(NutritionGuideType.gerd, 'fil'), contains('maliliit na'));
+    });
+
+    test('About CLARO, User Guide, Privacy, and Terms triggers and replies in English and Tagalog', () {
+      final router = VoiceCommandRouter.instance;
+
+      // 1. About CLARO triggers
+      expect(router.testTargetFromTranscript('about claro'), equals('about_claro'));
+      expect(router.testTargetFromTranscript('what is claro'), equals('about_claro'));
+      expect(router.testTargetFromTranscript('tell me about claro'), equals('about_claro'));
+      expect(router.testTargetFromTranscript('who made claro'), equals('about_claro'));
+      expect(router.testTargetFromTranscript('tungkol sa claro'), equals('about_claro'));
+      expect(router.testTargetFromTranscript('ano ang claro'), equals('about_claro'));
+      expect(router.testTargetFromTranscript('ano itong claro'), equals('about_claro'));
+      expect(router.testTargetFromTranscript('sino ang gumawa ng claro'), equals('about_claro'));
+      expect(router.testTargetFromTranscript('impormasyon sa claro'), equals('about_claro'));
+      expect(router.testTargetFromTranscript('alamin ang tungkol sa claro'), equals('about_claro'));
+
+      // 1b. About CLARO replies
+      expect(router.testNavigationReply('about_claro', 'en'), contains('Opening About CLARO'));
+      expect(router.testNavigationReply('about_claro', 'en'), contains('directed to learn more about CLARO'));
+      expect(router.testNavigationReply('about_claro', 'fil'), contains('Binubuksan ang Tungkol sa CLARO'));
+      expect(router.testNavigationReply('about_claro', 'fil'), contains('Ididirekta ka sa impormasyon tungkol sa CLARO'));
+
+      // 2. User Guide triggers
+      expect(router.testTargetFromTranscript('how to use'), equals('user_guide'));
+      expect(router.testTargetFromTranscript('how to use claro'), equals('user_guide'));
+      expect(router.testTargetFromTranscript('how do i use this app'), equals('user_guide'));
+      expect(router.testTargetFromTranscript('user guide'), equals('user_guide'));
+      expect(router.testTargetFromTranscript('gabay sa paggamit'), equals('user_guide'));
+      expect(router.testTargetFromTranscript('paano gamitin ang claro'), equals('user_guide'));
+      expect(router.testTargetFromTranscript('paano ito gamitin'), equals('user_guide'));
+      expect(router.testTargetFromTranscript('tulong sa paggamit'), equals('user_guide'));
+      expect(router.testTargetFromTranscript('turuan mo ako paano gamitin'), equals('user_guide'));
+
+      // 2b. User Guide replies
+      expect(router.testNavigationReply('user_guide', 'en'), contains('Opening the User Guide'));
+      expect(router.testNavigationReply('user_guide', 'en'), contains('directed to the guide on how to use CLARO'));
+      expect(router.testNavigationReply('user_guide', 'fil'), contains('Binubuksan ang Gabay sa Paggamit'));
+      expect(router.testNavigationReply('user_guide', 'fil'), contains('Ididirekta ka sa gabay kung paano gamitin ang CLARO'));
+
+      // 3. Privacy Policy triggers
+      expect(router.testTargetFromTranscript('privacy policy'), equals('privacy_policy'));
+      expect(router.testTargetFromTranscript('data privacy'), equals('privacy_policy'));
+      expect(router.testTargetFromTranscript('data protection'), equals('privacy_policy'));
+      expect(router.testTargetFromTranscript('patakaran sa privacy'), equals('privacy_policy'));
+      expect(router.testTargetFromTranscript('seguridad ng data'), equals('privacy_policy'));
+      expect(router.testTargetFromTranscript('proteksyon ng data'), equals('privacy_policy'));
+      expect(router.testTargetFromTranscript('privacy ng datos'), equals('privacy_policy'));
+
+      // 3b. Privacy Policy replies
+      expect(router.testNavigationReply('privacy_policy', 'en'), contains('Opening the Privacy Policy'));
+      expect(router.testNavigationReply('privacy_policy', 'en'), contains('directed to our privacy and data protection policy'));
+      expect(router.testNavigationReply('privacy_policy', 'fil'), contains('Binubuksan ang Patakaran sa Privacy'));
+      expect(router.testNavigationReply('privacy_policy', 'fil'), contains('Ididirekta ka sa aming patakaran sa proteksyon ng datos'));
+
+      // 4. Terms and Conditions triggers
+      expect(router.testTargetFromTranscript('terms and conditions'), equals('terms_conditions'));
+      expect(router.testTargetFromTranscript('terms of service'), equals('terms_conditions'));
+      expect(router.testTargetFromTranscript('terms of use'), equals('terms_conditions'));
+      expect(router.testTargetFromTranscript('mga tuntunin at kundisyon'), equals('terms_conditions'));
+      expect(router.testTargetFromTranscript('mga tuntunin at kondisyon'), equals('terms_conditions'));
+      expect(router.testTargetFromTranscript('tuntunin sa paggamit'), equals('terms_conditions'));
+      expect(router.testTargetFromTranscript('kasunduan sa paggamit'), equals('terms_conditions'));
+
+      // 4b. Terms and Conditions replies
+      expect(router.testNavigationReply('terms_conditions', 'en'), contains('Opening Terms and Conditions'));
+      expect(router.testNavigationReply('terms_conditions', 'en'), contains('directed to our terms of service'));
+      expect(router.testNavigationReply('terms_conditions', 'fil'), contains('Binubuksan ang mga Tuntunin at Kundisyon'));
+      expect(router.testNavigationReply('terms_conditions', 'fil'), contains('Ididirekta ka sa aming mga tuntunin ng serbisyo'));
     });
   });
 }

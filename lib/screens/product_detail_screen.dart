@@ -195,10 +195,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         BackendLocator.productRepository is FirestoreProductRepository) {
       _guestLiveRefresh = _refreshGuestProductLive();
     }
-    if (_authService.currentUser != null &&
-        VoiceAssistantService.instance.isEnabled) {
-      VoiceAssistantService.instance.announcePage('product_detail');
-    }
     _loadFdaVerification();
     _loadFavoriteStatus();
     FavoritesService.favoriteActionNotifier.addListener(
@@ -671,8 +667,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         _rankingExplanation = detail.rankingExplanation;
         _advisoryLoading = false;
       });
-      // Voice summary + auto-announce happen in _finishGroup() so a group
-      // user hears the GROUP verdict instead of the solo one.
+      // Verbal scan verdict: automatically speaks the health summary as soon
+      // as a single product is navigated to and evaluated.
+      _finishVoice();
     }
   }
 
@@ -1911,60 +1908,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                       const SizedBox(height: 20),
 
-                      // ── 7. Scores (Individual White Cards: Nutri-Score & NOVA) ─
-                      (() {
-                        final langCode = Localizations.localeOf(
-                          context,
-                        ).languageCode;
-                        final nutriResult =
-                            NutriScoreCalculator.computeFromProduct(
-                              _currentProduct,
-                              customServingSizeG: _selectedSizeG,
-                            );
-                        final novaResult =
-                            NovaScoreCalculator.computeFromProduct(
-                              _currentProduct,
-                            );
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                              child: Text(
-                                loc.scoresTitle,
-                                style: GoogleFonts.outfit(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: colorScheme.onSurface,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-
-                            _scoreCard(
-                              context: context,
-                              label: loc.scoreNutrition,
-                              badge: nutriResult.gradeLetter,
-                              badgeColor: Color(nutriResult.gradeColorHex),
-                              description: nutriResult.description(langCode),
-                            ),
-                            const SizedBox(height: 8),
-                            _scoreCard(
-                              context: context,
-                              label: loc.scoreProcess,
-                              badge: novaResult.groupString,
-                              badgeColor: Color(novaResult.colorHex),
-                              isCircle: true,
-                              description: novaResult.description(langCode),
-                            ),
-                          ],
-                        );
-                      })(),
-
-                      const SizedBox(height: 16),
 
                       // ── 8. Product Ranking Card ─────────────────────────
                       // Only rendered when this product was viewed as part of
@@ -4032,84 +3975,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // ── Individual white score card (matches the style of scores section) ────
-  Widget _scoreCard({
-    required BuildContext context,
-    required String label,
-    required String badge,
-    required Color badgeColor,
-    required String description,
-    bool isCircle = false,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // Badge indicator block
-          Column(
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  shape: isCircle ? BoxShape.circle : BoxShape.rectangle,
-                  borderRadius: isCircle ? null : BorderRadius.circular(6),
-                ),
-                child: Center(
-                  child: Text(
-                    badge,
-                    style: GoogleFonts.outfit(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 14),
-          // Description text
-          Expanded(
-            child: Text(
-              description,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: colorScheme.onSurface,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFdaBadge() {
     final fda = _fdaResult;
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -4250,21 +4115,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     BuildContext context,
     ProductEvaluation evaluation,
   ) {
-    final languageCode = Localizations.localeOf(context).languageCode;
+    final isTagalog =
+        VoiceAssistantService.languageNotifier.value == VoiceLang.tagalog ||
+        Localizations.localeOf(context).languageCode == 'tl';
+    final langCode = isTagalog ? 'tl' : 'en';
+
     final allergenLabels = _matchedUserAllergenLabels(
       _currentProduct,
-      languageCode,
+      langCode,
     );
     final advisory = _effectiveAdvisory(context);
     final verdict = switch (_currentOverallLevel()) {
-      AdvisoryLevel.suitable => 'Suitable',
-      AdvisoryLevel.moderate => 'Moderate',
-      AdvisoryLevel.caution => 'Caution',
+      AdvisoryLevel.suitable => isTagalog ? 'Angkop' : 'Suitable',
+      AdvisoryLevel.moderate => isTagalog ? 'Katamtaman' : 'Moderate',
+      AdvisoryLevel.caution => isTagalog ? 'Mag-ingat' : 'Caution',
     };
     final flaggedNutrients = <String>[];
     for (final nutrient in evaluation.nutrientEvaluations) {
       if (nutrient.level == AdvisoryLevel.suitable) continue;
-      final label = _voiceNutrientLabel(nutrient.nutrientKey);
+      final label = _voiceNutrientLabel(
+        nutrient.nutrientKey,
+        isTagalog: isTagalog,
+      );
       if (!flaggedNutrients.contains(label)) {
         flaggedNutrients.add(label);
       }
@@ -4272,11 +4144,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     final sections = <String>[];
     if (allergenLabels.isNotEmpty && !_isGroupMode) {
-      sections.add('Allergen warning: ${allergenLabels.join(', ')}.');
+      sections.add(
+        isTagalog
+            ? 'Babala sa allergen: ${allergenLabels.join(', ')}.'
+            : 'Allergen warning: ${allergenLabels.join(', ')}.',
+      );
     }
 
     sections.add(
-      'Product: ${_currentProduct.name}, size ${_selectedSizeG.toStringAsFixed(0)} grams.',
+      isTagalog
+          ? 'Produkto: ${_currentProduct.name}, laki ay ${_selectedSizeG.toStringAsFixed(0)} gramo.'
+          : 'Product: ${_currentProduct.name}, size ${_selectedSizeG.toStringAsFixed(0)} grams.',
     );
     if (_isGroupMode) {
       final groupAdvisory = _effectiveGroupAdvisory(context);
@@ -4291,11 +4169,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ? _selectedGroupOption?.group.name
           : null;
       final groupLabel = groupName == null
-          ? 'Group verdict'
-          : 'Group $groupName verdict';
+          ? (isTagalog ? 'Hatol ng grupo' : 'Group verdict')
+          : (isTagalog ? 'Hatol ng grupong $groupName' : 'Group $groupName verdict');
       sections.add(
         '$groupLabel: ${_levelLabel(_groupLevel)}. '
-        '$flaggedCount of ${_groupMembers.length} members flagged.',
+        '${isTagalog ? "$flaggedCount sa ${_groupMembers.length} na miyembro ang may babala." : "$flaggedCount of ${_groupMembers.length} members flagged."}',
       );
       if (groupAdvisory != null) {
         if (groupAdvisory.warningText.trim().isNotEmpty) {
@@ -4306,7 +4184,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         }
       }
     } else {
-      sections.add('Overall verdict: $verdict.');
+      sections.add(
+        isTagalog ? 'Kabuuang hatol: $verdict.' : 'Overall verdict: $verdict.',
+      );
 
       if (advisory != null) {
         if (advisory.warningText.trim().isNotEmpty) {
@@ -4320,7 +4200,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     if (flaggedNutrients.isNotEmpty && !_isGroupMode) {
       sections.add(
-        'Nutrients driving this verdict: ${flaggedNutrients.join(', ')}.',
+        isTagalog
+            ? 'Mga sustansyang nagdulot ng hatol na ito: ${flaggedNutrients.join(', ')}.'
+            : 'Nutrients driving this verdict: ${flaggedNutrients.join(', ')}.',
       );
     }
 
@@ -4328,10 +4210,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (fda != null) {
       sections.add(
         fda.isActive
-            ? 'FDA status: active.'
+            ? (isTagalog ? 'Katayuan sa FDA: aktibo.' : 'FDA status: active.')
             : fda.isExpired
-            ? 'FDA status: expired.'
-            : 'FDA status: unverified.',
+            ? (isTagalog ? 'Katayuan sa FDA: paso na.' : 'FDA status: expired.')
+            : (isTagalog ? 'Katayuan sa FDA: hindi beripikado.' : 'FDA status: unverified.'),
       );
     }
 
@@ -4349,10 +4231,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (_rankingExplanation != null &&
           _rankingExplanation!.trim().isNotEmpty) {
         sections.add(
-          'Comparison ranking: $rankLabel. ${_rankingExplanation!.trim()}',
+          isTagalog
+              ? 'Ranggo sa paghahambing: $rankLabel. ${_rankingExplanation!.trim()}'
+              : 'Comparison ranking: $rankLabel. ${_rankingExplanation!.trim()}',
         );
       } else {
-        sections.add('Comparison ranking: $rankLabel.');
+        sections.add(
+          isTagalog
+              ? 'Ranggo sa paghahambing: $rankLabel.'
+              : 'Comparison ranking: $rankLabel.',
+        );
       }
     }
 
@@ -4367,12 +4255,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  String _voiceNutrientLabel(String nutrientKey) {
+  String _voiceNutrientLabel(String nutrientKey, {bool isTagalog = false}) {
     switch (nutrientKey) {
       case 'sodiumMg':
         return 'sodium';
       case 'sugarsG':
-        return 'sugar';
+        return isTagalog ? 'asukal' : 'sugar';
       case 'saturatedFatG':
         return 'saturated fat';
       default:

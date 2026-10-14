@@ -118,6 +118,7 @@ class ClaroApp extends StatelessWidget {
               valueListenable: TextSizeService.textSizeNotifier,
               builder: (context, textSize, _) {
                 return MaterialApp(
+                  navigatorKey: VoiceAssistantService.navigatorKey,
                   title: 'CLARO',
                   debugShowCheckedModeBanner: false,
                   locale: locale,

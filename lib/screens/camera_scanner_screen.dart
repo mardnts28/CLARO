@@ -14,6 +14,8 @@ import '../services/haptic_service.dart';
 import '../data/services/backend_locator.dart';
 import '../services/guest_session.dart';
 import '../data/repositories/product_repository.dart';
+import '../services/audio_earcon_service.dart';
+import '../services/scanner_position_guide_service.dart';
 import 'product_detail_screen.dart';
 import 'multi_scan_results_screen.dart';
 import 'unknown_product_submission_screen.dart';
@@ -347,14 +349,17 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     }
   }
 
-  void _announceIfVisible() {
+  void _announceIfVisible() async {
     if (HomeTabController.tabNotifier.value == 1 &&
         VoiceAssistantService.instance.isEnabled) {
+      final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+      if (!hasInternet) return;
       VoiceAssistantService.instance.announcePage('scan');
     }
   }
 
   void _handleClose() {
+    _turnOffFlash();
     if (widget.returnResultsOnDetect) {
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
@@ -368,17 +373,22 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     }
   }
 
-  void _showNoProductFallbackDialog({String? capturedImagePath}) {
+  void _showNoProductFallbackDialog({String? capturedImagePath}) async {
     if (_isFallbackModalOpen || !mounted || !_isScreenActive) return;
     _isFallbackModalOpen = true;
 
     final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
 
-    VoiceAssistantService.instance.speak(
-      isTagalog
-          ? 'Walang produktong nahanap sa camera. Subukang itapat nang mas malapit o ipagbigay-alam ang hindi kilalang produkto.'
-          : 'No product detected on camera. Try moving closer or report the unknown product.',
-    );
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (hasInternet) {
+      VoiceAssistantService.instance.speak(
+        isTagalog
+            ? 'Walang produktong nahanap sa camera. Subukang itapat nang mas malapit o ipagbigay-alam ang hindi kilalang produkto.'
+            : 'No product detected on camera. Try moving closer or report the unknown product.',
+      );
+    }
+
+    if (!mounted) return;
 
     showModalBottomSheet(
       context: context,
@@ -535,6 +545,25 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     }
   }
 
+  Future<void> _turnOffFlash() async {
+    if (!_isFlashOn && _cameraController?.value.flashMode == FlashMode.off) {
+      return;
+    }
+    try {
+      if (_cameraController?.value.isInitialized == true) {
+        await _cameraController!.setFlashMode(FlashMode.off);
+      }
+    } catch (e) {
+      debugPrint('Flash turn off error: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isFlashOn = false);
+      } else {
+        _isFlashOn = false;
+      }
+    }
+  }
+
   Future<void> _navigateToReportDirectly({String? capturedImagePath}) async {
     if (_isProcessing) return;
 
@@ -553,6 +582,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         debugPrint('Could not take picture for direct report: $e');
       }
     }
+
+    await _turnOffFlash();
 
     if (!mounted) return;
 
@@ -652,12 +683,15 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       if (!mounted || !_isScreenActive) return;
 
       if (detections.isNotEmpty) {
+        await _turnOffFlash();
         setState(() {
           _liveDetections = detections;
           _isProductInGuide = true;
         });
         HapticService().vibrate();
-        SystemSound.play(SystemSoundType.click);
+        AudioEarconService.instance.playProductRecognized();
+        // Announce detection centered confirmation for voice assistant users
+        ScannerPositionGuideService.instance.onCentered();
         await _resolveAndNavigateDetections(detections, imagePath);
       } else {
         setState(() {
@@ -666,12 +700,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           _liveDetections = [];
           _isProductInGuide = false;
         });
-        final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
-        if (!hasInternet) {
-          await _showOfflineScanNotice();
-        } else {
-          _showNoProductFallbackDialog(capturedImagePath: imagePath);
-        }
+        _showNoProductFallbackDialog(capturedImagePath: imagePath);
       }
     } catch (e) {
       safetyTimer.cancel();
@@ -680,16 +709,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         setState(() {
           _isProcessing = false;
           _hasTappedToScan = false;
-          _qualityWarning = null;
+          _qualityWarning = 'Scan error. Please try again.';
         });
-        final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
-        if (!hasInternet) {
-          await _showOfflineScanNotice();
-        } else if (mounted) {
-          setState(() {
-            _qualityWarning = 'Scan error. Please try again.';
-          });
-        }
       }
     }
   }
@@ -703,17 +724,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     setState(() {
       _isProcessing = false;
       _hasTappedToScan = false;
-      _qualityWarning = null;
+      _qualityWarning = 'Scan timed out. Please try again.';
     });
-
-    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
-    if (!hasInternet) {
-      await _showOfflineScanNotice();
-    } else if (mounted) {
-      setState(() {
-        _qualityWarning = 'Scan timed out. Please try again.';
-      });
-    }
   }
 
   Future<void> _showOfflineScanNotice() async {
@@ -769,6 +781,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       final distinctProducts = resolvedProducts.toSet().toList();
 
       if (distinctProducts.isNotEmpty && widget.returnResultsOnDetect) {
+        await _turnOffFlash();
         if (mounted) {
           for (var p in distinctProducts) {
             HistoryService().addScanRecord(p);
@@ -783,6 +796,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
           final singleProd = distinctProducts.first;
           HistoryService().addScanRecord(singleProd);
           _isScreenActive = false;
+          await _turnOffFlash();
           await _stopImageStreamIfActive();
           if (!mounted) return;
           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -805,6 +819,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 _isProcessing = false;
                 _liveDetections = [];
                 _isProductInGuide = false;
+                _isFlashOn = false;
               });
               SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
             }
@@ -816,6 +831,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
             HistoryService().addScanRecord(p);
           }
           _isScreenActive = false;
+          await _turnOffFlash();
           await _stopImageStreamIfActive();
           if (!mounted) return;
           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -825,9 +841,6 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
               builder: (_) => MultiScanResultsScreen(
                 detectedProducts: distinctProducts,
                 productCounts: productCounts,
-                showOfflineNotice: distinctProducts.any(
-                  (p) => p.isOfflineFallback,
-                ),
               ),
             ),
           ).then((_) {
@@ -840,6 +853,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 _isProcessing = false;
                 _liveDetections = [];
                 _isProductInGuide = false;
+                _isFlashOn = false;
               });
               SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
             }
@@ -847,7 +861,12 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         }
       } else {
         if (!mounted) return;
-        _showNoProductFallbackDialog(capturedImagePath: imagePath);
+        final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+        if (!hasInternet) {
+          await _showOfflineScanNotice();
+        } else {
+          _showNoProductFallbackDialog(capturedImagePath: imagePath);
+        }
       }
     } else {
       if (!mounted) return;

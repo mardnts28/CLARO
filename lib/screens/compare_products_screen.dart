@@ -779,8 +779,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         body: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header bar: centered title with subtle shadow, matching the
-            // ranking screens' app-wide header treatment. ──
+            // ── Header bar ──
             Container(
               height: topPadding + 56,
               padding: EdgeInsets.only(left: 16, right: 16, top: topPadding),
@@ -788,21 +787,13 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                 color: colorScheme.surface,
                 boxShadow: _softShadow(theme, blur: 12, dy: 4),
               ),
-              child: Stack(
-                alignment: Alignment.center,
+              child: Row(
                 children: [
-                  Text(
-                    loc.similarProductsTitle,
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: GestureDetector(
-                      onTap: _handleBack,
+                  GestureDetector(
+                    onTap: _handleBack,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 12, top: 4, bottom: 4),
                       child: Icon(
                         Icons.arrow_back,
                         color: colorScheme.primary,
@@ -810,66 +801,80 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                       ),
                     ),
                   ),
-                  if (_profile != null &&
-                      _profileComplete &&
-                      !GuestSession.isGuest.value)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              HapticService().vibrate();
-                              _showFilterSheet();
-                            },
-                            icon: Icon(
-                              Icons.filter_list,
-                              color: colorScheme.primary,
-                              size: 18,
-                            ),
-                            label: Text(
-                              Localizations.localeOf(context).languageCode ==
-                                      'tl'
-                                  ? 'I-filter'
-                                  : 'Filter',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: colorScheme.primary,
-                              side: BorderSide(color: colorScheme.primary),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                          if (_selectedConditions.isNotEmpty ||
-                              _hasActiveTagFilters)
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.secondary,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                        ],
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        loc.similarProductsTitle,
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                        maxLines: 1,
                       ),
                     ),
+                  ),
+                  if (_profile != null &&
+                      _profileComplete &&
+                      !GuestSession.isGuest.value) ...[
+                    const SizedBox(width: 8),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            HapticService().vibrate();
+                            _showFilterSheet();
+                          },
+                          icon: Icon(
+                            Icons.filter_list,
+                            color: colorScheme.primary,
+                            size: 16,
+                          ),
+                          label: Text(
+                            Localizations.localeOf(context).languageCode ==
+                                    'tl'
+                                ? 'I-filter'
+                                : 'Filter',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colorScheme.primary,
+                            side: BorderSide(color: colorScheme.primary),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                        if (_selectedConditions.isNotEmpty ||
+                            _hasActiveTagFilters)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: colorScheme.secondary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

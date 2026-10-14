@@ -12,6 +12,7 @@ import '../services/home_tab_controller.dart';
 import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
 import '../services/guest_session.dart';
+import '../core/utils/success_feedback_utils.dart';
 
 /// NOTE ON LANGUAGE: this screen now follows the app-wide selected
 /// language (Select Language screen on first launch / Settings >
@@ -192,6 +193,20 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (mounted) {
+        final loc = AppLocalizations.of(context)!;
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     HapticService().vibrate();
     if (!mounted) return;
     setState(() {
@@ -207,6 +222,17 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result != null) {
         // Either an error message (String) or an MFA challenge (Map).
         if (result is String) {
+          final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+              result.toLowerCase().contains('network');
+          if (mounted && isNet) {
+            final loc = AppLocalizations.of(context)!;
+            await SuccessFeedbackUtils.showOfflineNoticeDialog(
+              context,
+              title: loc.noInternetTitle,
+              message: loc.noInternetActionMessage,
+              buttonText: loc.gotIt,
+            );
+          }
           setState(() => _formError = _friendlyLoginError(result));
           return;
         }
@@ -258,6 +284,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     HapticService().vibrate();
+
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (mounted) {
+        final loc = AppLocalizations.of(context)!;
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     setState(() {
       _formError = null;
       _isLoading = true;
@@ -273,6 +314,17 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (result is String) {
+        final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+            result.toLowerCase().contains('network');
+        if (mounted && isNet) {
+          final loc = AppLocalizations.of(context)!;
+          await SuccessFeedbackUtils.showOfflineNoticeDialog(
+            context,
+            title: loc.noInternetTitle,
+            message: loc.noInternetActionMessage,
+            buttonText: loc.gotIt,
+          );
+        }
         setState(() => _formError = _friendlyLoginError(result));
         return;
       }

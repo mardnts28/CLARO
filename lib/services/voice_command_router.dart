@@ -2,6 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../screens/nutrition_guide_screen.dart';
+import '../screens/group_screen.dart';
+
 import 'voice_assistant_service.dart';
 import 'scan_history_service.dart';
 import 'gemini_service.dart';
@@ -51,6 +54,13 @@ class VoiceCommandRouter {
   };
 
   Future<void> handleMicTap(BuildContext context) async {
+    // Immediate push-to-finish: If already listening, tap finishes recording and submits immediately
+    if (VoiceAssistantService.isListeningNotifier.value) {
+      debugPrint('handleMicTap: mic tapped while listening -> finishing early');
+      VoiceAssistantService.instance.stopListeningEarly();
+      return;
+    }
+
     final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
     if (!hasInternet) {
       if (context.mounted) {
@@ -100,7 +110,64 @@ class VoiceCommandRouter {
     );
 
     // ============================================================
-    // 2. SUMMARY REQUEST
+    // 2. NUTRITION GUIDE QUESTIONS (FDA label, WHO limits, Kidney, GERD)
+    // Evaluated first so guide inquiries (e.g. "limits on WHO", "how to read nutrition label")
+    // reliably open the guide with full spoken explanation rather than triggering product slots.
+    // ============================================================
+    final nutritionGuide = _matchNutritionGuideQuestion(transcript);
+    if (nutritionGuide != null) {
+      debugPrint(
+        'Voice command intent: nutrition guide -> ${nutritionGuide.name}',
+      );
+      await _handleNutritionGuideNavigation(
+        context, nutritionGuide, localeKey,
+      );
+      return;
+    }
+
+    // ============================================================
+    // 2b. FAST LOCAL NAVIGATION
+    // Evaluated before search to ensure navigation commands (e.g. user guide,
+    // about claro, privacy policy, terms, profile) are never misidentified as product searches.
+    // ============================================================
+    final localTarget =
+        _targetFromTranscript(transcript);
+
+    if (localTarget != null) {
+      debugPrint(
+        'Voice command intent: fast local navigation -> $localTarget',
+      );
+
+      final resolvedIntent = VoiceIntent(
+        type: VoiceIntentType.navigate,
+        targetPage: localTarget,
+        spokenReply:
+            _navigationReply(localTarget, localeKey),
+      );
+
+      await _handleNavigationIntent(
+        context,
+        resolvedIntent,
+        localeKey,
+      );
+
+      return;
+    }
+
+    // ============================================================
+    // 2c. OFFLINE LOCAL SLOT-FILLER (deterministic, in-store product queries)
+    // ============================================================
+    final offlineSlot = _matchOfflineSlot(transcript);
+    if (offlineSlot != null) {
+      debugPrint(
+        'Voice command intent: offline slot-filler -> $offlineSlot',
+      );
+      await _handleOfflineSlot(context, offlineSlot, localeKey);
+      return;
+    }
+
+    // ============================================================
+    // 2d. SUMMARY REQUEST
     // ============================================================
     if (_isSummaryRequest(transcript)) {
       debugPrint(
@@ -148,33 +215,6 @@ class VoiceCommandRouter {
 
       if (handled) return;
       if (!context.mounted) return;
-    }
-
-    // ============================================================
-    // 4. FAST LOCAL NAVIGATION
-    // ============================================================
-    final localTarget =
-        _targetFromTranscript(transcript);
-
-    if (localTarget != null) {
-      debugPrint(
-        'Voice command intent: fast local navigation -> $localTarget',
-      );
-
-      final resolvedIntent = VoiceIntent(
-        type: VoiceIntentType.navigate,
-        targetPage: localTarget,
-        spokenReply:
-            _navigationReply(localTarget, localeKey),
-      );
-
-      await _handleNavigationIntent(
-        context,
-        resolvedIntent,
-        localeKey,
-      );
-
-      return;
     }
 
     // ============================================================
@@ -301,8 +341,8 @@ class VoiceCommandRouter {
           resolvedIntent.spokenReply.isNotEmpty
               ? resolvedIntent.spokenReply
               : localeKey == 'fil'
-                  ? 'Narinig ko ang sinabi mo, pero hindi ko matukoy kung anong aksyon ang gusto mong gawin. Pakisubukan gamit ang mas simpleng utos.'
-                  : 'I heard what you said, but I could not determine what action you want me to perform. Please try a simpler command.',
+                  ? 'Narinig ko ang sinabi mo, pero hindi ko matukoy ang nais mong gawin. Maaari kang magtanong tulad ng "paano basahin ang nutrition label", o itanong ang sodium o calories.'
+                  : 'I heard what you said, but could not determine what action to take. You can ask things like "how to read nutrition labels", or ask for sodium or calories.',
         );
         break;
 
@@ -932,6 +972,87 @@ class VoiceCommandRouter {
     }
 
     // ============================================================
+    // INVITE PEOPLE / GROUP
+    // ============================================================
+    if (target == 'invite_people' || target == 'group') {
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+      HomeTabController.switchToTab(3); // Profile tab
+
+      final msg = localeKey == 'fil'
+          ? 'Binubuksan ang mga health group at imbitasyon.'
+          : 'Opening health groups and invitations.';
+
+      unawaited(
+        VoiceAssistantService.instance.announcePageWithPreamble(
+          msg,
+          target == 'invite_people' ? 'invite_people' : 'group',
+        ),
+      );
+
+      await Future.delayed(const Duration(milliseconds: 400));
+
+      if (!context.mounted) return;
+
+      try {
+        final loc = AppLocalizations.of(context);
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (ctx) => Scaffold(
+              backgroundColor: Theme.of(ctx).scaffoldBackgroundColor,
+              appBar: AppBar(
+                backgroundColor: Theme.of(ctx).scaffoldBackgroundColor,
+                elevation: 0,
+                title: Text(loc?.groupTab ?? 'Health Groups'),
+              ),
+              body: const SafeArea(child: GroupScreen()),
+            ),
+          ),
+        );
+      } catch (error, stackTrace) {
+        debugPrint('Invite people navigation failed: $error');
+        debugPrint('$stackTrace');
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Hindi ko mabuksan ang group screen.'
+              : 'I could not open the groups screen.',
+        );
+      }
+
+      return;
+    }
+
+    // ============================================================
+    // NUTRITION GUIDE SCREENS (from Gemini target)
+    // ============================================================
+    if (target == 'nutrition_guide_fda') {
+      await _handleNutritionGuideNavigation(
+        context, NutritionGuideType.fda, localeKey,
+      );
+      return;
+    }
+    if (target == 'nutrition_guide_who') {
+      await _handleNutritionGuideNavigation(
+        context, NutritionGuideType.who, localeKey,
+      );
+      return;
+    }
+    if (target == 'nutrition_guide_kidney') {
+      await _handleNutritionGuideNavigation(
+        context, NutritionGuideType.kidney, localeKey,
+      );
+      return;
+    }
+    if (target == 'nutrition_guide_gerd') {
+      await _handleNutritionGuideNavigation(
+        context, NutritionGuideType.gerd, localeKey,
+      );
+      return;
+    }
+
+    // ============================================================
     // RETURN TO ROOT
     // ============================================================
     if (Navigator.of(context).canPop()) {
@@ -1283,7 +1404,20 @@ class VoiceCommandRouter {
   String? testTargetFromTranscript(String transcript) => _targetFromTranscript(transcript);
 
   @visibleForTesting
+  String? testMatchOfflineSlot(String transcript) => _matchOfflineSlot(transcript);
+
+  @visibleForTesting
+  NutritionGuideType? testMatchNutritionGuideQuestion(String transcript) => _matchNutritionGuideQuestion(transcript);
+
+  @visibleForTesting
+  String testNavigationReply(String target, String localeKey) => _navigationReply(target, localeKey);
+
+  @visibleForTesting
   String? testExtractProductSearchQuery(String transcript) => _extractProductSearchQuery(transcript);
+
+  @visibleForTesting
+  String testNutritionGuideExplanation(NutritionGuideType type, String localeKey) =>
+      _nutritionGuideExplanation(type, localeKey);
 
   String? _targetFromTranscript(
     String transcript,
@@ -1524,6 +1658,12 @@ class VoiceCommandRouter {
     }
 
     if (RegExp(
+      r'\b(?:user guide|app guide|manual|how to use(?: claro| the app| this)?|how do i use(?: claro| this app| this)?|how does (?:this|claro) work|app tutorial|instructions|gabay sa paggamit|gabay ng gumagamit|paano gamitin(?: ang claro| ang app| ito| to)?|paano (?:ito|to) gamitin|tulong sa paggamit|turuan mo ako paano gamitin|tutorial sa paggamit|paraan ng paggamit|gabay kung paano gamitin)\b',
+    ).hasMatch(normalized)) {
+      return 'user_guide';
+    }
+
+    if (RegExp(
       r'\b(suggestion|suggestions|feedback|feedbacks|mungkahi|komento|comment|comments|suggest|help|support|contact|magbigay ng feedback|mungkahi at puna|tulong|suporta)\b',
     ).hasMatch(normalized)) {
       return 'suggestion';
@@ -1536,27 +1676,57 @@ class VoiceCommandRouter {
     }
 
     if (RegExp(
-      r'\b(about claro|tungkol sa claro|about app|about the app|about us|who made claro|app info|sino ang gumawa ng claro)\b',
+      r'\b(?:about claro|what is claro|tell me about claro|about (?:the )?app|about us|who (?:made|created|developed) claro|app info|claro info|information about claro|learn about claro|what does claro do|what is this app|tungkol sa claro|ano ang claro|ano itong claro|ano ba ang claro|impormasyon (?:tungkol )?sa claro|alamin ang tungkol sa claro|sino ang (?:gumawa ng )?claro|sino gumawa ng claro|tungkol sa app|ano ang app na ito|tungkol dito|kwento ng claro|ano ang layunin ng claro)\b',
     ).hasMatch(normalized)) {
       return 'about_claro';
     }
 
     if (RegExp(
-      r'\b(privacy policy|privacy|patakaran sa privacy|data privacy|patakaran sa data)\b',
+      r'\b(?:privacy policy|data privacy|data protection|privacy statement|privacy terms|privacy|patakaran sa privacy|patakaran sa data|seguridad ng data|proteksyon ng data|privacy ng datos|paano iniingatan ang data|paano pinoprotektahan ang data|patakaran sa pribadong impormasyon|pribadong datos)\b',
     ).hasMatch(normalized)) {
       return 'privacy_policy';
     }
 
     if (RegExp(
-      r'\b(terms and conditions|terms and condition|terms of service|terms of use|terms|mga tuntunin at kundisyon|mga tuntunin|kundisyon)\b',
+      r'\b(?:terms and conditions?|terms of service|terms of use|user agreement|service terms|terms|mga tuntunin at k(?:u|o)ndisyon|tuntunin at k(?:u|o)ndisyon|mga tuntunin|mga k(?:u|o)ndisyon|k(?:u|o)ndisyon sa paggamit|tuntunin sa paggamit|tuntunin ng serbisyo|kasunduan sa paggamit|kasunduan ng gumagamit)\b',
     ).hasMatch(normalized)) {
       return 'terms_conditions';
     }
 
+    // ============================================================
+    // NUTRITION GUIDES (specific types)
+    // ============================================================
     if (RegExp(
-      r'\b(user guide|app guide|manual|gabay sa paggamit|gabay ng gumagamit|gabay|how to use|nutrition guide)\b',
+      r'\b(?:(?:how (?:to|do (?:i|you)) (?:read|understand|check|use)|explain|what (?:is|are)|reading|understand|guide (?:for|to|on)|learn (?:to )?read) (?:a |the )?(?:nutrition|food|facts )?labels?|nutrition facts labels?|nutrition labels? guide|food labels? guide|fda guide|fda nutrition|nutrition facts|food labels?|nutrition labels?|how to read label|reading label|read label|paano (?:basahin|magbasa|intindihin|tingnan) (?:ang |ng )?(?:nutrition |food )?labels?|paano (?:basahin|magbasa|intindihin) (?:ang |ng )?label|gabay sa (?:pagbasa |pagbabasa )?(?:ng )?labels?|ipaliwanag ang (?:nutrition )?labels?|ipaliwanag ang label|ano ang (?:nutrition )?labels?|ano ang label ng pagkain|label(?:s)? ng pagkain|pagbasa ng labels?)\b',
     ).hasMatch(normalized)) {
-      return 'user_guide';
+      return 'nutrition_guide_fda';
+    }
+
+    if (RegExp(
+      r'\b(?:(?:who|w h o)\s*(?:guidelines?|guides?|recommendations?|limits?|thresholds?|nutrition|diet|daily limits?)|limits? (?:on|of|by|from) (?:the )?(?:who|w h o)|daily (?:nutrient|nutritional|nutrition|intake|dietary)?\s*(?:guidelines?|guides?|recommendations?|values?|requirements?|targets?|limits?)|recommended daily (?:intakes?|allowances?|nutrients?|values?|amounts?|limits?)|daily intakes?|daily nutrients?|daily nutrition|daily limits?|healthy diet (?:guidelines?|guide)|how much (?:sodium|sugar|fat|calories) (?:should|per day|daily)|daily (?:sodium|sugar|fat|calorie) limits?|limit(?:asyon)? (?:sa|ng) (?:who|w h o)|mga limitasyon (?:sa|ng) (?:who|w h o)|rekomendasyon ng (?:who|w h o)|gabay ng (?:who|w h o)|pang araw araw na (?:gabay|sustansya|nutrisyon|limitasyon)|araw araw na (?:gabay|sustansya|nutrisyon|limitasyon)|gabay sa sustansya|rekomendadong sustansya|tamang dami ng sustansya|sustansya bawat araw|limitasyon sa asukal at asin|magkano ang (?:sodium|asin|asukal) bawat araw)\b',
+    ).hasMatch(normalized)) {
+      return 'nutrition_guide_who';
+    }
+
+    if (RegExp(
+      r'\b(?:kidneys?|renal|nephro|bato|sakit sa bato|gabay sa bato|gabay sa sakit sa bato|diyeta para sa bato|pagkain para sa (?:may )?sakit sa bato|pagkain sa sakit sa bato|nutrisyon para sa (?:may )?sakit sa bato)\b',
+    ).hasMatch(normalized)) {
+      return 'nutrition_guide_kidney';
+    }
+
+    if (RegExp(
+      r'\b(?:gerd|acid reflux|heartburn|hyperacidity|sikmura|asim ng sikmura|gabay sa gerd|gabay sa acid reflux|pagkain para sa acid reflux|bawal sa (?:may )?acid reflux|bawal sa gerd)\b',
+    ).hasMatch(normalized)) {
+      return 'nutrition_guide_gerd';
+    }
+
+    // ============================================================
+    // INVITE PEOPLE / HEALTH GROUPS
+    // ============================================================
+    if (RegExp(
+      r'\b(invite people|invite member|invite family|mag imbita|mag invite|imbita|imbitahan|invite someone|invite friends|add member|add family|health group|create group|join group|lumikha ng grupo|sumali sa grupo|gumawa ng grupo|mga grupo)\b',
+    ).hasMatch(normalized)) {
+      return 'invite_people';
     }
 
     if (RegExp(
@@ -1586,6 +1756,350 @@ class VoiceCommandRouter {
     return null;
   }
 
+  // ================================================================
+  // NUTRITION GUIDE QUESTION MATCHER
+  // ================================================================
+  NutritionGuideType? _matchNutritionGuideQuestion(String transcript) {
+    final normalized = transcript.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9 ]'), ' ',
+    ).trim();
+
+    // FDA / How to read nutrition labels
+    if (RegExp(
+      r'\b(?:(?:how (?:to|do (?:i|you)) (?:read|understand|check|use)|explain|what (?:is|are)|reading|understand|guide (?:for|to|on)|learn (?:to )?read) (?:a |the )?(?:nutrition|food|facts )?labels?|nutrition facts labels?|nutrition labels? guide|food labels? guide|fda guide|fda nutrition|nutrition facts|food labels?|nutrition labels?|how to read label|reading label|read label|paano (?:basahin|magbasa|intindihin|tingnan) (?:ang |ng )?(?:nutrition |food )?labels?|paano (?:basahin|magbasa|intindihin) (?:ang |ng )?label|gabay sa (?:pagbasa |pagbabasa )?(?:ng )?labels?|ipaliwanag ang (?:nutrition )?labels?|ipaliwanag ang label|ano ang (?:nutrition )?labels?|ano ang label ng pagkain|label(?:s)? ng pagkain|pagbasa ng labels?)\b',
+    ).hasMatch(normalized)) {
+      return NutritionGuideType.fda;
+    }
+
+    // WHO / Daily nutrient guidelines & limits
+    if (RegExp(
+      r'\b(?:(?:who|w h o)\s*(?:guidelines?|guides?|recommendations?|limits?|thresholds?|nutrition|diet|daily limits?)|limits? (?:on|of|by|from) (?:the )?(?:who|w h o)|daily (?:nutrient|nutritional|nutrition|intake|dietary)?\s*(?:guidelines?|guides?|recommendations?|values?|requirements?|targets?|limits?)|recommended daily (?:intakes?|allowances?|nutrients?|values?|amounts?|limits?)|daily intakes?|daily nutrients?|daily nutrition|daily limits?|healthy diet (?:guidelines?|guide)|how much (?:sodium|sugar|fat|calories) (?:should|per day|daily)|daily (?:sodium|sugar|fat|calorie) limits?|limit(?:asyon)? (?:sa|ng) (?:who|w h o)|mga limitasyon (?:sa|ng) (?:who|w h o)|rekomendasyon ng (?:who|w h o)|gabay ng (?:who|w h o)|pang araw araw na (?:gabay|sustansya|nutrisyon|limitasyon)|araw araw na (?:gabay|sustansya|nutrisyon|limitasyon)|gabay sa sustansya|rekomendadong sustansya|tamang dami ng sustansya|sustansya bawat araw|limitasyon sa asukal at asin|magkano ang (?:sodium|asin|asukal) bawat araw)\b',
+    ).hasMatch(normalized)) {
+      return NutritionGuideType.who;
+    }
+
+    // Kidney disease nutrition
+    if (RegExp(
+      r'\b(?:kidneys?|renal|nephro|bato|sakit sa bato|gabay sa bato|gabay sa sakit sa bato|diyeta para sa bato|pagkain para sa (?:may )?sakit sa bato|pagkain sa sakit sa bato|nutrisyon para sa (?:may )?sakit sa bato)\b',
+    ).hasMatch(normalized)) {
+      return NutritionGuideType.kidney;
+    }
+
+    // GERD / Acid reflux diet
+    if (RegExp(
+      r'\b(?:gerd|acid reflux|heartburn|hyperacidity|sikmura|asim ng sikmura|gabay sa gerd|gabay sa acid reflux|pagkain para sa acid reflux|bawal sa (?:may )?acid reflux|bawal sa gerd)\b',
+    ).hasMatch(normalized)) {
+      return NutritionGuideType.gerd;
+    }
+
+    return null;
+  }
+
+  // ================================================================
+  // NUTRITION GUIDE NAVIGATION + BRIEF EXPLANATION
+  // ================================================================
+  Future<void> _handleNutritionGuideNavigation(
+    BuildContext context,
+    NutritionGuideType type,
+    String localeKey,
+  ) async {
+    final explanation = _nutritionGuideExplanation(type, localeKey);
+
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
+
+    await Future.delayed(const Duration(milliseconds: 150));
+    if (!context.mounted) return;
+
+    try {
+      unawaited(
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => NutritionGuideScreen(
+              type: type,
+              suppressPageAnnouncement: true,
+            ),
+          ),
+        ),
+      );
+
+      // Delay 400ms for Navigator.push transition and _VoiceNavigatorObserver.didPush()
+      // stopAudio() to finish, then speak the full brief explanation so the user hears it completely.
+      await Future.delayed(const Duration(milliseconds: 400));
+      await VoiceAssistantService.instance.speak(explanation);
+    } catch (error, stackTrace) {
+      debugPrint('Nutrition guide navigation failed: $error');
+      debugPrint('$stackTrace');
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Hindi ko mabuksan ang nutrition guide.'
+            : 'I could not open the nutrition guide.',
+      );
+    }
+  }
+
+  String _nutritionGuideExplanation(
+    NutritionGuideType type,
+    String localeKey,
+  ) {
+    switch (type) {
+      case NutritionGuideType.fda:
+        return localeKey == 'fil'
+            ? 'Binubuksan ang gabay sa nutrition facts label. '
+              'Dito matututunan kung paano basahin ang serving size, calories, '
+              'at porsyento ng daily value. Ipinapakita nito kung gaano karaming sustansya '
+              'ang ibinibigay ng isang serving batay sa 2,000-calorie na diyeta. '
+              'Ang 5 porsyento o mas mababa ay mababa, at 20 porsyento o higit pa ay mataas.'
+            : 'Opening the nutrition facts label guide. '
+              'Here you will learn how to read serving sizes, calories, '
+              'and percent daily values. Percent daily value shows how much a nutrient '
+              'in one serving contributes to a 2,000-calorie daily diet. '
+              '5 percent or less is low, and 20 percent or more is high.';
+      case NutritionGuideType.who:
+        return localeKey == 'fil'
+            ? 'Binubuksan ang pang-araw-araw na gabay sa sustansya. '
+              'Inirerekomenda ng WHO ang hindi hihigit sa 5 gramo ng asin o 2,000 milligrams '
+              'ng sodium, mas mababa sa 25 gramo ng asukal, at 20 hanggang 35 porsyento '
+              'ng calories mula sa taba bawat araw para sa malusog na pagkain.'
+            : 'Opening daily nutrient guidelines. '
+              'The WHO recommends no more than 5 grams of salt, which is about 2,000 milligrams '
+              'of sodium, less than 25 grams of added sugars, and 20 to 35 percent '
+              'of daily calories from fat for a healthy diet.';
+      case NutritionGuideType.kidney:
+        return localeKey == 'fil'
+            ? 'Binubuksan ang gabay sa nutrisyon para sa sakit sa bato. '
+              'Limitahan ang sodium sa 2,300 milligrams bawat araw, bantayan ang potassium '
+              'at phosphorus, at kumain ng tamang dami ng protina ayon sa payo '
+              'ng doktor upang maprotektahan ang mga bato.'
+            : 'Opening kidney disease nutrition guide. '
+              'Limit daily sodium to 2,300 milligrams, monitor potassium '
+              'and phosphorus levels, and eat the right amount of protein '
+              'recommended by your doctor to help protect kidney function.';
+      case NutritionGuideType.gerd:
+        return localeKey == 'fil'
+            ? 'Binubuksan ang gabay sa pagkain para sa GERD at acid reflux. '
+              'Iwasan ang mamantikang pagkain, maaasim na prutas, kamatis, kape, '
+              'at tsokolate upang mabawasan ang reflux. Kumain ng maliliit na '
+              'beses-beses at huwag humiga agad pagkatapos kumain.'
+            : 'Opening the GERD and acid reflux diet guide. '
+              'Avoid trigger foods like high fats, citrus fruits, tomatoes, coffee, '
+              'and chocolate. Eat smaller, frequent meals and avoid lying down right after eating.';
+    }
+  }
+
+  // ================================================================
+  // OFFLINE LOCAL SLOT-FILLER
+  // Fast deterministic commands for essential queries that work
+  // without internet or Gemini API latency.
+  // ================================================================
+  String? _matchOfflineSlot(String transcript) {
+    final normalized = transcript.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9 ]'), ' ',
+    ).trim();
+
+    // "Read allergens" / "What are the allergens"
+    if (RegExp(
+      r'\b(read (?:the )?allergen|what (?:are|is) (?:the )?allergen|show (?:the )?allergen|list (?:the )?allergen|any allergen|allergen (?:list|info|warning)|allergens?|allergic|allergy|ipakita ang (?:mga )?allergen|ano ang (?:mga )?allergen|basahin ang (?:mga )?allergen|may allergen ba|may allergy ba|nakaka allergy|bawal ba sa may allergy|anong allergy meron)\b',
+    ).hasMatch(normalized)) {
+      return 'read_allergens';
+    }
+
+    // "Read ingredients" / "What are the ingredients"
+    if (RegExp(
+      r'\b(read (?:the )?ingredient|what (?:are|is) (?:the )?ingredient|show (?:the )?ingredient|list (?:the )?ingredient|ingredient (?:list|info)|ingredients?|what is in this|what are the ingredients|what is it made of|ipakita ang (?:mga )?(?:sangkap|ingredient)|ano ang (?:mga )?(?:sangkap|ingredient)|basahin ang (?:mga )?(?:sangkap|ingredient)|mga sangkap|sangkap|anong laman|anong meron dito)\b',
+    ).hasMatch(normalized)) {
+      return 'read_ingredients';
+    }
+
+    // "Read calories" / "How many calories"
+    if (RegExp(
+      r'\b(read (?:the )?calorie|how many calorie|what (?:are|is) (?:the )?calorie|calorie (?:count|total|level)|total calorie|calories?|cals?|energy (?:count|level)|ilang calorie|ilan ang calorie|basahin ang calorie|dami ng calorie|mataas ba sa calorie|calorie nito)\b',
+    ).hasMatch(normalized)) {
+      return 'read_calories';
+    }
+
+    // "Read sodium" / "How much sodium"
+    if (RegExp(
+      r'\b(read (?:the )?sodium|how much sodium|what (?:is|are) (?:the )?sodium|sodium (?:content|level|amount)|sodium|how salty|is (?:it|this) salty|salt (?:content|level|amount)|how much salt|salt|magkano(?:ng)? sodium|asin|maalat ba|gaano kaalat|dami ng asin|sobrang alat|mataas ba sa asin)\b',
+    ).hasMatch(normalized)) {
+      return 'read_sodium';
+    }
+
+    // "Read sugar" / "How much sugar"
+    if (RegExp(
+      r'\b(read (?:the )?sugar|how much sugar|what (?:is|are) (?:the )?sugar|sugar (?:content|level|amount)|total sugar|added sugar|sugar|how sweet|is (?:it|this) sweet|sweetness|magkano(?:ng)? asukal|asukal|matamis ba|gaano katamis|dami ng asukal|mataas ba sa asukal|sobrang tamis)\b',
+    ).hasMatch(normalized)) {
+      return 'read_sugar';
+    }
+
+    // "Read fat" / "How much fat"
+    if (RegExp(
+      r'\b(read (?:the )?(?:total )?fat|how much (?:total )?fat|what (?:is|are) (?:the )?(?:total )?fat|fat (?:content|level|amount)|total fat|saturated fat|trans fat|fat|how oily|is (?:it|this) fatty|taba|mataba ba|mamantika ba|dami ng taba|magkano(?:ng)? taba|oily ba)\b',
+    ).hasMatch(normalized)) {
+      return 'read_fat';
+    }
+
+    // "Serving size"
+    if (RegExp(
+      r'\b(serving size|serving amount|one serving|portion size|how big is a serving|sukat ng serving|serving nito|gaano kalaki ang isang serving)\b',
+    ).hasMatch(normalized)) {
+      return 'read_serving_size';
+    }
+
+    // "Is this healthy" / "Is this safe"
+    if (RegExp(
+      r'\b(is (?:this|it) (?:healthy|safe|good|okay|ok|bad|dangerous)|can i (?:eat|have) this|healthy ba (?:ito|yan|to)|safe ba (?:ito|yan|to)|mabuti ba (?:ito|yan|to)|pwede ba (?:ito|yan|to|sa akin)|puwede ba (?:ito|yan|to|sa akin)|okay ba (?:ito|yan|to)|masama ba (?:ito|yan|to)|delikado ba (?:ito|yan|to))\b',
+    ).hasMatch(normalized)) {
+      return 'is_healthy';
+    }
+
+    // "What is the verdict" / "What is the score"
+    if (RegExp(
+      r'\b(what (?:is|are) (?:the )?(?:verdict|score|rating|health (?:score|rating|verdict))|ano ang (?:hatol|score|rating)|hatol|verdict|score|rating|health score|hatol nito|score nito)\b',
+    ).hasMatch(normalized)) {
+      return 'read_verdict';
+    }
+
+    return null;
+  }
+
+  Future<void> _handleOfflineSlot(
+    BuildContext context,
+    String slot,
+    String localeKey,
+  ) async {
+    final product = VoiceAssistantService.activeResultProductNotifier.value
+        ?? VoiceAssistantService.latestScanProductNotifier.value;
+
+    if (product == null) {
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Walang aktibong produkto. Mag-scan muna ng produkto.'
+            : 'No active product. Please scan a product first.',
+      );
+      return;
+    }
+
+    switch (slot) {
+      case 'read_allergens':
+        final allergens = product.allergens;
+        if (allergens.isEmpty) {
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Walang nakalistang allergen para sa ${product.name}.'
+                : 'No allergens are listed for ${product.name}.',
+          );
+        } else {
+          final list = allergens.join(', ');
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Ang mga allergen ng ${product.name} ay: $list.'
+                : 'The allergens in ${product.name} are: $list.',
+          );
+        }
+        break;
+
+      case 'read_ingredients':
+        final ingredients = product.ingredients;
+        if (ingredients.isEmpty) {
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Walang nakalistang sangkap para sa ${product.name}.'
+                : 'No ingredients are listed for ${product.name}.',
+          );
+        } else {
+          final list = ingredients.join(', ');
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Ang mga sangkap ng ${product.name} ay: $list.'
+                : 'The ingredients in ${product.name} are: $list.',
+          );
+        }
+        break;
+
+      case 'read_calories':
+        final cal = product.nutritionalFacts.caloriesKcal;
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Ang ${product.name} ay may ${cal.toStringAsFixed(0)} calories bawat serving.'
+              : '${product.name} has ${cal.toStringAsFixed(0)} calories per serving.',
+        );
+        break;
+
+      case 'read_sodium':
+        final sodiumMg = product.nutritionalFacts.sodiumMg;
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Ang sodium ng ${product.name} ay ${sodiumMg.toStringAsFixed(0)} milligrams bawat serving.'
+              : '${product.name} has ${sodiumMg.toStringAsFixed(0)} milligrams of sodium per serving.',
+        );
+        break;
+
+      case 'read_sugar':
+        final sugarG = product.nutritionalFacts.sugarsG;
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Ang asukal ng ${product.name} ay ${sugarG.toStringAsFixed(1)} grams bawat serving.'
+              : '${product.name} has ${sugarG.toStringAsFixed(1)} grams of sugar per serving.',
+        );
+        break;
+
+      case 'read_fat':
+        final fatG = product.nutritionalFacts.totalFatG;
+        final saturatedG = product.nutritionalFacts.saturatedFatG;
+        final transG = product.nutritionalFacts.transFatG;
+        final parts = <String>[];
+        if (fatG > 0) parts.add('${fatG.toStringAsFixed(1)} grams total fat');
+        if (saturatedG > 0) parts.add('${saturatedG.toStringAsFixed(1)} grams saturated fat');
+        if (transG > 0) parts.add('${transG.toStringAsFixed(1)} grams trans fat');
+        if (parts.isEmpty) {
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Hindi tukoy ang fat content ng ${product.name}.'
+                : 'Fat content is not specified for ${product.name}.',
+          );
+        } else {
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Ang fat ng ${product.name} ay: ${parts.join(', ')}.'
+                : '${product.name} has ${parts.join(', ')}.',
+          );
+        }
+      case 'read_serving_size':
+        final serving = product.nutritionalFacts.servingSize;
+        if (serving.trim().isEmpty) {
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Hindi nakalista ang serving size ng ${product.name}.'
+                : 'Serving size is not specified for ${product.name}.',
+          );
+        } else {
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Ang serving size ng ${product.name} ay $serving.'
+                : 'The serving size for ${product.name} is $serving.',
+          );
+        }
+        break;
+
+      case 'is_healthy':
+      case 'read_verdict':
+        final summary = VoiceAssistantService.latestScanSummaryNotifier.value;
+        if (summary != null && summary.trim().isNotEmpty) {
+          await VoiceAssistantService.instance.speak(summary);
+        } else {
+          await VoiceAssistantService.instance.speak(
+            localeKey == 'fil'
+                ? 'Sandali lang, sinusuri pa ang produktong ito.'
+                : 'Still analyzing this product, one moment.',
+          );
+        }
+        break;
+    }
+  }
+
   bool _isSummaryRequest(
     String transcript,
   ) {
@@ -1599,7 +2113,7 @@ class VoiceCommandRouter {
             .trim();
 
     if (RegExp(
-      r'\b(summarize|summarise|summary|summaries|ibuod|buod|ipaliwanag|paliwanag|recap|overview)\b',
+      r'\b(summarize|summarise|summary|summaries|ibuod|buod|recap|overview)\b',
     ).hasMatch(normalized)) {
       return true;
     }
@@ -1709,6 +2223,26 @@ class VoiceCommandRouter {
       'delete_my_account': 'delete_account',
       'close_account': 'delete_account',
       'remove_account': 'delete_account',
+      'invite_people': 'invite_people',
+      'invite': 'invite_people',
+      'invite_member': 'invite_people',
+      'invite_family': 'invite_people',
+      'health_groups': 'invite_people',
+      'health_group': 'invite_people',
+      'group': 'group',
+      'groups': 'group',
+      'nutrition_guide_fda': 'nutrition_guide_fda',
+      'nutrition_label': 'nutrition_guide_fda',
+      'read_nutrition_label': 'nutrition_guide_fda',
+      'nutrition_guide_who': 'nutrition_guide_who',
+      'daily_nutrient_guidelines': 'nutrition_guide_who',
+      'daily_nutrients': 'nutrition_guide_who',
+      'nutrition_guide_kidney': 'nutrition_guide_kidney',
+      'kidney_diet': 'nutrition_guide_kidney',
+      'kidney_nutrition': 'nutrition_guide_kidney',
+      'nutrition_guide_gerd': 'nutrition_guide_gerd',
+      'gerd_diet': 'nutrition_guide_gerd',
+      'acid_reflux_diet': 'nutrition_guide_gerd',
     };
 
     return aliases[normalized] ?? normalized;
@@ -1718,6 +2252,30 @@ class VoiceCommandRouter {
     String target,
     String localeKey,
   ) {
+    if (target == 'about_claro') {
+      return localeKey == 'fil'
+          ? 'Binubuksan ang Tungkol sa CLARO. Ididirekta ka sa impormasyon tungkol sa CLARO at sa aming misyon.'
+          : 'Opening About CLARO. You will be directed to learn more about CLARO and our mission.';
+    }
+
+    if (target == 'user_guide') {
+      return localeKey == 'fil'
+          ? 'Binubuksan ang Gabay sa Paggamit. Ididirekta ka sa gabay kung paano gamitin ang CLARO.'
+          : 'Opening the User Guide. You will be directed to the guide on how to use CLARO.';
+    }
+
+    if (target == 'privacy_policy') {
+      return localeKey == 'fil'
+          ? 'Binubuksan ang Patakaran sa Privacy. Ididirekta ka sa aming patakaran sa proteksyon ng datos at privacy.'
+          : 'Opening the Privacy Policy. You will be directed to our privacy and data protection policy.';
+    }
+
+    if (target == 'terms_conditions') {
+      return localeKey == 'fil'
+          ? 'Binubuksan ang mga Tuntunin at Kundisyon. Ididirekta ka sa aming mga tuntunin ng serbisyo at kundisyon.'
+          : 'Opening Terms and Conditions. You will be directed to our terms of service and conditions.';
+    }
+
     final pageName = switch (target) {
       'personal_info' =>
         localeKey == 'fil'
@@ -1809,6 +2367,36 @@ class VoiceCommandRouter {
             ? 'paghahambing ng produkto'
             : 'product comparison',
 
+      'invite_people' =>
+        localeKey == 'fil'
+            ? 'mga health group at imbitasyon'
+            : 'health groups and invitations',
+
+      'group' =>
+        localeKey == 'fil'
+            ? 'mga health group'
+            : 'health groups',
+
+      'nutrition_guide_fda' =>
+        localeKey == 'fil'
+            ? 'gabay sa nutrition facts label'
+            : 'nutrition facts label guide',
+
+      'nutrition_guide_who' =>
+        localeKey == 'fil'
+            ? 'pang-araw-araw na gabay sa sustansya'
+            : 'daily nutrient guidelines',
+
+      'nutrition_guide_kidney' =>
+        localeKey == 'fil'
+            ? 'gabay sa nutrisyon para sa kidney'
+            : 'kidney disease nutrition guide',
+
+      'nutrition_guide_gerd' =>
+        localeKey == 'fil'
+            ? 'gabay sa pagkain para sa GERD'
+            : 'GERD diet guide',
+
       _ => target.replaceAll('_', ' '),
     };
 
@@ -1893,6 +2481,23 @@ class VoiceCommandRouter {
       'about app',
       'about us',
       'about the app',
+      'user guide',
+      'app guide',
+      'manual',
+      'how to use',
+      'how to use claro',
+      'gabay sa paggamit',
+      'gabay ng gumagamit',
+      'paano gamitin',
+      'privacy policy',
+      'privacy',
+      'data privacy',
+      'patakaran sa privacy',
+      'terms and conditions',
+      'terms of service',
+      'terms',
+      'mga tuntunin at kundisyon',
+      'mga tuntunin',
       'compare',
       'compare products',
       'comparison',
@@ -1906,6 +2511,41 @@ class VoiceCommandRouter {
       'logout',
       'sign out',
       'signout',
+      'nutrition guide',
+      'nutrition guides',
+      'nutrition facts',
+      'nutrition facts label',
+      'nutrition label',
+      'food label',
+      'food labels',
+      'fda guide',
+      'fda nutrition',
+      'daily guidelines',
+      'daily nutrient guidelines',
+      'daily nutrients',
+      'who guidelines',
+      'who guide',
+      'who limits',
+      'who nutrition',
+      'who diet',
+      'limits on who',
+      'kidney guide',
+      'kidney disease',
+      'kidney diet',
+      'gerd guide',
+      'gerd diet',
+      'gerd',
+      'acid reflux',
+      'acid reflux guide',
+      'acid reflux diet',
+      'heartburn',
+      'gabay sa nutrisyon',
+      'gabay sa pagbasa ng label',
+      'pang araw araw na gabay',
+      'gabay sa bato',
+      'sakit sa bato',
+      'gabay sa gerd',
+      'gabay sa acid reflux',
     };
 
     if (excludedPages.contains(t)) {

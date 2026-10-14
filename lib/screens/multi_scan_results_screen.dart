@@ -141,25 +141,6 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     }
     _comparisonProducts = List.from(widget.detectedProducts);
     _rankProducts();
-    if (widget.showOfflineNotice) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showOfflineNotice();
-      });
-    }
-  }
-
-  Future<void> _showOfflineNotice() async {
-    if (!mounted) return;
-    final loc = AppLocalizations.of(context)!;
-    await SuccessFeedbackUtils.showOfflineNoticeDialog(
-      context,
-      title: loc.noInternetTitle,
-      message: loc.noInternetNutritionMessage,
-      buttonText: loc.gotIt,
-      onDismiss: () {
-        if (mounted) Navigator.pop(context);
-      },
-    );
   }
 
   // Ranks the scanned products via WhoCalculator (through
@@ -219,10 +200,53 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
             .where((c) => c.isScored && profile.conditions.contains(c))
             .toSet();
       });
+
+      // Multi-Product Audio Spatial List: auto-announce ranked items
+      // and the healthiest choice for voice assistant users.
+      _announceMultiScanResults(ranked);
     } catch (e) {
       debugPrint('Error ranking scanned products: $e');
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  /// Auto-reads the ranked product list aloud so voice assistant users
+  /// immediately hear how many items were detected, what they are, and
+  /// which one ranked healthiest -- without having to tap anything.
+  void _announceMultiScanResults(List<RankedProductResult> ranked) {
+    if (!VoiceAssistantService.instance.isEnabled) return;
+    if (ranked.isEmpty) return;
+
+    final isTagalog =
+        VoiceAssistantService.languageNotifier.value == VoiceLang.tagalog;
+
+    final count = ranked.length;
+    final names = ranked
+        .take(5) // cap at 5 to keep the utterance reasonable
+        .map((r) => r.evaluation.product.name)
+        .toList();
+    final nameList = names.join(', ');
+
+    final best = ranked.first;
+    final bestName = best.evaluation.product.name;
+
+    String announcement;
+    if (isTagalog) {
+      announcement =
+          '$count na produkto ang na-detect. '
+          'Ang mga ito ay: $nameList. '
+          'Ang pinaka-malusog na pagpipilian ay $bestName.';
+    } else {
+      announcement =
+          '$count products detected. '
+          'They are: $nameList. '
+          'The healthiest choice is $bestName.';
+    }
+
+    // Delay so the initial page announcement finishes first
+    Future.delayed(const Duration(milliseconds: 1200), () {
+      VoiceAssistantService.instance.speak(announcement);
+    });
   }
 
   Future<UserHealthProfile> _loadProfileOrDefault(String uid) async {
@@ -1034,24 +1058,16 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                 color: colorScheme.surface,
                 boxShadow: _softShadow(theme, blur: 12, dy: 4),
               ),
-              child: Stack(
-                alignment: Alignment.center,
+              child: Row(
                 children: [
-                  Text(
-                    loc.resultsTitle,
-                    style: GoogleFonts.outfit(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: colorScheme.primary,
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: GestureDetector(
-                      onTap: () {
-                        HapticService().vibrate();
-                        Navigator.pop(context);
-                      },
+                  GestureDetector(
+                    onTap: () {
+                      HapticService().vibrate();
+                      Navigator.pop(context);
+                    },
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 12, top: 4, bottom: 4),
                       child: Icon(
                         Icons.arrow_back,
                         color: colorScheme.primary,
@@ -1059,64 +1075,78 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                       ),
                     ),
                   ),
-                  if (_profile != null)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              HapticService().vibrate();
-                              _showFilterSheet();
-                            },
-                            icon: Icon(
-                              Icons.filter_list,
-                              color: colorScheme.primary,
-                              size: 18,
-                            ),
-                            label: Text(
-                              Localizations.localeOf(context).languageCode ==
-                                      'tl'
-                                  ? 'I-filter'
-                                  : 'Filter',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: colorScheme.primary,
-                              side: BorderSide(color: colorScheme.primary),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                          ),
-                          if (_selectedConditions.isNotEmpty ||
-                              _hasActiveTagFilters)
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.secondary,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                        ],
+                  Expanded(
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        loc.resultsTitle,
+                        style: GoogleFonts.outfit(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: colorScheme.primary,
+                        ),
+                        maxLines: 1,
                       ),
                     ),
+                  ),
+                  if (_profile != null) ...[
+                    const SizedBox(width: 8),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () {
+                            HapticService().vibrate();
+                            _showFilterSheet();
+                          },
+                          icon: Icon(
+                            Icons.filter_list,
+                            color: colorScheme.primary,
+                            size: 16,
+                          ),
+                          label: Text(
+                            Localizations.localeOf(context).languageCode ==
+                                    'tl'
+                                ? 'I-filter'
+                                : 'Filter',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: colorScheme.primary,
+                            side: BorderSide(color: colorScheme.primary),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                        if (_selectedConditions.isNotEmpty ||
+                            _hasActiveTagFilters)
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: colorScheme.secondary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),

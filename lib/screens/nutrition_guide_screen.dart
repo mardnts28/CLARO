@@ -1,12 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/voice_assistant_service.dart';
+
 enum NutritionGuideType { fda, who, kidney, gerd }
 
-class NutritionGuideScreen extends StatelessWidget {
+class NutritionGuideScreen extends StatefulWidget {
   final NutritionGuideType type;
+  final bool suppressPageAnnouncement;
 
-  const NutritionGuideScreen({super.key, required this.type});
+  const NutritionGuideScreen({
+    super.key,
+    required this.type,
+    this.suppressPageAnnouncement = false,
+  });
+
+  @override
+  State<NutritionGuideScreen> createState() => _NutritionGuideScreenState();
+}
+
+class _NutritionGuideScreenState extends State<NutritionGuideScreen> {
+  NutritionGuideType get type => widget.type;
 
   bool get isFDA => type == NutritionGuideType.fda;
 
@@ -17,6 +31,20 @@ class NutritionGuideScreen extends StatelessWidget {
 
   String _text(BuildContext context, String english, String tagalog) =>
       _isTagalog(context) ? tagalog : english;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!widget.suppressPageAnnouncement) {
+      final pageKey = switch (widget.type) {
+        NutritionGuideType.fda => 'nutrition_guide_fda',
+        NutritionGuideType.who => 'nutrition_guide_who',
+        NutritionGuideType.kidney => 'nutrition_guide_kidney',
+        NutritionGuideType.gerd => 'nutrition_guide_gerd',
+      };
+      VoiceAssistantService.instance.announcePage(pageKey);
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // SHARED SHADOW STYLE

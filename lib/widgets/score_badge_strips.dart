@@ -27,20 +27,23 @@ const double _kCellGap = 3;
 
 /// One rounded-square cell of a strip. Small when idle, larger + bolder
 /// (with a soft shadow) when it is the value that applies to the product.
+/// Supports tap / hover tooltip to show what the letter/group means in simplest terms.
 class _ScoreCell extends StatelessWidget {
   const _ScoreCell({
     required this.label,
     required this.color,
     required this.isActive,
+    this.tooltip,
   });
 
   final String label;
   final Color color;
   final bool isActive;
+  final String? tooltip;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
+    final cell = AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       width: isActive ? _kActiveWidth : _kCellSize,
       height: isActive ? _kActiveHeight : _kCellSize,
@@ -67,6 +70,45 @@ class _ScoreCell extends StatelessWidget {
         ),
       ),
     );
+
+    if (tooltip != null && tooltip!.isNotEmpty) {
+      return Tooltip(
+        message: tooltip!,
+        triggerMode: TooltipTriggerMode.tap,
+        preferBelow: false,
+        verticalOffset: 22,
+        showDuration: const Duration(seconds: 4),
+        waitDuration: Duration.zero,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        textStyle: GoogleFonts.inter(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: Container(
+            color: Colors.transparent,
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 1),
+            child: cell,
+          ),
+        ),
+      );
+    }
+
+    return cell;
   }
 }
 
@@ -85,34 +127,58 @@ class NutriScoreStrip extends StatelessWidget {
 
   static const List<String> _letters = ['A', 'B', 'C', 'D', 'E'];
 
+  static String _getTooltip(String letter, bool isTagalog) {
+    switch (letter.toUpperCase()) {
+      case 'A':
+        return isTagalog
+            ? 'Nutri-Score A: Napakagandang kalidad ng nutrisyon'
+            : 'Nutri-Score A: Very good nutritional quality';
+      case 'B':
+        return isTagalog
+            ? 'Nutri-Score B: Magandang kalidad ng nutrisyon'
+            : 'Nutri-Score B: Good nutritional quality';
+      case 'C':
+        return isTagalog
+            ? 'Nutri-Score C: Katamtamang kalidad ng nutrisyon'
+            : 'Nutri-Score C: Average nutritional quality';
+      case 'D':
+        return isTagalog
+            ? 'Nutri-Score D: Mababang kalidad ng nutrisyon'
+            : 'Nutri-Score D: Low nutritional quality';
+      case 'E':
+        return isTagalog
+            ? 'Nutri-Score E: Mahinang kalidad ng nutrisyon'
+            : 'Nutri-Score E: Poor nutritional quality';
+      default:
+        return 'Nutri-Score $letter';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final active = _letters.indexOf(grade.trim().toUpperCase());
+    final lang = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
+    final isTagalog = lang == 'tl' || lang == 'fil';
 
-    return Semantics(
-      label: active == -1
-          ? 'Nutri-Score unavailable'
-          : 'Nutri-Score ${_letters[active]}',
-      excludeSemantics: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          for (int i = 0; i < _letters.length; i++)
-            Padding(
-              padding: EdgeInsets.only(
-                right: i == _letters.length - 1 ? 0 : _kCellGap,
-              ),
-              child: _ScoreCell(
-                label: _letters[i],
-                color: (i == active && activeColor != null)
-                    ? activeColor!
-                    : _kNutriPalette[i],
-                isActive: i == active,
-              ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        for (int i = 0; i < _letters.length; i++)
+          Padding(
+            padding: EdgeInsets.only(
+              right: i == _letters.length - 1 ? 0 : _kCellGap,
             ),
-        ],
-      ),
+            child: _ScoreCell(
+              label: _letters[i],
+              color: (i == active && activeColor != null)
+                  ? activeColor!
+                  : _kNutriPalette[i],
+              isActive: i == active,
+              tooltip: _getTooltip(_letters[i], isTagalog),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -128,35 +194,55 @@ class NovaScoreStrip extends StatelessWidget {
   /// Optional override for the highlighted cell's colour.
   final Color? activeColor;
 
+  static String _getTooltip(int group, bool isTagalog) {
+    switch (group) {
+      case 1:
+        return isTagalog
+            ? 'NOVA 1: Hindi o bahagyang naproseso'
+            : 'NOVA 1: Minimally processed foods';
+      case 2:
+        return isTagalog
+            ? 'NOVA 2: Sangkap sa pagluluto'
+            : 'NOVA 2: Processed culinary ingredients';
+      case 3:
+        return isTagalog
+            ? 'NOVA 3: Naprosesong pagkain'
+            : 'NOVA 3: Processed foods';
+      case 4:
+        return isTagalog
+            ? 'NOVA 4: Ultra-processed na pagkain'
+            : 'NOVA 4: Ultra-processed foods';
+      default:
+        return 'NOVA $group';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final parsed = int.tryParse(group.trim());
     final active = (parsed != null && parsed >= 1 && parsed <= 4)
         ? parsed - 1
         : -1;
+    final lang = Localizations.maybeLocaleOf(context)?.languageCode ?? 'en';
+    final isTagalog = lang == 'tl' || lang == 'fil';
 
-    return Semantics(
-      label: active == -1
-          ? 'NOVA group unavailable'
-          : 'NOVA group ${active + 1}',
-      excludeSemantics: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          for (int i = 0; i < 4; i++)
-            Padding(
-              padding: EdgeInsets.only(right: i == 3 ? 0 : _kCellGap),
-              child: _ScoreCell(
-                label: '${i + 1}',
-                color: (i == active && activeColor != null)
-                    ? activeColor!
-                    : _kNovaPalette[i],
-                isActive: i == active,
-              ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        for (int i = 0; i < 4; i++)
+          Padding(
+            padding: EdgeInsets.only(right: i == 3 ? 0 : _kCellGap),
+            child: _ScoreCell(
+              label: '${i + 1}',
+              color: (i == active && activeColor != null)
+                  ? activeColor!
+                  : _kNovaPalette[i],
+              isActive: i == active,
+              tooltip: _getTooltip(i + 1, isTagalog),
             ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }

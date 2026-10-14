@@ -31,16 +31,42 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
     setState(() => _emailError = null);
 
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (mounted) {
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
     final error = await _authService.sendPasswordResetEmail(email: email);
     if (!mounted) return;
     setState(() => _isLoading = false);
     if (error != null) {
+      final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+          error.toLowerCase().contains('network');
+      if (mounted && isNet) {
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+        return;
+      }
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
 
     setState(() => _emailSent = true);
+    if (!mounted) return;
     SuccessFeedbackUtils.showSuccessSnackBar(context, loc.emailSent);
   }
 

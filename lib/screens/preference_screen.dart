@@ -49,7 +49,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
     try {
       final uid = _authService.currentUser?.uid;
       if (uid != null) {
-        final doc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
+        final doc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.serverAndCache));
         final data = doc.data();
         if (data != null) {
           setState(() {
@@ -76,7 +76,7 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
         if (!ok) return false;
 
         try {
-          final doc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.server));
+          final doc = await _authService.db.collection('users').doc(uid).get(GetOptions(source: Source.serverAndCache));
           final data = doc.data();
           if (data != null) {
             setState(() {
@@ -182,21 +182,6 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                                     final selectedLanguage = selection.first;
                                     if (selectedLanguage == language) return;
 
-                                    final dialogContext = context;
-                                    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
-                                    if (!hasInternet) {
-                                      if (dialogContext.mounted) {
-                                        final currentLoc = AppLocalizations.of(dialogContext)!;
-                                        await SuccessFeedbackUtils.showOfflineNoticeDialog(
-                                          dialogContext,
-                                          title: currentLoc.noInternetTitle,
-                                          message: currentLoc.noInternetActionMessage,
-                                          buttonText: currentLoc.gotIt,
-                                        );
-                                      }
-                                      return;
-                                    }
-
                                     HapticService().vibrate();
                                     await VoiceAssistantService.instance.updateLanguage(selectedLanguage);
 
@@ -204,7 +189,9 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                                     final targetLocaleCode = selectedLanguage == VoiceLang.tagalog ? 'tl' : 'en';
                                     if (LocaleService.localeNotifier.value.languageCode != targetLocaleCode) {
                                       await LocaleService.setAppLocale(targetLocaleCode);
-                                      await _authService.updateUserData({'language': targetLocaleCode});
+                                      try {
+                                        await _authService.updateUserData({'language': targetLocaleCode});
+                                      } catch (_) {}
                                     }
 
                                     final actualLanguage = VoiceAssistantService.languageNotifier.value;
@@ -229,6 +216,18 @@ class _PreferenceScreenState extends State<PreferenceScreen> {
                               child: OutlinedButton.icon(
                                 onPressed: () async {
                                   HapticService().vibrate();
+                                  final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+                                  if (!context.mounted) return;
+                                  if (!hasInternet) {
+                                    final loc = AppLocalizations.of(context)!;
+                                    await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                                      context,
+                                      title: loc.noInternetTitle,
+                                      message: loc.noInternetVoiceMessage,
+                                      buttonText: loc.gotIt,
+                                    );
+                                    return;
+                                  }
                                   await VoiceAssistantService.instance.speak(
                                     VoiceAssistantService.languageNotifier.value == VoiceLang.tagalog
                                         ? 'Ito ay isang preview ng boses ng CLARO.'

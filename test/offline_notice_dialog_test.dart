@@ -127,5 +127,75 @@ void main() {
       expect(find.text('Got it'), findsOneWidget);
       expect(find.byIcon(Icons.wifi_off_rounded), findsOneWidget);
     });
+
+    testWidgets('renders action offline dialog for features not feasible offline',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => ElevatedButton(
+                onPressed: () {
+                  SuccessFeedbackUtils.showOfflineNoticeDialog(
+                    context,
+                    title: 'No Internet Connection',
+                    message:
+                        'An internet connection is required to complete this action.',
+                    buttonText: 'Got it',
+                  );
+                },
+                child: const Text('Open Action Offline Dialog'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Action Offline Dialog'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No Internet Connection'), findsOneWidget);
+      expect(
+        find.text(
+            'An internet connection is required to complete this action.'),
+        findsOneWidget,
+      );
+      expect(find.text('Got it'), findsOneWidget);
+    });
+
+    testWidgets('Voice Assistant toggle blocked offline with dialog (like MFA)',
+        (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => Switch(
+                value: false,
+                onChanged: (value) async {
+                  await SuccessFeedbackUtils.showOfflineNoticeDialog(
+                    context,
+                    title: 'No Internet Connection',
+                    message:
+                        'Please connect to mobile data or Wi-Fi to use the Voice Assistant.',
+                    buttonText: 'Got it',
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(Switch));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No Internet Connection'), findsOneWidget);
+      expect(
+        find.text(
+            'Please connect to mobile data or Wi-Fi to use the Voice Assistant.'),
+        findsOneWidget,
+      );
+      expect(find.text('Got it'), findsOneWidget);
+    });
   });
 }

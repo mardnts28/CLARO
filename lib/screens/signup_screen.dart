@@ -13,6 +13,7 @@ import '../services/validation_service.dart';
 import '../services/haptic_service.dart';
 import '../services/guest_session.dart';
 import '../widgets/terms_and_conditions_dialog.dart';
+import '../core/utils/success_feedback_utils.dart';
 
 // NOTE ON LANGUAGE: the headline text, field hints, and primary buttons on
 // this screen now follow the app-wide selected language (see
@@ -388,6 +389,20 @@ class _SignupScreenState extends State<SignupScreen> {
       return; // Nothing is cleared — user's input is preserved as-is.
     }
 
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (mounted) {
+        final loc = AppLocalizations.of(context)!;
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     setState(() {
       _formError = null;
       _isLoading = true;
@@ -403,6 +418,17 @@ class _SignupScreenState extends State<SignupScreen> {
       if (!mounted) return;
 
       if (error != null) {
+        final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+            error.toLowerCase().contains('network');
+        if (mounted && isNet) {
+          final loc = AppLocalizations.of(context)!;
+          await SuccessFeedbackUtils.showOfflineNoticeDialog(
+            context,
+            title: loc.noInternetTitle,
+            message: loc.noInternetActionMessage,
+            buttonText: loc.gotIt,
+          );
+        }
         setState(() => _formError = _friendlyFormError(error));
         return;
       }
@@ -431,6 +457,17 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     } catch (e) {
       if (!mounted) return;
+      final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+          e.toString().toLowerCase().contains('network');
+      if (mounted && isNet) {
+        final loc = AppLocalizations.of(context)!;
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
       setState(() => _formError = _friendlyFormError(e.toString()));
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -439,6 +476,21 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _handleGoogleSignIn() async {
     HapticService().vibrate();
+
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      if (mounted) {
+        final loc = AppLocalizations.of(context)!;
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
+      return;
+    }
+
     // Unlike email/password sign-up, Google sign-up does NOT require the
     // on-screen Terms & Conditions checkbox to be ticked first -- ticking
     // it here would duplicate/pre-empt the mandatory "Agree" dialog we
@@ -480,6 +532,17 @@ class _SignupScreenState extends State<SignupScreen> {
       }
 
       if (result is String) {
+        final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+            result.toLowerCase().contains('network');
+        if (mounted && isNet) {
+          final loc = AppLocalizations.of(context)!;
+          await SuccessFeedbackUtils.showOfflineNoticeDialog(
+            context,
+            title: loc.noInternetTitle,
+            message: loc.noInternetActionMessage,
+            buttonText: loc.gotIt,
+          );
+        }
         setState(() => _formError = _friendlyFormError(result));
         return;
       }
@@ -490,6 +553,17 @@ class _SignupScreenState extends State<SignupScreen> {
       _navigateToOtpScreen();
     } catch (e) {
       if (!mounted) return;
+      final isNet = !(await SuccessFeedbackUtils.hasInternetConnection()) ||
+          e.toString().toLowerCase().contains('network');
+      if (mounted && isNet) {
+        final loc = AppLocalizations.of(context)!;
+        await SuccessFeedbackUtils.showOfflineNoticeDialog(
+          context,
+          title: loc.noInternetTitle,
+          message: loc.noInternetActionMessage,
+          buttonText: loc.gotIt,
+        );
+      }
       setState(() => _formError = _friendlyFormError(e.toString()));
     } finally {
       if (mounted) setState(() => _isLoading = false);

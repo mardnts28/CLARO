@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart';
@@ -8,6 +9,9 @@ import 'package:speech_to_text/speech_to_text.dart';
 import 'auth_service.dart';
 import 'locale_service.dart';
 import '../models/product_model.dart';
+import '../core/utils/success_feedback_utils.dart';
+import 'audio_earcon_service.dart';
+import 'shake_detector_service.dart';
 
 enum VoiceLang { english, tagalog }
 
@@ -33,6 +37,7 @@ class VoiceAssistantService {
   final FlutterTts _flutterTts = FlutterTts();
   final SpeechToText _speechToText = SpeechToText();
 
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static final NavigatorObserver navigatorObserver = _VoiceNavigatorObserver();
 
   /// ValueNotifier for voice assistant enabled state
@@ -142,6 +147,30 @@ class VoiceAssistantService {
       'en': 'Your submitted reports are here — check their review status.',
       'fil': 'Ang iyong mga isinubmit na ulat ay nandito — suriin ang kanilang review status.',
     },
+    'invite_people': {
+      'en': 'Health groups and invitations — create a group, invite family members with a code, or join an existing group.',
+      'fil': 'Mga health group at imbitasyon — lumikha ng grupo, mag-imbita ng miyembro gamit ang code, o sumali sa grupo.',
+    },
+    'group': {
+      'en': 'Your health groups are listed here — review group verdicts, invite members, or manage health profiles.',
+      'fil': 'Nakalista dito ang iyong mga health group — suriin ang hatol ng grupo, mag-imbita ng miyembro, o pamahalaan ang mga profile.',
+    },
+    'nutrition_guide_fda': {
+      'en': 'Nutrition facts label guide — learn how to read serving sizes, calories, and daily percentage values. The percent daily value shows how much a nutrient in one serving contributes to a 2,000-calorie daily diet.',
+      'fil': 'Gabay sa nutrition facts label — alamin kung paano basahin ang serving size, calories, at porsyento ng daily value. Ipinapakita nito kung gaano karaming sustansya ang ibinibigay ng isang serving batay sa 2,000-calorie na diyeta.',
+    },
+    'nutrition_guide_who': {
+      'en': 'Daily nutrient guidelines — WHO recommends no more than 5 grams of salt, which is about 2,000 milligrams of sodium, less than 25 grams of added sugars, and 20 to 35 percent of daily calories from fat.',
+      'fil': 'Pang-araw-araw na gabay sa sustansya — inirerekomenda ng WHO ang hindi hihigit sa 5 gramo ng asin o 2,000 milligrams ng sodium, mas mababa sa 25 gramo ng asukal, at 20 hanggang 35 porsyento ng calories mula sa taba bawat araw.',
+    },
+    'nutrition_guide_kidney': {
+      'en': 'Kidney disease nutrition guide — limit daily sodium to 2,300 milligrams, monitor potassium and phosphorus levels, and eat the right amount of protein to protect kidney function.',
+      'fil': 'Gabay sa nutrisyon para sa sakit sa bato — limitahan ang sodium sa 2,300 milligrams bawat araw, bantayan ang potassium at phosphorus, at kumain ng tamang dami ng protina upang protektahan ang mga bato.',
+    },
+    'nutrition_guide_gerd': {
+      'en': 'GERD and acid reflux diet guide — avoid trigger foods like high fats, citrus fruits, tomatoes, coffee, and chocolate. Eat smaller, frequent meals and avoid lying down right after eating.',
+      'fil': 'Gabay sa pagkain para sa GERD at acid reflux — iwasan ang mamantikang pagkain, maaasim na prutas, kamatis, kape, at tsokolate. Kumain ng maliliit na beses-beses at huwag humiga agad pagkatapos kumain.',
+    },
   };
 
   /// Initialize the service by loading the user's preference from Firestore
@@ -189,6 +218,7 @@ class VoiceAssistantService {
     }
 
     await _instance._instanceConfigureTts();
+    ShakeDetectorService.instance.initialize();
   }
 
   Future<void> _instanceConfigureTts() async {
@@ -286,6 +316,26 @@ class VoiceAssistantService {
       return;
     }
 
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      return;
+    }
+
+    // TalkBack / VoiceOver Harmonization: When system screen reader is active,
+    // route announcements through SemanticsService so TalkBack queues smoothly.
+    final accessibleNavigation =
+        WidgetsBinding.instance.platformDispatcher.accessibilityFeatures.accessibleNavigation;
+    if (accessibleNavigation) {
+      try {
+        // ignore: deprecated_member_use
+        await SemanticsService.announce(text, TextDirection.ltr);
+        return;
+      } catch (e) {
+        debugPrint('SemanticsService announce error: $e');
+      }
+    }
+
+
     try {
       await _flutterTts.stop();
       isSpeakingNotifier.value = true;
@@ -308,41 +358,189 @@ class VoiceAssistantService {
     }
   }
 
+  void Function()? _activeCompleteWithText;
+
+  /// Stops speech listening immediately and returns whatever was spoken so far.
+  /// Allows the user to tap the microphone to finish speaking early.
+  void stopListeningEarly() {
+    if (isListeningNotifier.value && _activeCompleteWithText != null) {
+      debugPrint('Voice assistant: stopListeningEarly invoked by user.');
+      _activeCompleteWithText!();
+    }
+  }
+
   Future<String?> listenOnce() async {
+    // Immediate Barge-In: Halt any active speech playback before microphone opens
+    if (isSpeakingNotifier.value) {
+      await stopAudio();
+    }
+
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) {
+      debugPrint('Voice assistant: listenOnce aborted because device is offline.');
+      return null;
+    }
+
     final status = await Permission.microphone.request();
     if (!status.isGranted) {
       debugPrint('Speech recognition: microphone permission denied.');
       return null;
     }
 
+    bool hasPlayedStop = false;
+
     try {
       await _flutterTts.stop();
       isListeningNotifier.value = true;
 
       final completer = Completer<String?>();
-      String recognizedText = '';
-      Timer? silenceDebounce;
+      final StringBuffer accumulatedBuffer = StringBuffer();
+      String currentChunkWords = '';
+      Timer? silenceTimer;
+      Timer? initialSpeechTimeout;
+      bool isSessionActive = true;
+      bool hasSpoken = false;
 
-      void completeWithText() {
-        silenceDebounce?.cancel();
-        if (!completer.isCompleted) {
-          final trimmed = recognizedText.trim();
-          completer.complete(trimmed.isNotEmpty ? trimmed : null);
+      void playStopEarconOnce() {
+        if (!hasPlayedStop) {
+          hasPlayedStop = true;
+          unawaited(AudioEarconService.instance.playMicStop());
         }
       }
 
+      String getFinalTranscript() {
+        final bufferText = accumulatedBuffer.toString().trim();
+        final chunkText = currentChunkWords.trim();
+        if (bufferText.isEmpty) return chunkText;
+        if (chunkText.isEmpty) return bufferText;
+        return '$bufferText $chunkText'.trim();
+      }
+
+      void completeSession([String? overrideText]) {
+        if (!isSessionActive) return;
+        isSessionActive = false;
+        silenceTimer?.cancel();
+        initialSpeechTimeout?.cancel();
+        playStopEarconOnce();
+        if (!completer.isCompleted) {
+          final text = (overrideText ?? getFinalTranscript()).trim();
+          completer.complete(text.isNotEmpty ? text : null);
+        }
+      }
+
+      _activeCompleteWithText = completeSession;
+
       final available = await _speechToText.initialize(
         onError: (error) {
-          debugPrint('Speech recognition error: $error');
-          completeWithText();
+          debugPrint(
+            'Speech recognition error: ${error.errorMsg} '
+            '(permanent=${error.permanent})',
+          );
+          if (!isSessionActive || completer.isCompleted) return;
+
+          final isTransient = !error.permanent ||
+              error.errorMsg == 'error_no_match' ||
+              error.errorMsg == 'error_speech_timeout' ||
+              error.errorMsg == 'error_retry';
+
+          if (isTransient) {
+            // Transient timeout or no match: do not abort mid-sentence!
+            if (hasSpoken && (silenceTimer?.isActive ?? false)) {
+              return;
+            } else if (!hasSpoken && (initialSpeechTimeout?.isActive ?? false)) {
+              return;
+            }
+          }
+
+          completeSession();
         },
         onStatus: (status) {
           debugPrint('Speech recognition status: $status');
           if (status == 'notListening' || status == 'done') {
-            completeWithText();
+            if (!isSessionActive || completer.isCompleted) return;
+
+            // Commit any recognized words in this chunk to accumulated buffer
+            if (currentChunkWords.trim().isNotEmpty) {
+              accumulatedBuffer.write(' ${currentChunkWords.trim()}');
+              currentChunkWords = '';
+            }
+
+            if (hasSpoken) {
+              // If the silence timer is still counting down, restart recognition pass
+              // so subsequent phrases/words from the user are seamlessly captured.
+              if (silenceTimer?.isActive ?? false) {
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  if (isSessionActive &&
+                      !completer.isCompleted &&
+                      !_speechToText.isListening) {
+                    _startListeningPass(
+                      locale: languageNotifier.value.ttsLanguageCode,
+                      isSessionActive: () => isSessionActive,
+                      onChunkResult: (words, isFinal) {
+                        currentChunkWords = words;
+                        if (words.trim().isNotEmpty) {
+                          hasSpoken = true;
+                          initialSpeechTimeout?.cancel();
+                          silenceTimer?.cancel();
+                          if (isFinal) {
+                            accumulatedBuffer.write(' ${words.trim()}');
+                            currentChunkWords = '';
+                          }
+                          silenceTimer = Timer(
+                            const Duration(milliseconds: 2200),
+                            () {
+                              debugPrint('Speech recognition: silence elapsed, completing.');
+                              completeSession();
+                            },
+                          );
+                        }
+                      },
+                    );
+                  }
+                });
+              } else {
+                completeSession();
+              }
+            } else {
+              // No speech detected yet in this pass: if initial timeout is still active, restart
+              if (initialSpeechTimeout?.isActive ?? false) {
+                Future.delayed(const Duration(milliseconds: 100), () {
+                  if (isSessionActive &&
+                      !completer.isCompleted &&
+                      !_speechToText.isListening) {
+                    _startListeningPass(
+                      locale: languageNotifier.value.ttsLanguageCode,
+                      isSessionActive: () => isSessionActive,
+                      onChunkResult: (words, isFinal) {
+                        currentChunkWords = words;
+                        if (words.trim().isNotEmpty) {
+                          hasSpoken = true;
+                          initialSpeechTimeout?.cancel();
+                          silenceTimer?.cancel();
+                          if (isFinal) {
+                            accumulatedBuffer.write(' ${words.trim()}');
+                            currentChunkWords = '';
+                          }
+                          silenceTimer = Timer(
+                            const Duration(milliseconds: 2200),
+                            () {
+                              debugPrint('Speech recognition: silence elapsed, completing.');
+                              completeSession();
+                            },
+                          );
+                        }
+                      },
+                    );
+                  }
+                });
+              } else {
+                completeSession();
+              }
+            }
           }
         },
       );
+
       if (!available) {
         debugPrint('Speech recognition: engine unavailable.');
         return null;
@@ -350,52 +548,103 @@ class VoiceAssistantService {
 
       final locale = languageNotifier.value.ttsLanguageCode;
 
-      await _speechToText.listen(
-        onResult: (result) {
-          recognizedText = result.recognizedWords;
-          debugPrint(
-            'Speech recognition result: "$recognizedText" '
-            '(final=${result.finalResult})',
-          );
-          if (result.finalResult) {
-            completeWithText();
-          } else if (recognizedText.trim().isNotEmpty) {
-            // Reset speech debounce: if no new words arrive within 1.5s, finish gracefully
-            silenceDebounce?.cancel();
-            silenceDebounce = Timer(const Duration(milliseconds: 1500), () {
-              completeWithText();
+      // Play distinct audio earcon chime and await its completion before opening the microphone,
+      // preventing chime audio from echoing into the mic and falsely triggering onEndOfSpeech.
+      await AudioEarconService.instance.playMicStart();
+      await Future.delayed(const Duration(milliseconds: 100));
+
+      // Allow 7 seconds for the user to start speaking before timing out with no speech
+      initialSpeechTimeout = Timer(const Duration(seconds: 7), () {
+        if (!hasSpoken && isSessionActive) {
+          debugPrint('Speech recognition: 7s initial speech timeout expired.');
+          completeSession();
+        }
+      });
+
+      await _startListeningPass(
+        locale: locale,
+        isSessionActive: () => isSessionActive,
+        onChunkResult: (words, isFinal) {
+          currentChunkWords = words;
+          if (words.trim().isNotEmpty) {
+            hasSpoken = true;
+            initialSpeechTimeout?.cancel();
+            silenceTimer?.cancel();
+            if (isFinal) {
+              accumulatedBuffer.write(' ${words.trim()}');
+              currentChunkWords = '';
+            }
+            silenceTimer = Timer(const Duration(milliseconds: 2200), () {
+              debugPrint('Speech recognition: silence elapsed, completing.');
+              completeSession();
             });
           }
         },
-        listenOptions: SpeechListenOptions(
-          listenMode: ListenMode.dictation,
-          partialResults: true,
-          listenFor: const Duration(seconds: 25),
-          pauseFor: const Duration(seconds: 3),
-          localeId: locale,
-        ),
       );
 
       final transcript = await completer.future.timeout(
-        const Duration(seconds: 15),
+        const Duration(seconds: 35),
         onTimeout: () {
-          completeWithText();
-          return recognizedText.trim().isEmpty ? null : recognizedText.trim();
+          completeSession();
+          final t = getFinalTranscript();
+          return t.isEmpty ? null : t;
         },
       );
 
-      silenceDebounce?.cancel();
-      await _speechToText.stop();
+      silenceTimer?.cancel();
+      initialSpeechTimeout.cancel();
+      playStopEarconOnce();
+      try {
+        await _speechToText.stop();
+      } catch (_) {}
       return transcript;
     } catch (e) {
       debugPrint('Speech recognition failure: $e');
       return null;
     } finally {
+      _activeCompleteWithText = null;
+      if (!hasPlayedStop) {
+        hasPlayedStop = true;
+        unawaited(AudioEarconService.instance.playMicStop());
+      }
       isListeningNotifier.value = false;
     }
   }
 
+  Future<void> _startListeningPass({
+    required String locale,
+    required bool Function() isSessionActive,
+    required void Function(String words, bool isFinal) onChunkResult,
+  }) async {
+    if (!isSessionActive()) return;
+    try {
+      await _speechToText.listen(
+        onResult: (result) {
+          if (!isSessionActive()) return;
+          debugPrint(
+            'Speech recognition result: "${result.recognizedWords}" '
+            '(final=${result.finalResult})',
+          );
+          onChunkResult(result.recognizedWords, result.finalResult);
+        },
+        listenOptions: SpeechListenOptions(
+          listenMode: ListenMode.dictation,
+          partialResults: true,
+          listenFor: const Duration(seconds: 45),
+          pauseFor: const Duration(seconds: 4),
+          localeId: locale,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error in _startListeningPass: $e');
+    }
+  }
+
   Future<void> announcePage(String pageKey) async {
+    if (!isEnabled) return;
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) return;
+
     final pageMap = _pageAnnouncements[pageKey];
     if (pageMap == null) return;
     final text = pageMap[languageNotifier.value == VoiceLang.tagalog ? 'fil' : 'en'] ?? '';
@@ -415,6 +664,10 @@ class VoiceAssistantService {
     String preamble,
     String pageKey,
   ) async {
+    if (!isEnabled) return;
+    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
+    if (!hasInternet) return;
+
     final pageMap = _pageAnnouncements[pageKey];
     if (pageMap == null) return;
     final lang = languageNotifier.value == VoiceLang.tagalog ? 'fil' : 'en';
