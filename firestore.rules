@@ -152,16 +152,20 @@ service cloud.firestore {
 
     // ─── Unknown Product Reports ──────────────────────────────────
     // Users can create their own reports (enforced by `reportedBy` field
-    // matching their uid). Offline-persistence write queuing relies on
-    // this exact `create` rule — queued writes are replayed with the
-    // same auth token when connectivity is restored, so the
-    // `reportedBy == request.auth.uid` check naturally passes.
+    // matching their uid). Guest users (unauthenticated) can also submit reports
+    // with `reportedBy == 'anonymous'` and `userName == 'Guest User'`.
+    // Offline-persistence write queuing relies on this exact `create` rule —
+    // queued writes are replayed with the same auth token when connectivity
+    // is restored, so the `reportedBy == request.auth.uid` check naturally
+    // passes for authenticated users.
     // Update and delete are admin-only: users cannot retract or modify a
     // report once submitted, and admins approve/reject via the dashboard.
     // Exception: Report creators can update extraction data fields only.
     match /reports/{reportId} {
-      allow create: if request.auth != null
-                    && request.resource.data.reportedBy == request.auth.uid;
+      allow create: if (request.auth != null
+                    && request.resource.data.reportedBy == request.auth.uid)
+                    || (request.resource.data.reportedBy == 'anonymous'
+                    && request.resource.data.userName == 'Guest User');
       allow read:   if request.auth != null
                     && (resource.data.reportedBy == request.auth.uid || isAdmin());
       allow update: if isAdmin()

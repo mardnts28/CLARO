@@ -70,7 +70,7 @@ class GerdTriggerDetector {
   // Value for total fat used on Philippine/US nutrition labels (78g,
   // based on a 2,000-kcal reference diet -- 21 CFR 101.9). 20% of 78g =
   // 15.6g. This mirrors the >20% "high" boundary WhoCalculator already
-  // uses for WHO-limit nutrients (see classifyByWhoPercentage), just
+  // uses for Recommended Daily Intake limit nutrients (see classifyByWhoPercentage), just
   // applied to total fat instead of sodium/sugars/saturated fat.
   static const double highFatPerServingThresholdG = 15.6;
 

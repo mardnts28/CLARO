@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -14,6 +15,22 @@ import 'audio_earcon_service.dart';
 import 'shake_detector_service.dart';
 
 enum VoiceLang { english, tagalog }
+
+enum VoiceListenStatus {
+  recognized,
+  noSpeech,
+  couldNotUnderstand,
+  unavailable,
+  permissionDenied,
+  alreadyListening,
+}
+
+class VoiceListenResult {
+  final VoiceListenStatus status;
+  final String? transcript;
+
+  const VoiceListenResult(this.status, {this.transcript});
+}
 
 extension VoiceLangExtension on VoiceLang {
   String get storageValue => name;
@@ -36,22 +53,46 @@ class VoiceAssistantService {
   final _authService = AuthService();
   final FlutterTts _flutterTts = FlutterTts();
   final SpeechToText _speechToText = SpeechToText();
+  Future<bool>? _speechInitialization;
+  bool _listenSessionActive = false;
+  void Function(String?)? _completeCurrentListen;
+  Completer<void>? _activeSpeechCompletion;
 
   static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   static final NavigatorObserver navigatorObserver = _VoiceNavigatorObserver();
 
   /// ValueNotifier for voice assistant enabled state
-  static final ValueNotifier<bool> isEnabledNotifier = ValueNotifier<bool>(false);
+  static final ValueNotifier<bool> isEnabledNotifier = ValueNotifier<bool>(
+    false,
+  );
 
-  static final ValueNotifier<bool> isListeningNotifier = ValueNotifier<bool>(false);
-  static final ValueNotifier<bool> isSpeakingNotifier = ValueNotifier<bool>(false);
-  static final ValueNotifier<VoiceLang> languageNotifier = ValueNotifier<VoiceLang>(VoiceLang.english);
-  static final ValueNotifier<double> speechRateNotifier = ValueNotifier<double>(0.5);
-  static final ValueNotifier<Product?> latestScanProductNotifier = ValueNotifier<Product?>(null);
-  static final ValueNotifier<String?> latestScanSummaryNotifier = ValueNotifier<String?>(null);
+  static final ValueNotifier<bool> isListeningNotifier = ValueNotifier<bool>(
+    false,
+  );
+  static final ValueNotifier<bool> isSpeakingNotifier = ValueNotifier<bool>(
+    false,
+  );
+  static final ValueNotifier<String> liveTranscriptNotifier =
+      ValueNotifier<String>('');
+  static final ValueNotifier<VoiceLang> languageNotifier =
+      ValueNotifier<VoiceLang>(VoiceLang.english);
+  static final ValueNotifier<double> speechRateNotifier = ValueNotifier<double>(
+    0.5,
+  );
+  static final ValueNotifier<Product?> latestScanProductNotifier =
+      ValueNotifier<Product?>(null);
+  static final ValueNotifier<String?> latestScanSummaryNotifier =
+      ValueNotifier<String?>(null);
 
   /// Stores the currently open product on ProductDetailScreen, or null when closed
-  static final ValueNotifier<Product?> activeResultProductNotifier = ValueNotifier<Product?>(null);
+  static final ValueNotifier<Product?> activeResultProductNotifier =
+      ValueNotifier<Product?>(null);
+
+  @visibleForTesting
+  static Future<PermissionStatus> Function()? microphonePermissionOverride;
+
+  @visibleForTesting
+  static Future<bool> Function()? openAppSettingsOverride;
 
   static void setLatestScanProduct(Product product) {
     latestScanProductNotifier.value = product;
@@ -64,88 +105,121 @@ class VoiceAssistantService {
 
   static const Map<String, Map<String, String>> _pageAnnouncements = {
     'home': {
-      'en': 'Hello! This is CLARO, your voice assistant. Tap the mic button anytime you need help.',
-      'fil': 'Kumusta! Ako ang CLARO, ang iyong voice assistant. I-tap ang mic button anumang oras kung kailangan mo ng tulong.',
+      'en':
+          'Hello! This is CLARO, your voice assistant. Tap the mic button anytime you need help.',
+      'fil':
+          'Kumusta! Ako ang CLARO, ang iyong voice assistant. I-tap ang mic button anumang oras kung kailangan mo ng tulong.',
     },
     'scan': {
-      'en': 'Hold the product in the frame — CLARO will detect it and read the nutrition result.',
-      'fil': 'Ilagay ang produkto sa loob ng frame — ide-detect ito ng CLARO at babasahin ang nutrition result.',
+      'en':
+          'Hold the product in the frame — CLARO will detect it and read the nutrition result.',
+      'fil':
+          'Ilagay ang produkto sa loob ng frame — ide-detect ito ng CLARO at babasahin ang nutrition result.',
     },
     'history': {
       'en': 'Your past scans are listed here — tap any item to review it.',
-      'fil': 'Ang iyong mga nakaraang scan ay nakalista dito — i-tap ang alinman para suriin.',
+      'fil':
+          'Ang iyong mga nakaraang scan ay nakalista dito — i-tap ang alinman para suriin.',
     },
     'profile': {
-      'en': 'Your profile is here — edit personal info, preferences, or send feedback.',
-      'fil': 'Nandito ang iyong profile — i-edit ang impormasyon, mga preference, o magpadala ng feedback.',
+      'en':
+          'Your profile is here — edit personal info, preferences, or send feedback.',
+      'fil':
+          'Nandito ang iyong profile — i-edit ang impormasyon, mga preference, o magpadala ng feedback.',
     },
     'personal_info': {
-      'en': 'Update your name, age, health conditions, and allergens here — save so CLARO gives better advice.',
-      'fil': 'I-update ang pangalan, edad, kondisyon sa kalusugan, at allergens dito — i-save para mas mapabuti ang payo ng CLARO.',
+      'en':
+          'Update your name, age, health conditions, and allergens here — save so CLARO gives better advice.',
+      'fil':
+          'I-update ang pangalan, edad, kondisyon sa kalusugan, at allergens dito — i-save para mas mapabuti ang payo ng CLARO.',
     },
     'preference': {
-      'en': 'Adjust language, speech rate, vibration, notifications, and text size here.',
-      'fil': 'Baguhin ang wika, bilis ng pananalita, vibration, notification, at laki ng teksto dito.',
+      'en':
+          'Adjust language, speech rate, vibration, notifications, and text size here.',
+      'fil':
+          'Baguhin ang wika, bilis ng pananalita, vibration, notification, at laki ng teksto dito.',
     },
     'product_detail': {
-      'en': 'Health advice and ingredient warnings are listed — tap Compare to see alternatives.',
-      'fil': 'Nakalista ang health advice at ingredient warnings — i-tap ang Compare para makita ang mga alternatibo.',
+      'en':
+          'Health advice and ingredient warnings are listed — tap Compare to see alternatives.',
+      'fil':
+          'Nakalista ang health advice at ingredient warnings — i-tap ang Compare para makita ang mga alternatibo.',
     },
     'compare_products': {
-      'en': 'Ranked alternatives are listed here — tap one to see its nutrition details.',
-      'fil': 'Ang mga alternatibong naka-rank ay nakalista dito — i-tap ang isa para makita ang nutrition details.',
+      'en':
+          'Ranked alternatives are listed here — tap one to see its nutrition details.',
+      'fil':
+          'Ang mga alternatibong naka-rank ay nakalista dito — i-tap ang isa para makita ang nutrition details.',
     },
     'multi_scan_results': {
       'en': 'Ranked products from your scan are here — tap one to learn more.',
-      'fil': 'Ang mga naka-rank na produkto mula sa iyong scan ay nandito — i-tap ang isa para malaman pa.',
+      'fil':
+          'Ang mga naka-rank na produkto mula sa iyong scan ay nandito — i-tap ang isa para malaman pa.',
     },
     'product_not_found': {
-      'en': 'Product could not be identified — scan again or report it for review.',
-      'fil': 'Hindi natukoy ang produkto — mag-scan muli o i-report para suriin.',
+      'en':
+          'Product could not be identified — scan again or report it for review.',
+      'fil':
+          'Hindi natukoy ang produkto — mag-scan muli o i-report para suriin.',
     },
     'unknown_product_submission': {
-      'en': 'Submit the unknown product with front and back photos so CLARO can learn it.',
-      'fil': 'Isumite ang hindi kilalang produkto kasama ang front at back photo para matutuhan ito ng CLARO.',
+      'en':
+          'Submit the unknown product with front and back photos so CLARO can learn it.',
+      'fil':
+          'Isumite ang hindi kilalang produkto kasama ang front at back photo para matutuhan ito ng CLARO.',
     },
     'suggestion': {
-      'en': 'Rate your experience and write a suggestion to help improve CLARO.',
-      'fil': 'I-rate ang iyong karanasan at magsulat ng suhestiyon para mapabuti ang CLARO.',
+      'en':
+          'Rate your experience and write a suggestion to help improve CLARO.',
+      'fil':
+          'I-rate ang iyong karanasan at magsulat ng suhestiyon para mapabuti ang CLARO.',
     },
     'review_history': {
-      'en': 'Your submitted feedback is here — check status and read replies from the team.',
-      'fil': 'Ang iyong mga isinubmit na feedback ay nandito — suriin ang status at basahin ang mga reply.',
+      'en':
+          'Your submitted feedback is here — check status and read replies from the team.',
+      'fil':
+          'Ang iyong mga isinubmit na feedback ay nandito — suriin ang status at basahin ang mga reply.',
     },
     'about_claro': {
       'en': 'Learn what CLARO does and who built the app.',
       'fil': 'Alamin kung ano ang ginagawa ng CLARO at sino ang gumawa ng app.',
     },
     'change_password': {
-      'en': 'Enter your current and new password to update your account security.',
-      'fil': 'Ilagay ang kasalukuyang at bagong password para i-update ang seguridad ng account.',
+      'en':
+          'Enter your current and new password to update your account security.',
+      'fil':
+          'Ilagay ang kasalukuyang at bagong password para i-update ang seguridad ng account.',
     },
     'theme': {
       'en': 'Choose default or dark mode to change the app look.',
       'fil': 'Pumili ng default o dark mode para baguhin ang itsura ng app.',
     },
     'report_detail': {
-      'en': 'Your submitted report is here — check its status and review the product images.',
-      'fil': 'Ang iyong isinubmit na report ay nandito — suriin ang status at ang mga larawan ng produkto.',
+      'en':
+          'Your submitted report is here — check its status and review the product images.',
+      'fil':
+          'Ang iyong isinubmit na report ay nandito — suriin ang status at ang mga larawan ng produkto.',
     },
     'more_details': {
       'en': 'Ingredients, allergen warnings, and storage tips are listed here.',
-      'fil': 'Nakalista dito ang ingredients, allergen warnings, at storage tips.',
+      'fil':
+          'Nakalista dito ang ingredients, allergen warnings, at storage tips.',
     },
     'favorites': {
       'en': 'Your saved products are here — tap one to view its details.',
-      'fil': 'Ang iyong mga na-save na produkto ay nandito — i-tap ang isa para makita ang detalye.',
+      'fil':
+          'Ang iyong mga na-save na produkto ay nandito — i-tap ang isa para makita ang detalye.',
     },
     'compare': {
-      'en': 'Products you queued for comparison are listed here — tap one to compare.',
-      'fil': 'Ang mga produktong naka-pila para sa paghahambing ay nakalista dito — i-tap ang isa para ikumpara.',
+      'en':
+          'Products you queued for comparison are listed here — tap one to compare.',
+      'fil':
+          'Ang mga produktong naka-pila para sa paghahambing ay nakalista dito — i-tap ang isa para ikumpara.',
     },
     'reports': {
       'en': 'Your submitted reports are here — check their review status.',
-      'fil': 'Ang iyong mga isinubmit na ulat ay nandito — suriin ang kanilang review status.',
+      'fil':
+          'Ang iyong mga isinubmit na ulat ay nandito — suriin ang kanilang review status.',
     },
     'invite_people': {
       'en': 'Health groups and invitations — create a group, invite family members with a code, or join an existing group.',
@@ -190,7 +264,8 @@ class VoiceAssistantService {
           .doc(user.uid)
           .get();
 
-      final appDefaultLang = LocaleService.localeNotifier.value.languageCode == 'tl'
+      final appDefaultLang =
+          LocaleService.localeNotifier.value.languageCode == 'tl'
           ? VoiceLang.tagalog
           : VoiceLang.english;
 
@@ -201,7 +276,8 @@ class VoiceAssistantService {
           (lang) => lang.name == (data['voiceLanguage'] as String? ?? ''),
           orElse: () => appDefaultLang,
         );
-        speechRateNotifier.value = (data['voiceRate'] as num?)?.toDouble() ?? 0.5;
+        speechRateNotifier.value =
+            (data['voiceRate'] as num?)?.toDouble() ?? 0.5;
       } else {
         isEnabledNotifier.value = false;
         languageNotifier.value = appDefaultLang;
@@ -209,7 +285,8 @@ class VoiceAssistantService {
       }
     } catch (e) {
       debugPrint('Error initializing voice assistant: $e');
-      final fallbackLang = LocaleService.localeNotifier.value.languageCode == 'tl'
+      final fallbackLang =
+          LocaleService.localeNotifier.value.languageCode == 'tl'
           ? VoiceLang.tagalog
           : VoiceLang.english;
       isEnabledNotifier.value = false;
@@ -223,12 +300,13 @@ class VoiceAssistantService {
 
   Future<void> _instanceConfigureTts() async {
     try {
-      final configuredLanguage = await _configureLanguage(languageNotifier.value);
+      final configuredLanguage = await _configureLanguage(
+        languageNotifier.value,
+      );
       languageNotifier.value = configuredLanguage;
       await _flutterTts.setSpeechRate(speechRateNotifier.value);
-      _flutterTts.setCompletionHandler(() {
-        isSpeakingNotifier.value = false;
-      });
+      await _flutterTts.awaitSpeakCompletion(true);
+      _flutterTts.setCompletionHandler(_completeActiveSpeech);
       _flutterTts.setErrorHandler((message) {
         isSpeakingNotifier.value = false;
         debugPrint('FlutterTts error: $message');
@@ -248,7 +326,9 @@ class VoiceAssistantService {
 
       final user = _instance._authService.currentUser;
       if (user != null) {
-        await _instance._authService.updateUserData({'voiceAssistant': enabled});
+        await _instance._authService.updateUserData({
+          'voiceAssistant': enabled,
+        });
       }
     } catch (e) {
       debugPrint('Error updating voice assistant state: $e');
@@ -262,7 +342,9 @@ class VoiceAssistantService {
 
       final user = _instance._authService.currentUser;
       if (user != null) {
-        await _instance._authService.updateUserData({'voiceLanguage': selectedLanguage.storageValue});
+        await _instance._authService.updateUserData({
+          'voiceLanguage': selectedLanguage.storageValue,
+        });
       }
     } catch (e) {
       debugPrint('Error updating voice assistant language: $e');
@@ -338,23 +420,40 @@ class VoiceAssistantService {
 
     try {
       await _flutterTts.stop();
+      _completeActiveSpeech();
+      _activeSpeechCompletion = Completer<void>();
       isSpeakingNotifier.value = true;
       await _flutterTts.speak(text);
     } catch (e) {
       debugPrint('Error speaking text: $e');
-      isSpeakingNotifier.value = false;
+    } finally {
+      _completeActiveSpeech();
     }
   }
 
-  Future<void> stopAudio() async {
+  void _completeActiveSpeech() {
+    isSpeakingNotifier.value = false;
+    final completion = _activeSpeechCompletion;
+    if (completion != null && !completion.isCompleted) {
+      completion.complete();
+    }
+    _activeSpeechCompletion = null;
+  }
+
+  Future<void> stopAudio({bool stopListening = true}) async {
     try {
       await _flutterTts.stop();
-      await _speechToText.stop();
+      _completeActiveSpeech();
+      if (stopListening && _listenSessionActive) {
+        await _speechToText.stop();
+      }
     } catch (e) {
       debugPrint('Voice audio stop error: $e');
     } finally {
       isSpeakingNotifier.value = false;
-      isListeningNotifier.value = false;
+      if (stopListening) {
+        isListeningNotifier.value = false;
+      }
     }
   }
 
@@ -369,276 +468,266 @@ class VoiceAssistantService {
     }
   }
 
-  Future<String?> listenOnce() async {
-    // Immediate Barge-In: Halt any active speech playback before microphone opens
-    if (isSpeakingNotifier.value) {
-      await stopAudio();
+  Future<VoiceListenResult> listenOnce() async {
+    if (_listenSessionActive) {
+      return const VoiceListenResult(VoiceListenStatus.alreadyListening);
     }
-
-    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
-    if (!hasInternet) {
-      debugPrint('Voice assistant: listenOnce aborted because device is offline.');
-      return null;
-    }
-
-    final status = await Permission.microphone.request();
-    if (!status.isGranted) {
-      debugPrint('Speech recognition: microphone permission denied.');
-      return null;
-    }
-
-    bool hasPlayedStop = false;
 
     try {
-      await _flutterTts.stop();
-      isListeningNotifier.value = true;
-
-      final completer = Completer<String?>();
-      final StringBuffer accumulatedBuffer = StringBuffer();
-      String currentChunkWords = '';
-      Timer? silenceTimer;
-      Timer? initialSpeechTimeout;
-      bool isSessionActive = true;
-      bool hasSpoken = false;
-
-      void playStopEarconOnce() {
-        if (!hasPlayedStop) {
-          hasPlayedStop = true;
-          unawaited(AudioEarconService.instance.playMicStop());
-        }
+      final requestPermission = microphonePermissionOverride;
+      final permission = await (requestPermission == null
+          ? Permission.microphone.request()
+          : requestPermission());
+      if (!permission.isGranted) {
+        await _openSettings();
+        return const VoiceListenResult(VoiceListenStatus.permissionDenied);
       }
 
-      String getFinalTranscript() {
-        final bufferText = accumulatedBuffer.toString().trim();
-        final chunkText = currentChunkWords.trim();
-        if (bufferText.isEmpty) return chunkText;
-        if (chunkText.isEmpty) return bufferText;
-        return '$bufferText $chunkText'.trim();
+      if (!await _speechToText.hasPermission) {
+        await _openSettings();
+        return const VoiceListenResult(VoiceListenStatus.permissionDenied);
       }
 
-      void completeSession([String? overrideText]) {
-        if (!isSessionActive) return;
-        isSessionActive = false;
-        silenceTimer?.cancel();
-        initialSpeechTimeout?.cancel();
-        playStopEarconOnce();
-        if (!completer.isCompleted) {
-          final text = (overrideText ?? getFinalTranscript()).trim();
-          completer.complete(text.isNotEmpty ? text : null);
-        }
-      }
-
-      _activeCompleteWithText = completeSession;
-
-      final available = await _speechToText.initialize(
-        onError: (error) {
-          debugPrint(
-            'Speech recognition error: ${error.errorMsg} '
-            '(permanent=${error.permanent})',
+      final activeSpeech = _activeSpeechCompletion;
+      if (isSpeakingNotifier.value && activeSpeech != null) {
+        try {
+          await activeSpeech.future.timeout(
+            const Duration(seconds: 20),
+            onTimeout: () {},
           );
-          if (!isSessionActive || completer.isCompleted) return;
+        } catch (_) {}
+      }
+      await _flutterTts.stop();
+      _completeActiveSpeech();
+      await Future<void>.delayed(const Duration(milliseconds: 400));
 
-          final isTransient = !error.permanent ||
-              error.errorMsg == 'error_no_match' ||
-              error.errorMsg == 'error_speech_timeout' ||
-              error.errorMsg == 'error_retry';
-
-          if (isTransient) {
-            // Transient timeout or no match: do not abort mid-sentence!
-            if (hasSpoken && (silenceTimer?.isActive ?? false)) {
-              return;
-            } else if (!hasSpoken && (initialSpeechTimeout?.isActive ?? false)) {
-              return;
-            }
-          }
-
-          completeSession();
-        },
-        onStatus: (status) {
-          debugPrint('Speech recognition status: $status');
-          if (status == 'notListening' || status == 'done') {
-            if (!isSessionActive || completer.isCompleted) return;
-
-            // Commit any recognized words in this chunk to accumulated buffer
-            if (currentChunkWords.trim().isNotEmpty) {
-              accumulatedBuffer.write(' ${currentChunkWords.trim()}');
-              currentChunkWords = '';
-            }
-
-            if (hasSpoken) {
-              // If the silence timer is still counting down, restart recognition pass
-              // so subsequent phrases/words from the user are seamlessly captured.
-              if (silenceTimer?.isActive ?? false) {
-                Future.delayed(const Duration(milliseconds: 100), () {
-                  if (isSessionActive &&
-                      !completer.isCompleted &&
-                      !_speechToText.isListening) {
-                    _startListeningPass(
-                      locale: languageNotifier.value.ttsLanguageCode,
-                      isSessionActive: () => isSessionActive,
-                      onChunkResult: (words, isFinal) {
-                        currentChunkWords = words;
-                        if (words.trim().isNotEmpty) {
-                          hasSpoken = true;
-                          initialSpeechTimeout?.cancel();
-                          silenceTimer?.cancel();
-                          if (isFinal) {
-                            accumulatedBuffer.write(' ${words.trim()}');
-                            currentChunkWords = '';
-                          }
-                          silenceTimer = Timer(
-                            const Duration(milliseconds: 2200),
-                            () {
-                              debugPrint('Speech recognition: silence elapsed, completing.');
-                              completeSession();
-                            },
-                          );
-                        }
-                      },
-                    );
-                  }
-                });
-              } else {
-                completeSession();
-              }
-            } else {
-              // No speech detected yet in this pass: if initial timeout is still active, restart
-              if (initialSpeechTimeout?.isActive ?? false) {
-                Future.delayed(const Duration(milliseconds: 100), () {
-                  if (isSessionActive &&
-                      !completer.isCompleted &&
-                      !_speechToText.isListening) {
-                    _startListeningPass(
-                      locale: languageNotifier.value.ttsLanguageCode,
-                      isSessionActive: () => isSessionActive,
-                      onChunkResult: (words, isFinal) {
-                        currentChunkWords = words;
-                        if (words.trim().isNotEmpty) {
-                          hasSpoken = true;
-                          initialSpeechTimeout?.cancel();
-                          silenceTimer?.cancel();
-                          if (isFinal) {
-                            accumulatedBuffer.write(' ${words.trim()}');
-                            currentChunkWords = '';
-                          }
-                          silenceTimer = Timer(
-                            const Duration(milliseconds: 2200),
-                            () {
-                              debugPrint('Speech recognition: silence elapsed, completing.');
-                              completeSession();
-                            },
-                          );
-                        }
-                      },
-                    );
-                  }
-                });
-              } else {
-                completeSession();
-              }
-            }
-          }
-        },
-      );
-
+      final available = await (_speechInitialization ??= _initializeSpeech());
       if (!available) {
-        debugPrint('Speech recognition: engine unavailable.');
-        return null;
+        return const VoiceListenResult(VoiceListenStatus.unavailable);
       }
 
-      final locale = languageNotifier.value.ttsLanguageCode;
+      final locale = await _recognitionLocale();
+      _listenSessionActive = true;
+      isListeningNotifier.value = true;
+      liveTranscriptNotifier.value = '';
 
-      // Play distinct audio earcon chime and await its completion before opening the microphone,
-      // preventing chime audio from echoing into the mic and falsely triggering onEndOfSpeech.
-      await AudioEarconService.instance.playMicStart();
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      // Allow 7 seconds for the user to start speaking before timing out with no speech
-      initialSpeechTimeout = Timer(const Duration(seconds: 7), () {
-        if (!hasSpoken && isSessionActive) {
-          debugPrint('Speech recognition: 7s initial speech timeout expired.');
-          completeSession();
-        }
-      });
-
-      await _startListeningPass(
-        locale: locale,
-        isSessionActive: () => isSessionActive,
-        onChunkResult: (words, isFinal) {
-          currentChunkWords = words;
-          if (words.trim().isNotEmpty) {
-            hasSpoken = true;
-            initialSpeechTimeout?.cancel();
-            silenceTimer?.cancel();
-            if (isFinal) {
-              accumulatedBuffer.write(' ${words.trim()}');
-              currentChunkWords = '';
-            }
-            silenceTimer = Timer(const Duration(milliseconds: 2200), () {
-              debugPrint('Speech recognition: silence elapsed, completing.');
-              completeSession();
-            });
-          }
-        },
-      );
-
-      final transcript = await completer.future.timeout(
-        const Duration(seconds: 35),
-        onTimeout: () {
-          completeSession();
-          final t = getFinalTranscript();
-          return t.isEmpty ? null : t;
-        },
-      );
-
-      silenceTimer?.cancel();
-      initialSpeechTimeout.cancel();
-      playStopEarconOnce();
-      try {
-        await _speechToText.stop();
-      } catch (_) {}
-      return transcript;
+      var result = await _captureSpeechAttempt(locale);
+      if (result.status == VoiceListenStatus.noSpeech) {
+        liveTranscriptNotifier.value = '';
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        result = await _captureSpeechAttempt(locale);
+      }
+      return result;
     } catch (e) {
       debugPrint('Speech recognition failure: $e');
-      return null;
+      return const VoiceListenResult(VoiceListenStatus.unavailable);
     } finally {
       _activeCompleteWithText = null;
+      _completeCurrentListen = null;
+      _listenSessionActive = false;
+      isListeningNotifier.value = false;
+      liveTranscriptNotifier.value = '';
+    }
+  }
+
+  Future<bool> _initializeSpeech() => _speechToText.initialize(
+    onError: (error) {
+      if (kDebugMode) debugPrint('Speech recognition error: ${error.errorMsg}');
+      _completeCurrentListen?.call(error.errorMsg);
+    },
+    onStatus: (status) {
+      if (kDebugMode) debugPrint('Speech recognition status: $status');
+      if (status == 'notListening' || status == 'done') {
+        _completeCurrentListen?.call(null);
+      }
+    },
+  );
+
+  Future<void> _openSettings() async {
+    final openSettings = openAppSettingsOverride;
+    if (openSettings == null) {
+      await openAppSettings();
+    } else {
+      await openSettings();
+    }
+  }
+
+  Future<String> _recognitionLocale() async {
+    try {
+      final locales = await _speechToText.locales();
+      final normalized = locales.map((locale) {
+        return MapEntry(
+          locale.localeId,
+          locale.localeId.toLowerCase().replaceAll('-', '_'),
+        );
+      }).toList();
+      final preferredLanguage = languageNotifier.value == VoiceLang.tagalog
+          ? 'fil'
+          : 'en';
+      final preferences = preferredLanguage == 'fil'
+          ? ['fil_ph', 'fil', 'tl_ph', 'tl']
+          : ['en_us', 'en_ph', 'en_gb', 'en'];
+      for (final preferred in preferences) {
+        for (final locale in normalized) {
+          if (locale.value == preferred ||
+              (preferred == 'fil' && locale.value.startsWith('fil_')) ||
+              (preferred == 'tl' && locale.value.startsWith('tl_')) ||
+              (preferred == 'en' && locale.value.startsWith('en_'))) {
+            return locale.key;
+          }
+        }
+      }
+      final systemLocale = await _speechToText.systemLocale();
+      if (systemLocale != null) return systemLocale.localeId;
+    } catch (e) {
+      if (kDebugMode) debugPrint('Speech locale lookup failed: $e');
+    }
+    return WidgetsBinding.instance.platformDispatcher.locale
+        .toLanguageTag()
+        .replaceAll('-', '_');
+  }
+
+  Future<VoiceListenResult> _captureSpeechAttempt(String locale) async {
+    final completer = Completer<VoiceListenResult>();
+    var latestPartial = '';
+    var finalText = '';
+    Timer? silenceDebounce;
+    bool hasPlayedStop = false;
+
+    void playStopEarconOnce() {
       if (!hasPlayedStop) {
         hasPlayedStop = true;
         unawaited(AudioEarconService.instance.playMicStop());
       }
-      isListeningNotifier.value = false;
     }
-  }
 
-  Future<void> _startListeningPass({
-    required String locale,
-    required bool Function() isSessionActive,
-    required void Function(String words, bool isFinal) onChunkResult,
-  }) async {
-    if (!isSessionActive()) return;
+    void complete([String? errorCode]) {
+      silenceDebounce?.cancel();
+      if (completer.isCompleted) return;
+      playStopEarconOnce();
+      final transcript = resolveRecognizedText(latestPartial, finalText);
+      if (transcript.isNotEmpty) {
+        completer.complete(
+          VoiceListenResult(
+            VoiceListenStatus.recognized,
+            transcript: transcript,
+          ),
+        );
+      } else if (errorCode == 'error_no_match') {
+        completer.complete(
+          const VoiceListenResult(VoiceListenStatus.couldNotUnderstand),
+        );
+      } else if (errorCode == null || errorCode == 'error_speech_timeout') {
+        completer.complete(const VoiceListenResult(VoiceListenStatus.noSpeech));
+      } else {
+        completer.complete(
+          const VoiceListenResult(VoiceListenStatus.unavailable),
+        );
+      }
+    }
+
+    _completeCurrentListen = complete;
+    _activeCompleteWithText = () => complete();
+
     try {
+      await AudioEarconService.instance.playMicStart();
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
       await _speechToText.listen(
         onResult: (result) {
-          if (!isSessionActive()) return;
-          debugPrint(
-            'Speech recognition result: "${result.recognizedWords}" '
-            '(final=${result.finalResult})',
-          );
-          onChunkResult(result.recognizedWords, result.finalResult);
+          final words = result.recognizedWords.trim();
+          if (words.isNotEmpty) {
+            if (result.finalResult) {
+              finalText = words;
+            } else {
+              latestPartial = words;
+            }
+            liveTranscriptNotifier.value = words;
+          }
+          if (kDebugMode) {
+            debugPrint(
+              'Speech recognition result: "${result.recognizedWords}" (final=${result.finalResult})',
+            );
+          }
+          if (words.isNotEmpty) {
+            silenceDebounce?.cancel();
+            silenceDebounce = Timer(
+              const Duration(milliseconds: 2200),
+              complete,
+            );
+          }
+        },
+        onSoundLevelChange: (level) {
+          if (kDebugMode) debugPrint('Speech input level: $level');
         },
         listenOptions: SpeechListenOptions(
           listenMode: ListenMode.dictation,
           partialResults: true,
-          listenFor: const Duration(seconds: 45),
+          listenFor: const Duration(seconds: 35),
           pauseFor: const Duration(seconds: 4),
           localeId: locale,
         ),
       );
-    } catch (e) {
-      debugPrint('Error in _startListeningPass: $e');
+
+      final result = await completer.future.timeout(
+        const Duration(seconds: 35),
+        onTimeout: () {
+          complete();
+          return VoiceListenResult(
+            latestPartial.isEmpty && finalText.isEmpty
+                ? VoiceListenStatus.noSpeech
+                : VoiceListenStatus.recognized,
+            transcript: resolveRecognizedText(latestPartial, finalText),
+          );
+        },
+      );
+      playStopEarconOnce();
+      await _speechToText.stop();
+      return result;
+    } finally {
+      silenceDebounce?.cancel();
+      playStopEarconOnce();
+      _completeCurrentListen = null;
+      _activeCompleteWithText = null;
     }
   }
+
+  @visibleForTesting
+  static String resolveRecognizedText(String partialText, String finalText) {
+    final finalTrimmed = finalText.trim();
+    return finalTrimmed.isNotEmpty ? finalTrimmed : partialText.trim();
+  }
+
+  static String messageForListenStatus(
+    VoiceListenStatus status,
+    VoiceLang language,
+  ) {
+    final isTagalog = language == VoiceLang.tagalog;
+    return switch (status) {
+      VoiceListenStatus.permissionDenied =>
+        isTagalog
+            ? 'Kailangan ng pahintulot sa mikropono para gumamit ng voice assistant. I-enable ito sa settings ng app.'
+            : 'Microphone permission is needed to use voice commands. Please enable it in app settings.',
+      VoiceListenStatus.unavailable =>
+        isTagalog
+            ? 'Hindi available ang speech recognition sa device na ito.'
+            : 'Speech recognition is unavailable on this device.',
+      VoiceListenStatus.couldNotUnderstand =>
+        isTagalog
+            ? 'Hindi ko naintindihan ang sinabi mo. Pakisubukan muli.'
+            : 'I could not understand that. Please try again.',
+      VoiceListenStatus.noSpeech =>
+        isTagalog
+            ? 'Wala akong narinig. Subukan muli at magsalita pagkatapos i-tap ang mikropono.'
+            : "I didn't hear anything. Please try again and speak after tapping the microphone.",
+      VoiceListenStatus.alreadyListening =>
+        isTagalog
+            ? 'Nakikinig na ako. Sandali lang.'
+            : "I'm already listening. One moment.",
+      VoiceListenStatus.recognized => '',
+    };
+  }
+
 
   Future<void> announcePage(String pageKey) async {
     if (!isEnabled) return;
@@ -647,7 +736,9 @@ class VoiceAssistantService {
 
     final pageMap = _pageAnnouncements[pageKey];
     if (pageMap == null) return;
-    final text = pageMap[languageNotifier.value == VoiceLang.tagalog ? 'fil' : 'en'] ?? '';
+    final text =
+        pageMap[languageNotifier.value == VoiceLang.tagalog ? 'fil' : 'en'] ??
+        '';
     if (text.isEmpty) return;
 
     // Small delay ensures route push animation and observer didPush() stopAudio()
@@ -665,9 +756,6 @@ class VoiceAssistantService {
     String pageKey,
   ) async {
     if (!isEnabled) return;
-    final hasInternet = await SuccessFeedbackUtils.hasInternetConnection();
-    if (!hasInternet) return;
-
     final pageMap = _pageAnnouncements[pageKey];
     if (pageMap == null) return;
     final lang = languageNotifier.value == VoiceLang.tagalog ? 'fil' : 'en';
@@ -685,19 +773,19 @@ class VoiceAssistantService {
 class _VoiceNavigatorObserver extends NavigatorObserver {
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    VoiceAssistantService.instance.stopAudio();
+    VoiceAssistantService.instance.stopAudio(stopListening: false);
     super.didPush(route, previousRoute);
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    VoiceAssistantService.instance.stopAudio();
+    VoiceAssistantService.instance.stopAudio(stopListening: false);
     super.didPop(route, previousRoute);
   }
 
   @override
   void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
-    VoiceAssistantService.instance.stopAudio();
+    VoiceAssistantService.instance.stopAudio(stopListening: false);
     super.didReplace(newRoute: newRoute, oldRoute: oldRoute);
   }
 }

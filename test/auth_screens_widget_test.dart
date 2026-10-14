@@ -29,7 +29,15 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('Send Reset Link'), findsOneWidget);
-      expect(find.byIcon(Icons.arrow_back), findsOneWidget);
+      expect(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is Icon &&
+              (widget.icon == Icons.arrow_back ||
+                  widget.icon == Icons.arrow_back_rounded),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('shows validation error when email is submitted empty',

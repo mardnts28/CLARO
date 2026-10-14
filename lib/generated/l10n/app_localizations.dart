@@ -2303,13 +2303,13 @@ abstract class AppLocalizations {
   /// No description provided for @ofWhoLimit.
   ///
   /// In en, this message translates to:
-  /// **'of WHO reference'**
+  /// **'of Recommended Daily Intake'**
   String get ofWhoLimit;
 
   /// No description provided for @ofWhoFreeSugarReference.
   ///
   /// In en, this message translates to:
-  /// **'of WHO free-sugar reference'**
+  /// **'of Recommended Daily Intake for free sugars'**
   String get ofWhoFreeSugarReference;
 
   /// No description provided for @allergenDetectedBadge.
@@ -2417,7 +2417,7 @@ abstract class AppLocalizations {
   /// No description provided for @calculationFormula.
   ///
   /// In en, this message translates to:
-  /// **'Product amount per serving ÷ WHO reference × 100 = % of WHO reference'**
+  /// **'Product amount per serving ÷ Recommended Daily Intake × 100 = % of Recommended Daily Intake'**
   String get calculationFormula;
 
   /// No description provided for @howClaroExampleTitle.
@@ -2441,7 +2441,7 @@ abstract class AppLocalizations {
   /// No description provided for @whoReferenceLabel.
   ///
   /// In en, this message translates to:
-  /// **'WHO reference'**
+  /// **'Recommended Daily Intake'**
   String get whoReferenceLabel;
 
   /// No description provided for @whoFreeSugarReferenceLabel.

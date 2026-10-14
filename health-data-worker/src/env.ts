@@ -7,4 +7,5 @@ export interface Env {
   GCP_CLIENT_EMAIL: string;
   GCP_PRIVATE_KEY: string;
   FIREBASE_PROJECT_ID: string;
+  CORS_ALLOWED_ORIGINS?: string; // Comma-separated list of allowed origins
 }

@@ -667,9 +667,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         _rankingExplanation = detail.rankingExplanation;
         _advisoryLoading = false;
       });
-      // Verbal scan verdict: automatically speaks the health summary as soon
-      // as a single product is navigated to and evaluated.
-      _finishVoice();
+
+      // Debug: log advisory source
+      if (_advisory != null) {
+        debugPrint('Advisory source: ${_advisory!.source.name} (${_advisory!.isFallback ? "Fallback" : "AI Generated"})');
+      }
+
+      // If group checking is not active, announce voice verdict immediately.
+      // Otherwise _finishGroup() will announce the group verdict.
+      if (!_groupChecking) {
+        _finishVoice();
+      }
     }
   }
 
@@ -876,6 +884,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _evaluation = self.evaluation;
       _groupChecking = false;
     });
+    
+    // Debug: log group advisory source
+    debugPrint('Group advisory source: ${advisory.source.name} (${advisory.isFallback ? "Fallback" : "AI Generated"})');
     _groupOptionsTick.value++;
     _finishVoice();
 
@@ -920,6 +931,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _groupAdvisory = cached;
       _groupAdvisoryLoading = cached == null;
     });
+    
+    // Debug: log cached group advisory source
+    if (cached != null) {
+      debugPrint('Cached group advisory source: ${cached.source.name} (${cached.isFallback ? "Fallback" : "AI Generated"})');
+    }
     _groupOptionsTick.value++;
 
     final uid = _authService.currentUser?.uid;
@@ -1062,28 +1078,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             ),
                           ),
                           const SizedBox(width: 16),
-                          // Favorite button
-                          Semantics(
-                            button: true,
-                            label: _isFavorite
-                                ? 'Remove from favorites'
-                                : 'Add to favorites',
-                            child: GestureDetector(
-                              onTap: () {
-                                HapticService().vibrate();
-                                _toggleFavorite();
-                              },
-                              child: Icon(
-                                _isFavorite
-                                    ? Icons.favorite
-                                    : Icons.favorite_border,
-                                color: _isFavorite
-                                    ? const Color(0xFFD32F2F)
-                                    : colorScheme.onSurfaceVariant,
-                                size: 24,
+                          // Favorite button - hidden for guest users
+                          if (!GuestSession.isGuest.value)
+                            Semantics(
+                              button: true,
+                              label: _isFavorite
+                                  ? 'Remove from favorites'
+                                  : 'Add to favorites',
+                              child: GestureDetector(
+                                onTap: () {
+                                  HapticService().vibrate();
+                                  _toggleFavorite();
+                                },
+                                child: Icon(
+                                  _isFavorite
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: _isFavorite
+                                      ? const Color(0xFFD32F2F)
+                                      : colorScheme.onSurfaceVariant,
+                                  size: 24,
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),

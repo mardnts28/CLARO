@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
-import emailjs from '@emailjs/browser';
 import { User, Send, Mail } from 'lucide-react';
-import { EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, EMAILJS_PUBLIC_KEY, CONTACT_RECIPIENT_EMAIL } from '../config/emailConfig';
+import { GEMINI_PROXY_URL, APP_SHARED_SECRET, CONTACT_RECIPIENT_EMAIL } from '../config/emailConfig';
 import './Pages.css';
 
 export default function ContactUs() {
@@ -51,24 +50,47 @@ export default function ContactUs() {
     }
   ];
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formRef.current) return;
 
     setStatus('sending');
 
-    emailjs
-      .sendForm(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, formRef.current, {
-        publicKey: EMAILJS_PUBLIC_KEY,
-      })
-      .then(() => {
+    // Get form data
+    const formData = new FormData(formRef.current);
+    const fromName = formData.get('from_name');
+    const fromEmail = formData.get('from_email');
+    const message = formData.get('message');
+
+    try {
+      // Call Cloudflare Worker /email endpoint
+      const response = await fetch(`${GEMINI_PROXY_URL}/email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-App-Secret': APP_SHARED_SECRET,
+        },
+        body: JSON.stringify({
+          template_params: {
+            to_email: CONTACT_RECIPIENT_EMAIL,
+            from_name: fromName,
+            from_email: fromEmail,
+            message: message,
+          },
+        }),
+      });
+
+      if (response.ok) {
         setStatus('success');
         formRef.current.reset();
-      })
-      .catch((error) => {
-        console.error('EmailJS send error:', error);
+      } else {
+        console.error('Worker email error:', response.status, response.statusText);
         setStatus('error');
-      });
+      }
+    } catch (error) {
+      console.error('Network error:', error);
+      setStatus('error');
+    }
   };
 
   return (

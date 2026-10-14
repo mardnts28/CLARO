@@ -171,11 +171,6 @@
   line-height: 1.75;
 }
 
-/* Dark mode: Force dark text in light card */
-[data-theme="dark"] .step-description-card .step-description {
-  color: #000000;
-}
-
 /* Text inside light card should be dark */
 .step-description-card .step-description {
   color: var(--text-primary);
@@ -270,39 +265,59 @@
     -webkit-backdrop-filter: blur(3px);
   }
 
+  /* Use the full screen width instead of the 85% desktop container */
+  .how-claro-works-section.page-section > .container {
+    max-width: 100%;
+    padding: 0 1.25rem;
+  }
+
   .how-claro-works-title {
-    margin-bottom: 3rem;
+    margin-bottom: 2.5rem;
   }
 
   .steps-container {
     gap: 3rem;
   }
 
-  .step-row {
-    grid-template-columns: 1fr;
-    gap: 2rem;
+  /* FIX: .step-row.image-left / .image-right (2 classes) set
+     "1fr 1fr" and out-ranked the plain .step-row rule (1 class), so on
+     mobile the content stayed trapped in half of a 2-column grid.
+     Match their specificity so the grid becomes a single full-width column. */
+  .step-row,
+  .step-row.image-left,
+  .step-row.image-right {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 1.5rem;
     transform: translateY(30px);
   }
 
-  /* Stack vertically on mobile but preserve alternating structure */
+  .step-row.is-visible {
+    transform: translateY(0);
+  }
+
+  /* Stack vertically on mobile: image first, then text */
   .step-row.image-left .step-images,
   .step-row.image-right .step-images {
     grid-column: 1;
     order: 1;
+    width: 100%;
   }
 
   .step-row.image-left .step-content,
   .step-row.image-right .step-content {
     grid-column: 1;
     order: 2;
+    width: 100%;
+    min-width: 0;
   }
 
   .step-images {
     gap: 0.75rem;
+    justify-content: center;
   }
 
   .step-image {
-    max-height: 300px;
+    max-height: 460px;
   }
 
   .step-row.is-visible .step-image {
@@ -311,6 +326,11 @@
 
   .step-content {
     padding: 0;
+    align-items: stretch;
+  }
+
+  .step-description-card {
+    width: 100%;
   }
 
   .step-title {
@@ -319,6 +339,7 @@
 
   .step-description {
     font-size: 0.95rem;
+    line-height: 1.65;
   }
 }
 
@@ -329,7 +350,7 @@
   }
 
   .step-image {
-    max-height: 250px;
+    max-height: 420px;
     width: 100%;
   }
 

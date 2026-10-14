@@ -1,31 +1,30 @@
-// EmailJS configuration for the Contact Us form.
+// Email configuration for the Contact Us form.
 //
-// This project sends the contact form using an EXISTING EmailJS service and
-// template (per the "Use existing templates" requirement), so no template is
-// created here — you just need to plug in your account's IDs below.
+// This project now uses the Cloudflare Worker (claro-gemini-proxy) to send emails
+// securely, hiding EmailJS credentials server-side instead of exposing them in
+// the client-side JavaScript bundle.
 //
-// Where to find these values (https://dashboard.emailjs.com):
-//   1. VITE_EMAILJS_SERVICE_ID  -> Email Services tab, the Service ID of the
-//      connected email service (e.g. Gmail) you want the message sent from.
-//   2. VITE_EMAILJS_TEMPLATE_ID -> Email Templates tab, the ID of the existing
-//      template you want to reuse for the Contact Us message.
-//   3. VITE_EMAILJS_PUBLIC_KEY  -> Account > General, your Public Key.
+// The Worker handles:
+//   - EmailJS service ID, template ID, and private key (server-side only)
+//   - Authentication via APP_SHARED_SECRET
+//   - Rate limiting and abuse prevention
 //
-// Set these in a local .env file (see .env.example) so real keys are never
+// Set these in a local .env file (see .env.example) so real values are never
 // committed to the repo:
-//   VITE_EMAILJS_SERVICE_ID=your_service_id
-//   VITE_EMAILJS_TEMPLATE_ID=your_template_id
-//   VITE_EMAILJS_PUBLIC_KEY=your_public_key
+//   VITE_GEMINI_PROXY_URL=https://claro-gemini-proxy.claro-app.workers.dev
+//   VITE_APP_SHARED_SECRET=your_shared_secret
 //
-// IMPORTANT: Your existing EmailJS template must contain variables that match
-// the ones sent from the Contact Us form (see ContactUs.jsx):
-//   {{from_name}}, {{from_email}}, {{message}}, {{to_email}}
-// If your template uses different variable names, either rename the fields
-// sent in ContactUs.jsx's templateParams, or update the template in your
-// EmailJS dashboard to match.
-export const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || 'YOUR_SERVICE_ID';
-export const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || 'YOUR_TEMPLATE_ID';
-export const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || 'YOUR_PUBLIC_KEY';
+// The Worker's /email endpoint expects:
+//   template_params: {
+//     to_email: recipient email,
+//     passcode: (not used for contact form, but required by template),
+//     time: (not used for contact form, but required by template),
+//     from_name: sender name,
+//     from_email: sender email,
+//     message: message content
+//   }
+export const GEMINI_PROXY_URL = import.meta.env.VITE_GEMINI_PROXY_URL || 'https://claro-gemini-proxy.claro-app.workers.dev';
+export const APP_SHARED_SECRET = import.meta.env.VITE_APP_SHARED_SECRET || 'YOUR_APP_SHARED_SECRET';
 
 // Fixed recipient for all Contact Us submissions.
 export const CONTACT_RECIPIENT_EMAIL = 'mrasalucop01@tip.edu.ph';

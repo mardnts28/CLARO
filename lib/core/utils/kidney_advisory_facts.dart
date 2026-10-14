@@ -25,13 +25,13 @@ class KidneyAdvisoryFacts {
   /// The serving size (g) every per-serving figure below was computed for.
   final double servingSizeG;
 
-  /// Sodium per serving (mg), its % of the WHO daily reference amount, and
+  /// Sodium per serving (mg), its % of the Recommended Daily Intake, and
   /// its classification level at that serving size.
   final double sodiumMg;
   final double sodiumPercentage;
   final AdvisoryLevel sodiumLevel;
 
-  /// Protein per serving (g) and its % of the WHO daily reference amount
+  /// Protein per serving (g) and its % of the Recommended Daily Intake
   /// (~75 g/day, the upper bound of 10-15% of energy on 2,000 kcal).
   final double proteinG;
   final double proteinPercentage;

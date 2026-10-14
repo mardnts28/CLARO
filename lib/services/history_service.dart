@@ -109,7 +109,24 @@ class HistoryService {
     // Sort chronologically (latest first)
     final sorted = filtered.toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return sorted;
+
+    // Deduplicate scans: the same product scanned multiple times must show
+    // as a single card carrying only its latest scan time. The list is
+    // already sorted latest-first, so the first occurrence of each product
+    // is the one to keep. Comparison records are left untouched.
+    final seenProducts = <String>{};
+    final deduped = <HistoryItem>[];
+    for (final item in sorted) {
+      if (item.type == HistoryType.scan) {
+        final productId = item.productId;
+        final key = (productId != null && productId.isNotEmpty)
+            ? 'id:$productId'
+            : 'title:${item.title.trim().toLowerCase()}';
+        if (!seenProducts.add(key)) continue;
+      }
+      deduped.add(item);
+    }
+    return deduped;
   }
 
   /// Fire-and-forget by design (callers like camera_scanner_screen.dart

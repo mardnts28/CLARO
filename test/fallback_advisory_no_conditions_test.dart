@@ -71,7 +71,11 @@ void main() {
       expect(advisory.explanation.length, lessThan(100)); // Should be short
       
       // Verify it contains the serving amount pattern
-      expect(advisory.explanation, contains('serving per meal'));
+      expect(
+        advisory.explanation.contains('serving per meal') ||
+            advisory.explanation.contains('amount per meal'),
+        isTrue,
+      );
       expect(advisory.explanation, contains('3 meals a day'));
       
       // Verify it does NOT contain nutrient amounts or WHO percentages

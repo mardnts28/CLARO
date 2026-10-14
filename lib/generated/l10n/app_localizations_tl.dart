@@ -117,14 +117,14 @@ class AppLocalizationsTl extends AppLocalizations {
   String get fdaCardTitle => 'Paano Basahin ang Nutrition Label';
 
   @override
-  String get fdaCardSource => 'ng FDA';
+  String get fdaCardSource => 'ng Food and Drug Administration (FDA)';
 
   @override
   String get whoCardTitle =>
       'Gabay sa Pang-araw-araw na Limitasyon ng Sustansya';
 
   @override
-  String get whoCardSource => 'ng WHO';
+  String get whoCardSource => 'ng World Health Organization (WHO)';
 
   @override
   String get healthConditionsSubtitle =>
@@ -134,13 +134,13 @@ class AppLocalizationsTl extends AppLocalizations {
   String get kidneyCardTitle => 'Malusog na Pagkain para sa Sakit sa Bato';
 
   @override
-  String get kidneyCardSource => 'ng NIDDK';
+  String get kidneyCardSource => 'ng National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK)';
 
   @override
   String get gerdCardTitle => 'Pagkain, Diyeta, at Nutrisyon para sa GERD';
 
   @override
-  String get gerdCardSource => 'ng NIDDK';
+  String get gerdCardSource => 'ng National Institute of Diabetes and Digestive and Kidney Diseases (NIDDK)';
 
   @override
   String get healthGradeTitle => 'Sukat ng kalusugan ng pagkain';
@@ -1164,7 +1164,7 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String analysisBasisSubtitle(String servingSize) {
-    return 'Batay sa sanggunian ng WHO, bawat 1 serving ($servingSize)';
+    return 'Batay sa Healthy Diet Fact Sheet ng WHO, bawat 1 serving ($servingSize)';
   }
 
   @override
@@ -1257,7 +1257,7 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get calculationFormula =>
-      'Halaga ng produkto kada serving ÷ WHO reference × 100 = % ng WHO reference';
+      'Halaga ng produkto kada serving ÷ Recommended Daily Intake × 100 = % ng Recommended Daily Intake';
 
   @override
   String get howClaroExampleTitle => 'Halimbawa mula sa produktong ito';
@@ -1270,10 +1270,10 @@ class AppLocalizationsTl extends AppLocalizations {
   String get productAmountPerServingLabel => 'Halaga ng produkto';
 
   @override
-  String get whoReferenceLabel => 'WHO reference';
+  String get whoReferenceLabel => 'Recommended Daily Intake';
 
   @override
-  String get whoFreeSugarReferenceLabel => 'WHO reference para sa free sugars';
+  String get whoFreeSugarReferenceLabel => 'Recommended Daily Intake para sa free sugars';
 
   @override
   String get howClaroClassificationTitle => 'Paano ito ini-klasipika ng CLARO';

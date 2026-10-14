@@ -1,13 +1,71 @@
-import { useState } from 'react';
-import { Camera, BarChart2, GitCompare, Mic, ChevronDown, ChevronUp, PackageSearch, ClipboardList } from 'lucide-react';
+import { useState, useRef, useCallback } from 'react';
+import { Camera, BarChart2, GitCompare, Mic, ChevronDown, ChevronUp, PackageSearch, ClipboardList, Play, Pause } from 'lucide-react';
 import './Pages.css';
+
+const VideoPlayer = ({ videoId, src, className, isPlaying, onTogglePlay }) => {
+  const videoRef = useRef(null);
+  const [hasEnded, setHasEnded] = useState(false);
+
+  const handlePlay = useCallback(() => {
+    setHasEnded(false);
+    onTogglePlay(videoId, true);
+  }, [videoId, onTogglePlay]);
+
+  const handlePause = useCallback(() => {
+    onTogglePlay(videoId, false);
+  }, [videoId, onTogglePlay]);
+
+  const handleEnded = useCallback(() => {
+    setHasEnded(true);
+    onTogglePlay(videoId, false);
+  }, [videoId, onTogglePlay]);
+
+  const handleClick = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      if (video.paused || hasEnded) {
+        video.play();
+      } else {
+        video.pause();
+      }
+    }
+  }, [hasEnded]);
+
+  return (
+    <div className={`guide-video-container ${className || ''}`}>
+      <video
+        ref={videoRef}
+        src={src}
+        className="guide-video"
+        playsInline
+        muted
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onEnded={handleEnded}
+        onClick={handleClick}
+      />
+      <button
+        className={`guide-video-play-button ${isPlaying && !hasEnded ? 'hidden' : ''}`}
+        onClick={handleClick}
+        aria-label={isPlaying ? 'Pause video' : 'Play video'}
+      >
+        {isPlaying && !hasEnded ? <Pause size={32} /> : <Play size={32} />}
+      </button>
+    </div>
+  );
+};
 
 export default function UserGuide() {
   const [expandedCard, setExpandedCard] = useState(null);
+  const [playingVideos, setPlayingVideos] = useState({});
 
   const toggleCard = (cardId) => {
     setExpandedCard(expandedCard === cardId ? null : cardId);
   };
+
+  const handleVideoPlayState = useCallback((videoId, isPlaying) => {
+    setPlayingVideos(prev => ({ ...prev, [videoId]: isPlaying }));
+  }, []);
 
   // Products currently supported by the CLARO recognition model, as of September 21, 2026.
   // Product data sourced from Ever Plus Superstore Inc., Dela Fuente St., Sampaloc, Manila
@@ -102,6 +160,7 @@ export default function UserGuide() {
       id: 1,
       title: 'How to Scan',
       icon: <Camera size={24} />,
+      video: 'https://res.cloudinary.com/dn64fatsy/video/upload/v1791801070/single_scan_imcezh.mp4',
       content: (
         <div className="guide-content">
           <h4>How to Scan</h4>
@@ -208,8 +267,15 @@ export default function UserGuide() {
       content: (
         <div className="guide-content">
           <h4>How to Compare Products</h4>
-          
+
           <div className="comparison-section">
+            <VideoPlayer
+              videoId="single-comparison"
+              src="https://res.cloudinary.com/dn64fatsy/video/upload/v1791801041/compare_uhndvm.mp4"
+              className="guide-section-video"
+              isPlaying={playingVideos['single-comparison'] || false}
+              onTogglePlay={handleVideoPlayState}
+            />
             <h5>Single Product Comparison</h5>
             <ol>
               <li>After scanning a product, tap the "Compare" button.</li>
@@ -220,10 +286,17 @@ export default function UserGuide() {
           </div>
 
           <div className="comparison-section">
+            <VideoPlayer
+              videoId="multi-comparison"
+              src="https://res.cloudinary.com/dn64fatsy/video/upload/v1791801292/multi_scan_cpfcj4.mp4"
+              className="guide-section-video"
+              isPlaying={playingVideos['multi-comparison'] || false}
+              onTogglePlay={handleVideoPlayState}
+            />
             <h5>Multi-Scan Comparison</h5>
             <ol>
               <li>Enable multi-scan mode in the camera screen.</li>
-              <li>Scan multiple products, up to 5, in one session.</li>
+              <li>Scan multiple products, up to 3, in one session.</li>
               <li>Tap "Compare Results" after scanning.</li>
               <li>View the side-by-side ranking with personalized recommendations.</li>
               <li>The app highlights the best choice for your specific health conditions.</li>
@@ -330,6 +403,7 @@ export default function UserGuide() {
       id: 5,
       title: 'What to Do if Product is Unrecognized?',
       icon: <PackageSearch size={24} />,
+      video: 'https://res.cloudinary.com/dn64fatsy/video/upload/v1791801078/report_uy3wyy.mp4',
       content: (
         <div className="guide-content">
           <h4>What to Do if Product is Unrecognized?</h4>
@@ -414,8 +488,8 @@ export default function UserGuide() {
         {/* User Guide Cards - Single Column Vertical List */}
         <div className="guide-cards-vertical">
           {guideCards.map((card) => (
-            <div 
-              key={card.id} 
+            <div
+              key={card.id}
               className={`guide-card ${expandedCard === card.id ? 'expanded' : ''}`}
             >
               <div className="guide-card-header">
@@ -435,6 +509,15 @@ export default function UserGuide() {
               </div>
               {expandedCard === card.id && (
                 <div className="guide-card-body">
+                  {card.video && (
+                    <VideoPlayer
+                      videoId={`video-${card.id}`}
+                      src={card.video}
+                      className="guide-card-video"
+                      isPlaying={playingVideos[`video-${card.id}`] || false}
+                      onTogglePlay={handleVideoPlayState}
+                    />
+                  )}
                   {card.content}
                 </div>
               )}

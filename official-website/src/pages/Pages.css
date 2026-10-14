@@ -468,6 +468,76 @@
   animation: slideDown 0.3s ease-out;
 }
 
+/* Video Styles */
+.guide-video-container {
+  position: relative;
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto 1.5rem auto;
+  background-color: #000;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.guide-card-video {
+  margin-bottom: 1.5rem;
+}
+
+.guide-section-video {
+  margin-bottom: 1rem;
+  max-width: 400px;
+}
+
+.guide-video {
+  width: 100%;
+  height: auto;
+  max-height: 500px;
+  display: block;
+  cursor: pointer;
+  object-fit: contain;
+}
+
+.guide-video-play-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: rgba(139, 26, 26, 0.9);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  z-index: 10;
+  opacity: 1;
+}
+
+.guide-video-play-button.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.guide-video-container:hover .guide-video-play-button {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.guide-video:hover + .guide-video-play-button,
+.guide-video-play-button:hover {
+  background-color: rgba(139, 26, 26, 1);
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.guide-video-play-button:focus-visible {
+  outline: 2px solid var(--primary-red-glow);
+  outline-offset: 2px;
+}
+
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -638,6 +708,19 @@
 
   .guide-content h4 {
     font-size: 1.2rem;
+  }
+
+  .guide-video-container {
+    max-width: 100%;
+  }
+
+  .guide-video {
+    max-height: 400px;
+  }
+
+  .guide-video-play-button {
+    width: 56px;
+    height: 56px;
   }
 
   .additional-help-section {

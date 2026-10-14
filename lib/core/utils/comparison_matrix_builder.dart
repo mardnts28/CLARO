@@ -74,7 +74,7 @@ class ComparisonMatrixBuilder {
       final ComparisonHighlight highlight;
       if (level != null) {
         // Absolute basis available (sodium+hypertension or sugar+diabetes):
-        // color reflects actual WHO/FDA safety, NOT relative rank within
+        // color reflects actual Recommended Daily Intake/FDA safety, NOT relative rank within
         // this specific comparison set. Fixes the case where three products
         // are 700mg/600mg/500mg sodium -- all three are Caution-level per
         // Table 3.14, so all three should read red, not "500mg = green"

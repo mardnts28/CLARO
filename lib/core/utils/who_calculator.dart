@@ -13,7 +13,7 @@ import 'kidney_nutrient_detector.dart';
 import 'nutrition_availability.dart';
 
 class WhoCalculator {
-  // Classify nutrient based on WHO daily limit percentage per serving
+  // Classify nutrient based on Recommended Daily Intake percentage per serving
   // Suitable: ≤10%, Moderate: >10-20%, Caution: >20%
   static AdvisoryLevel classifyByWhoPercentage(double whoPercentage) {
     if (whoPercentage <= 5) return AdvisoryLevel.suitable;
@@ -355,13 +355,13 @@ class WhoCalculator {
         // Calculate per-serving value
         final valuePerServing = (valuePer100g / 100) * product.servingSizeG;
 
-        // Get WHO daily limit for this nutrient
+        // Get Recommended Daily Intake for this nutrient
         final whoDailyLimit = getWhoDailyLimit(key);
 
-        // Calculate percentage of WHO daily limit per serving
+        // Calculate percentage of Recommended Daily Intake per serving
         final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
 
-        // Classify based on WHO percentage, per serving -- this is the
+        // Classify based on Recommended Daily Intake percentage, per serving -- this is the
         // health advisory basis: what a person actually eats in one
         // sitting is what should drive the advisory text/warning level
         // for a single product.
@@ -535,7 +535,7 @@ class WhoCalculator {
       case 'saturatedFatG':
         return WhoDailyLimits.saturatedFatGPerDay;
       default:
-        throw ArgumentError('No WHO daily limit defined for $nutrientKey');
+        throw ArgumentError('No Recommended Daily Intake defined for $nutrientKey');
     }
   }
 
