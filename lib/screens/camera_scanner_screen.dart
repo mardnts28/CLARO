@@ -598,6 +598,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       setState(() {
         _hasTappedToScan = false;
         _isProcessing = false;
+        _qualityWarning = null;
         _liveDetections = [];
         _isProductInGuide = false;
       });
@@ -617,8 +618,8 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       _qualityWarning = null;
     });
 
-    // Safety timer: 8.0s timeout to reset UI in case hardware capture stalls
-    Timer? safetyTimer = Timer(const Duration(milliseconds: 8000), () {
+    // Safety timer: 15.0s timeout to reset UI in case hardware capture stalls
+    Timer? safetyTimer = Timer(const Duration(milliseconds: 15000), () {
       if (mounted && _isProcessing) {
         _handleScanTimeout();
       }
@@ -687,6 +688,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         setState(() {
           _liveDetections = detections;
           _isProductInGuide = true;
+          _qualityWarning = null;
         });
         HapticService().vibrate();
         AudioEarconService.instance.playProductRecognized();
@@ -746,6 +748,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
     setState(() {
       _isProcessing = false;
       _hasTappedToScan = false;
+      _qualityWarning = null;
     });
 
     if (detections.isNotEmpty) {
@@ -817,6 +820,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 _isScreenActive = true;
                 _hasTappedToScan = false;
                 _isProcessing = false;
+                _qualityWarning = null;
                 _liveDetections = [];
                 _isProductInGuide = false;
                 _isFlashOn = false;
@@ -851,6 +855,7 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
                 _isScreenActive = true;
                 _hasTappedToScan = false;
                 _isProcessing = false;
+                _qualityWarning = null;
                 _liveDetections = [];
                 _isProductInGuide = false;
                 _isFlashOn = false;
