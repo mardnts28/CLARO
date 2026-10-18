@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../generated/l10n/app_localizations.dart';
 import '../services/auth_service.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../services/haptic_service.dart';
@@ -44,7 +43,8 @@ class OtpVerificationScreen extends StatefulWidget {
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   final _authService = AuthService();
-  final _otpController = TextEditingController();
+  final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
+  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isVerifying = false;
   bool _isResending = false;
   int _remainingSeconds = 180;
@@ -60,13 +60,34 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (widget.emailSent) {
       _startTimer();
     }
+    // Add listener to auto-submit when all 6 digits are entered
+    for (int i = 0; i < 6; i++) {
+      _otpControllers[i].addListener(_checkAutoSubmit);
+    }
+    // Check if initial OTP is pre-filled and auto-submit
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAutoSubmit();
+    });
   }
 
   @override
   void dispose() {
-    _otpController.dispose();
+    for (final controller in _otpControllers) {
+      controller.removeListener(_checkAutoSubmit);
+      controller.dispose();
+    }
+    for (final focusNode in _focusNodes) {
+      focusNode.dispose();
+    }
     _timer?.cancel();
     super.dispose();
+  }
+
+  void _checkAutoSubmit() {
+    final allFilled = _otpControllers.every((c) => c.text.isNotEmpty);
+    if (allFilled && !_isVerifying) {
+      _verifyOtp();
+    }
   }
 
   void _startTimer() {
@@ -107,7 +128,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   Future<void> _verifyOtp() async {
     HapticService().vibrate();
-    final code = _otpController.text.trim();
+    final code = _otpControllers.map((c) => c.text).join();
     if (code.length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Enter the 6-digit verification code.')),
@@ -170,7 +191,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   Future<void> _resendCode() async {
     HapticService().vibrate();
-    if (_isResending || _remainingSeconds > 0) return;
+    if (_isResending || _resendCooldownSeconds > 0) return;
     if (!mounted) return;
     setState(() => _isResending = true);
     try {
@@ -199,6 +220,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       }
       final resendEmailSent = otpData['emailSent'] == true;
       if (resendEmailSent) {
+        // Clear existing OTP digits when resending
+        for (final controller in _otpControllers) {
+          controller.clear();
+        }
         // Update expiry time if provided
         if (otpData['expiresAt'] != null) {
           _currentExpiresAt = (otpData['expiresAt'] as DateTime);
@@ -383,34 +408,82 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                           ),
                         ),
                       const SizedBox(height: 24),
-                      TextField(
-                        controller: _otpController,
-                        style: TextStyle(color: colorScheme.onSurface),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(6),
-                        ],
-                        keyboardType: TextInputType.number,
-                        textAlign: TextAlign.center,
-                        decoration: InputDecoration(
-                          hintText: AppLocalizations.of(
-                            context,
-                          )!.enterDigitCode,
-                          hintStyle: TextStyle(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: colorScheme.outlineVariant,
+                      // 6-digit OTP input boxes (matching admin dashboard UI)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: List.generate(6, (index) {
+                          return Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.only(right: index < 5 ? 8 : 0),
+                              child: TextField(
+                                controller: _otpControllers[index],
+                                focusNode: _focusNodes[index],
+                                style: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 4,
+                                ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(1),
+                                ],
+                                keyboardType: TextInputType.number,
+                                textAlign: TextAlign.center,
+                                decoration: InputDecoration(
+                                  hintText: '•',
+                                  hintStyle: TextStyle(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 20,
+                                    letterSpacing: 4,
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                  isDense: true,
+                                  enabledBorder: OutlineInputBorder(
+                                    borderSide: BorderSide(
+                                      color: colorScheme.outlineVariant,
+                                      width: 1.5,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderSide: BorderSide(
+                                      color: colorScheme.primary,
+                                      width: 2,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  border: OutlineInputBorder(
+                                    borderSide: BorderSide(
+                                      color: colorScheme.outlineVariant,
+                                      width: 1.5,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                onChanged: (value) {
+                                  if (value.isNotEmpty && index < 5) {
+                                    _focusNodes[index].unfocus();
+                                    FocusScope.of(context).requestFocus(_focusNodes[index + 1]);
+                                  }
+                                },
+                                onTap: () {
+                                  // When tapping an empty box, go to the first filled box
+                                  if (_otpControllers[index].text.isEmpty) {
+                                    for (int i = index - 1; i >= 0; i--) {
+                                      if (_otpControllers[i].text.isNotEmpty) {
+                                        _focusNodes[i].requestFocus();
+                                        return;
+                                      }
+                                    }
+                                  }
+                                },
+                              ),
                             ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(color: colorScheme.primary),
-                          ),
-                          border: const OutlineInputBorder(),
-                        ),
+                          );
+                        }),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -432,37 +505,35 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _resendCooldownSeconds > 0
-                                ? Colors.grey.shade400
-                                : Colors.red,
-                            foregroundColor: Colors.white,
-                            disabledBackgroundColor: Colors.grey.shade400,
-                          ),
-                          onPressed: _isResending || _resendCooldownSeconds > 0
-                              ? null
-                              : _resendCode,
-                          child: _isResending
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : Text(
-                                  _resendCooldownSeconds > 0
-                                      ? 'Resend Code in ${_formatTime(_resendCooldownSeconds)}'
-                                      : 'Resend Code',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                      TextButton(
+                        onPressed: _isResending || _resendCooldownSeconds > 0
+                            ? null
+                            : _resendCode,
+                        style: TextButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
+                        child: _isResending
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF8B1A1A),
+                                ),
+                              )
+                            : Text(
+                                _resendCooldownSeconds > 0
+                                    ? 'Resend Code in ${_formatTime(_resendCooldownSeconds)}'
+                                    : 'Resend Code',
+                                style: TextStyle(
+                                  color: _resendCooldownSeconds > 0
+                                      ? Colors.grey.shade400
+                                      : const Color(0xFF8B1A1A),
+                                  fontSize: 13,
+                                ),
+                              ),
                       ),
                       const SizedBox(height: 12),
                       Text(

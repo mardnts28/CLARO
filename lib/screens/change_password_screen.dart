@@ -30,6 +30,24 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   String? _newPasswordError;
   String? _confirmPasswordError;
 
+  // Password requirements (same as signup screen)
+  final List<Map<String, dynamic>> _passwordRequirements = [
+    {'label': 'At least 8 characters', 'test': (v) => v.length >= 8},
+    {'label': 'One uppercase letter', 'test': (v) => RegExp(r'[A-Z]').hasMatch(v)},
+    {'label': 'One lowercase letter', 'test': (v) => RegExp(r'[a-z]').hasMatch(v)},
+    {'label': 'One number', 'test': (v) => RegExp(r'[0-9]').hasMatch(v)},
+    {'label': 'One special character (!@#\$%^&* etc.)', 'test': (v) => RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(v)},
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Add listener to new password controller to update requirements panel in real-time
+    _newPasswordController.addListener(() {
+      setState(() {});
+    });
+  }
+
   Future<void> _handleChangePassword() async {
     HapticService().vibrate();
     final currentPassword = _currentPasswordController.text.trim();
@@ -168,7 +186,8 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
             children: [
               _buildHeader(theme, loc),
               const SizedBox(height: 24),
-              _buildDescriptionBox(theme, loc),
+              // Password requirements panel (always visible)
+              _buildPasswordRequirementsPanel(theme),
               const SizedBox(height: 24),
               _buildPasswordField(
                 controller: _currentPasswordController,
@@ -262,20 +281,6 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
-  Widget _buildDescriptionBox(ThemeData theme, AppLocalizations loc) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        loc.passwordRequirements,
-        style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface, height: 1.6),
-      ),
-    );
-  }
-
   Widget _buildPasswordField({
     required TextEditingController controller,
     required String hint,
@@ -298,6 +303,43 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           color: theme.colorScheme.onSurfaceVariant,
         ),
         onPressed: onToggle,
+      ),
+    );
+  }
+
+  Widget _buildPasswordRequirementsPanel(ThemeData theme) {
+    final password = _newPasswordController.text;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withAlpha(60),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: _passwordRequirements.map((req) {
+          final isMet = req['test'](password) as bool;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                Icon(
+                  isMet ? Icons.check_circle : Icons.circle_outlined,
+                  size: 16,
+                  color: isMet ? Colors.green : theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  req['label'] as String,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isMet ? Colors.green : theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
       ),
     );
   }
