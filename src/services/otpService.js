@@ -1,14 +1,12 @@
 import { doc, setDoc, getDoc, deleteDoc, Timestamp } from "firebase/firestore";
 import { db } from "../firebase/firebase";
-import emailjs from "@emailjs/browser";
 
 export const OTP_EXPIRY_MINUTES = 5;
 const MAX_ATTEMPTS = 5;
 
-// EmailJS config — from environment variables
-const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
+// Cloudflare Worker config for email routing
+const WORKER_URL = import.meta.env.VITE_GEMINI_PROXY_URL;
+const APP_SHARED_SECRET = import.meta.env.VITE_APP_SHARED_SECRET;
 
 function generateOTP() {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -34,18 +32,37 @@ export async function generateAndSendOTP(uid, email) {
   }
 
   try {
-    await emailjs.send(
-      EMAILJS_SERVICE_ID,
-      EMAILJS_TEMPLATE_ID,
-      {
-        to_email: email,
-        otp_code: otp,
+    // Format expiry time for email (12-hour format, e.g., 7:18 PM)
+    const expiryTime = expiresAt.toDate().toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    const response = await fetch(`${WORKER_URL}/email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-App-Secret': APP_SHARED_SECRET,
       },
-      EMAILJS_PUBLIC_KEY
-    );
-    console.log("✅ Email sent successfully");
+      body: JSON.stringify({
+        template_params: {
+          to_email: email,
+          passcode: otp,
+          time: expiryTime,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Worker email failed: ${response.status} - ${errorText}`);
+      throw new Error(`Failed to send OTP: ${response.status} - ${errorText}`);
+    }
+
+    console.log("✅ Email sent successfully via Worker");
   } catch (err) {
-    console.error("❌ EMAILJS SEND FAILED:", err);
+    console.error("❌ EMAIL SEND FAILED:", err);
     throw err;
   }
 

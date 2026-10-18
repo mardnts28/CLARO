@@ -38,9 +38,6 @@ services:
     # - VITE_GEMINI_MODEL (e.g., gemini-3.5-flash)
     # - VITE_CLOUDINARY_CLOUD_NAME
     # - VITE_CLOUDINARY_UPLOAD_PRESET
-    # - VITE_EMAILJS_SERVICE_ID
-    # - VITE_EMAILJS_TEMPLATE_ID
-    # - VITE_EMAILJS_PUBLIC_KEY
     
     # Auto-deploy on push to M9 branch (this is the branch where
     # admin-claro's files live at the repo root; on merged-works,

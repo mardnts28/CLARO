@@ -52,10 +52,12 @@ The application requires the following environment variables to be set in `.env`
 - `VITE_FIREBASE_APP_ID` - Firebase app ID
 - `VITE_FIREBASE_MEASUREMENT_ID` - Firebase measurement ID (optional)
 
-### EmailJS Configuration
-- `VITE_EMAILJS_SERVICE_ID` - EmailJS service ID
-- `VITE_EMAILJS_TEMPLATE_ID` - EmailJS template ID for OTP emails
-- `VITE_EMAILJS_PUBLIC_KEY` - EmailJS public key
+### Cloudflare Worker (Gemini Proxy)
+- `VITE_GEMINI_PROXY_URL` - Your Cloudflare Worker URL for Gemini API proxy (also handles OTP emails)
+- `VITE_APP_SHARED_SECRET` - Shared secret for authenticating with the Cloudflare Worker
+- `VITE_GEMINI_MODEL` - Gemini model to use (default: `gemini-3.5-flash`)
+
+**Note:** EmailJS credentials are now configured in the Cloudflare Worker (not in the admin dashboard). The Worker handles all email sending with both public and private EmailJS keys.
 
 ### Cloudflare Worker (Gemini Proxy)
 - `VITE_GEMINI_PROXY_URL` - Your Cloudflare Worker URL for Gemini API proxy
@@ -109,9 +111,6 @@ The application is configured for deployment on Render using the provided `rende
    VITE_GEMINI_MODEL=gemini-3.5-flash
    VITE_CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
    VITE_CLOUDINARY_UPLOAD_PRESET=your_cloudinary_upload_preset
-   VITE_EMAILJS_SERVICE_ID=your_emailjs_service_id
-   VITE_EMAILJS_TEMPLATE_ID=your_emailjs_template_id
-   VITE_EMAILJS_PUBLIC_KEY=your_emailjs_public_key
    ```
 
 4. **Deploy:**
