@@ -64,6 +64,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   List<ReportModel> _reports = [];
   bool _reportsLoading = true;
 
+  // Pending reports (offline queued)
+  List<Map<String, dynamic>> _pendingReports = [];
+  bool _pendingReportsLoading = true;
+
   Timer? _searchDebounce;
 
   @override
@@ -85,8 +89,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
     _subscribeFavorites();
     _subscribeReports();
+    _loadPendingReports();
     // Listen for language changes to refresh the UI with localized labels
     LocaleService.localeNotifier.addListener(_onLocaleChanged);
+    // Listen for pending reports count changes (sync updates)
+    BackendLocator.pendingReportsService.pendingCountNotifier.addListener(_onPendingReportsChanged);
   }
 
   void _handleSubTabChange() {
@@ -103,6 +110,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
   void _onLocaleChanged() {
     if (mounted) {
       setState(() {}); // Force rebuild to update localized labels
+    }
+  }
+
+  void _onPendingReportsChanged() {
+    if (mounted) {
+      _loadPendingReports();
+    }
+  }
+
+  Future<void> _loadPendingReports() async {
+    try {
+      final pending = await BackendLocator.pendingReportsService.getPendingReports();
+      if (mounted) {
+        setState(() {
+          _pendingReports = pending;
+          _pendingReportsLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('HistoryScreen: error loading pending reports: $e');
+      if (mounted) {
+        setState(() => _pendingReportsLoading = false);
+      }
     }
   }
 
@@ -140,6 +170,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     HomeTabController.tabNotifier.removeListener(_handleTabChange);
     HomeTabController.historySubTabNotifier.removeListener(_handleSubTabChange);
     LocaleService.localeNotifier.removeListener(_onLocaleChanged);
+    BackendLocator.pendingReportsService.pendingCountNotifier.removeListener(_onPendingReportsChanged);
     _subscription?.cancel();
     _favoritesSubscription?.cancel();
     _reportsSubscription?.cancel();
@@ -295,7 +326,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   // ── Group reports by date label ──────────────
-  Map<String, List<ReportModel>> _groupReports(List<ReportModel> reports) {
+  Map<String, List<dynamic>> _groupReports(List<ReportModel> reports, List<Map<String, dynamic>> pendingReports) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
@@ -303,12 +334,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final loc = AppLocalizations.of(context)!;
 
-    final Map<String, List<ReportModel>> grouped = {
+    final Map<String, List<dynamic>> grouped = {
+      'Pending Sync': [], // New group for offline queued reports
       loc.historyToday: [],
       loc.historyYesterday: [],
       loc.historyLastWeek: [],
       loc.historyLastMonth: [],
     };
+
+    // Add pending reports to "Pending Sync" group
+    for (final pending in pendingReports) {
+      grouped['Pending Sync']!.add(pending);
+    }
 
     for (final report in reports) {
       final d = DateTime(report.dateSubmitted.year, report.dateSubmitted.month,
@@ -711,6 +748,113 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  Widget _buildPendingReportCard(Map<String, dynamic> pendingReport) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final productName = pendingReport['productName'] as String? ?? 'Unknown Product';
+    final category = pendingReport['category'] as String? ?? 'others';
+    final queuedAt = pendingReport['queuedAt'] as String?;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: _softShadows(),
+        border: Border.all(
+          color: Colors.orange.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  productName,
+                  style: GoogleFonts.outfit(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.onSurface),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.sync_rounded, size: 12, color: Colors.orange[800]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Pending',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.orange[800],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Category: $category',
+            style: GoogleFonts.inter(
+                fontSize: 13, color: colorScheme.onSurfaceVariant),
+          ),
+          if (queuedAt != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Queued: ${_formatQueuedTime(queuedAt)}',
+              style: GoogleFonts.inter(
+                  fontSize: 12, color: colorScheme.onSurfaceVariant),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded,
+                  size: 14, color: colorScheme.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  'Will sync when internet is available',
+                  style: GoogleFonts.inter(
+                      fontSize: 12, color: colorScheme.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatQueuedTime(String isoString) {
+    try {
+      final dt = DateTime.parse(isoString);
+      final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+      final minute = dt.minute.toString().padLeft(2, '0');
+      final period = dt.hour >= 12 ? 'pm' : 'am';
+      return '$hour:$minute $period';
+    } catch (e) {
+      return isoString;
+    }
+  }
+
   Widget _buildReportCard(ReportModel report) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -941,7 +1085,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             filter: _activeTab, searchQuery: _searchQuery);
     final grouped = _groupItems(items);
 
-    final groupedReportsMap = _groupReports(_reports);
+    final groupedReportsMap = _groupReports(_reports, _pendingReports);
     final flattenedReports = <dynamic>[];
     for (final entry in groupedReportsMap.entries) {
       flattenedReports.add(entry.key);
@@ -1209,6 +1353,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                 );
                               } else if (item is ReportModel) {
                                 return _buildReportCard(item);
+                              } else if (item is Map<String, dynamic>) {
+                                return _buildPendingReportCard(item);
                               }
                               return const SizedBox.shrink();
                             },

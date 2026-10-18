@@ -19,6 +19,20 @@ class PendingReportsService {
     _initCount();
   }
 
+  /// Get all pending reports for display in UI.
+  Future<List<Map<String, dynamic>>> getPendingReports() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_storageKey) ?? [];
+    return list.map((raw) {
+      try {
+        return jsonDecode(raw) as Map<String, dynamic>;
+      } catch (e) {
+        debugPrint('PendingReportsService: error decoding pending report: $e');
+        return <String, dynamic>{};
+      }
+    }).where((map) => map.isNotEmpty).toList();
+  }
+
   Future<void> _initCount() async {
     try {
       final prefs = await SharedPreferences.getInstance();

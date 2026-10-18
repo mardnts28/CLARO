@@ -7,25 +7,33 @@
   background-position: center;
   background-repeat: no-repeat;
   position: relative;
+  isolation: isolate; /* keeps the overlay contained to this section */
 }
 
-/* Add overlay for readability */
+/* Add blur to background image (same as hero section) */
 .how-claro-works-section.page-section::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  inset: 0;
+  background: inherit;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(8px);
+  z-index: 0;
+}
+
+.how-claro-works-section.page-section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55); /* dark overlay */
   z-index: 0;
 }
 
 .how-claro-works-section.page-section > .container {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 /* Update text colors for dark background */
@@ -188,8 +196,7 @@
   }
 
   .how-claro-works-section.page-section::before {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
+    filter: none;
   }
 
   .step-description-card {
@@ -217,9 +224,11 @@
   }
 
   .how-claro-works-section.page-section::before {
+    filter: blur(4px);
+  }
+
+  .how-claro-works-section.page-section::after {
     background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
   }
 
   .how-claro-works-title {
@@ -260,9 +269,11 @@
   }
 
   .how-claro-works-section.page-section::before {
+    filter: blur(3px);
+  }
+
+  .how-claro-works-section.page-section::after {
     background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
   }
 
   /* Use the full screen width instead of the 85% desktop container */
@@ -355,9 +366,11 @@
   }
 
   .how-claro-works-section.page-section::before {
+    filter: blur(2px);
+  }
+
+  .how-claro-works-section.page-section::after {
     background: rgba(0, 0, 0, 0.55);
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
   }
 
   .step-description-card {

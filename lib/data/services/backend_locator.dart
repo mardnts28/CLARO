@@ -25,6 +25,7 @@ import 'product_extraction_service.dart';
 import 'product_ranking_service.dart';
 import 'cloudinary_upload_service.dart';
 import '../../services/pending_reports_service.dart';
+import '../../services/connectivity_service.dart';
 
 class BackendLocator {
   BackendLocator._();
@@ -128,4 +129,6 @@ class BackendLocator {
 
   static final PendingReportsService pendingReportsService =
       PendingReportsService();
+
+  static final ConnectivityService connectivityService = ConnectivityService();
 }

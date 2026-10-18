@@ -48,6 +48,10 @@ void main() async {
           await repo.preloadOfflineCatalog();
         }
 
+        // Initialize connectivity listener for auto-sync of pending reports
+        BackendLocator.connectivityService.initialize();
+
+        // Flush any pending reports from previous sessions
         unawaited(BackendLocator.pendingReportsService.flushPendingReports());
       } catch (e) {
         debugPrint('TIMING [Startup]: Deferred background service init warning: $e');
