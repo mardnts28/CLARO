@@ -8,8 +8,17 @@ import {
   changePassword,
   profileErrorMessages,
 } from "../services/profileService";
-import { FiUser } from "react-icons/fi";
+import { FiUser, FiCheckCircle } from "react-icons/fi";
 import "./Profile.css";
+
+// Password requirements (same as mobile app signup)
+const passwordRequirements = [
+  { label: "At least 8 characters", test: (v) => v.length >= 8 },
+  { label: "One uppercase letter", test: (v) => /[A-Z]/.test(v) },
+  { label: "One lowercase letter", test: (v) => /[a-z]/.test(v) },
+  { label: "One number", test: (v) => /[0-9]/.test(v) },
+  { label: "One special character (!@#$%^&* etc.)", test: (v) => /[!@#$%^&*(),.?":{}|<>]/.test(v) },
+];
 
 export default function Profile() {
   const [uid, setUid] = useState(null);
@@ -26,6 +35,9 @@ export default function Profile() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [usernameSuccess, setUsernameSuccess] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showRetypePassword, setShowRetypePassword] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -105,9 +117,11 @@ export default function Profile() {
 
     if (!newPassword) {
       newErrors.newPassword = "New password is required.";
-    } else if (newPassword.length < 6) {
-      newErrors.newPassword =
-        "New password must be at least 6 characters.";
+    } else {
+      const failed = passwordRequirements.filter((req) => !req.test(newPassword));
+      if (failed.length > 0) {
+        newErrors.newPassword = "Password does not meet all requirements.";
+      }
     }
 
     if (!retypePassword) {
@@ -266,21 +280,47 @@ export default function Profile() {
 
             <form onSubmit={handlePasswordSave}>
 
+              {/* Password requirements panel (always visible) */}
+              <div className="password-requirements">
+                {passwordRequirements.map((req, index) => {
+                  const isMet = req.test(newPassword);
+                  return (
+                    <div key={index} className={`requirement-item ${isMet ? "met" : ""}`}>
+                      {isMet ? (
+                        <FiCheckCircle className="requirement-icon" />
+                      ) : (
+                        <div className="requirement-dot" />
+                      )}
+                      <span>{req.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
               <div className="form-field">
                 <label>Current Password</label>
 
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) =>
-                    setCurrentPassword(e.target.value)
-                  }
-                  className={
-                    errors.currentPassword
-                      ? "input-error"
-                      : ""
-                  }
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showCurrentPassword ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(e) =>
+                      setCurrentPassword(e.target.value)
+                    }
+                    className={
+                      errors.currentPassword
+                        ? "input-error"
+                        : ""
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  >
+                    {showCurrentPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
 
                 {errors.currentPassword && (
                   <span className="field-error">
@@ -292,18 +332,27 @@ export default function Profile() {
               <div className="form-field">
                 <label>New Password</label>
 
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) =>
-                    setNewPassword(e.target.value)
-                  }
-                  className={
-                    errors.newPassword
-                      ? "input-error"
-                      : ""
-                  }
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) =>
+                      setNewPassword(e.target.value)
+                    }
+                    className={
+                      errors.newPassword
+                        ? "input-error"
+                        : ""
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                  >
+                    {showNewPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
 
                 {errors.newPassword && (
                   <span className="field-error">
@@ -315,18 +364,27 @@ export default function Profile() {
               <div className="form-field">
                 <label>Retype New Password</label>
 
-                <input
-                  type="password"
-                  value={retypePassword}
-                  onChange={(e) =>
-                    setRetypePassword(e.target.value)
-                  }
-                  className={
-                    errors.retypePassword
-                      ? "input-error"
-                      : ""
-                  }
-                />
+                <div className="password-input-wrapper">
+                  <input
+                    type={showRetypePassword ? "text" : "password"}
+                    value={retypePassword}
+                    onChange={(e) =>
+                      setRetypePassword(e.target.value)
+                    }
+                    className={
+                      errors.retypePassword
+                        ? "input-error"
+                        : ""
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="toggle-password"
+                    onClick={() => setShowRetypePassword(!showRetypePassword)}
+                  >
+                    {showRetypePassword ? "Hide" : "Show"}
+                  </button>
+                </div>
 
                 {errors.retypePassword && (
                   <span className="field-error">

@@ -7,13 +7,23 @@ import { FiAlertCircle } from "react-icons/fi";
 import "./Login.css";
 import "./OTPVerification.css";
 
+// Password requirements (for consistency across screens)
+const passwordRequirements = [
+  { label: "At least 8 characters", test: (v) => v.length >= 8 },
+  { label: "One uppercase letter", test: (v) => /[A-Z]/.test(v) },
+  { label: "One lowercase letter", test: (v) => /[a-z]/.test(v) },
+  { label: "One number", test: (v) => /[0-9]/.test(v) },
+  { label: "One special character (!@#$%^&* etc.)", test: (v) => /[!@#$%^&*(),.?":{}|<>]/.test(v) },
+];
+
 export default function OTPVerification() {
   const { state } = useLocation();
   const navigate = useNavigate();
   const [digits, setDigits] = useState(new Array(6).fill(""));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const [resending, setResending] = useState(false);
+  const [cooldown, setCooldown] = useState(15); // Start with 15 second cooldown (same as mobile app)
   const [expiresAt, setExpiresAt] = useState(state?.otpExpiresAt || null);
   const [secondsLeft, setSecondsLeft] = useState(
     state?.otpExpiresAt ? Math.max(0, Math.round((state.otpExpiresAt - Date.now()) / 1000)) : 0
@@ -26,6 +36,7 @@ export default function OTPVerification() {
     }
   }, [state, navigate]);
 
+  // Start cooldown timer immediately on mount
   useEffect(() => {
     if (cooldown <= 0) return;
     const timer = setInterval(() => setCooldown((c) => c - 1), 1000);
@@ -107,16 +118,19 @@ export default function OTPVerification() {
   }
 
   async function handleResend() {
-    if (cooldown > 0) return;
+    if (cooldown > 0 || resending) return;
+    setResending(true);
     try {
       const { expiresAt: newExpiresAt } = await generateAndSendOTP(state.uid, state.email);
-      setCooldown(60);
+      setCooldown(15); // Reset cooldown to 15 seconds (same as mobile app)
       setError("");
       setDigits(new Array(6).fill(""));
       setExpiresAt(newExpiresAt.getTime());
       setSecondsLeft(OTP_EXPIRY_MINUTES * 60);
     } catch {
       setError("Failed to resend OTP. Please try again.");
+    } finally {
+      setResending(false);
     }
   }
 
@@ -169,9 +183,9 @@ export default function OTPVerification() {
         <button
           className="resend-btn"
           onClick={handleResend}
-          disabled={cooldown > 0}
+          disabled={cooldown > 0 || resending}
         >
-          {cooldown > 0 ? `Resend OTP (${cooldown}s)` : "Resend OTP"}
+          {resending ? "Sending..." : cooldown > 0 ? `Resend Code in ${formatCountdown(cooldown)}` : "Resend Code"}
         </button>
       </div>
     </div>
