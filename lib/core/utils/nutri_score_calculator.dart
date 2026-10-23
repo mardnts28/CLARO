@@ -1,4 +1,5 @@
 // lib/core/utils/nutri_score_calculator.dart
+// ignore_for_file: constant_identifier_names
 //
 // Pure local implementation of the updated (2023) Nutri-Score algorithm
 // for canned goods and instant noodle products sold in the Philippines.

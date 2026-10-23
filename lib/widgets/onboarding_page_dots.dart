@@ -47,7 +47,7 @@ class OnboardingPageDots extends StatelessWidget {
   }) : this(key: key, count: count, position: activeIndex + 0.0);
 
   /// Convenience for the static case on the red dome.
-  OnboardingPageDots.onDome({
+  const OnboardingPageDots.onDome({
     Key? key,
     int count = 2,
     required int activeIndex,

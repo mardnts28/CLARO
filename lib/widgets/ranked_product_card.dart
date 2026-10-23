@@ -62,8 +62,8 @@ class RankedProductCard extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               color: isCurrent
-                  ? colorScheme.primary.withOpacity(0.12)
-                  : Colors.black.withOpacity(0.08),
+                  ? colorScheme.primary.withValues(alpha: 0.12)
+                  : Colors.black.withValues(alpha: 0.08),
               blurRadius: isCurrent ? 10 : 6,
               offset: const Offset(0, 3),
             ),

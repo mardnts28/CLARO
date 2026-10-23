@@ -43,6 +43,9 @@ import '../services/guest_favorites_service.dart';
 import '../services/feature_access.dart';
 import '../widgets/locked_feature_card.dart';
 import 'login_screen.dart';
+import 'product_detail/serving_selector.dart';
+import 'product_detail/advisory_banner_widget.dart';
+import 'product_detail/nutrition_breakdown_card.dart';
 
 // One selectable health group on the product detail screen. `members` stays
 // null until that group's member profiles have been fetched and evaluated.
@@ -276,7 +279,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 right: 50,
                 child: CustomPaint(
                   size: const Size(12, 6),
-                  painter: _TrianglePainter(color: Colors.grey[800]!),
+                  painter: TrianglePainter(color: Colors.grey[800]!),
                 ),
               ),
               // Speech bubble body
@@ -1245,56 +1248,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     ),
                                     const SizedBox(height: 8),
                                     // ── Size dropdown ──
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: colorScheme
-                                            .surfaceContainerHighest
-                                            .withValues(alpha: 0.3),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: theme.dividerColor,
-                                        ),
-                                      ),
-                                      child: DropdownButtonHideUnderline(
-                                        child: DropdownButton<double>(
-                                          value: _selectedSizeG,
-                                          isDense: true,
-                                          icon: Icon(
-                                            Icons.arrow_drop_down,
-                                            size: 18,
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                          style: GoogleFonts.inter(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: colorScheme.onSurface,
-                                          ),
-                                          items: _availableSizes.map((size) {
-                                            final label =
-                                                size == size.roundToDouble()
-                                                ? '${size.toInt()}g'
-                                                : '${size.toStringAsFixed(1)}g';
-                                            return DropdownMenuItem(
-                                              value: size,
-                                              child: Text(label),
-                                            );
-                                          }).toList(),
-                                          onChanged: (newSize) {
-                                            if (newSize != null) {
-                                              setState(() {
-                                                _selectedSizeG = newSize;
-                                                _displayedImageUrl = p
-                                                    .imageUrlForSize(newSize);
-                                              });
-                                              _refreshVoiceSummary();
-                                            }
-                                          },
-                                        ),
-                                      ),
+                                    ServingSelector(
+                                      selectedSizeG: _selectedSizeG,
+                                      availableSizes: _availableSizes,
+                                      onSizeChanged: (newSize) {
+                                        setState(() {
+                                          _selectedSizeG = newSize;
+                                          _displayedImageUrl =
+                                              p.imageUrlForSize(newSize);
+                                        });
+                                        _refreshVoiceSummary();
+                                      },
                                     ),
                                   ],
                                 ),
@@ -2125,161 +2089,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ColorScheme colorScheme,
     AppLocalizations loc,
   ) {
-    final isDark = colorScheme.brightness == Brightness.dark;
-    Color progressColor;
-    Color badgeBgColor;
-    Color badgeTextColor;
-    String badgeLabel;
-
-    // badgeBgColor/badgeTextColor are reused for both the small status
-    // pill AND (below) the full-width tint on the highlighted/priority
-    // row -- previously both stayed at their light-mode pastel/dark-text
-    // values even in dark mode, so the priority row's title/percentage
-    // text (which uses colorScheme.onSurface, near-white in dark mode)
-    // sat on a light background with poor contrast. Swapping in a dark
-    // tinted background + lighter accent text in dark mode keeps the
-    // same "priority concern" highlighting while staying readable.
-    String capitalize(String s) =>
-        s.isNotEmpty ? '${s[0].toUpperCase()}${s.substring(1)}' : s;
-
-    switch (e.level) {
-      case AdvisoryLevel.suitable:
-        progressColor = const Color(0xFF2E7D32);
-        badgeBgColor = isDark
-            ? const Color(0xFF1B3320)
-            : const Color(0xFFE8F5E9);
-        badgeTextColor = isDark
-            ? const Color(0xFF81C784)
-            : const Color(0xFF2E7D32);
-        badgeLabel = capitalize(loc.levelLow);
-        break;
-      case AdvisoryLevel.moderate:
-        progressColor = const Color(0xFFE65100);
-        badgeBgColor = isDark
-            ? const Color(0xFF3A2A12)
-            : const Color(0xFFFFF3E0);
-        badgeTextColor = isDark
-            ? const Color(0xFFFFB74D)
-            : const Color(0xFFE65100);
-        badgeLabel = capitalize(loc.levelMedium);
-        break;
-      case AdvisoryLevel.caution:
-        progressColor = const Color(0xFFC62828);
-        badgeBgColor = isDark
-            ? const Color(0xFF3A1414)
-            : const Color(0xFFFFEBEE);
-        badgeTextColor = isDark
-            ? const Color(0xFFEF9A9A)
-            : const Color(0xFFC62828);
-        badgeLabel = capitalize(loc.levelHigh);
-        break;
-    }
-
-    final isRelated = _isNutrientKeyRelatedToUser(e.nutrientKey);
-    final displayLabel = isRelated ? e.label : e.shortLabel;
-    // colorScheme.primary is a fixed dark maroon -- legible on the light
-    // pastel badgeBgColor above, but not on its dark-mode tinted
-    // counterpart. colorScheme.secondary is already brightness-aware
-    // (a brighter red in dark mode), so use that instead for the bold
-    // highlighted percentage when in dark mode.
-    final highlightAccentColor = isDark
-        ? colorScheme.secondary
-        : colorScheme.primary;
-
-    final content = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Text(
-                displayLabel,
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.onSurface,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: badgeBgColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                badgeLabel,
-                style: GoogleFonts.inter(
-                  color: badgeTextColor,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(6),
-          child: LinearProgressIndicator(
-            value: (e.percentage / 100).clamp(0.0, 1.0),
-            backgroundColor: colorScheme.surfaceContainerHighest,
-            valueColor: AlwaysStoppedAnimation<Color>(progressColor),
-            minHeight: 12,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text:
-                    '${_formatValue(e.valuePerServing)}${e.unit} / ${_formatValue(e.limit)}${e.unit} ${loc.dailySuffix} · ',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              TextSpan(
-                text:
-                    '${e.percentage.toStringAsFixed(0)}% ${e.nutrientKey == 'sugarsG' ? loc.ofWhoFreeSugarReference : loc.ofWhoLimit}',
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  color: isRelated
-                      ? highlightAccentColor
-                      : colorScheme.onSurfaceVariant,
-                  fontWeight: isRelated ? FontWeight.bold : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    if (!isRelated) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: content,
-      );
-    }
-
-    // Priority concern: bleed the tint to the full width of the enclosing
-    // card and cover the title, progress bar, and percentage text as one
-    // unified row -- no border, no inset gap around it.
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: badgeBgColor,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        child: content,
-      ),
+    return NutrientRowWidget(
+      evaluation: e,
+      isRelatedToUserCondition: _isNutrientKeyRelatedToUser(e.nutrientKey),
+      colorScheme: colorScheme,
+      loc: loc,
     );
   }
 
@@ -2349,79 +2163,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     ColorScheme colorScheme,
     AdvisoryLevel level,
   ) {
-    final trimmedSubtitle = subtitle.trim();
-
-    // Don't apply emphasis when suitability level is Suitable
-    if (level == AdvisoryLevel.suitable) {
-      return Text(
-        trimmedSubtitle,
-        softWrap: true,
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          color: colorScheme.onSurface,
-          height: 1.4,
-        ),
-      );
-    }
-
-    final parts = trimmedSubtitle
-        .split(RegExp(r'(?<=[.!?])\s+'))
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-
-    if (parts.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    // If there's only one part, emphasize it
-    if (parts.length == 1) {
-      return Text(
-        parts.first,
-        softWrap: true,
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          color: colorScheme.onSurface,
-          height: 1.4,
-          fontWeight: FontWeight.bold,
-          fontStyle: FontStyle.italic,
-        ),
-      );
-    }
-
-    // Build text spans with emphasis on the last sentence
-    final textSpans = <TextSpan>[];
-
-    // Add all sentences except the last one normally
-    for (int i = 0; i < parts.length - 1; i++) {
-      textSpans.add(
-        TextSpan(
-          text: '${parts[i]} ',
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            color: colorScheme.onSurface,
-            height: 1.4,
-          ),
-        ),
-      );
-    }
-
-    // Add the last sentence -- the recommended serving/intake amount --
-    // with emphasis (bold and italic, no underline).
-    textSpans.add(
-      TextSpan(
-        text: parts.last,
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          color: colorScheme.onSurface,
-          height: 1.4,
-          fontWeight: FontWeight.bold,
-          fontStyle: FontStyle.italic,
-        ),
-      ),
+    return AdvisorySubtitleText(
+      subtitle: subtitle,
+      colorScheme: colorScheme,
+      level: level,
     );
-
-    return Text.rich(TextSpan(children: textSpans), softWrap: true);
   }
 
   // ── Health advisory banner (WhoCalculator + GeminiAdvisoryService) ──────
@@ -2620,124 +2366,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       Localizations.localeOf(context).languageCode,
     );
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 36),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (multiAllergenRows != null) ...[
-                  Text(
-                    isTagalog ? 'Babala sa Allergen' : 'Allergen Warning',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    isTagalog
-                        ? 'Maraming allergen ang natukoy'
-                        : 'Multiple allergen detected',
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  for (final row in multiAllergenRows)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text.rich(
-                        TextSpan(
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: colorScheme.onSurface,
-                            height: 1.4,
-                          ),
-                          children: [
-                            TextSpan(
-                              text: row.ingredient.isEmpty
-                                  ? row.allergen
-                                  : '${row.allergen}: ',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            if (row.ingredient.isNotEmpty)
-                              TextSpan(text: row.ingredient),
-                          ],
-                        ),
-                      ),
-                    ),
-                ] else ...[
-                  Text(
-                    title,
-                    style: GoogleFonts.outfit(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  _buildAdvisorySubtitle(subtitle, colorScheme, level),
-                ],
-                // Kidney Disease footer note -- the same note the removed
-                // Kidney Disease Warning card ended with. Only shown while the
-                // advisory above is the kidney version (see
-                // KidneyAdvisoryFacts.build), so it always refers to the
-                // nutrients that advisory just mentioned.
-                if (showKidneyFooterNote) ...[
-                  const SizedBox(height: 10),
-                  Divider(height: 1, color: color.withValues(alpha: 0.5)),
-                  const SizedBox(height: 8),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        size: 14,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          loc.kidneyExpertAdvice,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: colorScheme.onSurfaceVariant,
-                            height: 1.3,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
+    final rows = multiAllergenRows
+        ?.map((r) => MultiAllergenDisplayRow(
+              allergen: r.allergen,
+              ingredient: r.ingredient,
+            ))
+        .toList();
+
+    return AdvisoryBannerWidget(
+      level: level,
+      color: color,
+      icon: icon,
+      title: title,
+      subtitle: subtitle,
+      isTagalog: isTagalog,
+      multiAllergenRows: rows,
+      showKidneyFooterNote: showKidneyFooterNote,
+      kidneyExpertAdviceText: loc.kidneyExpertAdvice,
     );
   }
 
@@ -4451,10 +4096,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  String _formatValue(double value) {
-    return NumberFormatUtils.formatValue(value);
-  }
-
   Widget _buildLegendItem({
     required Color dotColor,
     required String label,
@@ -4510,53 +4151,4 @@ class _NutrientEntry {
   final String formatted;
 
   _NutrientEntry(this.label, this.value, this.formatted);
-}
-
-class DisplayNutrientEval {
-  final String label;
-  final String shortLabel;
-  final String nutrientKey;
-  final double valuePerServing;
-  final double limit;
-  final double percentage;
-  final AdvisoryLevel level;
-  final String unit;
-
-  DisplayNutrientEval({
-    required this.label,
-    required this.shortLabel,
-    required this.nutrientKey,
-    required this.valuePerServing,
-    required this.limit,
-    required this.percentage,
-    required this.level,
-    required this.unit,
-  });
-}
-
-// Custom painter for the triangular tip of the speech bubble
-class _TrianglePainter extends CustomPainter {
-  final Color color;
-
-  _TrianglePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final path = Path()
-      ..moveTo(size.width / 2, 0) // Top center point
-      ..lineTo(0, size.height) // Bottom left
-      ..lineTo(size.width, size.height) // Bottom right
-      ..close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _TrianglePainter oldDelegate) {
-    return oldDelegate.color != color;
-  }
 }

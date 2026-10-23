@@ -66,7 +66,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   // Pending reports (offline queued)
   List<Map<String, dynamic>> _pendingReports = [];
-  bool _pendingReportsLoading = true;
 
   Timer? _searchDebounce;
 
@@ -125,13 +124,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
       if (mounted) {
         setState(() {
           _pendingReports = pending;
-          _pendingReportsLoading = false;
         });
       }
     } catch (e) {
       debugPrint('HistoryScreen: error loading pending reports: $e');
       if (mounted) {
-        setState(() => _pendingReportsLoading = false);
+        setState(() {});
       }
     }
   }

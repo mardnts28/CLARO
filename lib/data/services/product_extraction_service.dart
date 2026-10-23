@@ -22,6 +22,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -131,13 +132,12 @@ class ProductExtractionService {
 
       return _parseResponse(text);
     } on TimeoutException catch (e) {
-      print('GEMINI EXTRACTION TIMEOUT: $e');
+      dev.log('GEMINI EXTRACTION TIMEOUT', name: 'ProductExtraction', error: e);
       return ProductExtractionResult.empty(
         reason: 'Extraction timed out -- please review manually.',
       );
     } catch (e, stack) {
-      print('GEMINI EXTRACTION ERROR: $e');
-      print('STACK: $stack');
+      dev.log('GEMINI EXTRACTION ERROR', name: 'ProductExtraction', error: e, stackTrace: stack);
       return ProductExtractionResult.empty(
         reason: 'Extraction failed -- please review manually.',
       );
@@ -206,7 +206,7 @@ Rules:
 
   ProductExtractionResult _parseResponse(String? text) {
     if (text == null || text.trim().isEmpty) {
-      print('EMPTY RESPONSE from Gemini extraction');
+      dev.log('EMPTY RESPONSE from Gemini extraction', name: 'ProductExtraction');
       return ProductExtractionResult.empty(
         reason: 'No response from extraction -- please review manually.',
       );
@@ -271,8 +271,7 @@ Rules:
         confidenceNotes: (json['confidence_notes'] as String? ?? '').trim(),
       );
     } catch (e) {
-      print('EXTRACTION PARSE ERROR: $e');
-      print('RAW RESPONSE: $text');
+      dev.log('EXTRACTION PARSE ERROR – RAW RESPONSE: $text', name: 'ProductExtraction', error: e);
       return ProductExtractionResult.empty(
         reason: 'Could not parse extraction result -- please review manually.',
       );

@@ -1295,100 +1295,81 @@ class VoiceCommandRouter {
     await VoiceAssistantService.instance.speak(summary);
   }
 
+  static final Map<String, Future<bool> Function(BuildContext context)>
+      _subscreenHandlers = {
+    'personal_info': (context) async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
+      );
+      return true;
+    },
+    'preference': (context) async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PreferenceScreen()),
+      );
+      return true;
+    },
+    'suggestion': (context) async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SuggestionScreen()),
+      );
+      return true;
+    },
+    'about_claro': (context) async =>
+        _launchExternalUrl(claroWebsiteUrl, 'CLARO website'),
+    'privacy_policy': (context) async =>
+        _launchExternalUrl(privacyPolicyUrl, 'privacy policy'),
+    'terms_conditions': (context) async =>
+        _launchExternalUrl(termsConditionsUrl, 'terms'),
+    'user_guide': (context) async =>
+        _launchExternalUrl(userGuideUrl, 'user guide'),
+    'change_password': (context) async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+      );
+      return true;
+    },
+    'theme': (context) async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ThemeScreen()),
+      );
+      return true;
+    },
+    'review_history': (context) async {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ReviewHistoryScreen()),
+      );
+      return true;
+    },
+  };
+
+  static Future<bool> _launchExternalUrl(String url, String tag) async {
+    try {
+      return await launchUrl(
+        Uri.parse(url),
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (error) {
+      debugPrint('Open $tag failed: $error');
+      return false;
+    }
+  }
+
   Future<bool> _navigateToScreen(
     BuildContext context,
     String targetPage,
   ) async {
-    switch (targetPage) {
-      case 'personal_info':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const PersonalInfoScreen()),
-        );
-        return true;
-
-      case 'preference':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const PreferenceScreen()),
-        );
-        return true;
-
-      case 'suggestion':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const SuggestionScreen()),
-        );
-        return true;
-
-      case 'about_claro':
-        try {
-          return await launchUrl(
-            Uri.parse(claroWebsiteUrl),
-            mode: LaunchMode.externalApplication,
-          );
-        } catch (error) {
-          debugPrint('Open CLARO website failed: $error');
-          return false;
-        }
-
-      case 'privacy_policy':
-        try {
-          return await launchUrl(
-            Uri.parse(privacyPolicyUrl),
-            mode: LaunchMode.externalApplication,
-          );
-        } catch (error) {
-          debugPrint('Open privacy policy failed: $error');
-          return false;
-        }
-
-      case 'terms_conditions':
-        try {
-          return await launchUrl(
-            Uri.parse(termsConditionsUrl),
-            mode: LaunchMode.externalApplication,
-          );
-        } catch (error) {
-          debugPrint('Open terms failed: $error');
-          return false;
-        }
-
-      case 'user_guide':
-        try {
-          return await launchUrl(
-            Uri.parse(userGuideUrl),
-            mode: LaunchMode.externalApplication,
-          );
-        } catch (error) {
-          debugPrint('Open user guide failed: $error');
-          return false;
-        }
-
-      case 'change_password':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-        );
-        return true;
-
-      case 'theme':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ThemeScreen()),
-        );
-        return true;
-
-      case 'review_history':
-        await Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const ReviewHistoryScreen()),
-        );
-        return true;
-
-      default:
-        return false;
+    final handler = _subscreenHandlers[targetPage];
+    if (handler != null) {
+      return await handler(context);
     }
+    return false;
   }
 
   @visibleForTesting
@@ -1994,121 +1975,129 @@ class VoiceCommandRouter {
       return;
     }
 
-    switch (slot) {
-      case 'read_allergens':
-        final allergens = product.allergens;
-        if (allergens.isEmpty) {
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Walang nakalistang allergen para sa ${product.name}.'
-                : 'No allergens are listed for ${product.name}.',
-          );
-        } else {
-          final list = allergens.join(', ');
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Ang mga allergen ng ${product.name} ay: $list.'
-                : 'The allergens in ${product.name} are: $list.',
-          );
-        }
-        break;
+    final handler = _offlineSlotHandlers[slot];
+    if (handler != null) {
+      await handler(product, localeKey);
+    }
+  }
 
-      case 'read_ingredients':
-        final ingredients = product.ingredients;
-        if (ingredients.isEmpty) {
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Walang nakalistang sangkap para sa ${product.name}.'
-                : 'No ingredients are listed for ${product.name}.',
-          );
-        } else {
-          final list = ingredients.join(', ');
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Ang mga sangkap ng ${product.name} ay: $list.'
-                : 'The ingredients in ${product.name} are: $list.',
-          );
-        }
-        break;
-
-      case 'read_calories':
-        final cal = product.nutritionalFacts.caloriesKcal;
+  static final Map<String, Future<void> Function(Product product, String localeKey)>
+      _offlineSlotHandlers = {
+    'read_allergens': (product, localeKey) async {
+      final allergens = product.allergens;
+      if (allergens.isEmpty) {
         await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
-              ? 'Ang ${product.name} ay may ${cal.toStringAsFixed(0)} calories bawat serving.'
-              : '${product.name} has ${cal.toStringAsFixed(0)} calories per serving.',
+              ? 'Walang nakalistang allergen para sa ${product.name}.'
+              : 'No allergens are listed for ${product.name}.',
         );
-        break;
-
-      case 'read_sodium':
-        final sodiumMg = product.nutritionalFacts.sodiumMg;
+      } else {
+        final list = allergens.join(', ');
         await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
-              ? 'Ang sodium ng ${product.name} ay ${sodiumMg.toStringAsFixed(0)} milligrams bawat serving.'
-              : '${product.name} has ${sodiumMg.toStringAsFixed(0)} milligrams of sodium per serving.',
+              ? 'Ang mga allergen ng ${product.name} ay: $list.'
+              : 'The allergens in ${product.name} are: $list.',
         );
-        break;
-
-      case 'read_sugar':
-        final sugarG = product.nutritionalFacts.sugarsG;
+      }
+    },
+    'read_ingredients': (product, localeKey) async {
+      final ingredients = product.ingredients;
+      if (ingredients.isEmpty) {
         await VoiceAssistantService.instance.speak(
           localeKey == 'fil'
-              ? 'Ang asukal ng ${product.name} ay ${sugarG.toStringAsFixed(1)} grams bawat serving.'
-              : '${product.name} has ${sugarG.toStringAsFixed(1)} grams of sugar per serving.',
+              ? 'Walang nakalistang sangkap para sa ${product.name}.'
+              : 'No ingredients are listed for ${product.name}.',
         );
-        break;
+      } else {
+        final list = ingredients.join(', ');
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Ang mga sangkap ng ${product.name} ay: $list.'
+              : 'The ingredients in ${product.name} are: $list.',
+        );
+      }
+    },
+    'read_calories': (product, localeKey) async {
+      final cal = product.nutritionalFacts.caloriesKcal;
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Ang ${product.name} ay may ${cal.toStringAsFixed(0)} calories bawat serving.'
+            : '${product.name} has ${cal.toStringAsFixed(0)} calories per serving.',
+      );
+    },
+    'read_sodium': (product, localeKey) async {
+      final sodiumMg = product.nutritionalFacts.sodiumMg;
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Ang sodium ng ${product.name} ay ${sodiumMg.toStringAsFixed(0)} milligrams bawat serving.'
+            : '${product.name} has ${sodiumMg.toStringAsFixed(0)} milligrams of sodium per serving.',
+      );
+    },
+    'read_sugar': (product, localeKey) async {
+      final sugarG = product.nutritionalFacts.sugarsG;
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Ang asukal ng ${product.name} ay ${sugarG.toStringAsFixed(1)} grams bawat serving.'
+            : '${product.name} has ${sugarG.toStringAsFixed(1)} grams of sugar per serving.',
+      );
+    },
+    'read_fat': (product, localeKey) async {
+      final fatG = product.nutritionalFacts.totalFatG;
+      final saturatedG = product.nutritionalFacts.saturatedFatG;
+      final transG = product.nutritionalFacts.transFatG;
+      final parts = <String>[];
+      if (fatG > 0) parts.add('${fatG.toStringAsFixed(1)} grams total fat');
+      if (saturatedG > 0) {
+        parts.add('${saturatedG.toStringAsFixed(1)} grams saturated fat');
+      }
+      if (transG > 0) parts.add('${transG.toStringAsFixed(1)} grams trans fat');
+      if (parts.isEmpty) {
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Hindi tukoy ang fat content ng ${product.name}.'
+              : 'Fat content is not specified for ${product.name}.',
+        );
+      } else {
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Ang fat ng ${product.name} ay: ${parts.join(', ')}.'
+              : '${product.name} has ${parts.join(', ')}.',
+        );
+      }
+    },
+    'read_serving_size': (product, localeKey) async {
+      final serving = product.nutritionalFacts.servingSize;
+      if (serving.trim().isEmpty) {
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Hindi nakalista ang serving size ng ${product.name}.'
+              : 'Serving size is not specified for ${product.name}.',
+        );
+      } else {
+        await VoiceAssistantService.instance.speak(
+          localeKey == 'fil'
+              ? 'Ang serving size ng ${product.name} ay $serving.'
+              : 'The serving size for ${product.name} is $serving.',
+        );
+      }
+    },
+    'is_healthy': _handleVerdictSlot,
+    'read_verdict': _handleVerdictSlot,
+  };
 
-      case 'read_fat':
-        final fatG = product.nutritionalFacts.totalFatG;
-        final saturatedG = product.nutritionalFacts.saturatedFatG;
-        final transG = product.nutritionalFacts.transFatG;
-        final parts = <String>[];
-        if (fatG > 0) parts.add('${fatG.toStringAsFixed(1)} grams total fat');
-        if (saturatedG > 0) parts.add('${saturatedG.toStringAsFixed(1)} grams saturated fat');
-        if (transG > 0) parts.add('${transG.toStringAsFixed(1)} grams trans fat');
-        if (parts.isEmpty) {
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Hindi tukoy ang fat content ng ${product.name}.'
-                : 'Fat content is not specified for ${product.name}.',
-          );
-        } else {
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Ang fat ng ${product.name} ay: ${parts.join(', ')}.'
-                : '${product.name} has ${parts.join(', ')}.',
-          );
-        }
-      case 'read_serving_size':
-        final serving = product.nutritionalFacts.servingSize;
-        if (serving.trim().isEmpty) {
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Hindi nakalista ang serving size ng ${product.name}.'
-                : 'Serving size is not specified for ${product.name}.',
-          );
-        } else {
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Ang serving size ng ${product.name} ay $serving.'
-                : 'The serving size for ${product.name} is $serving.',
-          );
-        }
-        break;
-
-      case 'is_healthy':
-      case 'read_verdict':
-        final summary = VoiceAssistantService.latestScanSummaryNotifier.value;
-        if (summary != null && summary.trim().isNotEmpty) {
-          await VoiceAssistantService.instance.speak(summary);
-        } else {
-          await VoiceAssistantService.instance.speak(
-            localeKey == 'fil'
-                ? 'Sandali lang, sinusuri pa ang produktong ito.'
-                : 'Still analyzing this product, one moment.',
-          );
-        }
-        break;
+  static Future<void> _handleVerdictSlot(
+    Product product,
+    String localeKey,
+  ) async {
+    final summary = VoiceAssistantService.latestScanSummaryNotifier.value;
+    if (summary != null && summary.trim().isNotEmpty) {
+      await VoiceAssistantService.instance.speak(summary);
+    } else {
+      await VoiceAssistantService.instance.speak(
+        localeKey == 'fil'
+            ? 'Sandali lang, sinusuri pa ang produktong ito.'
+            : 'Still analyzing this product, one moment.',
+      );
     }
   }
 

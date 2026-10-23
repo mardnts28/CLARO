@@ -5,6 +5,8 @@
 // dependency. Templated, not generated -- deliberately less nuanced than
 // the AI version but always available and always accurate to the score.
 
+import 'dart:developer' as dev;
+
 import '../../data/models/health_advisory.dart';
 import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
@@ -220,7 +222,10 @@ class FallbackAdvisoryGenerator {
         servingSizeG: servingSizeG,
       );
       
-      print('Suitable product serving calculation: servingSizeG=$servingSizeG, safeServing=$safeServing');
+      dev.log(
+        'Suitable product serving calculation: servingSizeG=$servingSizeG, safeServing=$safeServing',
+        name: 'FallbackAdvisory',
+      );
       
       // If no restrictions needed, provide default serving suggestion
       final servingSuggestion = safeServing ?? 
@@ -335,9 +340,7 @@ class FallbackAdvisoryGenerator {
     bool isTagalog,
   ) {
     final sodiumAmount = '${k.sodiumMg.toStringAsFixed(1)}mg';
-    final sodiumPct = k.sodiumPercentage.toStringAsFixed(1);
     final proteinAmount = '${k.proteinG.toStringAsFixed(1)}g';
-    final proteinPct = k.proteinPercentage.toStringAsFixed(1);
 
     final amountSentence = isTagalog
         ? 'Naglalaman ang produktong ito ng $sodiumAmount na sodium '
@@ -463,21 +466,6 @@ class FallbackAdvisoryGenerator {
         return 'GERD';
       case HealthCondition.kidneyDisease:
         return isTagalog ? 'sakit sa bato' : 'kidney disease';
-    }
-  }
-
-  static String _factorLabel(String key, bool isTagalog) {
-    switch (key) {
-      case 'sodiumMg':
-        return 'Sodium';
-      case 'phosphateAdditives':
-        return isTagalog ? 'phosphate additives' : 'phosphate additives';
-      case 'gerdTotalFat':
-        return 'GERD total fat';
-      case 'gerdTriggers':
-        return 'GERD trigger categories';
-      default:
-        return key;
     }
   }
 

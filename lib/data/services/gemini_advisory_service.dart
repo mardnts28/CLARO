@@ -8,6 +8,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as dev;
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -133,7 +134,7 @@ class GeminiAdvisoryService {
       }
     } catch (e) {
       // Non-fatal: continue to generate or fallback if cache read fails
-      print('Persistent advisory cache read warning: $e');
+      dev.log('Persistent advisory cache read warning', name: 'GeminiAdvisory', error: e);
     }
 
     // Skip the API entirely when nothing is flagged and this isn't a
@@ -142,7 +143,10 @@ class GeminiAdvisoryService {
     if (evaluation.overallLevel == AdvisoryLevel.suitable &&
         !evaluation.allergenAssessment.hasDirectAllergen &&
         !isComparison) {
-      print('Using fallback for suitable product: overallLevel=${evaluation.overallLevel}, hasAllergen=${evaluation.allergenAssessment.hasDirectAllergen}, isComparison=$isComparison');
+      dev.log(
+        'Using fallback for suitable product: overallLevel=${evaluation.overallLevel}, hasAllergen=${evaluation.allergenAssessment.hasDirectAllergen}, isComparison=$isComparison',
+        name: 'GeminiAdvisory',
+      );
       // Use combined nutrient calculation for users without health conditions
       final useCombinedNutrients = user.conditions.isEmpty;
       final hasNoConditionsAndNoAllergens = user.conditions.isEmpty;
@@ -158,7 +162,10 @@ class GeminiAdvisoryService {
       return advisory;
     }
 
-    print('Calling Gemini for advisory: overallLevel=${evaluation.overallLevel}, hasAllergen=${evaluation.allergenAssessment.hasDirectAllergen}, isComparison=$isComparison, userConditions=${user.conditions.length}');
+    dev.log(
+      'Calling Gemini for advisory: overallLevel=${evaluation.overallLevel}, hasAllergen=${evaluation.allergenAssessment.hasDirectAllergen}, isComparison=$isComparison, userConditions=${user.conditions.length}',
+      name: 'GeminiAdvisory',
+    );
     final prompt = AdvisoryPromptBuilder.build(
       evaluation: evaluation,
       user: user,
@@ -190,7 +197,7 @@ class GeminiAdvisoryService {
         suggestedServing,
       );
     } on TimeoutException catch (e) {
-      print('GEMINI TIMEOUT: $e');
+      dev.log('GEMINI TIMEOUT', name: 'GeminiAdvisory', error: e);
       advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.timeout,
@@ -199,8 +206,7 @@ class GeminiAdvisoryService {
         hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
       );
     } catch (e, stack) {
-      print('GEMINI ERROR: $e');
-      print('STACK: $stack');
+      dev.log('GEMINI ERROR', name: 'GeminiAdvisory', error: e, stackTrace: stack);
       advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.apiError,
@@ -253,7 +259,7 @@ class GeminiAdvisoryService {
         return advisory;
       }
     } catch (e) {
-      print('Group advisory cache read warning: $e');
+      dev.log('Group advisory cache read warning', name: 'GeminiAdvisory', error: e);
     }
 
     final level = GroupAdvisoryBuilder.groupLevel(facts.map((f) => f.level));
@@ -293,7 +299,7 @@ class GeminiAdvisoryService {
               languageCode: languageCode,
             );
       } catch (e) {
-        print('GEMINI GROUP ADVISORY ERROR: $e');
+        dev.log('GEMINI GROUP ADVISORY ERROR', name: 'GeminiAdvisory', error: e);
         advisory = GroupAdvisoryBuilder.fallback(
           facts,
           servingSizeG: servingSizeG,
@@ -340,7 +346,7 @@ class GeminiAdvisoryService {
       if (!facts.any((f) => f.allergens.isNotEmpty) &&
           (_containsProhibitedAdvisoryMedicalClaim(warning) ||
               _containsProhibitedAdvisoryMedicalClaim(explanation))) {
-        print('GROUP PARSE ERROR: advisory contains prohibited medical wording');
+        dev.log('GROUP PARSE ERROR: advisory contains prohibited medical wording', name: 'GeminiAdvisory');
         return null;
       }
 
@@ -375,7 +381,7 @@ class GeminiAdvisoryService {
         generatedAt: DateTime.now(),
       );
     } catch (e) {
-      print('GROUP PARSE ERROR: $e');
+      dev.log('GROUP PARSE ERROR', name: 'GeminiAdvisory', error: e);
       return null;
     }
   }
@@ -386,7 +392,7 @@ class GeminiAdvisoryService {
           prefs.setString(key, jsonEncode(advisory.toJson()));
         })
         .catchError((e) {
-          print('Failed to persist advisory to cache: $e');
+          dev.log('Failed to persist advisory to cache', name: 'GeminiAdvisory', error: e);
         });
   }
 
@@ -399,7 +405,7 @@ class GeminiAdvisoryService {
     String? suggestedServing,
   ) {
     if (text == null || text.trim().isEmpty) {
-      print('EMPTY RESPONSE from Gemini');
+      dev.log('EMPTY RESPONSE from Gemini', name: 'GeminiAdvisory');
       return FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.emptyResponse,
@@ -474,8 +480,7 @@ class GeminiAdvisoryService {
         generatedAt: DateTime.now(),
       );
     } catch (e) {
-      print('PARSE ERROR: $e');
-      print('RAW RESPONSE: $text');
+      dev.log('PARSE ERROR – RAW RESPONSE: $text', name: 'GeminiAdvisory', error: e);
       return FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.parseError,
@@ -567,7 +572,7 @@ class GeminiAdvisoryService {
 
   String _parseRankingExplanation(String? text) {
     if (text == null || text.trim().isEmpty) {
-      print('EMPTY RESPONSE from Gemini for ranking explanation');
+      dev.log('EMPTY RESPONSE from Gemini for ranking explanation', name: 'GeminiAdvisory');
       throw const FormatException('Empty response');
     }
     try {
@@ -591,8 +596,7 @@ class GeminiAdvisoryService {
 
       return explanation;
     } catch (e) {
-      print('PARSE ERROR for ranking explanation: $e');
-      print('RAW RESPONSE: $text');
+      dev.log('PARSE ERROR for ranking explanation – RAW RESPONSE: $text', name: 'GeminiAdvisory', error: e);
       rethrow;
     }
   }

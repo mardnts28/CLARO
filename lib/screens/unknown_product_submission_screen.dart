@@ -818,28 +818,30 @@ class _UnknownProductSubmissionScreenState
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Column(
-                      children: _categories.map((category) {
-                        return RadioListTile<String>(
-                          title: Text(
-                            category,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: colorScheme.onSurface,
+                    RadioGroup<String>(
+                      groupValue: _selectedCategory,
+                      onChanged: (value) {
+                        if (value != null) {
+                          HapticService().vibrate();
+                          setState(() => _selectedCategory = value);
+                        }
+                      },
+                      child: Column(
+                        children: _categories.map((category) {
+                          return RadioListTile<String>(
+                            title: Text(
+                              category,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                color: colorScheme.onSurface,
+                              ),
                             ),
-                          ),
-                          value: category,
-                          groupValue: _selectedCategory,
-                          onChanged: (value) {
-                            if (value != null) {
-                              HapticService().vibrate();
-                              setState(() => _selectedCategory = value);
-                            }
-                          },
-                          activeColor: primaryColor,
-                          contentPadding: EdgeInsets.zero,
-                        );
-                      }).toList(),
+                            value: category,
+                            activeColor: primaryColor,
+                            contentPadding: EdgeInsets.zero,
+                          );
+                        }).toList(),
+                      ),
                     ),
 
                     const SizedBox(height: 32),

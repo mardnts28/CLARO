@@ -20,6 +20,7 @@
 // concern once this is public.
 
 import 'dart:convert';
+import 'dart:developer' as dev;
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -40,7 +41,7 @@ class CloudinaryUploadService {
   /// report submit with a missing photo URL rather than blocking entirely).
   Future<String?> upload(Uint8List bytes, {required String filename}) async {
     if (_cloudName.isEmpty || _uploadPreset.isEmpty) {
-      print('CLOUDINARY UPLOAD SKIPPED: missing cloud name or upload preset');
+      dev.log('CLOUDINARY UPLOAD SKIPPED: missing cloud name or upload preset', name: 'CloudinaryUpload');
       return null;
     }
 
@@ -57,14 +58,17 @@ class CloudinaryUploadService {
       final response = await http.Response.fromStream(streamed);
 
       if (response.statusCode != 200) {
-        print('CLOUDINARY UPLOAD FAILED (${response.statusCode}): ${response.body}');
+        dev.log(
+          'CLOUDINARY UPLOAD FAILED (${response.statusCode}): ${response.body}',
+          name: 'CloudinaryUpload',
+        );
         return null;
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
       return data['secure_url'] as String?;
     } catch (e) {
-      print('CLOUDINARY UPLOAD ERROR: $e');
+      dev.log('CLOUDINARY UPLOAD ERROR', name: 'CloudinaryUpload', error: e);
       return null;
     }
   }

@@ -54,8 +54,8 @@ class SelectableScannedProductCard extends StatelessWidget {
             boxShadow: [
               BoxShadow(
                 color: isSelected
-                    ? colorScheme.primary.withOpacity(0.10)
-                    : Colors.black.withOpacity(0.05),
+                    ? colorScheme.primary.withValues(alpha: 0.10)
+                    : Colors.black.withValues(alpha: 0.05),
                 blurRadius: isSelected ? 12 : 8,
                 offset: const Offset(0, 3),
               ),

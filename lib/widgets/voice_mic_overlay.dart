@@ -158,7 +158,7 @@ class _VoiceMicOverlayState extends State<VoiceMicOverlay>
                         height: _fabSize,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: colors.primary.withOpacity(0.28 * (1 - t)),
+                          color: colors.primary.withValues(alpha: 0.28 * (1 - t)),
                         ),
                       ),
                     );
@@ -181,7 +181,7 @@ class _VoiceMicOverlayState extends State<VoiceMicOverlay>
                   boxShadow: [
                     BoxShadow(
                       color: colors.primary
-                          .withOpacity(_isDragging ? 0.45 : 0.28),
+                          .withValues(alpha: _isDragging ? 0.45 : 0.28),
                       blurRadius: _isDragging ? 24 : 14,
                       spreadRadius: _isDragging ? 2 : 0,
                       offset: Offset(0, _isDragging ? 8 : 4),

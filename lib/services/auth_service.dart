@@ -272,7 +272,7 @@ class AuthService {
         .padLeft(6, '0');
     final now = Timestamp.now();
     final expiresAt = Timestamp.fromDate(
-      now.toDate().add(const Duration(minutes: 1)),
+      now.toDate().add(const Duration(minutes: 5)),
     );
 
     await _firebaseDb.collection('login_otps').doc(uid).set({
