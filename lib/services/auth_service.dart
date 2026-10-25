@@ -11,6 +11,7 @@ import 'home_tab_controller.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../data/services/backend_locator.dart'; // Phase 8
+import '../data/repositories/user_repository.dart';
 
 // Base URL for the Cloudflare Worker that performs server-side encryption
 // and decryption of health conditions/allergens. The key never lives on
@@ -929,6 +930,21 @@ class AuthService {
     await prefs.remove('sessionId');
     await _firebaseGoogleSignIn.signOut();
     await _firebaseAuth.signOut();
+
+    // Clear user-specific cached data after successful sign-out
+    try {
+      final uid = _firebaseAuth.currentUser?.uid;
+      if (uid != null) {
+        // Clear in-memory cache
+        BackendLocator.userRepository.invalidateCache(uid);
+        BackendLocator.geminiAdvisoryService.clearAllCache();
+        // Clear persistent cache
+        await FirebaseUserRepository.clearUserCache(uid);
+      }
+    } catch (e) {
+      debugPrint('Error clearing user cache on sign out: $e');
+      // Non-fatal: logout should not fail if cache clearing fails
+    }
   }
 
   /// Deletes the signed-in user's Firestore doc and Firebase Auth account.
@@ -1047,6 +1063,16 @@ class AuthService {
 
       // Reset personalized feedback
       HapticService().updateEnabled(false);
+
+      // Clear user-specific cached data after successful account deletion
+      try {
+        BackendLocator.userRepository.invalidateCache(uid);
+        BackendLocator.geminiAdvisoryService.clearAllCache();
+        await FirebaseUserRepository.clearUserCache(uid);
+      } catch (e) {
+        debugPrint('Error clearing user cache on account deletion: $e');
+        // Non-fatal: account deletion already succeeded
+      }
 
       return DeleteAccountResult.success();
     } on FirebaseAuthException catch (e) {

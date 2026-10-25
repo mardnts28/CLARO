@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../models/health_profile.dart';
 import 'firestore_label_mappings.dart';
@@ -63,6 +64,7 @@ class FirebaseUserRepository implements UserRepository {
   final FirebaseFirestore _firestore;
   final Map<String, UserHealthProfile> _memoryCache = {};
 
+  static const _secureStorage = FlutterSecureStorage();
   static String _persistentCacheKey(String userId) =>
       'user_health_profile_cache_$userId';
 
@@ -77,16 +79,45 @@ class FirebaseUserRepository implements UserRepository {
     //    a network round trip to the Worker)
     if (!forceRefresh) {
       try {
-        final prefs = await SharedPreferences.getInstance();
-        final cachedJson = prefs.getString(_persistentCacheKey(userId));
+        // Try secure storage first
+        final cachedJson = await _secureStorage.read(key: _persistentCacheKey(userId));
         if (cachedJson != null && cachedJson.isNotEmpty) {
           final decoded = jsonDecode(cachedJson) as Map<String, dynamic>;
           final profile = UserHealthProfile.fromJson(decoded);
           _memoryCache[userId] = profile;
           return profile;
         }
+
+        // Migration: if secure entry is missing, check legacy SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        final legacyJson = prefs.getString(_persistentCacheKey(userId));
+        if (legacyJson != null && legacyJson.isNotEmpty) {
+          final decoded = jsonDecode(legacyJson) as Map<String, dynamic>;
+          final profile = UserHealthProfile.fromJson(decoded);
+          _memoryCache[userId] = profile;
+
+          // Migrate to secure storage
+          try {
+            await _secureStorage.write(
+              key: _persistentCacheKey(userId),
+              value: legacyJson,
+            );
+            // Only delete plaintext after secure write succeeds
+            await prefs.remove(_persistentCacheKey(userId));
+            debugPrint('Migrated health profile cache to secure storage for user: $userId');
+          } catch (e) {
+            debugPrint('Failed to migrate health profile to secure storage: $e');
+            // Keep using the legacy value for this session, will retry on next launch
+          }
+
+          return profile;
+        }
       } catch (e) {
         // Non-fatal: fallback to remote fetch if cache read fails
+        // If secure storage is corrupted, delete the broken entry
+        try {
+          await _secureStorage.delete(key: _persistentCacheKey(userId));
+        } catch (_) {}
       }
     }
 
@@ -150,6 +181,9 @@ class FirebaseUserRepository implements UserRepository {
   void invalidateCache([String? userId]) {
     if (userId != null) {
       _memoryCache.remove(userId);
+      // Delete from secure storage
+      _secureStorage.delete(key: _persistentCacheKey(userId)).catchError((_) {});
+      // Also delete legacy SharedPreferences key if it still exists
       SharedPreferences.getInstance().then((prefs) {
         prefs.remove(_persistentCacheKey(userId));
       }).catchError((_) {});
@@ -165,10 +199,39 @@ class FirebaseUserRepository implements UserRepository {
   }
 
   void _persistProfile(String userId, UserHealthProfile profile) {
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString(_persistentCacheKey(userId), jsonEncode(profile.toJson()));
-    }).catchError((e) {
-      // Non-fatal logging
+    // Write to secure storage instead of SharedPreferences
+    _secureStorage.write(
+      key: _persistentCacheKey(userId),
+      value: jsonEncode(profile.toJson()),
+    ).catchError((e) {
+      // Non-fatal: if secure storage fails, app will fall back to Firestore on next load
+      debugPrint('Failed to persist health profile to secure storage: $e');
     });
+  }
+
+  /// Clears all user-specific cached data for [userId] from SharedPreferences and secure storage.
+  /// This includes health profile cache, advisory cache, and group selection.
+  /// Called during logout to prevent user data from persisting on shared devices.
+  static Future<void> clearUserCache(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Clear health profile cache from secure storage
+      await _secureStorage.delete(key: _persistentCacheKey(userId)).catchError((_) {});
+      // Clear legacy health profile cache from SharedPreferences if it still exists
+      await prefs.remove(_persistentCacheKey(userId));
+      // Clear last selected group for this user
+      await prefs.remove('product_detail_last_group_$userId');
+      // Clear all advisory cache keys (they embed user health fingerprint)
+      final keys = prefs.getKeys();
+      for (final key in keys) {
+        if (key.startsWith('advisory_cache_') || key.startsWith('group_advisory_')) {
+          await prefs.remove(key);
+        }
+      }
+      debugPrint('User cache cleared for UID: $userId');
+    } catch (e) {
+      debugPrint('Error clearing user cache for UID $userId: $e');
+      // Non-fatal: logout should not fail if cache clearing fails
+    }
   }
 }

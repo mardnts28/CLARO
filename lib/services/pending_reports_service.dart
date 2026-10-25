@@ -44,7 +44,8 @@ class PendingReportsService {
   }
 
   /// Queues a pending report when offline.
-  Future<void> queueReport({
+  /// Returns true if the report was queued, false if it was a duplicate.
+  Future<bool> queueReport({
     required String productName,
     required String category,
     required String reportedBy,
@@ -54,6 +55,23 @@ class PendingReportsService {
     required String backImagePath,
     List<String> additionalBackImagePaths = const [],
   }) async {
+    // Check for duplicate: same user + normalized name + category + back photo
+    final existingReports = await getPendingReports();
+    final duplicateKey = '${reportedBy}_${productName.trim().toLowerCase()}_${category}_$backImagePath';
+    final isDuplicate = existingReports.any((report) {
+      final existingKey = '${report['reportedBy']}_${(report['productName'] as String? ?? '').trim().toLowerCase()}_${report['category']}_${report['backImagePath']}';
+      return existingKey == duplicateKey;
+    });
+
+    if (isDuplicate) {
+      debugPrint('PendingReportsService: duplicate report skipped for "$productName"');
+
+      // For offline duplicates, we don't create a skipped report since it's just
+      // a local queue duplicate. The user can still submit the report when online.
+      // This is different from online duplicates where we create an audit trail.
+      return false;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final list = prefs.getStringList(_storageKey) ?? [];
 
@@ -74,6 +92,7 @@ class PendingReportsService {
     await prefs.setStringList(_storageKey, list);
     pendingCountNotifier.value = list.length;
     debugPrint('PendingReportsService: queued report for "$productName". Total pending: ${list.length}');
+    return true;
   }
 
   /// Attempts to upload and submit any pending reports if internet connection is available.
@@ -169,6 +188,47 @@ class PendingReportsService {
               .cast<String>()
               .toList();
 
+          // Check for duplicate in Firestore before submitting
+          final normalizedProductName = productName.trim().toLowerCase();
+          final duplicateQuery = await FirebaseFirestore.instance
+              .collection('reports')
+              .where('reportedBy', isEqualTo: uid)
+              .where('category', isEqualTo: category)
+              .get();
+
+          final duplicateDocs = duplicateQuery.docs.where((doc) {
+            final existingProductName = (doc.data()['productName'] as String? ?? '').trim().toLowerCase();
+            return existingProductName == normalizedProductName;
+          }).toList();
+
+          if (duplicateDocs.isNotEmpty) {
+            final duplicateDoc = duplicateDocs.first;
+            debugPrint('PendingReportsService: duplicate report skipped during flush for "$productName"');
+
+            // Create a skipped report entry for audit purposes
+            final skippedReport = ReportModel(
+              id: '',
+              dateSubmitted: DateTime.now(),
+              productDescription: '',
+              productName: productName,
+              category: category,
+              reportedBy: uid,
+              status: 'Skipped',
+              userEmail: email,
+              userName: name,
+              frontImageUrl: frontUrl,
+              backImageUrl: backUrl,
+              additionalBackImageUrls: additionalBackUrls,
+              extractedData: const {},
+              originalReportId: duplicateDoc.id,
+            );
+
+            await FirebaseFirestore.instance.collection('reports').add(skippedReport.toMap());
+
+            success = true; // Mark as success so it's removed from queue
+            continue;
+          }
+
           final report = ReportModel(
             id: '',
             dateSubmitted: DateTime.now(),
@@ -222,6 +282,12 @@ class PendingReportsService {
           remaining.add(raw);
         }
       }
+
+      // Keep reports that were queued while this flush was running.
+      final flushedBatch = list.toSet();
+      final queuedDuringFlush = (prefs.getStringList(_storageKey) ?? [])
+          .where((raw) => !flushedBatch.contains(raw));
+      remaining.addAll(queuedDuringFlush);
 
       await prefs.setStringList(_storageKey, remaining);
       pendingCountNotifier.value = remaining.length;

@@ -18,6 +18,7 @@ class ReportModel {
   final String status;
   final String rejectionReason;
   final String userEmail;
+  final String? originalReportId; // For skipped duplicates: references the original report
   final String userName;
   final String frontImageUrl;
   final String backImageUrl;
@@ -45,6 +46,7 @@ class ReportModel {
     this.backImageUrl = '',
     this.additionalBackImageUrls = const [],
     this.extractedData = const {},
+    this.originalReportId,
   });
 
   factory ReportModel.fromFirestore(DocumentSnapshot doc) {
@@ -75,11 +77,12 @@ class ReportModel {
       backImageUrl: data['backImageUrl'] ?? '',
       additionalBackImageUrls: List<String>.from(data['additionalBackImageUrls'] ?? []),
       extractedData: Map<String, dynamic>.from(data['extractedData'] ?? {}),
+      originalReportId: data['originalReportId'] as String?,
     );
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = <String, dynamic>{
       'dateSubmitted': FieldValue.serverTimestamp(),
       'productDescription': productDescription,
       'productName': productName,
@@ -94,5 +97,9 @@ class ReportModel {
       'additionalBackImageUrls': additionalBackImageUrls,
       'extractedData': extractedData,
     };
+    if (originalReportId != null) {
+      map['originalReportId'] = originalReportId;
+    }
+    return map;
   }
 }

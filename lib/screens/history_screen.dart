@@ -868,6 +868,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
     } else if (status == 'rejected') {
       statusBg = Colors.red.withValues(alpha: 0.15);
       statusText = Colors.red[700]!;
+    } else if (status == 'skipped') {
+      statusBg = Colors.grey.withValues(alpha: 0.15);
+      statusText = Colors.grey[700]!;
     } else {
       // pending
       statusBg = Colors.orange.withValues(alpha: 0.15);
@@ -936,6 +939,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 report.category,
                 style: GoogleFonts.inter(
                     fontSize: 12, color: colorScheme.onSurfaceVariant),
+              ),
+            ],
+            if (report.status.toLowerCase() == 'skipped' && report.originalReportId != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(Icons.info_outline,
+                      size: 12, color: colorScheme.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Duplicate of previous report',
+                    style: GoogleFonts.inter(
+                        fontSize: 11, color: colorScheme.onSurfaceVariant),
+                  ),
+                ],
               ),
             ],
             const SizedBox(height: 12),

@@ -30,6 +30,7 @@ dependencies:
   cloud_firestore: ^5.4.4
   cloud_functions: ^5.3.0
   shared_preferences: ^2.5.5
+  flutter_secure_storage: ^11.1.1
   connectivity_plus: ^6.0.5
 
   cupertino_icons: ^1.0.8

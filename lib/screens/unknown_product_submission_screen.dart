@@ -249,7 +249,7 @@ class _UnknownProductSubmissionScreenState
         } catch (_) {}
       }
 
-      await BackendLocator.pendingReportsService.queueReport(
+      final wasQueued = await BackendLocator.pendingReportsService.queueReport(
         productName: _nameController.text.trim(),
         category: _selectedCategory,
         reportedBy: uid,
@@ -261,16 +261,21 @@ class _UnknownProductSubmissionScreenState
       );
 
       if (mounted) {
-        final loc = AppLocalizations.of(context)!;
-        await SuccessFeedbackUtils.showQueuedNoticeDialog(
-          context,
-          title: loc.reportQueuedTitle,
-          message: loc.reportQueuedMessage,
-          buttonText: loc.gotIt,
-          onDismiss: () {
-            Navigator.of(context).popUntil((route) => route.isFirst);
-          },
-        );
+        if (wasQueued) {
+          final loc = AppLocalizations.of(context)!;
+          await SuccessFeedbackUtils.showQueuedNoticeDialog(
+            context,
+            title: loc.reportQueuedTitle,
+            message: loc.reportQueuedMessage,
+            buttonText: loc.gotIt,
+            onDismiss: () {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+          );
+        } else {
+          // Duplicate in offline queue
+          _showDuplicateDialog(_nameController.text.trim(), 'already in queue');
+        }
       }
       return;
     }
@@ -308,6 +313,55 @@ class _UnknownProductSubmissionScreenState
           // Keep the email-prefix fallback set above -- don't block
           // submission over a profile lookup failure.
         }
+      }
+
+      // Check for duplicate: same user + normalized name + category
+      // This matches the offline duplicate logic in PendingReportsService
+      final normalizedProductName = _nameController.text.trim().toLowerCase();
+      final duplicateQuery = await FirebaseFirestore.instance
+          .collection('reports')
+          .where('reportedBy', isEqualTo: uid)
+          .where('category', isEqualTo: _selectedCategory)
+          .get();
+
+      final duplicateDocs = duplicateQuery.docs.where((doc) {
+        final existingProductName = (doc.data()['productName'] as String? ?? '').trim().toLowerCase();
+        return existingProductName == normalizedProductName;
+      }).toList();
+
+      if (duplicateDocs.isNotEmpty) {
+        final duplicateDoc = duplicateDocs.first;
+        debugPrint('Duplicate report skipped for "${_nameController.text.trim()}"');
+
+        // Create a skipped report entry for audit purposes
+        final skippedReport = ReportModel(
+          id: '',
+          dateSubmitted: DateTime.now(),
+          productDescription: '',
+          productName: _nameController.text.trim(),
+          category: _selectedCategory,
+          reportedBy: uid,
+          status: 'Skipped',
+          userEmail: email,
+          userName: name,
+          frontImageUrl: '',
+          backImageUrl: '',
+          additionalBackImageUrls: const [],
+          extractedData: const {},
+          originalReportId: duplicateDoc.id,
+        );
+
+        await FirebaseFirestore.instance.collection('reports').add(skippedReport.toMap());
+
+        if (!mounted) return;
+        final duplicateData = duplicateDoc.data();
+        final duplicateDate = duplicateData['dateSubmitted'] as Timestamp?;
+        final formattedDate = duplicateDate != null
+            ? _formatDuplicateDate(duplicateDate.toDate())
+            : 'unknown date';
+
+        _showDuplicateDialog(_nameController.text.trim(), formattedDate);
+        return;
       }
 
       // Read photos safely -- front photo is optional if capturedImagePath was not provided
@@ -424,7 +478,7 @@ class _UnknownProductSubmissionScreenState
             } catch (_) {}
           }
 
-          await BackendLocator.pendingReportsService.queueReport(
+          final wasQueued = await BackendLocator.pendingReportsService.queueReport(
             productName: _nameController.text.trim(),
             category: _selectedCategory,
             reportedBy: uid,
@@ -436,15 +490,20 @@ class _UnknownProductSubmissionScreenState
           );
 
           if (!mounted) return;
-          await SuccessFeedbackUtils.showQueuedNoticeDialog(
-            context,
-            title: loc.reportQueuedTitle,
-            message: loc.reportQueuedMessage,
-            buttonText: loc.gotIt,
-            onDismiss: () {
-              Navigator.of(context).popUntil((route) => route.isFirst);
-            },
-          );
+          if (wasQueued) {
+            await SuccessFeedbackUtils.showQueuedNoticeDialog(
+              context,
+              title: loc.reportQueuedTitle,
+              message: loc.reportQueuedMessage,
+              buttonText: loc.gotIt,
+              onDismiss: () {
+                Navigator.of(context).popUntil((route) => route.isFirst);
+              },
+            );
+          } else {
+            // Duplicate in offline queue
+            _showDuplicateDialog(_nameController.text.trim(), 'already in queue');
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -499,6 +558,40 @@ class _UnknownProductSubmissionScreenState
         Navigator.of(context).popUntil((route) => route.isFirst);
       },
     );
+  }
+
+  void _showDuplicateDialog(String productName, String date) {
+    final loc = AppLocalizations.of(context)!;
+    SuccessFeedbackUtils.showSuccessDialog(
+      context,
+      title: 'Report Skipped',
+      message: 'You have already reported "$productName" previously on $date.',
+      buttonText: loc.gotIt,
+      onDismiss: () {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      },
+    );
+  }
+
+  String _formatDuplicateDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      if (difference.inHours == 0) {
+        if (difference.inMinutes == 0) {
+          return 'just now';
+        }
+        return '${difference.inMinutes} minute${difference.inMinutes == 1 ? '' : 's'} ago';
+      }
+      return '${difference.inHours} hour${difference.inHours == 1 ? '' : 's'} ago';
+    } else if (difference.inDays == 1) {
+      return 'yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
 
   // ── Reusable photo block (front or back) ────────────────────────────────

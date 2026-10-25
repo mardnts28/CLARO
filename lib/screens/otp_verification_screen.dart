@@ -97,7 +97,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (_currentExpiresAt != null) {
       final now = DateTime.now();
       final difference = _currentExpiresAt!.difference(now);
-      _remainingSeconds = difference.inSeconds;
+      _remainingSeconds = difference.inSeconds.clamp(0, 300);
     } else {
       _remainingSeconds = 300;
     }
@@ -107,13 +107,23 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       if (!mounted) return;
 
       setState(() {
-        if (_remainingSeconds > 0) {
-          _remainingSeconds--;
+        // Recalculate remaining time from expiry timestamp to continue counting down
+        // even when app is in the background
+        if (_currentExpiresAt != null) {
+          final now = DateTime.now();
+          final difference = _currentExpiresAt!.difference(now);
+          _remainingSeconds = difference.inSeconds.clamp(0, 300);
+        } else {
+          // Fallback to decrementing if no expiry timestamp is available
+          if (_remainingSeconds > 0) {
+            _remainingSeconds--;
+          }
         }
+
         if (_resendCooldownSeconds > 0) {
           _resendCooldownSeconds--;
         }
-        if (_remainingSeconds == 0 && _resendCooldownSeconds == 0) {
+        if (_remainingSeconds <= 0 && _resendCooldownSeconds <= 0) {
           timer.cancel();
         }
       });

@@ -495,6 +495,12 @@ class GeminiAdvisoryService {
     _cache.removeWhere((k, _) => k.startsWith('$scanEventId::'));
   }
 
+  /// Clears all in-memory advisory cache. Called during logout to prevent
+  /// user-specific advisories from persisting in memory.
+  void clearAllCache() {
+    _cache.clear();
+  }
+
   /// Generates the per-nutrient ranking explanation shown on the
   /// comparison card. [healthCondition] is the user's condition name
   /// (e.g. "hypertension", or a comma-joined list for multiple
