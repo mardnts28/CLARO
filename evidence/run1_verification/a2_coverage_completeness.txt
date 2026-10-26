@@ -1,0 +1,34 @@
+=== A2. COVERAGE COMPLETENESS AUDIT ===
+Total non-generated files in lib/: 128
+Files present in lcov (excluding generated/bootstrap): 119
+Non-generated files MISSING from lcov: 9
+
+List of missing non-generated files:
+  - lib/main.dart
+  - lib/screens/get_started_screen.dart
+  - lib/screens/select_language_screen.dart
+  - lib/screens/splash_screen.dart
+  - lib/services/get_started_service.dart
+  - lib/services/yolo_recognition_service.dart
+  - lib/services/yolo_recognition_service_web.dart
+  - lib/widgets/dome_clipper.dart
+  - lib/widgets/dome_page_route.dart
+
+Executable lines estimate per missing file:
+   242 lines - lib/main.dart
+   532 lines - lib/screens/get_started_screen.dart
+   724 lines - lib/screens/select_language_screen.dart
+   119 lines - lib/screens/splash_screen.dart
+    11 lines - lib/services/get_started_service.dart
+     2 lines - lib/services/yolo_recognition_service.dart
+    28 lines - lib/services/yolo_recognition_service_web.dart
+    53 lines - lib/widgets/dome_clipper.dart
+   170 lines - lib/widgets/dome_page_route.dart
+Total missing executable lines: 1881
+
+=== COMPARATIVE SUMMARY ===
+1. As reported by Flutter (Run 1 Net, 119 files): LF=19029, LH=3024, Coverage=15.89%
+2. All non-generated files included (128 files, including 9 un-imported files at 0%): LF=20910, LH=3024, Coverage=14.46%
+Threshold: >= 70.0% (LOCKED)
+Result: FAIL under both metrics.
+Corrected Run 1 Value: 14.46% (reflects true whole-codebase line coverage).

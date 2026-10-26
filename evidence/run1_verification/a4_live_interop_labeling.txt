@@ -1,0 +1,20 @@
+=== A4. LIVE INTEROPERABILITY RELABELING & TEST ACCOUNT AUDIT ===
+
+1. Relabeling of Layer B:
+   Previous Label in v1: External service live exchange rate (Live)
+   Corrected Label: Endpoint reachability
+   Status: 3 / 3 endpoints responded with standard contractual HTTP status codes:
+     - <GEMINI_PROXY_HOST>: HTTP 405 (Method Not Allowed on GET, endpoint active)
+     - <CLOUDINARY_CLOUD>: HTTP 400 (Bad Request: missing required parameters, API online)
+     - <FIREBASE_PROJECT>: HTTP 404 (Root identity endpoint active)
+   Reason for relabeling: HTTP 405, 400, and 404 verify network connectivity, DNS resolution, and endpoint existence, but do NOT constitute an end-to-end authenticated data exchange.
+
+2. Dedicated Test Account Audit:
+   Search performed for dedicated credentials in .env, test/, and lib/.
+   Finding: No dedicated test account credentials (email/password or auth tokens) are configured.
+   Per instruction: Valid-exchange check is marked NOT TESTED.
+
+3. Requirements for Future Valid-Exchange Testing:
+   - Dedicated Firebase test user (e.g. test-audit@claro.app) configured with known non-production password.
+   - Cloudinary sandbox upload preset for test payload verification.
+   - Gemini proxy shared secret configured with test mock food item OCR string to verify structured JSON response schema.

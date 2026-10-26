@@ -1,0 +1,21 @@
+=== A1. TEST-COUNT & BASELINE DISCREPANCY AUDIT ===
+Tracking test files and test additions across commits:
+
+Commit: 385be19 - Complete merge and portability maintainability validation (2026-09-22)
+  Test files count: 16
+Commit: 9f6fd41 - Add guest mode: live product data, locked personalized advisory, session favorites (2026-09-25)
+  Test files count: 17
+Commit: 5a52662 - Add voice assistant improvements, Gemini chat tests, and auth updates (2026-09-29)
+  Test files count: 19
+Commit: 08a7b82 - update voice assitant and offline parts (2026-10-15)
+  Test files count: 18
+Commit: 52ef412 - Merge remote-tracking branch 'origin/main' and integrate voice assistant enhancements (2026-10-15)
+  Test files count: 20
+Commit: b843690 - improved parts for ISO requirements (2026-10-23)
+  Test files count: 32
+
+Findings:
+1. Commit 385be19 (2026-09-22): Baseline of the original PORTABILITY_MAINTAINABILITY_EVALUATION.md report (16 test files, 87 test cases, 10.67% coverage).
+2. Commits 9f6fd41 to b843690 (2026-10-15 to 2026-10-26): Developers added 16 new test files and expanded voice navigation, guest mode, comparison calculators, and offline dialog tests.
+3. Commit b843690 (2026-10-26): True pre-evaluation baseline at the start of this evaluation had 32 test files and 160 test cases.
+4. No tests were added between the user prompt and Run 1. The prompt referenced the historical 2026-09-22 report figures (87 tests), whereas HEAD contained 160 passing tests.

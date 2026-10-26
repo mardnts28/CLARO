@@ -1,0 +1,32 @@
+=== A6. LAYER MATRIX RECONCILIATION AUDIT ===
+
+1. SERVICES -> SCREENS Violations (12 edges):
+   lib/services/voice_command_router.dart:6 -> lib/screens/nutrition_guide_screen.dart
+   lib/services/voice_command_router.dart:7 -> lib/screens/group_screen.dart
+   lib/services/voice_command_router.dart:15 -> lib/screens/personal_info_screen.dart
+   lib/services/voice_command_router.dart:16 -> lib/screens/preference_screen.dart
+   lib/services/voice_command_router.dart:17 -> lib/screens/suggestion_screen.dart
+   lib/services/voice_command_router.dart:18 -> lib/screens/change_password_screen.dart
+   lib/services/voice_command_router.dart:19 -> lib/screens/theme_screen.dart
+   lib/services/voice_command_router.dart:20 -> lib/screens/review_history_screen.dart
+   lib/services/voice_command_router.dart:21 -> lib/screens/compare_products_screen.dart
+   lib/services/voice_command_router.dart:22 -> lib/screens/more_details_screen.dart
+   lib/services/voice_command_router.dart:23 -> lib/screens/product_detail_screen.dart
+   lib/services/voice_command_router.dart:24 -> lib/screens/unknown_product_submission_screen.dart
+
+2. SERVICES -> WIDGETS Violations (0 edges):
+
+3. DATA_DOMAIN -> SERVICES Violations (3 edges):
+   lib/data/repositories/product_repository.dart:23 -> lib/services/nutrition_service.dart
+   lib/data/services/backend_locator.dart:27 -> lib/services/pending_reports_service.dart
+   lib/data/services/backend_locator.dart:28 -> lib/services/connectivity_service.dart
+
+4. DATA_DOMAIN -> UI Violations (0 edges):
+
+Total Layer Violations: 15
+v1 reported only 12 violations (SERVICES -> SCREENS).
+If strict unidirectional layering (UI -> SERVICES -> DATA_DOMAIN) is enforced:
+  - SERVICES -> SCREENS: 12
+  - SERVICES -> WIDGETS: 0
+  - DATA_DOMAIN -> SERVICES: 3
+  Total is 15 layer violations.

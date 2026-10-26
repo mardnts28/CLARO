@@ -1,0 +1,37 @@
+=== A5. MODIFIABILITY EXACT METRICS ===
+
+1. Files edited by hand: 1 (lib/data/models/health_profile.dart)
+2. Files that stopped compiling: 5
+   - lib/core/utils/advisory_prompt_builder.dart (Data / Core Layer)
+   - lib/core/utils/fallback_advisory_generator.dart (Data / Core Layer)
+   - lib/core/utils/who_calculator.dart (Data / Core Layer)
+   - lib/data/services/product_ranking_service.dart (Data / Core Layer)
+   - lib/screens/group_details_screen.dart (UI Layer)
+
+3. Test suites that failed to compile/load: 20 of 32 total test suites
+   - test/advisory_prompt_builder_test.dart
+   - test/allergen_matching_test.dart
+   - test/audit_verification/iso_25010_correctness_audit_test.dart
+   - test/auth_error_message_test.dart
+   - test/auth_screens_widget_test.dart
+   - test/ckd_gerd_scoring_test.dart
+   - test/comparison_calculator_test.dart
+   - test/comparison_matrix_builder_test.dart
+   - test/fallback_advisory_no_conditions_test.dart
+   - test/gemini_chat_test.dart
+   - test/pending_reports_offline_test.dart
+   - test/preferences_and_theme_widget_test.dart
+   - test/product_comparison_service_test.dart
+   - test/product_ranking_service_test.dart
+   - test/report_rejection_reason_test.dart
+   - test/serving_size_calculator_test.dart
+   - test/voice_assistant_listen_test.dart
+   - test/voice_compare_navigation_test.dart
+   - test/voice_earcon_and_shake_test.dart
+   - test/widget_test.dart
+
+4. Test suites that compiled and ran: 12 suites
+5. Tests that ran and passed: 47 tests
+6. Tests that ran and FAILED on assertions: 0 (0 assertion failures; all failures were compile-time load errors)
+7. Tests that could not run because of compile errors: 113 tests (160 baseline total - 47 passed)
+8. Total tests in the suite: 160 tests

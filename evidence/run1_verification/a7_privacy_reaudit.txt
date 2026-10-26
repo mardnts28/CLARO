@@ -1,0 +1,32 @@
+=== A7. EVIDENCE PRIVACY RE-AUDIT ===
+
+--- 1. Working Directory evidence/ Scan ---
+Google API Key (AIza...)      : 0 matches
+JWT Token (eyJ...)            : 0 matches
+Bearer Token                  : 0 matches
+Password references           : 0 matches
+Secret references             : 0 matches
+Token parameter (token=)      : 0 matches
+API Key parameter (apikey=)   : 0 matches
+Workers.dev hostnames         : 1 matches
+Cloudinary cloud names        : 0 matches
+Firebase project IDs          : 0 matches
+Email addresses               : 1 matches
+
+--- 2. Git History of evidence/ Scan ---
+Google API Key (AIza...)      : 0 matches in git log
+JWT Token (eyJ...)            : 0 matches in git log
+Bearer Token                  : 0 matches in git log
+Password references           : 0 matches in git log
+Secret references             : 0 matches in git log
+Token parameter (token=)      : 0 matches in git log
+API Key parameter (apikey=)   : 0 matches in git log
+Workers.dev hostnames         : 1 matches in git log
+Cloudinary cloud names        : 0 matches in git log
+Firebase project IDs          : 0 matches in git log
+Email addresses               : 2 matches in git log
+
+Summary of Privacy Audit:
+- Zero API keys (AIza...), JWTs, Bearer tokens, or passwords were found in evidence/ or its git history.
+- Workers.dev hostname appeared in evidence/run1/live_interop_checks.txt.
+- In accordance with Rule 5, private hostnames in REPORT_v1.1.md will be replaced with <GEMINI_PROXY_HOST>, <CLOUDINARY_CLOUD>, and <FIREBASE_PROJECT>.
