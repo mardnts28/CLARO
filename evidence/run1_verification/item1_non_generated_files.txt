@@ -1,0 +1,131 @@
+=== ALL 128 NON-GENERATED DART FILES IN lib/ ===
+Total count: 128
+
+  1. lib/core/constants/canonical_allergens.dart
+  2. lib/core/constants/who_fda_thresholds.dart
+  3. lib/core/utils/advisory_prompt_builder.dart
+  4. lib/core/utils/avatar_assets.dart
+  5. lib/core/utils/comparison_calculator.dart
+  6. lib/core/utils/comparison_matrix_builder.dart
+  7. lib/core/utils/fallback_advisory_generator.dart
+  8. lib/core/utils/gerd_trigger_detector.dart
+  9. lib/core/utils/group_advisory_builder.dart
+ 10. lib/core/utils/group_type_ui.dart
+ 11. lib/core/utils/image_validation_utils.dart
+ 12. lib/core/utils/kidney_advisory_facts.dart
+ 13. lib/core/utils/kidney_nutrient_detector.dart
+ 14. lib/core/utils/nova_score_calculator.dart
+ 15. lib/core/utils/number_format_utils.dart
+ 16. lib/core/utils/nutri_score_calculator.dart
+ 17. lib/core/utils/nutrition_availability.dart
+ 18. lib/core/utils/nutrition_calculator.dart
+ 19. lib/core/utils/product_characteristics.dart
+ 20. lib/core/utils/rank_label_helper.dart
+ 21. lib/core/utils/sanitizing_text_input_formatter.dart
+ 22. lib/core/utils/serving_size_calculator.dart
+ 23. lib/core/utils/success_feedback_utils.dart
+ 24. lib/core/utils/who_calculator.dart
+ 25. lib/data/models/comparison_matrix.dart
+ 26. lib/data/models/group_evaluation.dart
+ 27. lib/data/models/health_advisory.dart
+ 28. lib/data/models/health_group.dart
+ 29. lib/data/models/health_profile.dart
+ 30. lib/data/models/product_detail_result.dart
+ 31. lib/data/models/product_evaluation.dart
+ 32. lib/data/models/product_extraction_result.dart
+ 33. lib/data/models/ranked_product_result.dart
+ 34. lib/data/repositories/favorites_repository.dart
+ 35. lib/data/repositories/firestore_label_mappings.dart
+ 36. lib/data/repositories/group_repository.dart
+ 37. lib/data/repositories/history_repository.dart
+ 38. lib/data/repositories/mock_data/mock_users.dart
+ 39. lib/data/repositories/product_repository.dart
+ 40. lib/data/repositories/user_repository.dart
+ 41. lib/data/services/backend_locator.dart
+ 42. lib/data/services/cloudinary_upload_service.dart
+ 43. lib/data/services/favorites_service.dart
+ 44. lib/data/services/gemini_advisory_service.dart
+ 45. lib/data/services/product_comparison_service.dart
+ 46. lib/data/services/product_extraction_service.dart
+ 47. lib/data/services/product_ranking_service.dart
+ 48. lib/main.dart
+ 49. lib/models/history_item.dart
+ 50. lib/models/product_model.dart
+ 51. lib/models/report_model.dart
+ 52. lib/screens/add_managed_member_screen.dart
+ 53. lib/screens/camera_scanner_screen.dart
+ 54. lib/screens/change_password_screen.dart
+ 55. lib/screens/compare_products_screen.dart
+ 56. lib/screens/forgot_password_screen.dart
+ 57. lib/screens/get_started_screen.dart
+ 58. lib/screens/group_details_screen.dart
+ 59. lib/screens/group_screen.dart
+ 60. lib/screens/history_screen.dart
+ 61. lib/screens/home_screen.dart
+ 62. lib/screens/invite_member_screen.dart
+ 63. lib/screens/login_screen.dart
+ 64. lib/screens/more_details_screen.dart
+ 65. lib/screens/multi_scan_results_screen.dart
+ 66. lib/screens/nutrition_guide_screen.dart
+ 67. lib/screens/onboarding_screen.dart
+ 68. lib/screens/otp_verification_screen.dart
+ 69. lib/screens/personal_info_screen.dart
+ 70. lib/screens/preference_screen.dart
+ 71. lib/screens/product_detail/advisory_banner_widget.dart
+ 72. lib/screens/product_detail/nutrition_breakdown_card.dart
+ 73. lib/screens/product_detail/serving_selector.dart
+ 74. lib/screens/product_detail_screen.dart
+ 75. lib/screens/profile_screen.dart
+ 76. lib/screens/qr_scan_screen.dart
+ 77. lib/screens/report_detail_screen.dart
+ 78. lib/screens/review_history_screen.dart
+ 79. lib/screens/select_language_screen.dart
+ 80. lib/screens/signup_screen.dart
+ 81. lib/screens/splash_screen.dart
+ 82. lib/screens/suggestion_screen.dart
+ 83. lib/screens/theme_screen.dart
+ 84. lib/screens/unknown_product_submission_screen.dart
+ 85. lib/services/audio_earcon_service.dart
+ 86. lib/services/auth_service.dart
+ 87. lib/services/connectivity_service.dart
+ 88. lib/services/fda_verification_service.dart
+ 89. lib/services/feature_access.dart
+ 90. lib/services/gemini_service.dart
+ 91. lib/services/get_started_service.dart
+ 92. lib/services/guest_favorites_service.dart
+ 93. lib/services/guest_session.dart
+ 94. lib/services/haptic_service.dart
+ 95. lib/services/history_service.dart
+ 96. lib/services/home_tab_controller.dart
+ 97. lib/services/image_validation_service.dart
+ 98. lib/services/locale_service.dart
+ 99. lib/services/nutrition_service.dart
+100. lib/services/pending_reports_service.dart
+101. lib/services/scan_history_service.dart
+102. lib/services/scanner_position_guide_service.dart
+103. lib/services/shake_detector_service.dart
+104. lib/services/text_size_service.dart
+105. lib/services/theme_service.dart
+106. lib/services/validation_service.dart
+107. lib/services/voice_assistant_service.dart
+108. lib/services/voice_command_router.dart
+109. lib/services/yolo_recognition_service.dart
+110. lib/services/yolo_recognition_service_io.dart
+111. lib/services/yolo_recognition_service_web.dart
+112. lib/widgets/account_required_gate.dart
+113. lib/widgets/avatar_picker.dart
+114. lib/widgets/custom_text_field.dart
+115. lib/widgets/date_of_birth_picker.dart
+116. lib/widgets/dome_clipper.dart
+117. lib/widgets/dome_page_route.dart
+118. lib/widgets/health_info_warning_card.dart
+119. lib/widgets/join_group_dialog.dart
+120. lib/widgets/join_profile_dialog.dart
+121. lib/widgets/locked_feature_card.dart
+122. lib/widgets/onboarding_page_dots.dart
+123. lib/widgets/ranked_product_card.dart
+124. lib/widgets/score_badge_strips.dart
+125. lib/widgets/selectable_scanned_product_card.dart
+126. lib/widgets/terms_and_conditions_dialog.dart
+127. lib/widgets/voice_assistant_fab.dart
+128. lib/widgets/voice_mic_overlay.dart

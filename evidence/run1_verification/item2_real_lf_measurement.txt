@@ -1,0 +1,18 @@
+=== MEASURED LF FOR 9 PREVIOUSLY MISSING FILES ===
+File                                                        LF     LH
+----------------------------------------------------------------------
+lib/main.dart                                              159      3
+lib/screens/get_started_screen.dart                        203      2
+lib/screens/select_language_screen.dart                    292      1
+lib/screens/splash_screen.dart                              56      0
+lib/services/get_started_service.dart                        9      0
+lib/services/yolo_recognition_service.dart              NOT FOUND      0
+lib/services/yolo_recognition_service_web.dart              19      0
+lib/widgets/dome_clipper.dart                               33      1
+lib/widgets/dome_page_route.dart                            84      0
+                                                  TOTAL    855
+
+Run 1 net coverage (119 lcov files): 3024/19029 = 15.89%
+v1.1 estimated LF for 9 files: 1,881 (heuristic executable-line estimation)
+Measured LF for 9 files: 855 (flutter test --coverage instrumentation)
+Corrected coverage (128 non-gen files excl firebase_options): 3024/19884 = 15.21%

@@ -1,0 +1,27 @@
+=== ITEM 4: ALL IGNORE COMMENTS IN lib/ ===
+Total ignore comments found: 8
+
+ignore_for_file      HAND-WRITTEN   lib/core/utils/nutri_score_calculator.dart:2
+  // ignore_for_file: constant_identifier_names
+
+ignore_for_file      GENERATED      lib/firebase_options.dart:2
+  // ignore_for_file: type=lint
+
+ignore_for_file      GENERATED      lib/generated/l10n/app_localizations.dart:11
+  // ignore_for_file: type=lint
+
+ignore               GENERATED      lib/generated/l10n/app_localizations_en.dart:1
+  // ignore: unused_import
+
+ignore_for_file      GENERATED      lib/generated/l10n/app_localizations_en.dart:5
+  // ignore_for_file: type=lint
+
+ignore               GENERATED      lib/generated/l10n/app_localizations_tl.dart:1
+  // ignore: unused_import
+
+ignore_for_file      GENERATED      lib/generated/l10n/app_localizations_tl.dart:5
+  // ignore_for_file: type=lint
+
+ignore               HAND-WRITTEN   lib/services/voice_assistant_service.dart:412
+  // ignore: deprecated_member_use
+
