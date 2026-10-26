@@ -1,0 +1,23 @@
+=== GROSS COVERAGE (Without Exclusions) ===
+Total instrumented files: 122
+Lines Found (LF): 20122
+Lines Hit (LH): 3094
+Coverage: 15.38%
+
+=== NET COVERAGE (Excluding generated files & firebase_options.dart) ===
+Total evaluated files: 119
+Lines Found (LF): 19029
+Lines Hit (LH): 3024
+Coverage: 15.89%
+
+=== 10 LOWEST-COVERAGE FILES (Exclusions applied) ===
+  0.00% (0/1686 lines) - lib/screens/product_detail_screen.dart
+  0.00% (0/675 lines) - lib/screens/compare_products_screen.dart
+  0.00% (0/611 lines) - lib/screens/multi_scan_results_screen.dart
+  0.00% (0/490 lines) - lib/screens/signup_screen.dart
+  0.00% (0/408 lines) - lib/screens/group_details_screen.dart
+  0.00% (0/408 lines) - lib/services/yolo_recognition_service_io.dart
+  0.00% (0/382 lines) - lib/screens/more_details_screen.dart
+  0.00% (0/281 lines) - lib/data/repositories/group_repository.dart
+  0.00% (0/267 lines) - lib/screens/add_managed_member_screen.dart
+  0.00% (0/241 lines) - lib/screens/otp_verification_screen.dart

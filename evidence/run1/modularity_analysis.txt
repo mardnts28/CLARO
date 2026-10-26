@@ -1,0 +1,58 @@
+=== LAYER DEPENDENCY MATRIX (Source Layer -> Target Layer Imports) ===
+Source \ Target  | UI           | SERVICES     | DATA_DOMAIN  | OTHER       
+----------------------------------------------------------------------
+UI               | 41           | 117          | 95           | 1           
+SERVICES         | 12           | 1            | 22           | 0           
+DATA_DOMAIN      | 0            | 3            | 91           | 0           
+OTHER            | 0            | 0            | 0            | 0           
+
+=== ARCHITECTURAL LAYER VIOLATIONS ===
+Total layer violations: 12
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/nutrition_guide_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/group_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/personal_info_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/preference_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/suggestion_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/change_password_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/theme_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/review_history_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/compare_products_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/more_details_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/product_detail_screen.dart
+  [VIOLATION] SERVICES imports SCREENS: lib/services/voice_command_router.dart -> lib/screens/unknown_product_submission_screen.dart
+
+=== CIRCULAR DEPENDENCIES (SCCs > 1) ===
+Total circular dependency cycles: 3
+  Cycle 1 (2 files):
+    - lib/core/utils/nutrition_calculator.dart
+    - lib/models/product_model.dart
+  Cycle 2 (3 files):
+    - lib/services/pending_reports_service.dart
+    - lib/services/connectivity_service.dart
+    - lib/data/services/backend_locator.dart
+  Cycle 3 (11 files):
+    - lib/screens/suggestion_screen.dart
+    - lib/screens/theme_screen.dart
+    - lib/screens/change_password_screen.dart
+    - lib/widgets/voice_mic_overlay.dart
+    - lib/screens/preference_screen.dart
+    - lib/screens/compare_products_screen.dart
+    - lib/screens/more_details_screen.dart
+    - lib/screens/product_detail_screen.dart
+    - lib/services/voice_command_router.dart
+    - lib/widgets/voice_assistant_fab.dart
+    - lib/screens/unknown_product_submission_screen.dart
+
+=== SIZE PROXY: FILES > 500 LOC ===
+Files > 500 LOC: 34 / 129 (26.36%)
+Top 10 largest files:
+   4154 LOC - lib/screens/product_detail_screen.dart
+   2725 LOC - lib/services/voice_command_router.dart
+   2197 LOC - lib/screens/home_screen.dart
+   1845 LOC - lib/screens/profile_screen.dart
+   1544 LOC - lib/screens/compare_products_screen.dart
+   1471 LOC - lib/screens/camera_scanner_screen.dart
+   1455 LOC - lib/screens/history_screen.dart
+   1410 LOC - lib/screens/multi_scan_results_screen.dart
+   1230 LOC - lib/services/auth_service.dart
+   1213 LOC - lib/screens/nutrition_guide_screen.dart

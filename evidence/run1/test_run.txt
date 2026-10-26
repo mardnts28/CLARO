@@ -1,0 +1,261 @@
+Resolving dependencies...
+Downloading packages...
+  _flutterfire_internals 1.3.59 (1.3.79 available)
+  camera 0.10.6 (0.12.1 available)
+  camera_avfoundation 0.9.23+2 (0.11.1 available)
+  cli_util 0.4.2 (0.6.0 available)
+  clock 1.1.2 (1.1.3 available)
+  cloud_firestore 5.6.12 (7.1.0 available)
+  cloud_firestore_platform_interface 6.6.12 (8.1.0 available)
+  cloud_firestore_web 4.4.12 (5.8.0 available)
+  cloud_functions 5.6.2 (7.0.1 available)
+  cloud_functions_platform_interface 5.8.2 (6.1.1 available)
+  cloud_functions_web 4.11.5 (5.1.15 available)
+  code_assets 1.2.1 (2.1.0 available)
+  connectivity_plus 6.1.5 (7.3.2 available)
+  cross_file 0.3.5+5 (0.4.0 available)
+  cupertino_icons 1.0.9 (2.0.0 available)
+  dbus 0.7.15 (0.8.0 available)
+  file_selector_macos 0.9.5+1 (0.9.5+2 available)
+  firebase_auth 5.7.0 (7.0.1 available)
+  firebase_auth_platform_interface 7.7.3 (9.1.2 available)
+  firebase_auth_web 5.15.3 (6.3.2 available)
+  firebase_core 3.15.2 (5.1.0 available)
+  firebase_core_platform_interface 6.0.3 (8.1.1 available)
+  firebase_core_web 2.24.1 (4.1.0 available)
+  flutter_dotenv 5.2.1 (6.0.1 available)
+  google_fonts 6.3.3 (9.0.0 available)
+  google_sign_in 6.3.0 (7.2.0 available)
+  google_sign_in_android 6.2.1 (7.2.18 available)
+  google_sign_in_ios 5.9.0 (6.3.8 available)
+  google_sign_in_platform_interface 2.5.0 (3.1.0 available)
+  google_sign_in_web 0.12.4+4 (1.1.3 available)
+  hooks 2.0.2 (2.2.0 available)
+  image_picker_ios 0.8.13+10 (0.8.13+13 available)
+  intl 0.20.2 (0.20.3 available)
+  matcher 0.12.19 (0.12.20 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.0 (1.19.0 available)
+  nm 0.5.0 (0.6.0 available)
+  objective_c 9.5.0 (9.6.2 available)
+  permission_handler 11.4.0 (13.0.2 available)
+  permission_handler_android 12.1.0 (14.1.0 available)
+  permission_handler_apple 9.6.3 (9.6.4 available)
+  petitparser 7.0.2 (7.1.0 available)
+  pointycastle 3.9.1 (4.0.0 available)
+  qr 3.0.2 (4.0.0 available)
+  record_use 0.6.0 (1.1.1 available)
+  shared_preferences_android 2.5.2 (2.5.3 available)
+  shared_preferences_foundation 2.5.7 (2.6.0 available)
+  stack_trace 1.12.1 (1.12.2 available)
+  test_api 0.7.11 (0.7.15 available)
+  vector_math 2.2.0 (2.4.3 available)
+  web 1.1.1 (1.1.2 available)
+  xml 7.0.1 (7.1.0 available)
+Got dependencies!
+52 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+00:00 +0: loading /Users/maryardientes/Desktop/Projects/CLARO/test/comparison_calculator_test.dart
+00:00 +0: /Users/maryardientes/Desktop/Projects/CLARO/test/gerd_trigger_detector_test.dart: GERD Trigger Detector Tests Should NOT flag Vegetable Oil with Green Tea Extract as caffeine
+00:00 +1: /Users/maryardientes/Desktop/Projects/CLARO/test/gerd_trigger_detector_test.dart: GERD Trigger Detector Tests Should flag genuine Tea as caffeine trigger
+00:00 +2: /Users/maryardientes/Desktop/Projects/CLARO/test/gerd_trigger_detector_test.dart: GERD Trigger Detector Tests Should NOT flag decaffeinated coffee as caffeine trigger
+00:00 +3: /Users/maryardientes/Desktop/Projects/CLARO/test/gerd_trigger_detector_test.dart: GERD Trigger Detector Tests Should detect spicy ingredients and avoid duplicate product name trigger
+00:00 +4: /Users/maryardientes/Desktop/Projects/CLARO/test/gerd_trigger_detector_test.dart: GERD Trigger Detector Tests Should detect high fat content per serving
+00:00 +5: /Users/maryardientes/Desktop/Projects/CLARO/test/health_advisory_model_test.dart: HealthAdvisory Model Tests isFallback evaluates correctly based on source
+00:00 +6: /Users/maryardientes/Desktop/Projects/CLARO/test/health_advisory_model_test.dart: HealthAdvisory Model Tests toJson and fromJson round-trips correctly
+00:00 +7: /Users/maryardientes/Desktop/Projects/CLARO/test/advisory_prompt_builder_test.dart: AdvisoryPromptBuilder Tests displayedPercentage computes correctly
+00:00 +8: /Users/maryardientes/Desktop/Projects/CLARO/test/advisory_prompt_builder_test.dart: AdvisoryPromptBuilder Tests build generates allergen prompt with strict constraints
+00:00 +9: /Users/maryardientes/Desktop/Projects/CLARO/test/advisory_prompt_builder_test.dart: AdvisoryPromptBuilder Tests build generates kidney disease prompt in Tagalog
+00:00 +10: /Users/maryardientes/Desktop/Projects/CLARO/test/advisory_prompt_builder_test.dart: AdvisoryPromptBuilder Tests buildRankingExplanation contains exact per-100g facts and ranking
+00:00 +11: /Users/maryardientes/Desktop/Projects/CLARO/test/comparison_calculator_test.dart: ComparisonCalculator Tests computeFacts finds best, worst, and flags relative positioning
+00:00 +12: /Users/maryardientes/Desktop/Projects/CLARO/test/product_comparison_service_test.dart: ProductComparisonService Tests deduplicates identical products in comparison set
+00:00 +13: /Users/maryardientes/Desktop/Projects/CLARO/test/product_comparison_service_test.dart: ProductComparisonService Tests deduplicates identical products in comparison set
+00:00 +14: /Users/maryardientes/Desktop/Projects/CLARO/test/product_comparison_service_test.dart: ProductComparisonService Tests excludes alternatives without valid nutrition facts
+00:00 +15: /Users/maryardientes/Desktop/Projects/CLARO/test/product_comparison_service_test.dart: ProductComparisonService Tests ranks candidate set using nutritional risk criteria
+00:00 +16: loading /Users/maryardientes/Desktop/Projects/CLARO/test/product_detail_subwidgets_test.dart
+00:00 +16: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: guest session is process-local and clears on conversion
+00:00 +17: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: guest favorites toggle in memory and clear without persistence
+00:00 +18: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +19: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +20: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +21: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +22: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +23: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +24: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +25: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +26: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +27: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +28: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +29: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +30: /Users/maryardientes/Desktop/Projects/CLARO/test/guest_mode_test.dart: locked card exposes accessible personalized-insight prompt
+00:01 +31: /Users/maryardientes/Desktop/Projects/CLARO/test/product_detail_subwidgets_test.dart: Product Detail Sub-Widgets Tests ServingSelector renders options and triggers onSizeChanged
+00:01 +32: /Users/maryardientes/Desktop/Projects/CLARO/test/product_detail_subwidgets_test.dart: Product Detail Sub-Widgets Tests ServingSelector renders options and triggers onSizeChanged
+00:01 +33: /Users/maryardientes/Desktop/Projects/CLARO/test/product_detail_subwidgets_test.dart: Product Detail Sub-Widgets Tests AdvisoryBannerWidget renders banner title and emphasized subtitle
+00:01 +34: /Users/maryardientes/Desktop/Projects/CLARO/test/product_detail_subwidgets_test.dart: Product Detail Sub-Widgets Tests AdvisoryBannerWidget renders multi-allergen rows when provided
+00:01 +35: /Users/maryardientes/Desktop/Projects/CLARO/test/product_detail_subwidgets_test.dart: Product Detail Sub-Widgets Tests NutrientRowWidget renders formatted nutrient facts and indicator
+00:01 +36: /Users/maryardientes/Desktop/Projects/CLARO/test/profile_versioned_cache_test.dart: UserHealthProfile Fingerprint Tests Identical health profiles produce identical fingerprints regardless of order
+00:01 +37: /Users/maryardientes/Desktop/Projects/CLARO/test/profile_versioned_cache_test.dart: UserHealthProfile Fingerprint Tests Updating condition or allergy changes the fingerprint (invalidates cache)
+00:01 +38: /Users/maryardientes/Desktop/Projects/CLARO/test/profile_versioned_cache_test.dart: HealthAdvisory Serialization & Persistence Tests HealthAdvisory correctly serializes to JSON and deserializes back
+00:02 +39: /Users/maryardientes/Desktop/Projects/CLARO/test/product_characteristics_test.dart: ProductCharacteristics Tests extracts typeTags correctly from name
+00:02 +40: /Users/maryardientes/Desktop/Projects/CLARO/test/product_characteristics_test.dart: ProductCharacteristics Tests extracts flavorTags and detects spice level
+00:02 +41: /Users/maryardientes/Desktop/Projects/CLARO/test/product_characteristics_test.dart: ProductCharacteristics Tests genericNameTokens filters stopwords and brand words
+00:02 +42: /Users/maryardientes/Desktop/Projects/CLARO/test/product_characteristics_test.dart: ProductCharacteristics Tests displayLabel title-cases keywords
+00:02 +43: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: PendingReportsService Offline Queueing Tests queuing a report updates pendingCountNotifier and persists in SharedPreferences
+PendingReportsService: queued report for "Century Tuna Flakes in Oil". Total pending: 1
+00:02 +44: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +45: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +46: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +47: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +48: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +49: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +50: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +51: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +52: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +53: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +54: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +55: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +56: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:02 +57: /Users/maryardientes/Desktop/Projects/CLARO/test/pending_reports_offline_test.dart: SuccessFeedbackUtils showQueuedNoticeDialog Widget Test renders queued dialog with hourglass icon, custom title and message
+00:03 +58: /Users/maryardientes/Desktop/Projects/CLARO/test/widget_test.dart: onboarding next button stays disabled until required info is entered
+00:03 +59: /Users/maryardientes/Desktop/Projects/CLARO/test/widget_test.dart: onboarding next button stays disabled until required info is entered
+00:03 +60: /Users/maryardientes/Desktop/Projects/CLARO/test/widget_test.dart: onboarding next button stays disabled until required info is entered
+00:03 +61: /Users/maryardientes/Desktop/Projects/CLARO/test/widget_test.dart: onboarding next button stays disabled until required info is entered
+00:03 +62: /Users/maryardientes/Desktop/Projects/CLARO/test/widget_test.dart: onboarding next button stays disabled until required info is entered
+00:04 +63: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_earcon_and_shake_test.dart: (setUpAll)
+00:04 +63: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_earcon_and_shake_test.dart: AudioEarconService Tests AudioEarconService singleton instance is accessible
+00:04 +64: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_earcon_and_shake_test.dart: AudioEarconService Tests playMicStart executes safely without uncaught exceptions
+AudioEarconService playMicStart error: MissingPluginException(No implementation found for method getTemporaryDirectory on channel plugins.flutter.io/path_provider)
+00:04 +65: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_earcon_and_shake_test.dart: AudioEarconService Tests playMicStop executes safely without uncaught exceptions
+AudioEarconService playMicStop error: MissingPluginException(No implementation found for method getTemporaryDirectory on channel plugins.flutter.io/path_provider)
+00:04 +66: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_earcon_and_shake_test.dart: AudioEarconService Tests playProductRecognized executes safely without uncaught exceptions
+AudioEarconService playProductRecognized error: MissingPluginException(No implementation found for method getTemporaryDirectory on channel plugins.flutter.io/path_provider)
+00:04 +67: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_earcon_and_shake_test.dart: ShakeDetectorService Tests ShakeDetectorService initializes and syncs with VoiceAssistant toggle
+ShakeDetectorService: Shake-to-Talk active.
+Shake detected, but no mounted context is available.
+ShakeDetectorService: Shake-to-Talk stopped.
+00:04 +68: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_earcon_and_shake_test.dart: VoiceAssistantService NavigatorKey & Earcons Integration VoiceAssistantService exposes global navigatorKey
+00:04 +69: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_earcon_and_shake_test.dart: VoiceAssistantService NavigatorKey & Earcons Integration setLatestScanProduct sets product and resets summary notifier
+00:04 +70: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_earcon_and_shake_test.dart: (tearDownAll)
+00:04 +70: /Users/maryardientes/Desktop/Projects/CLARO/test/fallback_advisory_no_conditions_test.dart: FallbackAdvisoryGenerator - No Conditions/Allergens should generate simplified advisory for users with no conditions and no allergens
+00:04 +71: /Users/maryardientes/Desktop/Projects/CLARO/test/nutri_score_calculator_test.dart: NutriScoreCalculator - Unit Normalization & Helper Tests kcalToKj converts accurately
+00:04 +72: /Users/maryardientes/Desktop/Projects/CLARO/test/nutri_score_calculator_test.dart: NutriScoreCalculator - Unit Normalization & Helper Tests kcalToKj converts accurately
+00:04 +73: /Users/maryardientes/Desktop/Projects/CLARO/test/nutri_score_calculator_test.dart: NutriScoreCalculator - Unit Normalization & Helper Tests kcalToKj converts accurately
+00:04 +74: /Users/maryardientes/Desktop/Projects/CLARO/test/nutri_score_calculator_test.dart: NutriScoreCalculator - Unit Normalization & Helper Tests kcalToKj converts accurately
+00:04 +75: /Users/maryardientes/Desktop/Projects/CLARO/test/nutri_score_calculator_test.dart: NutriScoreCalculator - Unit Normalization & Helper Tests kcalToKj converts accurately
+00:04 +76: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart: Gemini scoped product chat refuses arithmetic locally without calling Gemini
+00:04 +77: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart: Gemini scoped product chat refuses arithmetic locally without calling Gemini
+00:04 +78: /Users/maryardientes/Desktop/Projects/CLARO/test/nutri_score_calculator_test.dart: NutriScoreCalculator - Unit Normalization & Helper Tests normalizeToPer100g scales per-serving to per-100g correctly
+00:04 +79: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart: Gemini scoped product chat refuses obvious general knowledge locally without calling Gemini
+00:04 +80: /Users/maryardientes/Desktop/Projects/CLARO/test/nutri_score_calculator_test.dart: NutriScoreCalculator - 5 Realistic PH Product Scenarios Scenario 1: Plain canned sardine in tomato sauce
+00:04 +81: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart: Gemini scoped product chat routes product questions to Gemini with product data and recent history
+00:04 +82: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart: Gemini scoped product chat routes product questions to Gemini with product data and recent history
+00:04 +83: /Users/maryardientes/Desktop/Projects/CLARO/test/nutri_score_calculator_test.dart: NutriScoreCalculator - 5 Realistic PH Product Scenarios Scenario 3: Instant noodle cup (regular, high salt/sat fat)
+00:04 +84: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart: Gemini scoped product chat uses the fixed local refusal when the model reports off topic
+00:04 +85: /Users/maryardientes/Desktop/Projects/CLARO/test/nutri_score_calculator_test.dart: NutriScoreCalculator - 5 Realistic PH Product Scenarios Scenario 4: Whole grain / low-sodium instant noodle variant
+00:04 +86: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart: Gemini scoped product chat returns a local fallback when Gemini fails
+00:04 +87: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart: Gemini scoped product chat returns a local fallback when Gemini fails
+Product chat fallback branch: exception
+Product chat exception type: _Exception
+Product chat exception message: Exception: simulated network error
+Product chat stack trace:
+#0      main.<anonymous closure>.<anonymous closure>.<anonymous closure> (file:///Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart:143:11)
+#1      GeminiService.askChat (package:claro/services/gemini_service.dart:449:36)
+#2      main.<anonymous closure>.ask (file:///Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart:39:70)
+#3      main.<anonymous closure>.<anonymous closure> (file:///Users/maryardientes/Desktop/Projects/CLARO/test/gemini_chat_test.dart:145:27)
+#4      Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:253:25)
+<asynchronous suspension>
+#5      Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#6      Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+
+Product chat finishReason: null
+Product chat promptFeedback/block reason: null
+Product chat raw response text: <empty>
+00:04 +88: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing parses supported commands and maps them to existing app actions
+00:05 +89: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing asks to open a product before interpreting product-specific requests
+00:05 +90: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing uses the requested prompt format and structured response schema
+00:05 +91: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing low confidence returns clarify fallback
+00:05 +92: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing malformed JSON returns clarify fallback
+00:05 +93: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing request exceptions return clarify fallback
+00:05 +94: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing scan command only switches to the scan tab
+00:05 +95: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing scan command only switches to the scan tab
+00:05 +96: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing scan command only switches to the scan tab
+00:05 +97: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing scan command only switches to the scan tab
+00:05 +98: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing scan command only switches to the scan tab
+00:05 +99: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing scan command only switches to the scan tab
+00:05 +100: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing scan command only switches to the scan tab
+00:05 +101: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing scan command only switches to the scan tab
+00:05 +102: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing scan command only switches to the scan tab
+Voice command transcript: "scan this for me"
+Voice command intent: fast local navigation -> scan
+00:05 +103: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing guided clear history opens history without clearing data
+Voice command transcript: "burahin lahat ng history"
+Voice command intent: fast local navigation -> clear_history
+00:05 +104: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing compare and favorite requests without an open product do not act
+Voice command transcript: "paki-compare nito"
+Voice command intent: fast local navigation -> compare_products
+Voice command transcript: "ilagay sa favorites"
+Voice command intent: fast local navigation -> favorite_product
+00:05 +105: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Structured voice command routing Gemini fallback applies theme and leaves unsupported requests idle
+Voice command transcript: "gawing madilim"
+Theme preference save failed: [firebase_core/no-app] Firebase has not been initialized.
+Voice command transcript: "what's the weather"
+00:05 +106: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Voice Compare Navigation Tests latestScanProductNotifier stores active product for comparison
+00:05 +107: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Voice Compare Navigation Tests Voice product search patterns correctly match English and Tagalog commands
+00:05 +108: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Voice Compare Navigation Tests Voice navigation patterns resolve profile, preferences, theme/darkmode, suggestions, and sub-tabs
+00:05 +109: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Voice Compare Navigation Tests Voice navigation patterns resolve in-screen actions on result screen
+00:05 +110: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Voice Compare Navigation Tests isSummaryRequest correctly recognizes display results, advisory, and comparison commands in EN and FIL
+00:05 +111: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Voice Compare Navigation Tests detects product questions like allergen and nutrition requests in English and Tagalog
+00:05 +112: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Voice Compare Navigation Tests Bilingual voice commands for MFA, Voice, Theme, and Language are fully aligned
+00:05 +113: /Users/maryardientes/Desktop/Projects/CLARO/test/voice_compare_navigation_test.dart: Voice Compare Navigation Tests FavoritesService favoriteActionNotifier broadcasts state immediately for reactive UI
+00:06 +114: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen with title and theme options in English
+00:06 +115: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen with title and theme options in English
+00:06 +116: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen with title and theme options in English
+00:06 +117: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen with title and theme options in English
+00:06 +118: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen with title and theme options in English
+00:06 +119: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen with title and theme options in English
+00:06 +120: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen with title and theme options in English
+00:06 +121: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: Product isOfflineFallback tests default value is false
+00:06 +122: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen in Tagalog when locale is tl
+00:06 +123: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen in Tagalog when locale is tl
+00:06 +124: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: ThemeScreen Widget Tests renders ThemeScreen in Tagalog when locale is tl
+00:06 +125: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: SuccessFeedbackUtils offline dialog widget test renders dialog with correct title, message, and button
+00:06 +126: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: SuccessFeedbackUtils offline dialog widget test renders dialog with correct title, message, and button
+00:06 +127: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: SuccessFeedbackUtils offline dialog widget test renders dialog with correct title, message, and button
+00:06 +128: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: SuccessFeedbackUtils offline dialog widget test renders dialog with correct title, message, and button
+00:06 +129: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: SuccessFeedbackUtils offline dialog widget test renders dialog with correct title, message, and button
+00:06 +129: /Users/maryardientes/Desktop/Projects/CLARO/test/preferences_and_theme_widget_test.dart: LocaleService State Tests LocaleService updates notifier when setting locale
+Error configuring TTS language: MissingPluginException(No implementation found for method isLanguageAvailable on channel flutter_tts)
+Error configuring TTS language: MissingPluginException(No implementation found for method setLanguage on channel flutter_tts)
+00:06 +130: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: SuccessFeedbackUtils offline dialog widget test renders dialog with correct title, message, and button
+00:06 +131: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: SuccessFeedbackUtils offline dialog widget test renders voice assistant offline dialog with correct message
+00:06 +132: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: SuccessFeedbackUtils offline dialog widget test renders action offline dialog for features not feasible offline
+00:06 +133: /Users/maryardientes/Desktop/Projects/CLARO/test/offline_notice_dialog_test.dart: SuccessFeedbackUtils offline dialog widget test Voice Assistant toggle blocked offline with dialog (like MFA)
+00:07 +134: /Users/maryardientes/Desktop/Projects/CLARO/test/number_format_utils_test.dart: NumberFormatUtils Tests formats whole numbers without decimal places and with comma separators
+00:07 +135: /Users/maryardientes/Desktop/Projects/CLARO/test/number_format_utils_test.dart: NumberFormatUtils Tests formats decimal numbers with one decimal place
+00:07 +136: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_service_resilience_test.dart: Gemini JSON parsing resilience tests ProductExtractionService handles markdown fenced JSON
+00:07 +137: /Users/maryardientes/Desktop/Projects/CLARO/test/gemini_service_resilience_test.dart: Gemini JSON parsing resilience tests GeminiAdvisoryService parses markdown-wrapped advisory JSON
+00:07 +138: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: CKD scores sodium once
+00:07 +139: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: hypertension scores sodium once
+00:07 +140: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: missing sodium nutrition data scores sodium as unknown
+00:07 +141: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: CKD and hypertension share one sodium score
+00:07 +142: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: phosphate additives score 1 when the ingredient list is clean
+00:07 +143: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: phosphate additives score 3 when detected
+00:07 +144: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: missing ingredients make phosphate unknown and score 2
+00:07 +145: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: GERD total fat uses the existing high-fat reference
+00:07 +146: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: missing GERD fat data scores 2 instead of clean
+00:07 +147: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: GERD trigger category is scored with potential-trigger wording
+00:07 +148: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: missing GERD ingredients score trigger state as unknown
+00:07 +149: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: warning-only kidney nutrients do not add factors or points
+00:07 +150: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: matching allergen remains a hard block separate from score
+00:07 +151: /Users/maryardientes/Desktop/Projects/CLARO/test/ckd_gerd_scoring_test.dart: GERD and CKD profiles participate in ranking
+00:07 +152: /Users/maryardientes/Desktop/Projects/CLARO/test/auth_screens_widget_test.dart: ForgotPasswordScreen Widget & Validation Tests renders reset password screen with title and input field
+00:07 +153: /Users/maryardientes/Desktop/Projects/CLARO/test/auth_screens_widget_test.dart: ForgotPasswordScreen Widget & Validation Tests renders reset password screen with title and input field
+00:07 +154: /Users/maryardientes/Desktop/Projects/CLARO/test/auth_screens_widget_test.dart: ForgotPasswordScreen Widget & Validation Tests renders reset password screen with title and input field
+00:07 +155: /Users/maryardientes/Desktop/Projects/CLARO/test/auth_screens_widget_test.dart: ForgotPasswordScreen Widget & Validation Tests renders reset password screen with title and input field
+00:07 +156: /Users/maryardientes/Desktop/Projects/CLARO/test/auth_screens_widget_test.dart: ForgotPasswordScreen Widget & Validation Tests shows validation error when email is submitted empty
+00:07 +157: /Users/maryardientes/Desktop/Projects/CLARO/test/auth_screens_widget_test.dart: ForgotPasswordScreen Widget & Validation Tests shows validation error when email format is invalid
+00:07 +158: /Users/maryardientes/Desktop/Projects/CLARO/test/auth_screens_widget_test.dart: ValidationService Auth Unit Tests validateEmail returns proper errors in English and Tagalog
+00:07 +159: /Users/maryardientes/Desktop/Projects/CLARO/test/auth_screens_widget_test.dart: ValidationService Auth Unit Tests validatePassword enforces length and complexity rules
+00:08 +160: All tests passed!

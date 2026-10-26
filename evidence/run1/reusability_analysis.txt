@@ -1,0 +1,58 @@
+=== REUSABILITY HEURISTIC ANALYSIS ===
+Target shared components in lib/widgets, lib/services, lib/core: 68
+Components imported by >= 2 distinct feature modules: 33
+Reusability Ratio (X = A / B): 0.4853 (48.53%)
+
+Top reused components (by distinct feature importers):
+  28 modules - lib/services/haptic_service.dart
+  22 modules - lib/services/auth_service.dart
+  18 modules - lib/core/utils/success_feedback_utils.dart
+  17 modules - lib/services/voice_assistant_service.dart
+   9 modules - lib/services/home_tab_controller.dart
+   9 modules - lib/services/locale_service.dart
+   9 modules - lib/widgets/voice_assistant_fab.dart
+   8 modules - lib/services/guest_session.dart
+   8 modules - lib/widgets/custom_text_field.dart
+   7 modules - lib/core/constants/who_fda_thresholds.dart
+   4 modules - lib/core/utils/number_format_utils.dart
+   4 modules - lib/core/utils/nutrition_availability.dart
+   4 modules - lib/services/validation_service.dart
+   3 modules - lib/core/utils/who_calculator.dart
+   3 modules - lib/core/utils/product_characteristics.dart
+
+Components with < 2 feature module imports:
+   1 modules - lib/core/constants/canonical_allergens.dart
+   0 modules - lib/core/utils/serving_size_calculator.dart
+   1 modules - lib/core/utils/kidney_nutrient_detector.dart
+   1 modules - lib/core/utils/group_type_ui.dart
+   1 modules - lib/core/utils/nova_score_calculator.dart
+   1 modules - lib/core/utils/nutri_score_calculator.dart
+   1 modules - lib/core/utils/image_validation_utils.dart
+   1 modules - lib/core/utils/comparison_matrix_builder.dart
+   1 modules - lib/core/utils/comparison_calculator.dart
+   1 modules - lib/core/utils/advisory_prompt_builder.dart
+   0 modules - lib/services/shake_detector_service.dart
+   1 modules - lib/services/yolo_recognition_service.dart
+   1 modules - lib/services/image_validation_service.dart
+   1 modules - lib/services/text_size_service.dart
+   1 modules - lib/services/voice_command_router.dart
+   1 modules - lib/services/fda_verification_service.dart
+   0 modules - lib/services/scan_history_service.dart
+   1 modules - lib/services/scanner_position_guide_service.dart
+   0 modules - lib/services/gemini_service.dart
+   0 modules - lib/services/yolo_recognition_service_io.dart
+   1 modules - lib/services/nutrition_service.dart
+   1 modules - lib/services/connectivity_service.dart
+   1 modules - lib/services/guest_favorites_service.dart
+   1 modules - lib/services/pending_reports_service.dart
+   1 modules - lib/services/get_started_service.dart
+   1 modules - lib/services/audio_earcon_service.dart
+   0 modules - lib/services/yolo_recognition_service_web.dart
+   1 modules - lib/widgets/account_required_gate.dart
+   1 modules - lib/widgets/dome_page_route.dart
+   1 modules - lib/widgets/join_group_dialog.dart
+   1 modules - lib/widgets/score_badge_strips.dart
+   1 modules - lib/widgets/terms_and_conditions_dialog.dart
+   1 modules - lib/widgets/health_info_warning_card.dart
+   0 modules - lib/widgets/join_profile_dialog.dart
+   1 modules - lib/widgets/date_of_birth_picker.dart
