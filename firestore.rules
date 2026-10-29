@@ -249,8 +249,10 @@ service cloud.firestore {
         // Allow get for owner or the member themselves
         allow get: if request.auth != null && (isGroupOwner() || isThisUser());
         
-        // Allow create: owner can add members
-        allow create: if request.auth != null && isGroupOwner();
+        // Allow create: owner can add members, or joining member can add their own linked record
+        allow create: if request.auth != null 
+                      && (isGroupOwner() 
+                          || (isThisUser() && request.resource.data.sourceType == 'linked'));
         
         // Allow update: owner can update any fields on managed members (including health data via Worker)
         // Linked users can update their own display name or mark themselves
@@ -297,11 +299,22 @@ service cloud.firestore {
     // ─── Invite Codes Lookup ───────────────────────────────────
     // Top-level collection for invite code lookup without knowing the group ID
     match /inviteCodes/{code} {
+      // Helper to check if caller is the owner of the referenced group
+      function isGroupOwner() {
+        return request.auth != null 
+               && 'groupId' in request.resource.data
+               && exists(/databases/$(database)/documents/groups/$(request.resource.data.groupId))
+               && get(/databases/$(database)/documents/groups/$(request.resource.data.groupId)).data.ownerUid == request.auth.uid;
+      }
+
       // Allow read for authenticated users (to redeem invites)
       allow read: if request.auth != null;
       
-      // Allow create/delete: only through group operations (by owner)
-      allow create, delete: if false;
+      // Allow create: group owner can create lookup documents for their group
+      allow create: if isGroupOwner();
+      
+      // Allow delete: authenticated users can delete lookup codes upon redemption, or group owners can clean them up
+      allow delete: if request.auth != null;
       
       // Allow update: only through group operations
       allow update: if false;

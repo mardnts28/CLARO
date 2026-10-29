@@ -15,11 +15,35 @@
       },
       "oauth_client": [
         {
+          "client_id": "1033502181973-dlnf4ldn71gg1it05nqi5k2kk7jrihv7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.claro.claro",
+            "certificate_hash": "b2b5dff5829cb99c0e5ff95c213d77b7cbad4bd4"
+          }
+        },
+        {
+          "client_id": "1033502181973-hifkl0c2g83sdgg3m1c1t28odqhmir4p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.claro.claro",
+            "certificate_hash": "00499471cf933f6710ef97bcc73e24427f862181"
+          }
+        },
+        {
           "client_id": "1033502181973-kk6qh5n8qhtm95o37qiqscdkbqfjifpi.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.claro.claro",
             "certificate_hash": "9e586ca8383ee6a765121e83efac301f3219ae89"
+          }
+        },
+        {
+          "client_id": "1033502181973-nbrorslun8ooq0ji6dbg28fvju44pubc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.claro.claro",
+            "certificate_hash": "62dd586a21ae63ccdd29089a0d56dd210289e1c5"
           }
         },
         {
@@ -88,6 +112,14 @@
           "android_info": {
             "package_name": "com.example.claro",
             "certificate_hash": "e7e4eb84e59a7e0a9034d733dea118d738e55d68"
+          }
+        },
+        {
+          "client_id": "1033502181973-sitpkftr0aprfbalea6ua3atg78d4ffm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.claro",
+            "certificate_hash": "00499471cf933f6710ef97bcc73e24427f862181"
           }
         },
         {
