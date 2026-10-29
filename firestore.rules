@@ -278,8 +278,8 @@ service cloud.firestore {
         // Allow list for owner (to check invite status)
         allow list: if request.auth != null && isGroupOwner();
         
-        // Allow get for owner (to check invite status)
-        allow get: if request.auth != null && isGroupOwner();
+        // Allow get for authenticated users (to validate and redeem invites)
+        allow get: if request.auth != null;
         
         // Allow create: createdBy must match authenticated user (client validates group ownership)
         allow create: if request.auth != null 

@@ -114,7 +114,8 @@ class _JoinGroupDialogState extends State<JoinGroupDialog> {
         avatar: profile.avatar,
       );
       if (mounted) Navigator.pop(context, true);
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('JoinGroupDialog error: $e\n$st');
       if (!mounted) return;
       setState(() {
         _errorText = loc.codeDidNotWorkError;
