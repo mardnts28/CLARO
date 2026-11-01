@@ -35,7 +35,10 @@ class YoloRecognitionService {
     _isModelLoaded = true;
   }
 
-  Future<List<DetectionResult>> detectProducts(String imagePath) async {
+  Future<List<DetectionResult>> detectProducts(
+    String imagePath, {
+    bool forceTileFallback = false,
+  }) async {
     debugPrint('YoloRecognitionService (Web): Local detection requested for $imagePath');
     return [];
   }

@@ -50,6 +50,12 @@ class YoloRecognitionService {
   List<int> _outputShape = [];
   bool _isNCHW = false;
 
+  // Fallback 800 Model (best-6.tflite) for tile-based recall enhancement
+  Interpreter? _fallbackInterpreter;
+  List<int> _fallbackInputShape = [];
+  List<int> _fallbackOutputShape = [];
+  bool _isFallbackNCHW = false;
+
   // Persistent Worker Isolate (Issue 1 & 2 Fix)
   Isolate? _workerIsolate;
   SendPort? _workerSendPort;
@@ -93,10 +99,35 @@ class YoloRecognitionService {
       labelsStopwatch.stop();
       debugPrint('TIMING [YOLO]: Labels load (${_labels.length} classes) took ${labelsStopwatch.elapsedMilliseconds}ms');
 
-      _inputShape = _interpreter!.getInputTensor(0).shape;
-      _outputShape = _interpreter!.getOutputTensor(0).shape;
+      final inTensor = _interpreter!.getInputTensor(0);
+      final outTensor = _interpreter!.getOutputTensor(0);
+      _inputShape = inTensor.shape;
+      _outputShape = outTensor.shape;
       // NCHW: [1, 3, H, W]  vs  NHWC: [1, H, W, 3]
       _isNCHW = _inputShape.length == 4 && _inputShape[1] == 3;
+
+      debugPrint('====================================================');
+      debugPrint('YOLOv8 MODEL LOAD:');
+      debugPrint('  Primary Model: assets/model/claro_stage1_57class_1024.tflite');
+      debugPrint('  Input Shape: $_inputShape');
+      debugPrint('  Input Dtype: ${inTensor.type}');
+      debugPrint('  Output Shape: $_outputShape');
+      debugPrint('  Output Dtype: ${outTensor.type}');
+      debugPrint('  Layout: ${_isNCHW ? "NCHW (channels first)" : "NHWC (channels last)"}');
+      debugPrint('  Classes: ${_labels.length}');
+      debugPrint('====================================================');
+
+      // Fail loudly if model assumptions are violated
+      if (_inputShape.length != 4 || _inputShape[0] != 1) {
+        throw StateError(
+          'YOLOv8: Unexpected input shape $_inputShape. Expected 4 dimensions [1, C, H, W] or [1, H, W, C].',
+        );
+      }
+      if (_outputShape.length != 3 || _outputShape[0] != 1) {
+        throw StateError(
+          'YOLOv8: Unexpected output shape $_outputShape. Expected 3 dimensions [1, 4+classes, boxes].',
+        );
+      }
 
       // ── Spawn Persistent Worker Isolate ─────────────────────────────────
       final isolateSpawnStopwatch = Stopwatch()..start();
@@ -113,6 +144,37 @@ class YoloRecognitionService {
       _isModelLoaded = false;
     } finally {
       _isInitializing = false;
+    }
+  }
+
+  /// Lazily loads the fallback 800x800 production model for tile fallback.
+  Future<Interpreter?> _getFallbackInterpreter() async {
+    if (_fallbackInterpreter != null) return _fallbackInterpreter;
+    try {
+      final threadCount = Platform.isAndroid ? 4 : 2;
+      final cpuOptions = InterpreterOptions()..threads = threadCount;
+      final interp = await Interpreter.fromAsset(
+        'assets/model/best-6.tflite',
+        options: cpuOptions,
+      );
+      interp.allocateTensors();
+      _fallbackInputShape = interp.getInputTensor(0).shape;
+      _fallbackOutputShape = interp.getOutputTensor(0).shape;
+      _isFallbackNCHW =
+          _fallbackInputShape.length == 4 && _fallbackInputShape[1] == 3;
+      _fallbackInterpreter = interp;
+
+      debugPrint('====================================================');
+      debugPrint('YOLOv8 FALLBACK 800 MODEL LOAD:');
+      debugPrint('  Fallback Model: assets/model/best-6.tflite');
+      debugPrint('  Input Shape: $_fallbackInputShape');
+      debugPrint('  Output Shape: $_fallbackOutputShape');
+      debugPrint('  Layout: ${_isFallbackNCHW ? "NCHW" : "NHWC"}');
+      debugPrint('====================================================');
+      return _fallbackInterpreter;
+    } catch (e) {
+      debugPrint('YOLOv8: Failed to load 800 fallback model: $e');
+      return null;
     }
   }
 
@@ -169,63 +231,227 @@ class YoloRecognitionService {
   ///
   /// [ISSUE 3]: Decodes, letterboxes, and decodes entirely inside the persistent worker
   /// isolate, keeping the Flutter main UI thread free and preventing ANR.
-  Future<List<DetectionResult>> detectProducts(String imagePath) async {
+  Future<List<DetectionResult>> detectProducts(
+    String imagePath, {
+    bool forceTileFallback = false,
+  }) async {
     if (_interpreter == null) return [];
     try {
       final file = File(imagePath);
       if (!await file.exists()) return [];
       final Uint8List bytes = await file.readAsBytes();
 
-      final int targetW = _isNCHW ? _inputShape[3] : _inputShape[2];
-      final int targetH = _isNCHW ? _inputShape[2] : _inputShape[1];
-      final int dim1 = _outputShape.length >= 2 ? _outputShape[1] : 61;
-      final int dim2 = _outputShape.length >= 3 ? _outputShape[2] : 13125;
+      List<DetectionResult> results = [];
 
-      // 1. Offload heavy JPEG decoding and letterboxing to persistent isolate
-      final prep = await _sendWorkerRequest('preprocess_still', <String, dynamic>{
+      if (!forceTileFallback) {
+        final int targetW = _isNCHW ? _inputShape[3] : _inputShape[2];
+        final int targetH = _isNCHW ? _inputShape[2] : _inputShape[1];
+        final int dim1 = _outputShape.length >= 2 ? _outputShape[1] : 61;
+        final int dim2 = _outputShape.length >= 3 ? _outputShape[2] : 21504;
+
+        // 1. Offload heavy JPEG decoding and letterboxing to persistent isolate
+        final prep = await _sendWorkerRequest('preprocess_still', <String, dynamic>{
+          'bytes': bytes,
+          'isNCHW': _isNCHW,
+          'targetW': targetW,
+          'targetH': targetH,
+        }) as Map<String, dynamic>;
+
+        if (prep['success'] == true && _interpreter != null) {
+          final Float32List inputBuffer = prep['flatInput'] as Float32List;
+          final int newW = prep['newW'] as int;
+          final int newH = prep['newH'] as int;
+          final int padX = prep['padX'] as int;
+          final int padY = prep['padY'] as int;
+
+          if (!_interpreter!.isAllocated) {
+            _interpreter!.allocateTensors();
+          }
+          _interpreter!.getInputTensor(0).copyFrom(inputBuffer);
+          _interpreter!.invoke();
+
+          final outputTensor = _interpreter!.getOutputTensor(0);
+          final Float32List outputBuffer = outputTensor.data.buffer.asFloat32List(
+            outputTensor.data.offsetInBytes,
+            outputTensor.numElements(),
+          );
+
+          // 2. Offload bounding box decoding and NMS to persistent isolate
+          final decodedList = await _sendWorkerRequest('decode_output', <String, dynamic>{
+            'outputBuffer': outputBuffer,
+            'dim1': dim1,
+            'dim2': dim2,
+            'targetW': targetW,
+            'targetH': targetH,
+            'newW': newW,
+            'newH': newH,
+            'padX': padX,
+            'padY': padY,
+            'confidenceThreshold': confidenceThreshold,
+            'iouThreshold': iouThreshold,
+            'labels': _labels,
+          }) as List<dynamic>;
+
+          results = decodedList.map((dynamic m) {
+            final map = m as Map<String, dynamic>;
+            return DetectionResult(
+              label: map['label'] as String,
+              confidence: (map['confidence'] as num).toDouble(),
+              boundingBox: Rect.fromLTWH(
+                (map['left'] as num).toDouble(),
+                (map['top'] as num).toDouble(),
+                (map['width'] as num).toDouble(),
+                (map['height'] as num).toDouble(),
+              ),
+            );
+          }).toList();
+        }
+      }
+
+      // Step 1: If 1024 model found detections, use the best box(es) (max 3 shown)
+      if (results.isNotEmpty) {
+        results.sort((a, b) => b.confidence.compareTo(a.confidence));
+        debugPrint('YOLOv8 [1024 Full]: Found ${results.length} detection(s):');
+        for (int i = 0; i < min(3, results.length); i++) {
+          final d = results[i];
+          debugPrint(
+            '  #${i + 1}: ${d.label} (${(d.confidence * 100).toStringAsFixed(2)}%) '
+            'box=[L:${d.boundingBox.left.toStringAsFixed(3)}, T:${d.boundingBox.top.toStringAsFixed(3)}, '
+            'W:${d.boundingBox.width.toStringAsFixed(3)}, H:${d.boundingBox.height.toStringAsFixed(3)}]',
+          );
+        }
+        if (results.length > 3) {
+          results = results.sublist(0, 3);
+        }
+        return results;
+      }
+
+      // Step 2: 1024 model found NOTHING on whole photo -> trigger tile fallback with 800 model
+      debugPrint(
+        'YOLOv8 [1024 Full]: 0 products found. Triggering 800 model tile fallback...',
+      );
+      final tileResults = await _run800TileFallback(bytes);
+      if (tileResults.isNotEmpty) {
+        tileResults.sort((a, b) => b.confidence.compareTo(a.confidence));
+        debugPrint(
+          'YOLOv8 [800 Tiles]: Fallback recovered ${tileResults.length} detection(s):',
+        );
+        for (int i = 0; i < min(3, tileResults.length); i++) {
+          final d = tileResults[i];
+          debugPrint(
+            '  #${i + 1}: ${d.label} (${(d.confidence * 100).toStringAsFixed(2)}%) '
+            'box=[L:${d.boundingBox.left.toStringAsFixed(3)}, T:${d.boundingBox.top.toStringAsFixed(3)}, '
+            'W:${d.boundingBox.width.toStringAsFixed(3)}, H:${d.boundingBox.height.toStringAsFixed(3)}]',
+          );
+        }
+        // Per specification: take the highest-confidence box
+        return [tileResults.first];
+      }
+
+      debugPrint('YOLOv8: No products found after 1024 full scan and 800 tile fallback.');
+      return [];
+    } catch (e) {
+      debugPrint('YOLOv8 detectProducts error: $e');
+      return [];
+    }
+  }
+
+  /// Runs tile-based fallback using the 800x800 production model (`best-6.tflite`).
+  ///
+  /// Specification:
+  /// - Tile side = 0.5 x shorter side of original photo, 25% overlap, last row/col shifted to edge
+  /// - Run 800 model on each tile (letterbox to 800), conf >= 0.40
+  /// - Discard any box touching an INNER tile edge (within 2 px) — cut-off product filter
+  /// - Shift boxes back to photo coordinates, merge with class-agnostic NMS IoU 0.5
+  Future<List<DetectionResult>> _run800TileFallback(Uint8List bytes) async {
+    try {
+      final fallbackInterpreter = await _getFallbackInterpreter();
+      if (fallbackInterpreter == null) return [];
+
+      final int targetW =
+          _isFallbackNCHW ? _fallbackInputShape[3] : _fallbackInputShape[2];
+      final int targetH =
+          _isFallbackNCHW ? _fallbackInputShape[2] : _fallbackInputShape[1];
+      final int dim1 =
+          _fallbackOutputShape.length >= 2 ? _fallbackOutputShape[1] : 61;
+      final int dim2 =
+          _fallbackOutputShape.length >= 3 ? _fallbackOutputShape[2] : 13125;
+
+      // 1. Offload tile generation & preprocessing to persistent worker isolate
+      final prep = await _sendWorkerRequest('preprocess_tiles', <String, dynamic>{
         'bytes': bytes,
-        'isNCHW': _isNCHW,
+        'isNCHW': _isFallbackNCHW,
         'targetW': targetW,
         'targetH': targetH,
       }) as Map<String, dynamic>;
 
-      if (prep['success'] != true || _interpreter == null) return [];
+      if (prep['success'] != true) return [];
 
-      final Float32List inputBuffer = prep['flatInput'] as Float32List;
-      final int newW = prep['newW'] as int;
-      final int newH = prep['newH'] as int;
-      final int padX = prep['padX'] as int;
-      final int padY = prep['padY'] as int;
-
-      if (!_interpreter!.isAllocated) {
-        _interpreter!.allocateTensors();
-      }
-      _interpreter!.getInputTensor(0).copyFrom(inputBuffer);
-      _interpreter!.invoke();
-
-      final outputTensor = _interpreter!.getOutputTensor(0);
-      final Float32List outputBuffer = outputTensor.data.buffer.asFloat32List(
-        outputTensor.data.offsetInBytes,
-        outputTensor.numElements(),
+      final int origW = prep['origW'] as int;
+      final int origH = prep['origH'] as int;
+      final List<dynamic> tiles = prep['tiles'] as List<dynamic>;
+      debugPrint(
+        'YOLOv8 [800 Tiles]: Processing ${tiles.length} tiles for $origW x $origH photo',
       );
 
-      // 2. Offload bounding box decoding and NMS to persistent isolate
-      final decodedList = await _sendWorkerRequest('decode_output', <String, dynamic>{
-        'outputBuffer': outputBuffer,
-        'dim1': dim1,
-        'dim2': dim2,
-        'targetW': targetW,
-        'targetH': targetH,
-        'newW': newW,
-        'newH': newH,
-        'padX': padX,
-        'padY': padY,
-        'confidenceThreshold': confidenceThreshold,
-        'iouThreshold': iouThreshold,
-        'labels': _labels,
-      }) as List<dynamic>;
+      final List<Map<String, dynamic>> allCandidates = [];
 
-      return decodedList.map((dynamic m) {
+      for (int i = 0; i < tiles.length; i++) {
+        final Map<String, dynamic> tile = tiles[i] as Map<String, dynamic>;
+        final Float32List flatInput = tile['flatInput'] as Float32List;
+
+        if (!fallbackInterpreter.isAllocated) {
+          fallbackInterpreter.allocateTensors();
+        }
+        fallbackInterpreter.getInputTensor(0).copyFrom(flatInput);
+        fallbackInterpreter.invoke();
+
+        final outputTensor = fallbackInterpreter.getOutputTensor(0);
+        final Float32List outputBuffer = outputTensor.data.buffer.asFloat32List(
+          outputTensor.data.offsetInBytes,
+          outputTensor.numElements(),
+        );
+
+        final tileDecoded = await _sendWorkerRequest(
+          'decode_tile_output',
+          <String, dynamic>{
+            'outputBuffer': outputBuffer,
+            'dim1': dim1,
+            'dim2': dim2,
+            'targetW': targetW,
+            'targetH': targetH,
+            'tileX': tile['tileX'] as int,
+            'tileY': tile['tileY'] as int,
+            'tileSide': tile['tileSide'] as int,
+            'origW': origW,
+            'origH': origH,
+            'isInnerLeft': tile['isInnerLeft'] as bool,
+            'isInnerTop': tile['isInnerTop'] as bool,
+            'isInnerRight': tile['isInnerRight'] as bool,
+            'isInnerBottom': tile['isInnerBottom'] as bool,
+            'confidenceThreshold': confidenceThreshold,
+            'labels': _labels,
+          },
+        ) as List<dynamic>;
+
+        for (var c in tileDecoded) {
+          allCandidates.add(c as Map<String, dynamic>);
+        }
+      }
+
+      if (allCandidates.isEmpty) return [];
+
+      // Merge tile candidate boxes across all tiles with class-agnostic NMS IoU 0.5
+      final mergedList = await _sendWorkerRequest(
+        'merge_tile_candidates',
+        <String, dynamic>{
+          'candidates': allCandidates,
+          'iouThreshold': 0.5,
+          'labels': _labels,
+        },
+      ) as List<dynamic>;
+
+      return mergedList.map((dynamic m) {
         final map = m as Map<String, dynamic>;
         return DetectionResult(
           label: map['label'] as String,
@@ -239,7 +465,7 @@ class YoloRecognitionService {
         );
       }).toList();
     } catch (e) {
-      debugPrint('YOLOv8 detectProducts error: $e');
+      debugPrint('YOLOv8 800 tile fallback error: $e');
       return [];
     }
   }
@@ -360,6 +586,8 @@ class YoloRecognitionService {
     _workerSendPort = null;
     _workerResponsePort = null;
     _pendingRequests.clear();
+    _fallbackInterpreter?.close();
+    _fallbackInterpreter = null;
   }
 }
 
@@ -392,6 +620,15 @@ void _persistentWorkerEntry(SendPort initSendPort) {
           replyPort?.send([id, true, result]);
         } else if (action == 'preprocess_still') {
           final result = _preprocessStillImageWorker(data);
+          replyPort?.send([id, true, result]);
+        } else if (action == 'preprocess_tiles') {
+          final result = _preprocessTilesWorker(data);
+          replyPort?.send([id, true, result]);
+        } else if (action == 'decode_tile_output') {
+          final result = _decodeTileOutputWorker(data);
+          replyPort?.send([id, true, result]);
+        } else if (action == 'merge_tile_candidates') {
+          final result = _mergeTileCandidatesWorker(data);
           replyPort?.send([id, true, result]);
         } else {
           replyPort?.send([id, false, 'Unknown action $action']);
@@ -573,7 +810,7 @@ List<Map<String, dynamic>> _decodeOutputWorker(Map<String, dynamic> data) {
 
   if (isTransposed) {
     bool coordsAreAbsolute = false;
-    for (int col = 0; col < min(numBoxes, 100); col++) {
+    for (int col = 0; col < min(numBoxes, 1000); col++) {
       final double peekCx = outputBuffer[0 * dim2 + col];
       final double peekCy = outputBuffer[1 * dim2 + col];
       if (peekCx > 1.5 || peekCy > 1.5) {
@@ -624,7 +861,7 @@ List<Map<String, dynamic>> _decodeOutputWorker(Map<String, dynamic> data) {
     }
   } else {
     bool coordsAreAbsolute = false;
-    for (int row = 0; row < min(numBoxes, 100); row++) {
+    for (int row = 0; row < min(numBoxes, 1000); row++) {
       final double peekCx = outputBuffer[row * dim2 + 0];
       final double peekCy = outputBuffer[row * dim2 + 1];
       if (peekCx > 1.5 || peekCy > 1.5) {
@@ -770,6 +1007,271 @@ Map<String, dynamic> _preprocessStillImageWorker(Map<String, dynamic> params) {
   } catch (e) {
     return {'success': false, 'error': e.toString()};
   }
+}
+
+/// [800 TILE FALLBACK]: Slices image into overlapping square tiles of side 0.5 x min(W, H).
+Map<String, dynamic> _preprocessTilesWorker(Map<String, dynamic> data) {
+  try {
+    final Uint8List bytes = data['bytes'] as Uint8List;
+    final bool isNCHW = data['isNCHW'] as bool;
+    final int targetW = data['targetW'] as int;
+    final int targetH = data['targetH'] as int;
+
+    img.Image? decoded = img.decodeImage(bytes);
+    if (decoded == null) return {'success': false};
+    decoded = img.bakeOrientation(decoded);
+
+    final int origW = decoded.width;
+    final int origH = decoded.height;
+    final int shorterSide = min(origW, origH);
+    final int tileSide = (0.5 * shorterSide).round();
+    final int step = (tileSide * 0.75).round(); // 25% overlap -> 75% step
+
+    final List<int> xs = [];
+    for (int x = 0; x + tileSide <= origW; x += step) {
+      xs.add(x);
+    }
+    if (xs.isEmpty || xs.last + tileSide < origW) {
+      xs.add(max(0, origW - tileSide));
+    }
+
+    final List<int> ys = [];
+    for (int y = 0; y + tileSide <= origH; y += step) {
+      ys.add(y);
+    }
+    if (ys.isEmpty || ys.last + tileSide < origH) {
+      ys.add(max(0, origH - tileSide));
+    }
+
+    final List<Map<String, dynamic>> tiles = [];
+    const double divisor = 255.0;
+
+    for (final y in ys) {
+      for (final x in xs) {
+        final cropped = img.copyCrop(
+          decoded,
+          x: x,
+          y: y,
+          width: tileSide,
+          height: tileSide,
+        );
+        final resized = (tileSide == targetW && tileSide == targetH)
+            ? cropped
+            : img.copyResize(cropped, width: targetW, height: targetH);
+
+        final int totalElements = targetH * targetW * 3;
+        final Float32List flatInput = Float32List(totalElements);
+        int idx = 0;
+
+        if (isNCHW) {
+          for (int c = 0; c < 3; c++) {
+            for (int py = 0; py < targetH; py++) {
+              for (int px = 0; px < targetW; px++) {
+                final p = resized.getPixel(px, py);
+                final v = c == 0 ? p.r : c == 1 ? p.g : p.b;
+                flatInput[idx++] = v.toDouble() / divisor;
+              }
+            }
+          }
+        } else {
+          for (int py = 0; py < targetH; py++) {
+            for (int px = 0; px < targetW; px++) {
+              final p = resized.getPixel(px, py);
+              flatInput[idx++] = p.r.toDouble() / divisor;
+              flatInput[idx++] = p.g.toDouble() / divisor;
+              flatInput[idx++] = p.b.toDouble() / divisor;
+            }
+          }
+        }
+
+        tiles.add({
+          'flatInput': flatInput,
+          'tileX': x,
+          'tileY': y,
+          'tileSide': tileSide,
+          'isInnerLeft': x > 0,
+          'isInnerTop': y > 0,
+          'isInnerRight': (x + tileSide) < origW,
+          'isInnerBottom': (y + tileSide) < origH,
+        });
+      }
+    }
+
+    return {
+      'success': true,
+      'origW': origW,
+      'origH': origH,
+      'tiles': tiles,
+    };
+  } catch (e) {
+    return {'success': false, 'error': e.toString()};
+  }
+}
+
+/// [800 TILE FALLBACK]: Decodes detections from a single tile and filters out inner-edge cuts.
+List<Map<String, dynamic>> _decodeTileOutputWorker(Map<String, dynamic> data) {
+  final Float32List outputBuffer = data['outputBuffer'] as Float32List;
+  final int dim1 = data['dim1'] as int;
+  final int dim2 = data['dim2'] as int;
+  final int targetW = data['targetW'] as int;
+  final int targetH = data['targetH'] as int;
+  final int tileX = data['tileX'] as int;
+  final int tileY = data['tileY'] as int;
+  final int tileSide = data['tileSide'] as int;
+  final int origW = data['origW'] as int;
+  final int origH = data['origH'] as int;
+  final bool isInnerLeft = data['isInnerLeft'] as bool;
+  final bool isInnerTop = data['isInnerTop'] as bool;
+  final bool isInnerRight = data['isInnerRight'] as bool;
+  final bool isInnerBottom = data['isInnerBottom'] as bool;
+  final double confidenceThreshold =
+      (data['confidenceThreshold'] as num).toDouble();
+  final List<String> labels = List<String>.from(data['labels'] as List);
+
+  final int modelClasses = (dim1 < dim2) ? (dim1 - 4) : (dim2 - 4);
+  final int numClasses = min(labels.length, max(0, modelClasses));
+
+  double applyConfidence(double raw) {
+    if (raw > 1.0 || raw < 0.0) {
+      return 1.0 / (1.0 + exp(-raw));
+    }
+    return raw;
+  }
+
+  final bool isTransposed = dim1 < dim2 || dim1 == (4 + modelClasses);
+  final int numBoxes = isTransposed ? dim2 : dim1;
+
+  bool coordsAreAbsolute = false;
+  for (int col = 0; col < min(numBoxes, 1000); col++) {
+    final double peekCx = isTransposed
+        ? outputBuffer[0 * dim2 + col]
+        : outputBuffer[col * dim2 + 0];
+    final double peekCy = isTransposed
+        ? outputBuffer[1 * dim2 + col]
+        : outputBuffer[col * dim2 + 1];
+    if (peekCx > 1.5 || peekCy > 1.5) {
+      coordsAreAbsolute = true;
+      break;
+    }
+  }
+
+  final double scale = targetW.toDouble() / tileSide.toDouble();
+  final List<Map<String, dynamic>> candidates = [];
+
+  for (int idx = 0; idx < numBoxes; idx++) {
+    double maxScore = -1e9;
+    int bestClass = 0;
+    for (int c = 0; c < numClasses; c++) {
+      final double s = isTransposed
+          ? outputBuffer[(4 + c) * dim2 + idx]
+          : outputBuffer[idx * dim2 + 4 + c];
+      if (s > maxScore) {
+        maxScore = s;
+        bestClass = c;
+      }
+    }
+
+    final double conf = applyConfidence(maxScore);
+    if (conf < confidenceThreshold) continue;
+
+    final double cx = isTransposed
+        ? outputBuffer[0 * dim2 + idx]
+        : outputBuffer[idx * dim2 + 0];
+    final double cy = isTransposed
+        ? outputBuffer[1 * dim2 + idx]
+        : outputBuffer[idx * dim2 + 1];
+    final double bw = isTransposed
+        ? outputBuffer[2 * dim2 + idx]
+        : outputBuffer[idx * dim2 + 2];
+    final double bh = isTransposed
+        ? outputBuffer[3 * dim2 + idx]
+        : outputBuffer[idx * dim2 + 3];
+
+    final double cxPx = coordsAreAbsolute ? cx : cx * targetW.toDouble();
+    final double cyPx = coordsAreAbsolute ? cy : cy * targetH.toDouble();
+    final double bwPx = coordsAreAbsolute ? bw : bw * targetW.toDouble();
+    final double bhPx = coordsAreAbsolute ? bh : bh * targetH.toDouble();
+
+    // In tile pixels (0 .. tileSide)
+    final double boxLeftPx = (cxPx - bwPx / 2.0) / scale;
+    final double boxTopPx = (cyPx - bhPx / 2.0) / scale;
+    final double boxRightPx = (cxPx + bwPx / 2.0) / scale;
+    final double boxBottomPx = (cyPx + bhPx / 2.0) / scale;
+
+    // Discard any box touching an INNER tile edge within 2 px (cut-off product rule)
+    if (isInnerLeft && boxLeftPx <= 2.0) continue;
+    if (isInnerTop && boxTopPx <= 2.0) continue;
+    if (isInnerRight && boxRightPx >= (tileSide - 2.0)) continue;
+    if (isInnerBottom && boxBottomPx >= (tileSide - 2.0)) continue;
+
+    // Shift to photo coordinates (0.0 .. 1.0 normalized)
+    final double normLeft = ((tileX + boxLeftPx) / origW).clamp(0.0, 1.0);
+    final double normTop = ((tileY + boxTopPx) / origH).clamp(0.0, 1.0);
+    final double normRight = ((tileX + boxRightPx) / origW).clamp(0.0, 1.0);
+    final double normBottom = ((tileY + boxBottomPx) / origH).clamp(0.0, 1.0);
+
+    if (normRight <= normLeft || normBottom <= normTop) continue;
+
+    candidates.add({
+      'classIndex': bestClass,
+      'confidence': conf,
+      'left': normLeft,
+      'top': normTop,
+      'width': normRight - normLeft,
+      'height': normBottom - normTop,
+    });
+  }
+
+  return candidates;
+}
+
+/// [800 TILE FALLBACK]: Merges candidates from all tiles with class-agnostic NMS IoU 0.5.
+List<Map<String, dynamic>> _mergeTileCandidatesWorker(
+  Map<String, dynamic> data,
+) {
+  final List<dynamic> rawList = data['candidates'] as List<dynamic>;
+  final double iouThreshold = (data['iouThreshold'] as num).toDouble();
+  final List<String> labels = List<String>.from(data['labels'] as List);
+
+  if (rawList.isEmpty) return [];
+
+  final List<_RawCandidate> candidates = rawList.map((dynamic m) {
+    final map = m as Map<String, dynamic>;
+    final double left = (map['left'] as num).toDouble();
+    final double top = (map['top'] as num).toDouble();
+    final double width = (map['width'] as num).toDouble();
+    final double height = (map['height'] as num).toDouble();
+    return _RawCandidate(
+      classId: map['classIndex'] as int,
+      score: (map['confidence'] as num).toDouble(),
+      box: Rect.fromLTWH(left, top, width, height),
+    );
+  }).toList();
+
+  // Class-agnostic NMS with IoU 0.5
+  candidates.sort((a, b) => b.score.compareTo(a.score));
+  final kept = <_RawCandidate>[];
+  for (final cand in candidates) {
+    if (kept.any((k) => _iouStatic(cand.box, k.box) > iouThreshold)) {
+      continue;
+    }
+    kept.add(cand);
+  }
+
+  return kept.map((k) {
+    final label = (k.classId >= 0 && k.classId < labels.length)
+        ? labels[k.classId]
+        : 'class_${k.classId}';
+    return {
+      'label': label,
+      'confidence': k.score,
+      'left': k.box.left,
+      'top': k.box.top,
+      'width': k.box.width,
+      'height': k.box.height,
+      'classIndex': k.classId,
+    };
+  }).toList();
 }
 
 // ── Internal Helpers ──────────────────────────────────────────────────────────
