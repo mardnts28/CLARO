@@ -75,7 +75,7 @@ class YoloRecognitionService {
 
       final loadAssetStopwatch = Stopwatch()..start();
       _interpreter = await Interpreter.fromAsset(
-        'assets/model/best.tflite-2',
+        'assets/model/claro_stage1_57class_1024.tflite',
         options: cpuOptions,
       );
       _interpreter!.allocateTensors();
