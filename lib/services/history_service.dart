@@ -13,6 +13,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../data/repositories/history_repository.dart';
+import '../data/repositories/consecutive_scan_repository.dart';
 import '../data/services/backend_locator.dart';
 import '../models/history_item.dart';
 import '../models/product_model.dart';
@@ -34,6 +35,7 @@ class HistoryService {
   Stream<void> get onUpdate => _updateController.stream;
 
   final HistoryRepository _repository;
+  final ConsecutiveScanRepository _consecutiveScanRepository;
 
   List<HistoryItem> _items = [];
   bool _loading = true;
@@ -47,8 +49,12 @@ class HistoryService {
   /// of a premature "no history yet" empty state.
   bool get isLoading => _loading;
 
-  HistoryService._internal({HistoryRepository? repository})
-      : _repository = repository ?? BackendLocator.historyRepository {
+  HistoryService._internal({
+    HistoryRepository? repository,
+    ConsecutiveScanRepository? consecutiveScanRepository,
+  })  : _repository = repository ?? BackendLocator.historyRepository,
+        _consecutiveScanRepository =
+            consecutiveScanRepository ?? BackendLocator.consecutiveScanRepository {
     // Re-subscribe to the right user's `users/{uid}/history` collection
     // whenever auth state changes (sign in, sign out, account switch),
     // rather than only reading the uid once at construction time.
@@ -110,23 +116,7 @@ class HistoryService {
     final sorted = filtered.toList()
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 
-    // Deduplicate scans: the same product scanned multiple times must show
-    // as a single card carrying only its latest scan time. The list is
-    // already sorted latest-first, so the first occurrence of each product
-    // is the one to keep. Comparison records are left untouched.
-    final seenProducts = <String>{};
-    final deduped = <HistoryItem>[];
-    for (final item in sorted) {
-      if (item.type == HistoryType.scan) {
-        final productId = item.productId;
-        final key = (productId != null && productId.isNotEmpty)
-            ? 'id:$productId'
-            : 'title:${item.title.trim().toLowerCase()}';
-        if (!seenProducts.add(key)) continue;
-      }
-      deduped.add(item);
-    }
-    return deduped;
+    return sorted;
   }
 
   /// Fire-and-forget by design (callers like camera_scanner_screen.dart
@@ -140,15 +130,6 @@ class HistoryService {
     }
 
     final now = DateTime.now();
-    // Check if we already scanned this product recently (e.g. within last
-    // minute) to avoid duplicates. Uses the local cache rather than a
-    // Firestore query so this stays instant even offline.
-    final exists = _items.any((item) =>
-        item.productId == product.id &&
-        item.type == HistoryType.scan &&
-        now.difference(item.timestamp).inMinutes < 2);
-    if (exists) return;
-
     final item = HistoryItem(
       id: 'scan_${now.millisecondsSinceEpoch}',
       title: product.name,
@@ -166,6 +147,17 @@ class HistoryService {
 
     try {
       await _repository.addItem(userId: userId, item: item);
+      // Track consecutive-day scanning
+      if (product.id.isNotEmpty) {
+        try {
+          await _consecutiveScanRepository.recordScan(
+            userId: userId,
+            productId: product.id,
+          );
+        } catch (e) {
+          debugPrint('HistoryService: failed to record consecutive scan: $e');
+        }
+      }
     } catch (e) {
       debugPrint('HistoryService.addScanRecord failed: $e');
       _items = _items.where((i) => i.id != item.id).toList();

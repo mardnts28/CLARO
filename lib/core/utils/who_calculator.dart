@@ -50,8 +50,12 @@ class WhoCalculator {
         return info.sodiumMg;
       case 'sugarsG':
         return info.sugarsG;
+      case 'totalCarbohydratesG':
+        return info.totalCarbohydratesG;
       case 'saturatedFatG':
         return info.saturatedFatG;
+      case 'transFatG':
+        return info.transFatG;
       default:
         throw ArgumentError('Unknown nutrientKey: $nutrientKey');
     }
@@ -348,7 +352,7 @@ class WhoCalculator {
       final nutrientKeys =
           ConditionThresholds.thresholds[condition]?.keys ?? const <String>[];
       for (final key in nutrientKeys) {
-        // Sodium is shared by hypertension and kidney disease; score it once.
+        // Sodium is shared by cardiovascular disease and kidney disease; score it once.
         if (!evaluatedNutrientKeys.add(key)) continue;
         final valuePer100g = readNutrientValue(product.nutritionPer100g, key);
 
@@ -498,7 +502,7 @@ class WhoCalculator {
     final allergenAssessment = assessAllergens(product, user);
 
     // Table 3.14: food allergy is a THIRD condition row in the same table
-    // as hypertension/diabetes, with its own Suitable/Caution classification
+    // as cardiovascular disease/diabetes, with its own Suitable/Caution classification
     // (no Moderate -- N/A). An allergen match (confirmed by explicit ingredient
     // evidence) forces the overall advisory level to Caution, even if every
     // evaluated nutrient came back Suitable. This does NOT touch riskScore --
@@ -532,8 +536,14 @@ class WhoCalculator {
         return WhoDailyLimits.sodiumMgPerDay;
       case 'sugarsG':
         return WhoDailyLimits.sugarsGPerDay;
+      case 'totalCarbohydratesG':
+        return WhoDailyLimits.totalCarbohydratesGPerDay;
       case 'saturatedFatG':
         return WhoDailyLimits.saturatedFatGPerDay;
+      case 'transFatG':
+        return WhoDailyLimits.transFatGPerDay;
+      case 'proteinG':
+        return WhoDailyLimits.proteinGPerDay;
       default:
         throw ArgumentError('No Recommended Daily Intake defined for $nutrientKey');
     }

@@ -37,10 +37,9 @@ const _noValueLabels = {'none', 'wala', 'nil'};
 
 final Map<String, HealthCondition> _conditionLabelMap = {
   _normalize('Diabetes'): HealthCondition.diabetes,
-  _normalize('Alta-presyon'): HealthCondition.hypertension,
-  _normalize('Hypertension'): HealthCondition.hypertension,
-  _normalize('Sakit sa puso'): HealthCondition.heartCondition,
-  _normalize('Heart Condition'): HealthCondition.heartCondition,
+  _normalize('Cardiovascular disease'): HealthCondition.cardiovascularDisease,
+  _normalize('Sakit sa puso'): HealthCondition.cardiovascularDisease,
+  _normalize('Cardiovascular Disease'): HealthCondition.cardiovascularDisease,
   _normalize('GERD'): HealthCondition.gerd,
   _normalize('Kidney Disease'): HealthCondition.kidneyDisease,
   _normalize('Sakit sa bato'): HealthCondition.kidneyDisease,

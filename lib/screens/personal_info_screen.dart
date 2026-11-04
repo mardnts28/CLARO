@@ -247,16 +247,20 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
           final conditionsList = List<String>.from(
             healthData?['conditions'] ?? [],
           );
+          // Migration: if user has Hypertension or Heart condition, map to Cardiovascular Disease
+          final hasHypertension = conditionsList.contains('Hypertension') ||
+              conditionsList.contains('Alta-presyon');
+          final hasHeartCondition = conditionsList.contains('Heart condition') ||
+              conditionsList.contains('Sakit sa puso');
+          
           _conditions = {
+            'Cardiovascular disease':
+                hasHypertension || hasHeartCondition ||
+                conditionsList.contains('Cardiovascular disease') ||
+                conditionsList.contains('Sakit sa puso'),
             'Diabetes':
                 conditionsList.contains('Diabetes') ||
                 conditionsList.contains('Diabetes'),
-            'Hypertension':
-                conditionsList.contains('Hypertension') ||
-                conditionsList.contains('Alta-presyon'),
-            'Heart condition':
-                conditionsList.contains('Heart condition') ||
-                conditionsList.contains('Sakit sa puso'),
             'GERD': conditionsList.contains('GERD'),
             'Kidney disease':
                 conditionsList.contains('Kidney disease') ||
@@ -566,12 +570,10 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
 
   String _getLocalizedConditionLabel(String key, AppLocalizations loc) {
     switch (key) {
+      case 'Cardiovascular disease':
+        return loc.conditionCardiovascularDisease;
       case 'Diabetes':
         return loc.conditionDiabetes;
-      case 'Hypertension':
-        return loc.conditionHypertension;
-      case 'Heart condition':
-        return loc.conditionHeartCondition;
       case 'GERD':
         return loc.conditionGerd;
       case 'Kidney disease':

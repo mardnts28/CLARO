@@ -283,10 +283,8 @@ class _GroupDetailsScreenState extends State<GroupDetailsScreen> {
     switch (c) {
       case HealthCondition.diabetes:
         return loc.conditionDiabetes;
-      case HealthCondition.hypertension:
-        return loc.conditionHypertension;
-      case HealthCondition.heartCondition:
-        return loc.conditionHeartCondition;
+      case HealthCondition.cardiovascularDisease:
+        return loc.conditionCardiovascularDisease;
       case HealthCondition.gerd:
         return loc.conditionGerd;
       case HealthCondition.kidneyDisease:

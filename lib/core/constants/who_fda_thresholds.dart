@@ -28,6 +28,7 @@ enum AdvisoryLevel { suitable, moderate, caution }
 class WhoDailyLimits {
   static const double sodiumMgPerDay = 2000;
   static const double sugarsGPerDay = 50;
+  static const double totalCarbohydratesGPerDay = 375;
   static const double saturatedFatGPerDay = 22.2;
 
   // WHO: trans fat < 1% of total energy/day (~2.2 g/day on 2,000 kcal).
@@ -44,11 +45,24 @@ class ConditionThresholds {
     cautionMinInclusive: 400,
   );
 
+  static const NutrientThreshold _saturatedFatThreshold = NutrientThreshold(
+    suitableMaxInclusive: 1.11,
+    cautionMinInclusive: 4.44,
+  );
+
+  // Trans fat threshold: < 0.22g per 100g is Suitable (1% of 2.2g daily limit)
+  // >= 0.44g per 100g is Caution (20% of 2.2g daily limit)
+  static const NutrientThreshold _transFatThreshold = NutrientThreshold(
+    suitableMaxInclusive: 0.22,
+    cautionMinInclusive: 0.44,
+  );
+
   static const Map<HealthCondition, Map<String, NutrientThreshold>> thresholds =
       {
-        HealthCondition.hypertension: {
+        HealthCondition.cardiovascularDisease: {
           'sodiumMg': _sodiumThreshold,
-          // unchanged
+          'saturatedFatG': _saturatedFatThreshold,
+          'transFatG': _transFatThreshold,
         },
         HealthCondition.kidneyDisease: {'sodiumMg': _sodiumThreshold},
         HealthCondition.diabetes: {
@@ -56,14 +70,10 @@ class ConditionThresholds {
             suitableMaxInclusive: 2.5,
             cautionMinInclusive: 10,
           ),
-          // 9.5 -> 10
-        },
-        HealthCondition.heartCondition: {
-          'saturatedFatG': NutrientThreshold(
-            suitableMaxInclusive: 1.11,
-            cautionMinInclusive: 4.44,
+          'totalCarbohydratesG': NutrientThreshold(
+            suitableMaxInclusive: 37.5,
+            cautionMinInclusive: 75,
           ),
-          // 2.2/4.4 -> 1.11/4.44
         },
       };
 }

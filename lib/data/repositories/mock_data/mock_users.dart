@@ -7,8 +7,8 @@
 final List<Map<String, dynamic>> mockUsersJson = [
   {
     'userId': 'u001',
-    'displayName': 'Test User - Hypertension Only',
-    'conditions': ['hypertension'],
+    'displayName': 'Test User - Cardiovascular Disease Only',
+    'conditions': ['cardiovascularDisease'],
     'allergies': [],
     'voiceAssistant': false,
   },
@@ -28,8 +28,8 @@ final List<Map<String, dynamic>> mockUsersJson = [
   },
   {
     'userId': 'u004',
-    'displayName': 'Test User - Hypertension + Diabetes',
-    'conditions': ['hypertension', 'diabetes'],
+    'displayName': 'Test User - Cardiovascular Disease + Diabetes',
+    'conditions': ['cardiovascularDisease', 'diabetes'],
     'allergies': [],
     'voiceAssistant': false,
   },
@@ -42,8 +42,8 @@ final List<Map<String, dynamic>> mockUsersJson = [
   },
   {
     'userId': 'u006',
-    'displayName': 'Test User - Hypertension + Voice Assistant',
-    'conditions': ['hypertension'],
+    'displayName': 'Test User - Cardiovascular Disease + Voice Assistant',
+    'conditions': ['cardiovascularDisease'],
     'allergies': [],
     'voiceAssistant': true,
   },
@@ -57,7 +57,7 @@ final List<Map<String, dynamic>> mockUsersJson = [
   {
     'userId': 'u008',
     'displayName': 'Test User - All',
-    'conditions': ['hypertension', 'diabetes'],
+    'conditions': ['cardiovascularDisease', 'diabetes'],
     'allergies': ['fish'],
     'voiceAssistant': false,
   }

@@ -364,6 +364,7 @@ class NutritionInfo {
   final double sodiumMg;
   final double sugarsG;
   final double saturatedFatG;
+  final double transFatG;
   final double totalCarbohydratesG;
   final double dietaryFiberG;
   final double potassiumMg;
@@ -375,6 +376,7 @@ class NutritionInfo {
     required this.sodiumMg,
     required this.sugarsG,
     required this.saturatedFatG,
+    required this.transFatG,
     required this.totalCarbohydratesG,
     required this.dietaryFiberG,
     required this.potassiumMg,
@@ -403,6 +405,7 @@ extension ProductBackendAdapter on Product {
         sodiumMg: nutritionalFacts.sodiumMg,
         sugarsG: nutritionalFacts.sugarsG,
         saturatedFatG: nutritionalFacts.saturatedFatG,
+        transFatG: nutritionalFacts.transFatG,
         totalCarbohydratesG: nutritionalFacts.carbsG,
         dietaryFiberG: nutritionalFacts.fiberG,
         potassiumMg: nutritionalFacts.potassiumMg,
@@ -415,6 +418,7 @@ extension ProductBackendAdapter on Product {
       sodiumMg: per100g['sodiumMg'] ?? nutritionalFacts.sodiumMg,
       sugarsG: per100g['sugarsG'] ?? nutritionalFacts.sugarsG,
       saturatedFatG: per100g['saturatedFatG'] ?? nutritionalFacts.saturatedFatG,
+      transFatG: per100g['transFatG'] ?? nutritionalFacts.transFatG,
       totalCarbohydratesG: per100g['carbsG'] ?? nutritionalFacts.carbsG,
       dietaryFiberG: per100g['fiberG'] ?? nutritionalFacts.fiberG,
       potassiumMg: per100g['potassiumMg'] ?? nutritionalFacts.potassiumMg,

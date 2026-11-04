@@ -16,7 +16,7 @@ void main() {
     final user = UserHealthProfile(
       userId: 'test_user',
       displayName: 'Test User',
-      conditions: const [HealthCondition.hypertension],
+      conditions: [HealthCondition.cardiovascularDisease],
       allergies: const [AllergenType.fish],
     );
 

@@ -175,6 +175,19 @@ class HealthInfoWarningCard extends StatelessWidget {
               ],
             ),
           ],
+          // Medical disclaimer footer
+          const SizedBox(height: 12),
+          Divider(height: 1, color: colorScheme.outline.withValues(alpha: 0.3)),
+          const SizedBox(height: 8),
+          Text(
+            'This advisory is for informational purposes only and is not a substitute for professional medical advice. Consult a doctor for personalized guidance, especially if your health condition worsens.',
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              height: 1.4,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
         ],
       ),
     );

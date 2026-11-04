@@ -203,7 +203,7 @@ class ProductRankingService {
     // compared set. These conditions contribute real weight to the
     // overall rank via WhoCalculator.evaluateProduct's scoredFactors, but
     // ConditionThresholds only defines numeric per-100g bands for
-    // hypertension/diabetes/heartCondition/kidneyDisease -- GERD has no
+    // cardiovascularDisease/diabetes/kidneyDisease -- GERD has no
     // entry there at all. Without this step: (a) GERD-only users got no
     // nutrient/factor-specific explanation whatsoever (always fell to the
     // generic "ranks X of Y" line below), and (b) GERD + kidney-disease
@@ -227,8 +227,8 @@ class ProductRankingService {
 
     // Get the nutrient that best explains THIS product's position, across
     // ALL of the user's conditions -- not just the first one -- so a user
-    // with e.g. hypertension + heart condition doesn't lose the
-    // saturated-fat story just because sodium happens to be listed first.
+    // with cardiovascular disease doesn't lose the saturated-fat story just
+    // because sodium happens to be listed first.
     final fact = _primaryComparisonFact(
       target: target,
       comparisonSet: comparisonSet,
@@ -445,12 +445,10 @@ class ProductRankingService {
 
     final conditions = scored.map((c) {
       switch (c) {
-        case HealthCondition.hypertension:
-          return 'hypertension';
+        case HealthCondition.cardiovascularDisease:
+          return 'cardiovascular disease';
         case HealthCondition.diabetes:
           return 'diabetes';
-        case HealthCondition.heartCondition:
-          return 'heart condition';
         case HealthCondition.gerd:
           return 'GERD';
         case HealthCondition.kidneyDisease:

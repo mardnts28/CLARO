@@ -17,6 +17,8 @@ import '../widgets/selectable_scanned_product_card.dart';
 import '../services/home_tab_controller.dart';
 import '../services/haptic_service.dart';
 import '../core/utils/success_feedback_utils.dart';
+import '../core/utils/group_filter_controller.dart';
+import '../widgets/group_filter_widgets.dart';
 
 /// Soft drop shadow used everywhere an outline/border used to be.
 List<BoxShadow> _softShadow(ThemeData theme, {double blur = 14, double dy = 5}) {
@@ -82,6 +84,19 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   // product source here (widget.detectedProducts, from image recognition)
   // and ranking source (ProductRankingService.rankProducts) are unchanged.
   UserHealthProfile? _profile;
+
+  // ── Group filter (same behavior as CompareProductsScreen) ─────────────
+  // Non-null when the signed-in user belongs to a health group with at
+  // least one OTHER member. The group name is a filter button with a
+  // checkbox (enabled == checked); its dialog picks which members'
+  // conditions/allergies apply. Disabled (or nobody selected) == rank
+  // against the user's OWN saved profile only.
+  GroupFilterController? _groupFilter;
+
+  bool get _groupFilterActive => _groupFilter?.isActive ?? false;
+
+  UserHealthProfile? get _baseProfile =>
+      _groupFilterActive ? _groupFilter!.combinedProfile : _profile;
 
   // Multi-select, same as CompareProductsScreen: empty set == "Overall"
   // (rank against the full saved profile). Non-empty narrows the
@@ -179,9 +194,18 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
             )
           : await _loadProfileOrDefault(uid);
 
+      // Group users: rank against the selected members' combined profile by
+      // default (all members selected, filter enabled).
+      if (uid != null) {
+        _groupFilter = await GroupFilterController.load(
+          uid: uid,
+          ownProfile: profile,
+        );
+      }
+
       final ranked = BackendLocator.productRankingService.rankProducts(
         products: _comparisonProducts,
-        user: profile,
+        user: _groupFilterActive ? _groupFilter!.combinedProfile : profile,
       );
 
       if (!mounted) return;
@@ -196,9 +220,13 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
         // conditions the user actually has doesn't require a re-rank --
         // it just reflects, in the filter UI, the same ranking already
         // shown. Matches CompareProductsScreen's default.
-        _selectedConditions = HealthCondition.values
-            .where((c) => c.isScored && profile.conditions.contains(c))
-            .toSet();
+        // With the group filter active, the group button stands in for the
+        // individual condition chips, so nothing is pre-checked.
+        _selectedConditions = _groupFilterActive
+            ? <HealthCondition>{}
+            : HealthCondition.values
+                  .where((c) => c.isScored && profile.conditions.contains(c))
+                  .toSet();
       });
 
       // Multi-Product Audio Spatial List: auto-announce ranked items
@@ -367,7 +395,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
     required Set<String> typeTags,
     required Set<String> flavorTags,
   }) {
-    final profile = _profile;
+    final profile = _baseProfile;
     if (profile == null) return;
 
     final effectiveProfile = conditions.isEmpty
@@ -398,6 +426,33 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
       _allRanked = reRanked;
       _filtered = _computeFiltered(reRanked);
     });
+  }
+
+  /// Opens the member-selection dialog and re-ranks the SAME detected set
+  /// against the resulting profile (selected members' combined profile, or
+  /// the user's own when the group filter is disabled).
+  Future<void> _openGroupFilterDialog() async {
+    final controller = _groupFilter;
+    final own = _profile;
+    if (controller == null || own == null) return;
+
+    final result = await showGroupFilterDialog(context, controller);
+    if (result == null || !mounted) return;
+
+    controller.update(
+      enabled: result.enabled,
+      selectedIds: result.selectedIds,
+    );
+
+    _reRankAndFilter(
+      conditions: _groupFilterActive
+          ? <HealthCondition>{}
+          : HealthCondition.values
+                .where((c) => c.isScored && own.conditions.contains(c))
+                .toSet(),
+      typeTags: _selectedTypeTags,
+      flavorTags: _selectedFlavorTags,
+    );
   }
 
   /// Removes a single condition from the current multi-select, keeping
@@ -443,12 +498,10 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   String _conditionLabel(HealthCondition condition) {
     final loc = AppLocalizations.of(context)!;
     switch (condition) {
-      case HealthCondition.hypertension:
-        return loc.conditionHypertension;
+      case HealthCondition.cardiovascularDisease:
+        return loc.conditionCardiovascularDisease;
       case HealthCondition.diabetes:
         return loc.conditionDiabetes;
-      case HealthCondition.heartCondition:
-        return loc.conditionHeartCondition;
       case HealthCondition.gerd:
         return loc.conditionGerd;
       case HealthCondition.kidneyDisease:
@@ -532,29 +585,33 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    sectionTitle(loc.filterConditionTitle),
-                    // Multi-select: any combination of the conditions can
-                    // be checked at once (e.g. Diabetes + Heart Condition
-                    // together). Only deterministic scored conditions can
-                    // re-rank products.
-                    for (final condition in HealthCondition.values.where(
-                      (c) => c.isScored,
-                    ))
-                      CheckboxListTile(
-                        value: tempConditions.contains(condition),
-                        activeColor: colorScheme.primary,
-                        title: Text(_conditionLabel(condition)),
-                        onChanged: (checked) {
-                          HapticService().vibrate();
-                          setSheetState(() {
-                            if (checked == true) {
-                              tempConditions.add(condition);
-                            } else {
-                              tempConditions.remove(condition);
-                            }
-                          });
-                        },
-                      ),
+                    // While the group filter is active, the group button on
+                    // the main screen is the health-condition filter, so
+                    // the per-condition checkboxes are hidden here.
+                    if (!_groupFilterActive) ...[
+                      sectionTitle(loc.filterConditionTitle),
+                      // Multi-select: any combination of the conditions can
+                      // be checked at once. Only deterministic scored
+                      // conditions can re-rank products.
+                      for (final condition in HealthCondition.values.where(
+                        (c) => c.isScored,
+                      ))
+                        CheckboxListTile(
+                          value: tempConditions.contains(condition),
+                          activeColor: colorScheme.primary,
+                          title: Text(_conditionLabel(condition)),
+                          onChanged: (checked) {
+                            HapticService().vibrate();
+                            setSheetState(() {
+                              if (checked == true) {
+                                tempConditions.add(condition);
+                              } else {
+                                tempConditions.remove(condition);
+                              }
+                            });
+                          },
+                        ),
+                    ],
 
                     // ── Product Type (only shown if this comparison set
                     // actually has products with a curated type tag) ────
@@ -878,7 +935,7 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
   /// been part of the initial comparison. Previously-ranked products are
   /// kept; duplicates (already in _comparisonProducts) are skipped.
   void _addProductsToRanking(List<Product> newProducts) {
-    final profile = _profile;
+    final profile = _baseProfile;
     if (profile == null) return;
 
     final existingIds = _comparisonProducts.map((p) => p.id).toSet();
@@ -1130,7 +1187,8 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                         ),
-                        if (_selectedConditions.isNotEmpty ||
+                        if (_groupFilterActive ||
+                            _selectedConditions.isNotEmpty ||
                             _hasActiveTagFilters)
                           Positioned(
                             top: -2,
@@ -1167,6 +1225,11 @@ class _MultiScanResultsScreenState extends State<MultiScanResultsScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+                  if (_groupFilter != null)
+                    GroupFilterButton(
+                      controller: _groupFilter!,
+                      onTap: _openGroupFilterDialog,
+                    ),
                   for (final condition in _selectedConditions)
                     _buildRemovableChip(
                       label: _conditionLabel(condition),

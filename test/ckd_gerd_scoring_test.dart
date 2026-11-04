@@ -55,10 +55,10 @@ void main() {
     expect(evaluation.riskScore, 2); // sodium + verified-clean phosphate
   });
 
-  test('hypertension scores sodium once', () {
+  test('cardiovascular disease scores sodium once', () {
     final evaluation = WhoCalculator.evaluateProduct(
       _product(),
-      _user([HealthCondition.hypertension]),
+      _user([HealthCondition.cardiovascularDisease]),
     );
 
     expect(evaluation.riskScore, 1);
@@ -71,7 +71,7 @@ void main() {
   test('missing sodium nutrition data scores sodium as unknown', () {
     final evaluation = WhoCalculator.evaluateProduct(
       _product(hasNutritionData: false),
-      _user([HealthCondition.hypertension]),
+      _user([HealthCondition.cardiovascularDisease]),
     );
 
     final sodium = evaluation.scoredFactors.firstWhere(
@@ -81,10 +81,10 @@ void main() {
     expect(sodium.points, 2);
   });
 
-  test('CKD and hypertension share one sodium score', () {
+  test('CKD and cardiovascular disease share one sodium score', () {
     final evaluation = WhoCalculator.evaluateProduct(
       _product(),
-      _user([HealthCondition.kidneyDisease, HealthCondition.hypertension]),
+      _user([HealthCondition.kidneyDisease, HealthCondition.cardiovascularDisease]),
     );
 
     expect(

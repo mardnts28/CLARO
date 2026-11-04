@@ -117,6 +117,11 @@ class NutrientRowWidget extends StatelessWidget {
     final highlightAccentColor = isDark
         ? colorScheme.secondary
         : colorScheme.primary;
+    final dailyLimitText = evaluation.percentage > 100
+        ? loc.exceedsDailyLimitBy(
+            (evaluation.percentage - 100).toStringAsFixed(0),
+          )
+        : '${evaluation.percentage.toStringAsFixed(0)}% ${evaluation.nutrientKey == 'sugarsG' ? loc.ofWhoFreeSugarReference : evaluation.nutrientKey == 'totalFatG' ? 'of FDA Daily Value' : loc.ofWhoLimit}';
 
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,8 +181,7 @@ class NutrientRowWidget extends StatelessWidget {
                 ),
               ),
               TextSpan(
-                text:
-                    '${evaluation.percentage.toStringAsFixed(0)}% ${evaluation.nutrientKey == 'sugarsG' ? loc.ofWhoFreeSugarReference : loc.ofWhoLimit}',
+                text: dailyLimitText,
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   color: isRelatedToUserCondition

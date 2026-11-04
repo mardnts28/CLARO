@@ -128,7 +128,7 @@ void main() {
       final user = UserHealthProfile(
         userId: 'user4',
         displayName: 'Test User',
-        conditions: [HealthCondition.hypertension],
+        conditions: [HealthCondition.cardiovascularDisease],
         allergies: [AllergenType.dairy],
       );
 
@@ -249,7 +249,7 @@ void main() {
       final user = UserHealthProfile(
         userId: 'user8',
         displayName: 'Test User',
-        conditions: [HealthCondition.hypertension],
+        conditions: [HealthCondition.cardiovascularDisease],
         allergies: [], // No allergies
       );
 

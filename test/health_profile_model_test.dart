@@ -7,14 +7,14 @@ void main() {
       final p1 = UserHealthProfile(
         userId: 'user_123',
         displayName: 'Juan',
-        conditions: const [HealthCondition.hypertension, HealthCondition.diabetes],
+        conditions: [HealthCondition.cardiovascularDisease, HealthCondition.diabetes],
         allergies: const [AllergenType.fish],
       );
 
       final p2 = UserHealthProfile(
         userId: 'user_123',
         displayName: 'Juan',
-        conditions: const [HealthCondition.diabetes, HealthCondition.hypertension], // reversed order
+        conditions: [HealthCondition.diabetes, HealthCondition.cardiovascularDisease], // reversed order
         allergies: const [AllergenType.fish],
       );
 
@@ -24,7 +24,7 @@ void main() {
       final p3 = UserHealthProfile(
         userId: 'user_123',
         displayName: 'Juan',
-        conditions: const [HealthCondition.hypertension], // diabetes removed
+        conditions: [HealthCondition.cardiovascularDisease], // diabetes removed
         allergies: const [AllergenType.fish],
       );
       expect(p1.profileFingerprint, isNot(equals(p3.profileFingerprint)));
@@ -52,7 +52,7 @@ void main() {
       expect(reconstructed.displayName, 'Maria Clara');
       expect(reconstructed.hasGerd, isTrue);
       expect(reconstructed.hasKidneyDisease, isTrue);
-      expect(reconstructed.hasHypertension, isFalse);
+      expect(reconstructed.hasCardiovascularDisease, isFalse);
       expect(reconstructed.allergies, containsAll([AllergenType.shellfish, AllergenType.dairy]));
       expect(reconstructed.voiceAssistant, isTrue);
     });

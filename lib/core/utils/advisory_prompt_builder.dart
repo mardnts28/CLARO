@@ -12,6 +12,7 @@ import '../../data/models/product_evaluation.dart';
 import '../../data/models/ranked_product_result.dart';
 import '../constants/who_fda_thresholds.dart';
 import 'comparison_calculator.dart';
+import 'gerd_trigger_detector.dart';
 import 'kidney_advisory_facts.dart';
 import 'serving_size_calculator.dart';
 import '../../models/product_model.dart';
@@ -45,6 +46,8 @@ String _formatPercentageWording(
 enum _AdvisoryMode {
   allergen,
   kidney,
+  gerdOnly,
+  diabetesOnly,
   noConditions,
   allSuitable,
   factorsOnly,
@@ -60,32 +63,25 @@ class AdvisoryPromptBuilder {
       percentage <= 100 ? percentage : percentage - 100;
 
   /// The suggested serving amount for this product and user, worked out by
-  /// the app. Public so GeminiAdvisoryService can attach it to the advisory
-  /// directly (the badge on the product screen) instead of trusting a copy
-  /// of it that came back from the model. Null when there is nothing to
-  /// suggest.
+  /// the app (Table 3.22, see ServingSizeCalculator). Public so
+  /// GeminiAdvisoryService can attach it to the advisory directly (the badge
+  /// on the product screen) instead of trusting a copy of it that came back
+  /// from the model.
+  ///
+  /// Null ONLY when no amount may be shown: the user has GERD (alone or with
+  /// other conditions), or the product contains a food allergen the user is
+  /// allergic to. In every other case an amount is returned, even when
+  /// nothing is flagged.
   static String? suggestedServing({
     required ProductEvaluation evaluation,
     required UserHealthProfile user,
   }) {
     final product = evaluation.product;
-    // No health conditions and no allergens: the amount is based on sodium,
-    // total sugars and saturated fat combined.
-    final hasNoConditionsAndNoAllergens =
-        user.conditions.isEmpty &&
-        !evaluation.allergenAssessment.hasDirectAllergen;
-    if (hasNoConditionsAndNoAllergens) {
-      return ServingSizeCalculator.calculateCombinedNutrients(
-        nutritionPer100g: product.nutritionPer100g,
-        servingSizeG: product.servingSizeG,
-      );
-    }
-    final worst = _worstFlagged(evaluation);
-    if (worst == null) return null;
-    return ServingSizeCalculator.calculate(
-      nutrientKey: worst.nutrientKey,
-      valuePer100g: worst.valuePer100g,
+    return ServingSizeCalculator.forProfile(
+      conditions: user.conditions,
+      nutritionPer100g: product.nutritionPer100g,
       servingSizeG: product.servingSizeG,
+      hasDirectAllergen: evaluation.allergenAssessment.hasDirectAllergen,
     );
   }
 
@@ -138,6 +134,29 @@ Rules:
     final kidneyFacts = KidneyAdvisoryFacts.build(evaluation);
 
     final worst = _worstFlagged(evaluation);
+    final diabetesOnly =
+        user.conditions.length == 1 &&
+        user.conditions.single == HealthCondition.diabetes;
+    final diabetesEvaluations = evaluation.nutrientEvaluations
+        .where((e) => e.condition == HealthCondition.diabetes)
+        .toList();
+    final hasDiabetesFacts =
+        diabetesEvaluations.any((e) => e.nutrientKey == 'sugarsG') &&
+        diabetesEvaluations.any(
+          (e) => e.nutrientKey == 'totalCarbohydratesG',
+        );
+    final gerdOnly =
+        user.conditions.length == 1 &&
+        user.conditions.single == HealthCondition.gerd;
+    final gerdDetection = gerdOnly
+        ? GerdTriggerDetector.detect(product)
+        : null;
+    final gerdFat = scoredFactors.where(
+      (f) => f.factorKey == 'gerdTotalFat',
+    );
+    final gerdTriggers = scoredFactors.where(
+      (f) => f.factorKey == 'gerdTriggers',
+    );
 
     // No health conditions and no allergens: the suggested amount is
     // worked out from sodium, total sugars and saturated fat combined.
@@ -166,6 +185,10 @@ Rules:
       mode = _AdvisoryMode.allergen;
     } else if (kidneyFacts != null) {
       mode = _AdvisoryMode.kidney;
+    } else if (gerdOnly && gerdFat.isNotEmpty && gerdTriggers.isNotEmpty) {
+      mode = _AdvisoryMode.gerdOnly;
+    } else if (diabetesOnly && hasDiabetesFacts) {
+      mode = _AdvisoryMode.diabetesOnly;
     } else if (hasNoConditionsAndNoAllergens) {
       mode = _AdvisoryMode.noConditions;
     } else if (worst == null && scoredFactors.isEmpty) {
@@ -244,26 +267,24 @@ explanation: exactly 2 short sentences, under 45 words in total.
 2. If phosphate additive ingredients are listed, name them exactly and say they may be worth noting for kidney health. Otherwise say these amounts are worth keeping in mind with kidney disease.
 Do not mention the serving size or a suggested amount; the app shows that separately.''';
     } else if (mode == _AdvisoryMode.noConditions) {
+      if (safeServing == null) {
+        throw StateError(
+          'A suggested serving amount is required for a user without '
+          'health conditions or detected allergens.',
+        );
+      }
       final exceededLabels = exceededDailyLimitKeys
           .map(_nutrientLabel)
           .join(', ');
       factsBlock = [
         'The user has no health conditions or allergens on file.',
-        safeServing != null
-            ? 'Suggested amount (already written by the app): "$safeServing".'
-            : 'No suggested serving amount was supplied.',
+        'Suggested amount (already written by the app): "$safeServing".',
         if (exceededDailyLimitKeys.isNotEmpty)
           'At the full labeled serving (${product.servingSizeG.toStringAsFixed(0)}g), these already go above the daily reference amount: $exceededLabels. That is why a smaller amount is suggested.',
       ].join('\n');
       const suitableHeadline =
           'warningText: at most 8 words. It must clearly say "Suitable"; a short phrase after it is optional.';
-      if (safeServing == null) {
-        taskBlock =
-            '''
-$suitableHeadline
-
-explanation: exactly 1 short sentence saying that no specific serving amount was suggested for this product. Do not add numbers.''';
-      } else if (exceededDailyLimitKeys.isEmpty) {
+      if (exceededDailyLimitKeys.isEmpty) {
         taskBlock =
             '''
 $suitableHeadline
@@ -279,6 +300,66 @@ explanation: exactly 2 short sentences.
 1. Restate the suggested amount from the facts in friendly words, keeping the amount and the grams exactly as written, and say it is for up to ${ServingSizeCalculator.mealsPerDay} meals a day.
 2. Give a short, plain, non-alarming reason for the smaller amount, based on the note in the facts (for example "A full serving has more sodium than the daily reference amount."). Do not use numbers or percentages.''';
       }
+    } else if (mode == _AdvisoryMode.gerdOnly) {
+      final fat = gerdFat.first;
+      final triggerFactor = gerdTriggers.first;
+      final ingredientTriggers = gerdDetection!.triggers
+          .where((t) => t.type != GerdTriggerType.highFat)
+          .map((t) => t.matchedIngredient)
+          .whereType<String>()
+          .toSet()
+          .toList();
+      factsBlock = [
+        'The user has GERD as their only selected health condition.',
+        if (fat.isUnknown)
+          'Total fat: not enough nutrition information to evaluate it for GERD.'
+        else
+          'Total fat: ${fat.valuePerServing?.toStringAsFixed(1)}g per serving; evaluated level is ${_levelLabel(fat.level)} using the existing high-fat reference of ${GerdTriggerDetector.highFatPerServingThresholdG}g per serving.',
+        if (triggerFactor.isUnknown)
+          'GERD-triggering ingredients: not enough ingredient information to check.'
+        else if (ingredientTriggers.isEmpty)
+          'GERD-triggering ingredients: none detected.'
+        else
+          'Potential GERD-triggering ingredients detected: ${ingredientTriggers.join(', ')}.',
+      ].join('\n');
+      taskBlock = '''
+warningText: at most 8 words and must match the supplied evaluation. If total fat or a trigger ingredient is flagged, describe the concern neutrally; if neither is flagged and both checks have data, say "Suitable"; if a check lacks data, say "Limited information".
+
+explanation: exactly 2 short sentences.
+1. State the total-fat amount and whether it meets the existing high-fat reference, or say the nutrition information is insufficient.
+2. Name the potential GERD-triggering ingredients exactly as supplied and say reactions differ between people; if none were detected, say so; if ingredient information is missing, say it could not be checked.
+Do not mention a suggested serving amount.''';
+    } else if (mode == _AdvisoryMode.diabetesOnly) {
+      final sugars = diabetesEvaluations.firstWhere(
+        (e) => e.nutrientKey == 'sugarsG',
+      );
+      final carbohydrates = diabetesEvaluations.firstWhere(
+        (e) => e.nutrientKey == 'totalCarbohydratesG',
+      );
+      final sugarsPercentage = _formatPercentageWording(
+        sugars.whoDailyLimitPercentage,
+        isTagalog,
+        forFreeSugars: true,
+      );
+      final carbohydratesPercentage = _formatPercentageWording(
+        carbohydrates.whoDailyLimitPercentage,
+        isTagalog,
+      );
+      final sugarsLevel = _levelLabel(sugars.level);
+      final carbohydratesLevel = _levelLabel(carbohydrates.level);
+      factsBlock = [
+        'The user has diabetes as their only selected health condition.',
+        'Total sugars: ${sugars.valuePerServing.toStringAsFixed(1)}g, $sugarsPercentage of the Recommended Daily Intake for free sugars.',
+        'Total carbohydrates: ${carbohydrates.valuePerServing.toStringAsFixed(1)}g, $carbohydratesPercentage of the Recommended Daily Intake.',
+        'Evaluated levels: total sugars is $sugarsLevel; total carbohydrates is $carbohydratesLevel.',
+      ].join('\n');
+      taskBlock = '''
+warningText: at most 8 words, naming the most concerning nutrient in a neutral way. If both evaluated levels are Suitable, clearly say "Suitable". Do not change or exaggerate the supplied levels.
+
+explanation: exactly 2 short sentences.
+1. Identify both total sugars and total carbohydrates, with each nutrient's respective amount and percentage wording copied exactly from the facts. Always call the first nutrient "total sugars"; do not call it free sugars or added sugars.
+2. Explain how the supplied evaluated levels relate to diabetes. If both are Suitable, say both are within the recommended range; if either is Moderate or Caution, say the amounts are worth keeping in mind with diabetes. Do not make medical claims.
+Do not mention the serving size or a suggested amount; the app shows that separately.''';
     } else if (mode == _AdvisoryMode.allSuitable) {
       factsBlock =
           'All checked nutrients are within the suitable range for this user\'s health profile.';
@@ -359,6 +440,7 @@ Also write "comparisonExplanation": one short sentence saying why this product i
     // Allergen and GERD-ingredient warnings may use cautious warning wording.
     final usesWarningWording =
         mode == _AdvisoryMode.allergen ||
+        mode == _AdvisoryMode.gerdOnly ||
         (mode == _AdvisoryMode.factorsOnly &&
             scoredFactors.any((f) => f.factorKey.startsWith('gerd')));
     final styleRules = usesWarningWording ? _warningStyleRules : _styleRules;
@@ -401,6 +483,10 @@ $jsonFields
   // amount (WhoDailyLimits). Uses raw per-100g values directly rather
   // than `evaluation.nutrientEvaluations` because that list is only
   // populated per-condition -- this path is for users with none.
+  //
+  // These three nutrients are exactly the ones the no-condition suggested
+  // amount is built from (ServingSizeCalculator, Table 3.22), so every
+  // reason named here really explains the suggested amount.
   static List<String> _exceededDailyLimitKeys(Product product) {
     final checks = <String, double>{
       'sodiumMg': product.nutritionPer100g.sodiumMg,
@@ -435,12 +521,10 @@ $jsonFields
 
   static String _conditionLabel(HealthCondition c) {
     switch (c) {
-      case HealthCondition.hypertension:
-        return 'hypertension';
+      case HealthCondition.cardiovascularDisease:
+        return 'cardiovascular disease';
       case HealthCondition.diabetes:
         return 'diabetes';
-      case HealthCondition.heartCondition:
-        return 'heart condition';
       case HealthCondition.gerd:
         return 'GERD';
       case HealthCondition.kidneyDisease:
@@ -469,8 +553,14 @@ $jsonFields
         return 'sodium';
       case 'sugarsG':
         return 'total sugars';
+      case 'totalCarbohydratesG':
+        return 'total carbohydrates';
       case 'saturatedFatG':
         return 'saturated fat';
+      case 'transFatG':
+        return 'trans fat';
+      case 'proteinG':
+        return 'protein';
       default:
         return key;
     }
@@ -482,7 +572,13 @@ $jsonFields
         return 'mg';
       case 'sugarsG':
         return 'g';
+      case 'totalCarbohydratesG':
+        return 'g';
       case 'saturatedFatG':
+        return 'g';
+      case 'transFatG':
+        return 'g';
+      case 'proteinG':
         return 'g';
       default:
         return '';

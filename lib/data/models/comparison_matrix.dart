@@ -7,12 +7,13 @@
 //    sugars, protein, total fat, saturated fat), regardless of the user's
 //    saved health conditions. This is a general nutritional comparison, not
 //    a suitability-ranking comparison.
-// 2. `level` (Suitable/Moderate/Caution) is populated ONLY for sodium and
-//    sugars, and ONLY when the user has the matching condition saved
-//    (hypertension -> sodium, diabetes -> sugars) -- these are the only two
-//    nutrients Table 3.14 actually defines thresholds for. Calories,
-//    protein, total fat, and saturated fat have no Table 3.14 basis, so
-//    `level` stays null for those rows; only the relative best/worst
+// 2. `level` (Suitable/Moderate/Caution) is populated ONLY for sodium,
+//    saturated fat, and sugars, and ONLY when the user has the matching
+//    condition saved (cardiovascular disease -> sodium/saturated fat,
+//    diabetes -> sugars) -- these are the only nutrients Table 3.14
+//    actually defines thresholds for. Calories, protein, total fat have
+//    no Table 3.14 basis, so `level` stays null for those rows; only the
+//    relative best/worst
 //    highlight applies.
 
 import '../../core/constants/who_fda_thresholds.dart';

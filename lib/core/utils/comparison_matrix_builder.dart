@@ -73,7 +73,7 @@ class ComparisonMatrixBuilder {
 
       final ComparisonHighlight highlight;
       if (level != null) {
-        // Absolute basis available (sodium+hypertension or sugar+diabetes):
+        // Absolute basis available (sodium+cardiovascular disease or sugar+diabetes):
         // color reflects actual Recommended Daily Intake/FDA safety, NOT relative rank within
         // this specific comparison set. Fixes the case where three products
         // are 700mg/600mg/500mg sodium -- all three are Caution-level per
@@ -129,8 +129,8 @@ class ComparisonMatrixBuilder {
     }
   }
 
-  // Table 3.14 only defines thresholds for sodium (hypertension), sugars
-  // (diabetes), and saturated fat (heart condition) -- and only meaningful
+  // Table 3.14 only defines thresholds for sodium, saturated fat, and trans fat
+  // (cardiovascular disease), and sugars/carbohydrates (diabetes) -- and only meaningful
   // if the user actually has that condition saved. Every other
   // nutrient/condition combination has no defined band, so this returns
   // null rather than fabricating one.
@@ -139,14 +139,14 @@ class ComparisonMatrixBuilder {
     double value,
     UserHealthProfile user,
   ) {
-    if (nutrient == ComparisonNutrient.sodium && user.hasHypertension) {
-      return WhoCalculator.classifyNutrient(HealthCondition.hypertension, 'sodiumMg', value);
+    if (nutrient == ComparisonNutrient.sodium && user.hasCardiovascularDisease) {
+      return WhoCalculator.classifyNutrient(HealthCondition.cardiovascularDisease, 'sodiumMg', value);
+    }
+    if (nutrient == ComparisonNutrient.saturatedFat && user.hasCardiovascularDisease) {
+      return WhoCalculator.classifyNutrient(HealthCondition.cardiovascularDisease, 'saturatedFatG', value);
     }
     if (nutrient == ComparisonNutrient.sugars && user.hasDiabetes) {
       return WhoCalculator.classifyNutrient(HealthCondition.diabetes, 'sugarsG', value);
-    }
-    if (nutrient == ComparisonNutrient.saturatedFat && user.hasHeartCondition) {
-      return WhoCalculator.classifyNutrient(HealthCondition.heartCondition, 'saturatedFatG', value);
     }
     return null;
   }

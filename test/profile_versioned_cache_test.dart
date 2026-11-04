@@ -13,17 +13,17 @@ void main() {
 
   group('UserHealthProfile Fingerprint Tests', () {
     test('Identical health profiles produce identical fingerprints regardless of order', () {
-      final profile1 = const UserHealthProfile(
+      final profile1 = UserHealthProfile(
         userId: 'user_123',
         displayName: 'Juan',
-        conditions: [HealthCondition.hypertension, HealthCondition.diabetes],
+        conditions: [HealthCondition.cardiovascularDisease, HealthCondition.diabetes],
         allergies: [AllergenType.peanuts, AllergenType.shellfish],
       );
 
-      final profile2 = const UserHealthProfile(
+      final profile2 = UserHealthProfile(
         userId: 'user_123',
         displayName: 'Juan',
-        conditions: [HealthCondition.diabetes, HealthCondition.hypertension],
+        conditions: [HealthCondition.diabetes, HealthCondition.cardiovascularDisease],
         allergies: [AllergenType.shellfish, AllergenType.peanuts],
       );
 
@@ -31,17 +31,17 @@ void main() {
     });
 
     test('Updating condition or allergy changes the fingerprint (invalidates cache)', () {
-      final baseProfile = const UserHealthProfile(
+      final baseProfile = UserHealthProfile(
         userId: 'user_123',
         displayName: 'Juan',
-        conditions: [HealthCondition.hypertension],
+        conditions: [HealthCondition.cardiovascularDisease],
         allergies: [AllergenType.peanuts],
       );
 
-      final updatedProfile = const UserHealthProfile(
+      final updatedProfile = UserHealthProfile(
         userId: 'user_123',
         displayName: 'Juan',
-        conditions: [HealthCondition.hypertension, HealthCondition.diabetes],
+        conditions: [HealthCondition.cardiovascularDisease, HealthCondition.diabetes],
         allergies: [AllergenType.peanuts],
       );
 

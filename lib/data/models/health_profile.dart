@@ -4,9 +4,8 @@
 // Firestore under: users/{userId}/healthProfile
 
 enum HealthCondition {
-  hypertension,
+  cardiovascularDisease,
   diabetes,
-  heartCondition,
   // Conditions with deterministic scoring factors. They may also drive
   // informational warning cards. New values are
   // appended at the end and (de)serialized by name, so existing saved
@@ -19,9 +18,8 @@ extension HealthConditionKind on HealthCondition {
   /// True for conditions that participate in deterministic scoring/ranking.
   bool get isScored {
     switch (this) {
-      case HealthCondition.hypertension:
+      case HealthCondition.cardiovascularDisease:
       case HealthCondition.diabetes:
-      case HealthCondition.heartCondition:
       case HealthCondition.gerd:
       case HealthCondition.kidneyDisease:
         return true;
@@ -91,10 +89,9 @@ class UserHealthProfile {
     this.voiceAssistant = false,
   });
 
-  bool get hasHypertension => conditions.contains(HealthCondition.hypertension);
+  bool get hasCardiovascularDisease =>
+      conditions.contains(HealthCondition.cardiovascularDisease);
   bool get hasDiabetes => conditions.contains(HealthCondition.diabetes);
-  bool get hasHeartCondition =>
-      conditions.contains(HealthCondition.heartCondition);
   bool get hasGerd => conditions.contains(HealthCondition.gerd);
   bool get hasKidneyDisease =>
       conditions.contains(HealthCondition.kidneyDisease);
@@ -114,18 +111,41 @@ class UserHealthProfile {
   }
 
   factory UserHealthProfile.fromJson(Map<String, dynamic> json) {
+    final rawConditions = (json['conditions'] as List<dynamic>? ?? [])
+        .map(
+          (c) => HealthCondition.values.cast<HealthCondition?>().firstWhere(
+            (e) => e?.name == c?.toString(),
+            orElse: () => null,
+          ),
+        )
+        .whereType<HealthCondition>()
+        .toList();
+
+    // Migration: Map old hypertension and heartCondition to cardiovascularDisease
+    final hasHypertension = rawConditions.any((c) => c.name == 'hypertension');
+    final hasHeartCondition = rawConditions.any((c) => c.name == 'heartCondition');
+    
+    final migratedConditions = <HealthCondition>[];
+    for (final condition in rawConditions) {
+      if (condition.name == 'hypertension' || condition.name == 'heartCondition') {
+        // Skip these - they'll be replaced with cardiovascularDisease if either exists
+        continue;
+      }
+      migratedConditions.add(condition);
+    }
+    
+    // Add cardiovascularDisease if user had either old condition
+    if (hasHypertension || hasHeartCondition) {
+      migratedConditions.add(HealthCondition.cardiovascularDisease);
+    }
+    
+    // Remove duplicates in case cardiovascularDisease was already present
+    final uniqueConditions = migratedConditions.toSet().toList();
+
     return UserHealthProfile(
       userId: json['userId']?.toString() ?? '',
       displayName: json['displayName']?.toString() ?? '',
-      conditions: (json['conditions'] as List<dynamic>? ?? [])
-          .map(
-            (c) => HealthCondition.values.cast<HealthCondition?>().firstWhere(
-              (e) => e?.name == c?.toString(),
-              orElse: () => null,
-            ),
-          )
-          .whereType<HealthCondition>()
-          .toList(),
+      conditions: uniqueConditions,
       allergies: (json['allergies'] as List<dynamic>? ?? [])
           .map(
             (a) => AllergenType.values.cast<AllergenType?>().firstWhere(

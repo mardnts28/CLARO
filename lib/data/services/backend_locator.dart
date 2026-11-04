@@ -18,6 +18,7 @@ import '../repositories/user_repository.dart';
 import '../repositories/favorites_repository.dart';
 import '../repositories/history_repository.dart';
 import '../repositories/group_repository.dart'; // NEW (Phase 2)
+import '../repositories/consecutive_scan_repository.dart'; // Consecutive-day tracking
 import 'favorites_service.dart';
 import 'gemini_advisory_service.dart';
 import 'product_comparison_service.dart';
@@ -91,6 +92,11 @@ class BackendLocator {
   // in-memory cache + broadcast stream the History screen listens to for
   // UI reactivity, so this instance itself stays a thin Firestore adapter.
   static final HistoryRepository historyRepository = FirebaseHistoryRepository();
+
+  // Tracks consecutive-day scanning behavior per product per user.
+  // Used to display health warnings when a product is scanned on 3+ consecutive days.
+  static final ConsecutiveScanRepository consecutiveScanRepository =
+      FirebaseConsecutiveScanRepository();
 
   static final GeminiAdvisoryService geminiAdvisoryService =
       GeminiAdvisoryService(

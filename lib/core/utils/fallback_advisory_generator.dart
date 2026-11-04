@@ -7,18 +7,21 @@
 
 import 'dart:developer' as dev;
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import '../../data/models/health_advisory.dart';
 import '../../data/models/health_profile.dart';
 import '../../data/models/product_evaluation.dart';
 import '../constants/who_fda_thresholds.dart';
+import 'gerd_trigger_detector.dart';
 import 'kidney_advisory_facts.dart';
 import 'serving_size_calculator.dart';
 import 'who_calculator.dart';
 import '../../models/product_model.dart';
 
 /// Formats percentage wording for health advisories.
-/// If percentage <= 100%, returns "X% of the Recommended Daily Intake"
-/// If percentage > 100%, returns "(X-100)% above the Recommended Daily Intake"
+/// If percentage <= 100%, returns "takes up X% of the recommended daily intake"
+/// If percentage > 100%, returns "(X-100)% exceeding the recommended daily intake"
 String _formatPercentageWording(double percentage, bool isTagalog) {
   if (percentage <= 100) {
     return isTagalog
@@ -27,7 +30,7 @@ String _formatPercentageWording(double percentage, bool isTagalog) {
   } else {
     final above = percentage - 100;
     return isTagalog
-        ? 'Lumagpas sa ${above.toStringAsFixed(1)}% ng inererekomendang pang araw-araw na pagkain'
+        ? 'lumagpas sa ${above.toStringAsFixed(1)}% ng inererekomendang pang araw-araw na pagkain'
         : '${above.toStringAsFixed(1)}% exceeding the recommended daily intake';
   }
 }
@@ -38,6 +41,31 @@ String _formatPercentageWording(double percentage, bool isTagalog) {
 enum FallbackReason { timeout, apiError, emptyResponse, parseError, notNeeded }
 
 class FallbackAdvisoryGenerator {
+  /// The user's health conditions, worked out from the evaluation itself.
+  /// Only used when the caller did not pass `userConditions`:
+  ///  - every condition that has a nutrient evaluation (cardiovascular
+  ///    disease, diabetes, kidney sodium),
+  ///  - GERD, which has no nutrient evaluation but always has `gerd*`
+  ///    scored factors,
+  ///  - kidney disease, which also shows up as kidney facts / phosphate
+  ///    additive factors.
+  /// Passing the real profile conditions is always preferred.
+  static List<HealthCondition> _inferConditions(ProductEvaluation evaluation) {
+    final conditions = <HealthCondition>{
+      ...evaluation.nutrientEvaluations.map((e) => e.condition),
+    };
+    if (evaluation.scoredFactors.any((f) => f.factorKey.startsWith('gerd'))) {
+      conditions.add(HealthCondition.gerd);
+    }
+    if (evaluation.scoredFactors.any(
+          (f) => f.factorKey == 'phosphateAdditives',
+        ) ||
+        KidneyAdvisoryFacts.build(evaluation) != null) {
+      conditions.add(HealthCondition.kidneyDisease);
+    }
+    return conditions.toList();
+  }
+
   static HealthAdvisory generate(
     ProductEvaluation evaluation, {
     required FallbackReason reason,
@@ -51,25 +79,46 @@ class FallbackAdvisoryGenerator {
     // WhoCalculator functions the backend used to build `evaluation` in
     // the first place, so it can't silently drift out of sync).
     double? servingSizeGOverride,
-    // When true, uses combined nutrient calculation (sodium + sugars + saturated fat)
-    // instead of single worst nutrient. Intended for users without health conditions.
-    bool useCombinedNutrients = false,
-    // When true, user has no health conditions and no allergens - use simplified advisory
+    // When true, user has no health conditions and no allergens - use
+    // simplified advisory TEXT.
     bool hasNoConditionsAndNoAllergens = false,
+    // The user's saved health conditions. Drives the suggested serving
+    // amount (GERD and detected food allergens get none). When null, the
+    // conditions are inferred from [evaluation].
+    Iterable<HealthCondition>? userConditions,
   }) {
+    // Visible in the normal flutter console (dev.log is not), so a real
+    // failure (timeout/apiError/parseError) can be told apart from the
+    // intentional "notNeeded" skip.
+    debugPrint('FallbackAdvisory reason: ${reason.name}');
+
     final allergen = evaluation.allergenAssessment;
     final isTagalog = languageCode == 'tl';
 
-    // Handle users with no health conditions and no allergens
-    if (hasNoConditionsAndNoAllergens) {
-      final servingSizeG =
-          servingSizeGOverride ?? evaluation.product.servingSizeG;
+    final servingSizeG =
+        servingSizeGOverride ?? evaluation.product.servingSizeG;
+    final conditions = userConditions?.toList() ?? _inferConditions(evaluation);
 
-      // Use combined nutrient calculation
-      final safeServing = ServingSizeCalculator.calculateCombinedNutrients(
-        nutritionPer100g: evaluation.product.nutritionPer100g,
-        servingSizeG: servingSizeG,
-      );
+    // The suggested per-meal amount (Table 3.22). Null ONLY for GERD users
+    // and when a food allergen is detected in the product; in every other
+    // case an amount is returned, even when nothing is flagged.
+    final String? suggestedAmount = ServingSizeCalculator.forProfile(
+      conditions: conditions,
+      nutritionPer100g: evaluation.product.nutritionPer100g,
+      servingSizeG: servingSizeG,
+      hasDirectAllergen: allergen.hasDirectAllergen,
+    );
+
+    // Do not let an incorrect caller flag turn an active condition (such as
+    // GERD) into the no-condition advisory.
+    final useNoConditionAdvisory =
+        hasNoConditionsAndNoAllergens &&
+        conditions.isEmpty &&
+        !allergen.hasDirectAllergen;
+
+    // Handle users with no health conditions and no allergens
+    if (useNoConditionAdvisory) {
+      final safeServing = suggestedAmount;
 
       // Extract the numeric amount from the safeServing string for formatting
       String? servingAmount;
@@ -90,7 +139,7 @@ class FallbackAdvisoryGenerator {
                 ? 'Isipin ang $servingAmount serving per meal (para sa 3 beses na pagkain sa isang araw).'
                 : 'Consider a $servingAmount amount per meal (for 3 meals a day).')
           : (isTagalog
-                ? 'Mainit ito nang maayos bilang bahagi ng balanced na pagkain.'
+                ? 'Maaari itong ikonsumo nang katamtaman bilang bahagi ng balanseng pagkain.'
                 : 'Enjoy this in moderation as part of a balanced diet.');
 
       // Overall level stays Suitable regardless -- this branch is only
@@ -98,25 +147,35 @@ class FallbackAdvisoryGenerator {
       // "Suitable" here reflects that nothing was flagged *against a
       // condition*. But a full labeled serving can still deliver more
       // than 100% of the Recommended Daily Intake for sodium, total
-      // sugars, and/or saturated fat even for someone with no diagnosed
+      // sugars, or saturated fat even for someone with no diagnosed
       // condition -- worth surfacing so the suggested per-meal amount
       // above doesn't read as an arbitrary downsize. Checked at the
       // product's own full serving size (not the possibly-smaller
       // suggested amount), using the same WhoCalculator daily limits used
       // everywhere else, so this can't drift from the rest of the app.
+      //
+      // Sodium, total sugars and saturated fat are exactly the nutrients the
+      // no-condition suggested amount is built from (Table 3.22), so each
+      // reason named here really explains the amount. This also matches
+      // AdvisoryPromptBuilder._exceededDailyLimitKeys.
+      //
+      // Skipped when no amount is shown (e.g. a GERD-only user whose product
+      // has no GERD triggers), since there is no smaller portion to explain.
       final exceededNutrientKeys = <String>[];
-      final fullServingChecks = <String, double>{
-        'sodiumMg': evaluation.product.nutritionPer100g.sodiumMg,
-        'sugarsG': evaluation.product.nutritionPer100g.sugarsG,
-        'saturatedFatG': evaluation.product.nutritionPer100g.saturatedFatG,
-      };
-      fullServingChecks.forEach((key, valuePer100g) {
-        if (valuePer100g <= 0) return;
-        final valuePerServing = (valuePer100g / 100) * servingSizeG;
-        final whoDailyLimit = WhoCalculator.getWhoDailyLimit(key);
-        final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
-        if (whoPercentage > 100) exceededNutrientKeys.add(key);
-      });
+      if (suggestedAmount != null) {
+        final fullServingChecks = <String, double>{
+          'sodiumMg': evaluation.product.nutritionPer100g.sodiumMg,
+          'sugarsG': evaluation.product.nutritionPer100g.sugarsG,
+          'saturatedFatG': evaluation.product.nutritionPer100g.saturatedFatG,
+        };
+        fullServingChecks.forEach((key, valuePer100g) {
+          if (valuePer100g <= 0) return;
+          final valuePerServing = (valuePer100g / 100) * servingSizeG;
+          final whoDailyLimit = WhoCalculator.getWhoDailyLimit(key);
+          final whoPercentage = (valuePerServing / whoDailyLimit) * 100;
+          if (whoPercentage > 100) exceededNutrientKeys.add(key);
+        });
+      }
 
       String reasonSentence = '';
       if (exceededNutrientKeys.isNotEmpty) {
@@ -163,6 +222,8 @@ class FallbackAdvisoryGenerator {
 
       final explanation = '$sentence1 $sentence2 $sentence3';
 
+      // A smaller portion does not make an allergen match acceptable, so
+      // no suggested amount is given here.
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.caution,
         warningText: isTagalog
@@ -174,9 +235,6 @@ class FallbackAdvisoryGenerator {
         generatedAt: DateTime.now(),
       );
     }
-
-    final servingSizeG =
-        servingSizeGOverride ?? evaluation.product.servingSizeG;
 
     // Re-derive valuePerServing/whoDailyLimitPercentage/level for
     // `servingSizeG` from each nutrient's stored valuePer100g, using the
@@ -201,43 +259,133 @@ class FallbackAdvisoryGenerator {
         .where((e) => e.level != AdvisoryLevel.suitable)
         .toList();
 
-    // Kidney Disease: same 3-sentence structure as every other condition,
-    // but narrating sodium + protein (each as a % of the Recommended Daily Intake
-    // amount) and any detected phosphate additives. Null for everyone else,
-    // so no other condition's advisory changes.
+    // Kidney Disease: same structure as every other condition, but
+    // narrating sodium + protein (each as a % of the Recommended Daily
+    // Intake amount) and any detected phosphate additives. Null for
+    // everyone else, so no other condition's advisory changes.
     final kidneyFacts = KidneyAdvisoryFacts.build(
       evaluation,
       servingSizeG: servingSizeG,
     );
     if (kidneyFacts != null) {
-      return _kidneyAdvisory(evaluation, kidneyFacts, isTagalog);
+      return _kidneyAdvisory(
+        evaluation,
+        kidneyFacts,
+        isTagalog,
+        suggestedAmount,
+      );
+    }
+
+    if (conditions.length == 1 &&
+        conditions.single == HealthCondition.gerd) {
+      return _gerdOnlyAdvisory(
+        evaluation: evaluation,
+        suggestedAmount: suggestedAmount,
+        isTagalog: isTagalog,
+      );
     }
 
     if (flagged.isEmpty) {
-      // Calculate suggested serving size even for suitable products
-      final servingSizeG =
-          servingSizeGOverride ?? evaluation.product.servingSizeG;
-      final safeServing = ServingSizeCalculator.calculateCombinedNutrients(
-        nutritionPer100g: evaluation.product.nutritionPer100g,
-        servingSizeG: servingSizeG,
-      );
-      
+      // No nutrient is flagged per serving, but GERD (which has no nutrient
+      // thresholds) can still be flagged by a fat/trigger factor. The screen
+      // builds its verdict badge from these same factors, so the text must
+      // report them too -- otherwise the banner reads e.g.
+      // "Caution - Suitable".
+      final gerdConcerns = evaluation.scoredFactors
+          .where(
+            (f) =>
+                f.factorKey.startsWith('gerd') &&
+                f.level != AdvisoryLevel.suitable,
+          )
+          .toList();
+      if (gerdConcerns.isNotEmpty) {
+        final level = gerdConcerns.any((f) => f.level == AdvisoryLevel.caution)
+            ? AdvisoryLevel.caution
+            : AdvisoryLevel.moderate;
+
+        final triggerFlagged = gerdConcerns.any(
+          (f) =>
+              f.factorKey == 'gerdTriggers' &&
+              f.status == ScoringStatus.known,
+        );
+        final fatFlagged = gerdConcerns.any(
+          (f) =>
+              f.factorKey == 'gerdTotalFat' && f.status == ScoringStatus.known,
+        );
+
+        final sentences = <String>[];
+        if (triggerFlagged) {
+          sentences.add(
+            isTagalog
+                ? 'May natukoy na posibleng GERD trigger sa mga sangkap; magkakaiba ang reaksyon ng bawat tao.'
+                : 'A potential GERD trigger was detected in the ingredients; reactions differ from person to person.',
+          );
+        }
+        if (fatFlagged) {
+          sentences.add(
+            isTagalog
+                ? 'Medyo mataas ang total fat para sa GERD.'
+                : 'Total fat is on the higher side for GERD.',
+          );
+        }
+        if (sentences.isEmpty) {
+          sentences.add(
+            isTagalog
+                ? 'Kulang ang impormasyon para lubos na masuri ang produktong ito para sa GERD.'
+                : 'There is not enough information to fully check this product for GERD.',
+          );
+        }
+
+        final String headline;
+        if (triggerFlagged) {
+          headline = isTagalog
+              ? 'Natukoy ang posibleng GERD trigger'
+              : 'Potential GERD trigger detected';
+        } else if (fatFlagged) {
+          headline = isTagalog ? 'Mataas sa total fat' : 'High in total fat';
+        } else {
+          headline = isTagalog
+              ? 'Limitado ang impormasyon'
+              : 'Limited information';
+        }
+
+        // GERD users never get a suggested amount.
+        return HealthAdvisory(
+          overallLevel: level,
+          warningText: headline,
+          explanation: sentences.join(' '),
+          safeServingSize: null,
+          source: AdvisorySource.fallbackRuleBased,
+          generatedAt: DateTime.now(),
+        );
+      }
+
+      if (conditions.length == 1 &&
+          conditions.single == HealthCondition.diabetes) {
+        return _diabetesAdvisory(
+          nutrients: scaledEvals,
+          worst: null,
+          overallLevel: AdvisoryLevel.suitable,
+          suggestedAmount: suggestedAmount,
+          isTagalog: isTagalog,
+        );
+      }
+
+      // Nothing flagged for this user's conditions. A suggested amount is
+      // still given (Table 3.22) unless the user has GERD, so the badge no
+      // longer depends on whether anything happened to be flagged.
       dev.log(
-        'Suitable product serving calculation: servingSizeG=$servingSizeG, safeServing=$safeServing',
+        'Suitable product (conditions on file, nothing flagged), serving=$servingSizeG',
         name: 'FallbackAdvisory',
       );
-      
-      // If no restrictions needed, provide default serving suggestion
-      final servingSuggestion = safeServing ?? 
-        'Up to 1 full serving (${servingSizeG.toStringAsFixed(0)}g) is the suggested amount per meal';
-      
+
       return HealthAdvisory(
         overallLevel: AdvisoryLevel.suitable,
         warningText: isTagalog ? 'Angkop' : 'Suitable',
         explanation: isTagalog
             ? 'Ang mga nutrients na sinuri namin para sa iyong kundisyon ay pasok sa inirerekomendang limitasyon.'
             : 'The nutrients we checked for your condition(s) are within the recommended range for this product.',
-        safeServingSize: servingSuggestion,
+        safeServingSize: suggestedAmount,
         source: AdvisorySource.fallbackRuleBased,
         generatedAt: DateTime.now(),
       );
@@ -250,6 +398,17 @@ class FallbackAdvisoryGenerator {
         ? AdvisoryLevel.caution
         : AdvisoryLevel.moderate;
 
+    if (conditions.length == 1 &&
+        conditions.single == HealthCondition.diabetes) {
+      return _diabetesAdvisory(
+        nutrients: scaledEvals,
+        worst: worst,
+        overallLevel: overallLevel,
+        suggestedAmount: suggestedAmount,
+        isTagalog: isTagalog,
+      );
+    }
+
     final nutrientName = _nutrientLabel(worst.nutrientKey, isTagalog);
     // "severityWord" feeds the warningText headline only -- it must NOT
     // repeat one of the three decision-level words ("Caution"/"Moderate"/
@@ -261,35 +420,30 @@ class FallbackAdvisoryGenerator {
         ? (isTagalog ? 'Mataas' : 'High')
         : (isTagalog ? 'Medyo Mataas' : 'Elevated');
 
-    // Calculate suggested serving amount
-    // Use combined nutrient calculation when flag is set, otherwise use single worst nutrient
-    final safeServing = useCombinedNutrients
-        ? ServingSizeCalculator.calculateCombinedNutrients(
-            nutritionPer100g: evaluation.product.nutritionPer100g,
-            servingSizeG: servingSizeG,
-          )
-        : ServingSizeCalculator.calculate(
-            nutrientKey: worst.nutrientKey,
-            valuePer100g: worst.valuePer100g,
-            servingSizeG: servingSizeG,
-          );
+    // The suggested amount (`suggestedAmount`, Table 3.22) was already
+    // worked out above from the user's conditions: the most severely
+    // flagged nutrient tied to them. It is null for GERD users.
+    final safeServing = suggestedAmount;
 
     // Sentence 1: "This product contains [amount] ([% of Recommended Daily
-    // Intake])." -- no serving size mentioned here. Sugars
-    // keeps its own exact wording -- the app only records TOTAL sugars
-    // (no free/added sugars breakdown), but the Recommended Daily Intake 50g/day reference
-    // it's compared against is specifically for free sugars. This
-    // sentence must be explicit about that so we never imply the app
-    // measured free/added sugars directly.
+    // Intake])." -- no serving size mentioned here. Sugars keeps its own
+    // wording -- the app only records TOTAL sugars (no free/added sugars
+    // breakdown), but the 50g/day reference it's compared against is
+    // specifically for free sugars. This sentence must be explicit about
+    // that so we never imply the app measured free/added sugars directly.
+    // The percentage wording sits inside parentheses so it reads correctly
+    // both below and above 100%.
     final isSugars = worst.nutrientKey == 'sugarsG';
+    final amountText =
+        '${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)}';
     final amountSentence = isSugars
         ? (isTagalog
-              ? 'Naglalaman ang serving na ito ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} ng total sugars, na humigit-kumulang ${_formatPercentageWording(worst.whoDailyLimitPercentage, true)} para sa free sugars.'
-              : 'This serving contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of total sugars, which ${_formatPercentageWording(worst.whoDailyLimitPercentage, false)} for free sugars.')
+              ? 'Naglalaman ang serving na ito ng $amountText ng total sugars (${_formatPercentageWording(worst.whoDailyLimitPercentage, true)}, batay sa reference para sa free sugars).'
+              : 'This serving contains $amountText of total sugars (${_formatPercentageWording(worst.whoDailyLimitPercentage, false)}, measured against the reference for free sugars).')
         : (isTagalog
-              ? 'Naglalaman ang produktong ito ng ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} na $nutrientName '
+              ? 'Naglalaman ang produktong ito ng $amountText na $nutrientName '
                     '(${_formatPercentageWording(worst.whoDailyLimitPercentage, true)}).'
-              : 'This product contains ${worst.valuePerServing.toStringAsFixed(1)}${_nutrientUnit(worst.nutrientKey)} of $nutrientName '
+              : 'This product contains $amountText of $nutrientName '
                     '(${_formatPercentageWording(worst.whoDailyLimitPercentage, false)}).');
 
     // Build concise advisory in exactly 2 sentences (mirrors the Gemini
@@ -298,10 +452,9 @@ class FallbackAdvisoryGenerator {
     //    size, no math explanation).
     // 2. What that means for the user's condition, without implying this
     //    product causes/worsens/triggers it.
-    // The suggested per-meal amount (safeServing) is no longer stated as a
+    // The suggested per-meal amount (safeServing) is not stated as a
     // sentence here -- the UI shows it separately as a badge, using the
-    // safeServingSize field below, matching how the group health analysis
-    // card already presents a member's suggested amount.
+    // safeServingSize field below.
     final sentence1 = amountSentence;
     final sentence2 = isTagalog
         ? 'Mahalagang bantayan ito kung mayroon kang ${_conditionLabel(worst.condition, isTagalog)}.'
@@ -321,23 +474,87 @@ class FallbackAdvisoryGenerator {
     );
   }
 
-  // Builds the Kidney Disease advisory in the same exactly-3-sentence shape
-  // the other conditions use (mirrors the kidney branch of
-  // AdvisoryPromptBuilder):
+  static HealthAdvisory _gerdOnlyAdvisory({
+    required ProductEvaluation evaluation,
+    required String? suggestedAmount,
+    required bool isTagalog,
+  }) {
+    final factors = evaluation.scoredFactors;
+    final fat = factors.firstWhere((f) => f.factorKey == 'gerdTotalFat');
+    final triggerFactor = factors.firstWhere(
+      (f) => f.factorKey == 'gerdTriggers',
+    );
+    final detection = GerdTriggerDetector.detect(evaluation.product);
+    final ingredientTriggers = detection.triggers
+        .where((t) => t.type != GerdTriggerType.highFat)
+        .map((t) => t.matchedIngredient)
+        .whereType<String>()
+        .toSet()
+        .toList();
+
+    final fatSentence = fat.isUnknown
+        ? (isTagalog
+              ? 'Kulang ang impormasyon sa nutrisyon para masuri ang total fat kaugnay ng GERD.'
+              : 'There is not enough nutrition information to check total fat for GERD.')
+        : (isTagalog
+              ? 'Ang total fat na ${fat.valuePerServing?.toStringAsFixed(1)}g bawat serving ay ${fat.level == AdvisoryLevel.suitable ? 'mas mababa sa' : 'umabot o lumampas sa'} umiiral na mataas na sanggunian para sa GERD.'
+              : 'Total fat is ${fat.valuePerServing?.toStringAsFixed(1)}g per serving and ${fat.level == AdvisoryLevel.suitable ? 'below' : 'at or above'} the existing high-fat reference for GERD.');
+
+    final triggerSentence = triggerFactor.isUnknown
+        ? (isTagalog
+              ? 'Kulang ang impormasyon sa mga sangkap para masuri ang mga posibleng GERD trigger.'
+              : 'There is not enough ingredient information to check for potential GERD triggers.')
+        : ingredientTriggers.isEmpty
+        ? (isTagalog
+              ? 'Walang natukoy na mga sangkap na posibleng GERD trigger.'
+              : 'No potential GERD-triggering ingredients were detected.')
+        : (isTagalog
+              ? 'May natukoy na mga posibleng GERD trigger sa mga sangkap na ${ingredientTriggers.join(', ')}; magkakaiba ang reaksyon ng bawat tao.'
+              : 'Potential GERD triggers were detected in ${ingredientTriggers.join(', ')}; reactions differ from person to person.');
+
+    final overallLevel = factors.fold<AdvisoryLevel>(
+      AdvisoryLevel.suitable,
+      (current, factor) => _severityRank(factor.level) > _severityRank(current)
+          ? factor.level
+          : current,
+    );
+    final warningText = ingredientTriggers.isNotEmpty
+        ? (isTagalog
+              ? 'Natukoy ang posibleng GERD trigger'
+              : 'Potential GERD trigger detected')
+        : !fat.isUnknown && fat.level != AdvisoryLevel.suitable
+        ? (isTagalog ? 'Mataas sa total fat' : 'High in total fat')
+        : (fat.isUnknown || triggerFactor.isUnknown)
+        ? (isTagalog ? 'Limitado ang impormasyon' : 'Limited information')
+        : (isTagalog ? 'Angkop' : 'Suitable');
+
+    return HealthAdvisory(
+      overallLevel: overallLevel,
+      warningText: warningText,
+      explanation: '$fatSentence $triggerSentence',
+      safeServingSize: suggestedAmount,
+      source: AdvisorySource.fallbackRuleBased,
+      generatedAt: DateTime.now(),
+    );
+  }
+
+  // Builds the Kidney Disease advisory in the same shape the other
+  // conditions use (mirrors the kidney branch of AdvisoryPromptBuilder):
   //   1. Sodium and protein amounts, each with its % of the Recommended Daily
   //      Intake.
   //   2. Detected phosphate additive ingredients -- or, when there are none,
   //      a short "worth watching" note (phosphate additives are never
   //      mentioned unless actually detected).
-  // The suggested per-meal amount (sodium-based) is no longer stated as a
-  // sentence here -- the UI shows it separately as a badge, using the
-  // safeServingSize field below, matching how the group health analysis
-  // card already presents a member's suggested amount.
+  // The suggested per-meal amount ([suggestedAmount], Table 3.22: sodium and
+  // protein, the most severely flagged one) is shown by the UI as a badge,
+  // using the safeServingSize field below. It is null for GERD users and
+  // when a food allergen is detected.
   // The "consult an expert" footer is shown by the UI, not repeated here.
   static HealthAdvisory _kidneyAdvisory(
     ProductEvaluation evaluation,
     KidneyAdvisoryFacts k,
     bool isTagalog,
+    String? suggestedAmount,
   ) {
     final sodiumAmount = '${k.sodiumMg.toStringAsFixed(1)}mg';
     final proteinAmount = '${k.proteinG.toStringAsFixed(1)}g';
@@ -358,16 +575,6 @@ class FallbackAdvisoryGenerator {
               ? 'Mahalagang bantayan ang mga halagang ito kung mayroon kang sakit sa bato.'
               : 'These amounts are worth watching if you have kidney disease.');
 
-    // Suggested amount stays sodium-based, exactly as it was for kidney
-    // users before (protein is informational only, not scored).
-    final safeServing = k.sodiumFlagged
-        ? ServingSizeCalculator.calculate(
-            nutrientKey: 'sodiumMg',
-            valuePer100g: evaluation.product.nutritionPer100g.sodiumMg,
-            servingSizeG: k.servingSizeG,
-          )
-        : null;
-
     // Level/headline follow only what is actually scored for kidney users
     // (sodium and phosphate additives) -- protein stays informational.
     final phosphateLevel = !k.ingredientDataKnown
@@ -375,8 +582,8 @@ class FallbackAdvisoryGenerator {
         : (k.hasPhosphateAdditives
               ? AdvisoryLevel.caution
               : AdvisoryLevel.suitable);
-    final overallLevel = _severityRank(phosphateLevel) >
-            _severityRank(k.sodiumLevel)
+    final overallLevel =
+        _severityRank(phosphateLevel) > _severityRank(k.sodiumLevel)
         ? phosphateLevel
         : k.sodiumLevel;
 
@@ -389,9 +596,7 @@ class FallbackAdvisoryGenerator {
           ? (isTagalog
                 ? '$severityWord sa sodium at phosphate additives'
                 : '$severityWord in sodium and phosphate additives')
-          : (isTagalog
-                ? '$severityWord sa sodium'
-                : '$severityWord in sodium');
+          : (isTagalog ? '$severityWord sa sodium' : '$severityWord in sodium');
     } else if (k.hasPhosphateAdditives) {
       warningText = isTagalog
           ? 'Natukoy ang phosphate additives'
@@ -411,7 +616,64 @@ class FallbackAdvisoryGenerator {
       overallLevel: overallLevel,
       warningText: warningText,
       explanation: '$sentence1 $sentence2',
-      safeServingSize: safeServing,
+      safeServingSize: suggestedAmount,
+      source: AdvisorySource.fallbackRuleBased,
+      generatedAt: DateTime.now(),
+    );
+  }
+
+  static HealthAdvisory _diabetesAdvisory({
+    required List<NutrientEvaluation> nutrients,
+    required NutrientEvaluation? worst,
+    required AdvisoryLevel overallLevel,
+    required String? suggestedAmount,
+    required bool isTagalog,
+  }) {
+    final sugars = nutrients.firstWhere(
+      (e) => e.condition == HealthCondition.diabetes && e.nutrientKey == 'sugarsG',
+    );
+    final carbohydrates = nutrients.firstWhere(
+      (e) =>
+          e.condition == HealthCondition.diabetes &&
+          e.nutrientKey == 'totalCarbohydratesG',
+    );
+    final sugarsPercentage = _formatPercentageWording(
+      sugars.whoDailyLimitPercentage,
+      isTagalog,
+    );
+    final carbohydratesPercentage = _formatPercentageWording(
+      carbohydrates.whoDailyLimitPercentage,
+      isTagalog,
+    );
+    final sentence1 = isTagalog
+        ? 'Naglalaman ang produktong ito ng ${sugars.valuePerServing.toStringAsFixed(1)}g na total sugars ($sugarsPercentage, batay sa reference para sa free sugars) at ${carbohydrates.valuePerServing.toStringAsFixed(1)}g na total carbohydrates ($carbohydratesPercentage).'
+        : 'This product contains ${sugars.valuePerServing.toStringAsFixed(1)}g of total sugars ($sugarsPercentage, measured against the reference for free sugars) and ${carbohydrates.valuePerServing.toStringAsFixed(1)}g of total carbohydrates ($carbohydratesPercentage).';
+    final sentence2 = worst == null
+        ? (isTagalog
+              ? 'Ang dalawang antas ng nutrient ay pasok sa inirerekomendang saklaw para sa diabetes.'
+              : 'Both nutrient levels are within the recommended range for diabetes.')
+        : (isTagalog
+              ? 'Mahalagang isaalang-alang ang mga halagang ito kung may diabetes.'
+              : 'These amounts are worth keeping in mind with diabetes.');
+
+    final nutrientName = worst == null
+        ? null
+        : _nutrientLabel(worst.nutrientKey, isTagalog);
+    final severityWord = worst == null
+        ? null
+        : worst.level == AdvisoryLevel.caution
+        ? (isTagalog ? 'Mataas' : 'High')
+        : (isTagalog ? 'Medyo Mataas' : 'Elevated');
+
+    return HealthAdvisory(
+      overallLevel: overallLevel,
+      warningText: worst == null
+          ? (isTagalog ? 'Angkop' : 'Suitable')
+          : isTagalog
+          ? '$severityWord sa $nutrientName'
+          : '$severityWord in $nutrientName',
+      explanation: '$sentence1 $sentence2',
+      safeServingSize: suggestedAmount,
       source: AdvisorySource.fallbackRuleBased,
       generatedAt: DateTime.now(),
     );
@@ -431,11 +693,17 @@ class FallbackAdvisoryGenerator {
   static String _nutrientLabel(String key, bool isTagalog) {
     switch (key) {
       case 'sodiumMg':
-        return isTagalog ? 'sodium' : 'sodium'; // generally untranslated
+        return 'sodium'; // generally untranslated
       case 'sugarsG':
-        return isTagalog ? 'total sugars' : 'total sugars';
+        return 'total sugars';
+      case 'totalCarbohydratesG':
+        return 'total carbohydrates';
       case 'saturatedFatG':
-        return isTagalog ? 'saturated fat' : 'saturated fat';
+        return 'saturated fat';
+      case 'transFatG':
+        return 'trans fat';
+      case 'proteinG':
+        return 'protein';
       default:
         return key;
     }
@@ -446,8 +714,10 @@ class FallbackAdvisoryGenerator {
       case 'sodiumMg':
         return 'mg';
       case 'sugarsG':
-        return 'g';
+      case 'totalCarbohydratesG':
       case 'saturatedFatG':
+      case 'transFatG':
+      case 'proteinG':
         return 'g';
       default:
         return '';
@@ -456,12 +726,12 @@ class FallbackAdvisoryGenerator {
 
   static String _conditionLabel(HealthCondition c, bool isTagalog) {
     switch (c) {
-      case HealthCondition.hypertension:
-        return isTagalog ? 'altapresyon (hypertension)' : 'hypertension';
+      case HealthCondition.cardiovascularDisease:
+        return isTagalog
+            ? 'sakit sa puso (cardiovascular disease)'
+            : 'cardiovascular disease';
       case HealthCondition.diabetes:
         return 'diabetes';
-      case HealthCondition.heartCondition:
-        return isTagalog ? 'kondisyon sa puso' : 'heart condition';
       case HealthCondition.gerd:
         return 'GERD';
       case HealthCondition.kidneyDisease:
@@ -531,11 +801,7 @@ class FallbackAdvisoryGenerator {
   /// This is NOT the same thing as the product's overall [rank]: a
   /// product can be #1 overall (across every condition + allergens)
   /// while still not holding the single lowest value for just one
-  /// nutrient. Previously this method always appended a "X% more than
-  /// the best option" clause whenever the numbers differed, even for the
-  /// #1-overall product -- producing a self-contradictory sentence like
-  /// "ranks 1 of 4 (highest-ranked) ... which is 31% more than the lowest
-  /// value." [thisIsBestNutrient] lets the #1-overall branch tell the
+  /// nutrient. [thisIsBestNutrient] lets the #1-overall branch tell the
   /// two apart and phrase the not-literally-lowest case honestly instead
   /// of contradicting the rank badge the user is looking at.
   ///
@@ -543,9 +809,8 @@ class FallbackAdvisoryGenerator {
   /// has the lowest saturated fat in this comparison (2.1g per 100g)")
   /// naming a DIFFERENT nutrient where [target] genuinely is the lowest
   /// in the set. Only meaningful when [thisIsBestNutrient] is false and
-  /// [rank] is 1 -- lets that sentence point to a concrete number
-  /// instead of a vague "every relevant factor" phrase. Null when no
-  /// such nutrient exists, in which case the generic phrasing is used.
+  /// [rank] is 1. Null when no such nutrient exists, in which case the
+  /// generic phrasing is used.
   static String generateRankingExplanation({
     required String nutrientName,
     required String nutrientUnit,
@@ -580,10 +845,6 @@ class FallbackAdvisoryGenerator {
         ? (((thisValue - bestValue) / bestValue) * 100).abs().toStringAsFixed(0)
         : null;
 
-    // NOTE: renamed "best option" -> "lowest in this comparison" here.
-    // "Best option" was ambiguous with "best/top-ranked *product*"
-    // (a different, overall-rank concept) and was itself part of what
-    // made the contradiction confusing to read.
     final comparisonClause = percentageDiffStr != null
         ? (isTagalog
               ? ', na $percentageDiffStr% mas mataas kumpara sa pinakamababa sa paghahambingang ito ($bestValueStr$nutrientUnit kada 100g)'
@@ -593,27 +854,18 @@ class FallbackAdvisoryGenerator {
               : ' (the lowest in this comparison has $bestValueStr$nutrientUnit per 100g)');
 
     // Derived from rank/totalProducts ONLY, never from a separately
-    // computed "lowest value of this one nutrient" check -- that mismatch
-    // (a product can be #1 overall without having the single lowest value
-    // of one nutrient) was the root cause of the rank/explanation
-    // contradiction. Every branch also states the numeric rank so the
-    // sentence is checkable against the badge shown on screen.
+    // computed "lowest value of this one nutrient" check. Every branch
+    // also states the numeric rank so the sentence is checkable against
+    // the badge shown on screen.
     final isBestRank = rank == 1;
     final isWorstRank = rank == totalProducts;
 
     if (isBestRank) {
       if (thisIsBestNutrient) {
-        // This product really is both #1 overall AND the single lowest
-        // for this nutrient -- no tension, no extra clause needed.
         return isTagalog
             ? 'Ang produktong ito ay nangunguna ($rank sa $totalProducts) na may $thisValueStr$nutrientUnit na $nutrientName kada 100g$conditionClause.'
             : 'This product ranks $rank of $totalProducts (highest-ranked) with $thisValueStr$nutrientUnit $nutrientName per 100g$conditionClause.';
       }
-      // #1 overall, but NOT the single lowest for this one nutrient --
-      // other factors on this product's profile made up the difference.
-      // Say so plainly instead of implying it lost on this nutrient. If
-      // we have a concrete other nutrient it wins on, name it instead of
-      // the vague "every relevant factor" fallback.
       final tailClause =
           (supportingReason != null && supportingReason.isNotEmpty)
           ? (isTagalog

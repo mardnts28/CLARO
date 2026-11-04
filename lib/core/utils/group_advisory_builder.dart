@@ -47,12 +47,10 @@ class GroupMemberFacts {
   final double? amountPerServing;
   final double? percentOfDaily;
   // App-calculated suggested grams PER MEAL (ServingSizeCalculator), for
-  // Suitable, Moderate and Caution members alike: the most restrictive
-  // nutrient tied to the member's conditions, or -- for a member with no
-  // conditions -- the combined sodium/sugars/saturated-fat amount, exactly
-  // like the single-user advisory. Null when an allergen match is present
-  // (a smaller portion doesn't make an allergen match acceptable) or the
-  // product has none of the relevant nutrients.
+  // Suitable, Moderate and Caution members alike: the smallest amount across
+  // nutrients tied to the member's conditions, or -- for a member with no
+  // conditions -- the combined sodium/sugars/saturated-fat amount. Null for
+  // GERD members and members with a detected food allergen.
   final double? suggestedGrams;
 
   const GroupMemberFacts({
@@ -201,7 +199,7 @@ class GroupAdvisoryBuilder {
           ? null
           : (worst.valuePer100g / 100) * size,
       percentOfDaily: worst == null ? null : worstPct,
-      suggestedGrams: allergens.isNotEmpty ? null : _suggestedGramsFor(m, size),
+      suggestedGrams: _suggestedGramsFor(m, size),
     );
   }
 
@@ -209,22 +207,13 @@ class GroupAdvisoryBuilder {
 
   static double? _suggestedGramsFor(MemberEvaluation m, double size) {
     final ev = m.evaluation;
-    if (m.profile.conditions.isEmpty || ev.nutrientEvaluations.isEmpty) {
-      return ServingSizeCalculator.suggestedGramsCombined(
-        nutritionPer100g: ev.product.nutritionPer100g,
-        servingSizeG: size,
-      );
-    }
-    double? smallest;
-    for (final n in ev.nutrientEvaluations) {
-      final g = ServingSizeCalculator.suggestedGrams(
-        nutrientKey: n.nutrientKey,
-        valuePer100g: n.valuePer100g,
-        servingSizeG: size,
-      );
-      if (g != null && (smallest == null || g < smallest)) smallest = g;
-    }
-    return smallest;
+    return ServingSizeCalculator.gramsForProfile(
+      conditions: m.profile.conditions,
+      nutritionPer100g: ev.product.nutritionPer100g,
+      servingSizeG: size,
+      hasDirectAllergen: ev.allergenAssessment.hasDirectAllergen,
+      smallestAmongNutrients: true,
+    );
   }
 
   /// "up to 1 full serving (50g)" / "about half a serving (25g)" /
@@ -248,8 +237,8 @@ class GroupAdvisoryBuilder {
     return tl ? 'hindi hihigit sa $g' : 'no more than $g';
   }
 
-  /// One member's suggested amount at any level, or null when none applies
-  /// (allergen match, or the product has none of the relevant nutrients).
+  /// One member's suggested amount at any level, or null for GERD members
+  /// and detected food allergens.
   static String? memberAmountLine(
     GroupMemberFacts f,
     double servingSizeG, {
@@ -263,8 +252,8 @@ class GroupAdvisoryBuilder {
   }
 
   /// The single amount that fits everyone in the group: the SMALLEST of
-  /// their suggested amounts (same strictest-member rule as the group
-  /// verdict). Null when nobody has one. [token] is the grams
+  /// their available suggested amounts. Members excluded by the serving
+  /// rules do not contribute. Null when nobody has an amount. [token] is the grams
   /// figure as it appears in [sentence], used to check that Gemini kept it.
   static ({String sentence, String token})? groupAmount(
     List<GroupMemberFacts> facts,
@@ -519,9 +508,8 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
   };
 
   static String _conditionName(HealthCondition c) => switch (c) {
-    HealthCondition.hypertension => 'hypertension',
+    HealthCondition.cardiovascularDisease => 'cardiovascular disease',
     HealthCondition.diabetes => 'diabetes',
-    HealthCondition.heartCondition => 'heart condition',
     HealthCondition.gerd => 'GERD',
     HealthCondition.kidneyDisease => 'kidney disease',
   };
@@ -529,6 +517,7 @@ Return ONLY valid JSON, no markdown, matching exactly this shape:
   static String _nutrientLabel(String key) => switch (key) {
     'sodiumMg' => 'sodium',
     'sugarsG' => 'total sugars',
+    'totalCarbohydratesG' => 'total carbohydrates',
     'saturatedFatG' => 'saturated fat',
     _ => key,
   };

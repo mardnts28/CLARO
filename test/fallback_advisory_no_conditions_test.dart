@@ -250,12 +250,12 @@ void main() {
         ),
       );
 
-      // Create evaluation with flagged nutrient for hypertension
+      // Create evaluation with flagged nutrient for cardiovascular disease
       final evaluation = ProductEvaluation(
         product: product,
         nutrientEvaluations: [
           NutrientEvaluation(
-            condition: HealthCondition.hypertension,
+            condition: HealthCondition.cardiovascularDisease,
             nutrientKey: 'sodiumMg',
             valuePer100g: 800,
             valuePerServing: 800,

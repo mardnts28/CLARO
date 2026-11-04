@@ -27,6 +27,7 @@ import '../core/constants/who_fda_thresholds.dart';
 import '../core/utils/rank_label_helper.dart';
 import '../core/utils/who_calculator.dart';
 import '../core/utils/fallback_advisory_generator.dart';
+import '../core/utils/serving_size_calculator.dart';
 import '../core/utils/nutrition_availability.dart';
 import '../core/utils/nutrition_calculator.dart';
 import '../core/utils/nutri_score_calculator.dart';
@@ -105,6 +106,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // the user changes the pack-size dropdown afterward).
   bool _hasAutoAnnouncedSummary = false;
   bool _nutritionUnavailable = false;
+  bool _advisoryError = false;
+
   ProductEvaluation? _evaluation;
   HealthAdvisory? _advisory;
   ComparisonMatrix? _comparisonMatrix;
@@ -168,6 +171,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _isReportTooltipVisible = false;
   Timer? _reportToastTimer;
 
+  // Consecutive-day tracking state
+  bool _hasShownConsecutiveWarning = false;
+
   void _initSizes(Product product) {
     final originalG = product.servingSizeG > 0 ? product.servingSizeG : 100.0;
     final sizeSet = <double>{originalG, ...product.availableSizes};
@@ -203,6 +209,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     FavoritesService.favoriteActionNotifier.addListener(
       _handleFavoriteActionChanged,
     );
+    _checkConsecutiveDays();
   }
 
   void _handleFavoriteActionChanged() {
@@ -257,6 +264,78 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_isReportTooltipVisible && mounted) {
       setState(() => _isReportTooltipVisible = false);
     }
+  }
+
+  Future<void> _checkConsecutiveDays() async {
+    final uid = _authService.currentUser?.uid;
+    if (uid == null) return;
+
+    try {
+      final data = await BackendLocator.consecutiveScanRepository
+          .getConsecutiveScans(userId: uid, productId: _currentProduct.id);
+      if (data != null) {
+        final consecutiveDays = data['consecutiveDays'] as int? ?? 0;
+        // Show warning if 3+ consecutive days and not already shown for this visit
+        if (consecutiveDays >= 3 && !_hasShownConsecutiveWarning && mounted) {
+          _hasShownConsecutiveWarning = true;
+          _showConsecutiveDaysWarning(consecutiveDays);
+        }
+      }
+    } catch (e) {
+      debugPrint('ProductDetailScreen: error checking consecutive days: $e');
+    }
+  }
+
+  void _showConsecutiveDaysWarning(int consecutiveDays) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.info_outline, color: Colors.orange[700], size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Consumption Notice',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'You have scanned this product for $consecutiveDays consecutive days. Regular consumption of processed food may negatively affect a healthy diet. Please consume mindfully.',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: colorScheme.onSurfaceVariant,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              HapticService().vibrate();
+              Navigator.pop(ctx);
+            },
+            child: Text(
+              'OK',
+              style: GoogleFonts.inter(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildReportTooltip(double topPadding, AppLocalizations loc) {
@@ -373,6 +452,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _initSizes(newProduct);
       _advisoryLoading = true;
       _nutritionUnavailable = false;
+      _advisoryError = false;
+
       _evaluation = null;
       _advisory = null;
       _comparisonMatrix = null;
@@ -578,11 +659,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       final groupFuture = _prepareGroups(uid);
       await _loadSoloAdvisory();
       await _finishGroup(groupFuture, uid);
-    } catch (e) {
+    } catch (e, stackTrace) {
+      // Log the full error with stack trace for debugging
       debugPrint('Error loading health advisory: $e');
+      debugPrint('Stack trace: $stackTrace');
       if (mounted) {
         setState(() {
           _advisoryLoading = false;
+          _advisoryError = true;
+
           _groupChecking = false;
         });
       }
@@ -626,24 +711,22 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       setState(() => _userHealthProfile = resolvedProfile);
     }
 
-    // Filter comparison set to only include products with available nutrition data
+    // Keep comparison context, but recalculate its evaluations and order for
+    // this user's own profile instead of reusing any group-based ranking.
     final validComparisonSet = _currentComparisonSet
         ?.where((r) => NutritionAvailability.isAvailable(r.evaluation.product))
         .toList();
-
-    // If a valid comparisonSet was handed to us (from Compare / multi-scan),
-    // use it as-is -- it's already ranked. Otherwise this is a solo
-    // scan: rank just this one product so we still get a proper
-    // ProductEvaluation out of WhoCalculator.
-    List<RankedProductResult> ranked;
-    if (validComparisonSet != null && validComparisonSet.length > 1) {
-      ranked = validComparisonSet;
-    } else {
-      ranked = BackendLocator.productRankingService.rankProducts(
-        products: [_currentProduct],
-        user: resolvedProfile,
-      );
+    final products =
+        validComparisonSet?.map((r) => r.evaluation.product).toList() ??
+        <Product>[];
+    if (!products.any((product) => product.id == _currentProduct.id)) {
+      products.add(_currentProduct);
     }
+    final ranked = BackendLocator.productRankingService.rankProducts(
+      products: products,
+      user: resolvedProfile,
+      enforceMaxCap: false,
+    );
 
     final target = ranked.firstWhere(
       (r) => r.evaluation.product.id == _currentProduct.id,
@@ -673,7 +756,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
       // Debug: log advisory source
       if (_advisory != null) {
-        debugPrint('Advisory source: ${_advisory!.source.name} (${_advisory!.isFallback ? "Fallback" : "AI Generated"})');
+        debugPrint(
+          'Advisory source: ${_advisory!.source.name} (${_advisory!.isFallback ? "Fallback" : "AI Generated"})',
+        );
       }
 
       // If group checking is not active, announce voice verdict immediately.
@@ -887,9 +972,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _evaluation = self.evaluation;
       _groupChecking = false;
     });
-    
+
     // Debug: log group advisory source
-    debugPrint('Group advisory source: ${advisory.source.name} (${advisory.isFallback ? "Fallback" : "AI Generated"})');
+    debugPrint(
+      'Group advisory source: ${advisory.source.name} (${advisory.isFallback ? "Fallback" : "AI Generated"})',
+    );
     _groupOptionsTick.value++;
     _finishVoice();
 
@@ -934,10 +1021,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       _groupAdvisory = cached;
       _groupAdvisoryLoading = cached == null;
     });
-    
+
     // Debug: log cached group advisory source
     if (cached != null) {
-      debugPrint('Cached group advisory source: ${cached.source.name} (${cached.isFallback ? "Fallback" : "AI Generated"})');
+      debugPrint(
+        'Cached group advisory source: ${cached.source.name} (${cached.isFallback ? "Fallback" : "AI Generated"})',
+      );
     }
     _groupOptionsTick.value++;
 
@@ -1254,8 +1343,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       onSizeChanged: (newSize) {
                                         setState(() {
                                           _selectedSizeG = newSize;
-                                          _displayedImageUrl =
-                                              p.imageUrlForSize(newSize);
+                                          _displayedImageUrl = p
+                                              .imageUrlForSize(newSize);
                                         });
                                         _refreshVoiceSummary();
                                       },
@@ -1352,16 +1441,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                       const SizedBox(height: 16),
                       _buildAdvisoryBanner(context, loc),
 
-                      // Spacers are dropped for whichever of the two cards is
-                      // hidden by the GERD-only rule (see _gerdOnlyDetection).
-                      if (!_hideAdvisoryForGerdOnly) const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
                       // ── 3b. GERD Warning card (awareness-only) ────────────────
                       // Positioned above Health Analysis card but below Health Advisory banner
                       // Follows the profile currently driving the Health Analysis card below
                       _buildAwarenessWarningCards(context, loc, p),
 
-                      if (!_isGerdOnlyClean) const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
                       // ── 3. Batayan ng Pagsusuri (Reminders Box) ───────
                       Container(
@@ -1481,12 +1568,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               // regardless of relevance.
                               ...(() {
                                 final evals = <DisplayNutrientEval>[
-                                  // 1. Sodium (Hypertension)
+                                  // 1. Sodium (Cardiovascular Disease)
                                   (() {
                                     final val100g = p.nutritionPer100g.sodiumMg;
                                     final valServing =
                                         (val100g / 100) * _selectedSizeG;
-                                    final limit = 2000.0;
+                                    final limit = WhoDailyLimits.sodiumMgPerDay;
                                     final pct = (valServing / limit) * 100;
                                     return DisplayNutrientEval(
                                       label: _sodiumConditionLabel(loc),
@@ -1507,7 +1594,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                     final val100g = p.nutritionPer100g.sugarsG;
                                     final valServing =
                                         (val100g / 100) * _selectedSizeG;
-                                    final limit = 50.0;
+                                    final limit = WhoDailyLimits.sugarsGPerDay;
                                     final pct = (valServing / limit) * 100;
                                     return DisplayNutrientEval(
                                       label: loc.diabetesSugarsLabel,
@@ -1523,13 +1610,70 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       unit: 'g',
                                     );
                                   })(),
-                                  // 3. Saturated Fats (Heart disease)
+                                  // Carbohydrates (Diabetes only) -- WHO: 45-75% of
+                                  // daily energy (~375 g/day on 2,000 kcal).
+                                  // Only added, and therefore only highlighted,
+                                  // for users with diabetes.
+                                  if (_userHealthProfile?.hasDiabetes ?? false)
+                                    (() {
+                                      final val100g = p
+                                          .nutritionPer100g
+                                          .totalCarbohydratesG;
+                                      final valServing =
+                                          (val100g / 100) * _selectedSizeG;
+                                      final limit = WhoDailyLimits
+                                          .totalCarbohydratesGPerDay;
+                                      final pct = (valServing / limit) * 100;
+                                      return DisplayNutrientEval(
+                                        label: _diabetesCarbsLabel(loc),
+                                        shortLabel: _carbsShortLabel(loc),
+                                        nutrientKey: 'totalCarbohydratesG',
+                                        valuePerServing: valServing,
+                                        limit: limit,
+                                        percentage: pct,
+                                        level:
+                                            WhoCalculator.classifyByWhoPercentage(
+                                              pct,
+                                            ),
+                                        unit: 'g',
+                                      );
+                                    })(),
+                                  // Total fat is a GERD-specific Health
+                                  // Analysis row. Its high-fat cutoff comes
+                                  // from the existing per-serving detector.
+                                  if (_userHealthProfile?.hasGerd ?? false)
+                                    (() {
+                                      final val100g =
+                                          p.nutritionPer100g.totalFatG;
+                                      final valServing =
+                                          (val100g / 100) * _selectedSizeG;
+                                      final limit = GerdTriggerDetector
+                                          .totalFatDailyValueG;
+                                      final pct = (valServing / limit) * 100;
+                                      return DisplayNutrientEval(
+                                        label: _gerdTotalFatLabel(loc),
+                                        shortLabel: _totalFatShortLabel(loc),
+                                        nutrientKey: 'totalFatG',
+                                        valuePerServing: valServing,
+                                        limit: limit,
+                                        percentage: pct,
+                                        level:
+                                            GerdTriggerDetector.isHighFatPerServing(
+                                              valServing,
+                                            )
+                                            ? AdvisoryLevel.caution
+                                            : AdvisoryLevel.suitable,
+                                        unit: 'g',
+                                      );
+                                    })(),
+                                  // 3. Saturated Fats (Cardiovascular Disease)
                                   (() {
                                     final val100g =
                                         p.nutritionPer100g.saturatedFatG;
                                     final valServing =
                                         (val100g / 100) * _selectedSizeG;
-                                    final limit = 22.2;
+                                    final limit =
+                                        WhoDailyLimits.saturatedFatGPerDay;
                                     final pct = (valServing / limit) * 100;
                                     return DisplayNutrientEval(
                                       label: loc.heartSatFatLabel,
@@ -1545,10 +1689,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                       unit: 'g',
                                     );
                                   })(),
-                                  // 4. Trans Fat (Heart disease) -- WHO: < 1% of
+                                  // 4. Trans Fat (Cardiovascular Disease) -- WHO: < 1% of
                                   // total energy/day (~2.2 g/day on 2,000 kcal).
                                   // Always shown; highlighted only for users
-                                  // with heart disease (see
+                                  // with cardiovascular disease (see
                                   // `_isNutrientKeyRelatedToUser`).
                                   (() {
                                     final val100g =
@@ -1562,7 +1706,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                         WhoDailyLimits.transFatGPerDay;
                                     final pct = (valServing / limit) * 100;
                                     return DisplayNutrientEval(
-                                      label: _heartTransFatLabel(loc),
+                                      label: _cardiovascularTransFatLabel(loc),
                                       shortLabel: _transFatShortLabel(loc),
                                       nutrientKey: 'transFatG',
                                       valuePerServing: valServing,
@@ -1713,16 +1857,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                                           .matchedContains ??
                                       const [],
                                   healthProfile: _userHealthProfile,
-                                  // Same conditions WhoCalculator.evaluateProduct() iterated
-                                  // over for this user (i.e. the ones on their saved health
-                                  // profile) -- lets the "How CLARO Calculates" guide only
-                                  // badge a nutrient card with a condition the user actually
-                                  // has.
+                                  // Pass the saved profile rather than only
+                                  // nutrient-evaluation conditions, since
+                                  // GERD is evaluated through scoring factors.
                                   userConditions:
-                                      _evaluation?.nutrientEvaluations
-                                          .map((e) => e.condition)
-                                          .toSet()
-                                          .toList() ??
+                                      _userHealthProfile?.conditions ??
                                       const [],
                                 ),
                               ),
@@ -1889,7 +2028,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                       const SizedBox(height: 20),
 
-
                       // ── 8. Product Ranking Card ─────────────────────────
                       // Only rendered when this product was viewed as part of
                       // a comparison set (Compare button / multi-scan), per
@@ -1971,18 +2109,21 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
     for (final condition in _userHealthProfile!.conditions) {
       switch (condition) {
-        case HealthCondition.hypertension:
-          if (nutrientKey == 'sodiumMg') return true;
-          break;
-        case HealthCondition.diabetes:
-          if (nutrientKey == 'sugarsG') return true;
-          break;
-        case HealthCondition.heartCondition:
-          if (nutrientKey == 'saturatedFatG' || nutrientKey == 'transFatG') {
+        case HealthCondition.cardiovascularDisease:
+          if (nutrientKey == 'sodiumMg' ||
+              nutrientKey == 'saturatedFatG' ||
+              nutrientKey == 'transFatG') {
             return true;
           }
           break;
+        case HealthCondition.diabetes:
+          if (nutrientKey == 'sugarsG' || nutrientKey == 'totalCarbohydratesG')
+            return true;
+          break;
         case HealthCondition.gerd:
+          if (nutrientKey == 'totalFatG') {
+            return true;
+          }
           break;
         case HealthCondition.kidneyDisease:
           if (nutrientKey == 'sodiumMg' || nutrientKey == 'proteinG') {
@@ -1995,27 +2136,29 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // Picks the Health Analysis card's sodium row title based on which of
-  // the two sodium-relevant conditions (hypertension, kidney disease) the
+  // the two sodium-relevant conditions (cardiovascular disease, kidney disease) the
   // signed-in user actually has on file. Only the LABEL changes here --
   // the nutrient math (val100g/valServing/pct/level above), the
   // `_isNutrientKeyRelatedToUser`/`_reorderNutrientEvaluations` relevance
   // and ordering logic, the highlight styling in `_buildConditionRow`,
   // and every other condition's row are untouched: kidney disease already
-  // shares the same `sodiumMg` key as hypertension via
+  // shares the same `sodiumMg` key as cardiovascular disease via
   // `ConditionThresholds.thresholds`, so no new nutrientKey or threshold
   // is introduced, only which title is shown for that existing row.
-  //   - Hypertension only (or no conditions on file): "Blood pressure -
-  //     Sodium", same text as before this change.
+  //   - Cardiovascular disease only (or no conditions on file): "Cardiovascular Disease -
+  //     Sodium".
   //   - Kidney disease only: "Kidney Disease - Sodium".
-  //   - Both hypertension and kidney disease: "CKD & Blood Pressure -
+  //   - Both cardiovascular disease and kidney disease: "CKD & Cardiovascular Disease -
   //     Sodium".
   String _sodiumConditionLabel(AppLocalizations loc) {
     final List<HealthCondition> conditions =
         _userHealthProfile?.conditions ?? const <HealthCondition>[];
-    final hasHypertension = conditions.contains(HealthCondition.hypertension);
+    final hasCardiovascularDisease = conditions.contains(
+      HealthCondition.cardiovascularDisease,
+    );
     final hasKidneyDisease = conditions.contains(HealthCondition.kidneyDisease);
 
-    if (hasHypertension && hasKidneyDisease) {
+    if (hasCardiovascularDisease && hasKidneyDisease) {
       return loc.ckdBpSodiumLabel;
     }
     if (hasKidneyDisease) {
@@ -2025,12 +2168,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   // Trans fat row titles. There are no localization keys for these yet, so
-  // they mirror `heartSatFatLabel` / `heartSatFatShortLabel` ("Heart disease
+  // they mirror `heartSatFatLabel` / `heartSatFatShortLabel` ("Cardiovascular Disease
   // - Saturated fats" / "Saturated fats") for both supported languages.
-  String _heartTransFatLabel(AppLocalizations loc) =>
+  String _cardiovascularTransFatLabel(AppLocalizations loc) =>
       loc.localeName.startsWith('tl')
       ? 'Sakit sa puso - Trans fats'
-      : 'Heart disease - Trans fats';
+      : 'Cardiovascular Disease - Trans fats';
 
   String _transFatShortLabel(AppLocalizations loc) => 'Trans fats';
 
@@ -2042,6 +2185,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       : 'Kidney Disease - Protein';
 
   String _proteinShortLabel(AppLocalizations loc) => 'Protein';
+
+  // Diabetes Carbohydrates row titles.
+  String _diabetesCarbsLabel(AppLocalizations loc) => loc.diabetesCarbsLabel;
+
+  String _carbsShortLabel(AppLocalizations loc) => loc.diabetesCarbsShortLabel;
+
+  String _gerdTotalFatLabel(AppLocalizations loc) =>
+      'GERD - ${_totalFatShortLabel(loc)}';
+
+  String _totalFatShortLabel(AppLocalizations loc) => loc.nutriTotalFat;
 
   // ── Helper method to reorder nutrient evaluations based on user's health profile ──────
   List<DisplayNutrientEval> _reorderNutrientEvaluations(
@@ -2246,32 +2399,25 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     // explanation + member avatars). Solo users never reach this.
     if (_isGroupMode) return _buildGroupBanner(context, loc);
 
-    // Known gap fix (UI layer only): a user whose ONLY saved conditions
-    // are awareness-only (see HealthConditionKind.isAwarenessOnly) has nothing for
-    // WhoCalculator.evaluateProduct to score: `nutrientEvaluations` stays
-    // empty, so `evaluation.overallLevel`/`_currentOverallLevel()` falls
-    // back to Suitable even though nothing was actually evaluated. That
-    // "Suitable" verdict would be misleading here, so this banner is
-    // hidden entirely for that case -- the awareness card(s) below (e.g.
-    // the GERD Warning card) carry the relevant information instead.
-    // Does NOT apply when there's no profile/no conditions at all (that
-    // keeps showing today's Suitable banner, unchanged), and does not
-    // suppress a direct-allergen Caution, which is independent of
-    // condition scoring.
+    // When advisory loading fails, show error state instead of banner
+    if (_advisoryError) {
+      return _buildAdvisoryErrorBanner(context, loc);
+    }
+
+    // Hide the banner only for awareness-only conditions that have no
+    // deterministic scoring factors. GERD has explicit total-fat and
+    // ingredient factors, so GERD-only users still get the evaluated
+    // advisory even though GERD has no nutrient-evaluation rows.
     final profile = _userHealthProfile;
     final hasOnlyAwarenessConditions =
         profile != null &&
         profile.conditions.isNotEmpty &&
-        profile.scoredConditions.isEmpty;
+        profile.scoredConditions.isEmpty &&
+        !profile.hasGerd;
     if (hasOnlyAwarenessConditions &&
         !(_evaluation?.allergenAssessment.hasDirectAllergen ?? false)) {
       return const SizedBox.shrink();
     }
-
-    // GERD-only user + detected GERD trigger(s): the GERD Warning card is
-    // the only card shown, so the Health Advisory banner is hidden. A direct
-    // allergen match still keeps the banner (see _hideAdvisoryForGerdOnly).
-    if (_hideAdvisoryForGerdOnly) return const SizedBox.shrink();
 
     // The backend's `_evaluation.overallLevel` is fixed to the product's
     // labeled serving size (`product.servingSizeG`) -- deliberately, so
@@ -2301,11 +2447,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final levelLabel = _levelLabel(level);
     final effectiveAdvisory = _effectiveAdvisory(context);
     final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
-    // A GERD-only user with no detected GERD triggers gets the same advisory
-    // a user with no health condition gets when the product is Suitable
-    // (see _isGerdOnlyClean and _effectiveAdvisory).
     final hasNoConditionsAndNoAllergens =
-        ((profile == null || profile.conditions.isEmpty) || _isGerdOnlyClean) &&
+        (profile == null || profile.conditions.isEmpty) &&
         (profile == null || profile.allergies.isEmpty) &&
         !(_evaluation?.allergenAssessment.hasDirectAllergen ?? false);
     final hasNoFlaggedNutrients =
@@ -2322,33 +2465,42 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ? '$levelLabel - Walang Minarkahang Nutrient o Sangkap'
           : '$levelLabel - No Flagged Nutrient or Ingredient';
     } else {
-      final advisoryTitle =
-          effectiveAdvisory?.warningText ??
-          (level == AdvisoryLevel.suitable
-              ? loc.safeToConsume
-              : loc.reminderLabel);
+      // When advisory is unavailable, show explicit message instead of placeholder
+      if (effectiveAdvisory == null) {
+        title = isTagalog
+            ? '$levelLabel - Hindi available ang advisory'
+            : '$levelLabel - Advisory unavailable';
+      } else {
+        final advisoryTitle = effectiveAdvisory.warningText;
 
-      // Remove decision word from advisoryTitle if it's duplicated at the start
-      // This handles cases where AI might include "Caution" in warningText despite instructions
-      String cleanAdvisoryTitle = advisoryTitle;
-      if (advisoryTitle.toLowerCase().startsWith(levelLabel.toLowerCase()) ||
-          advisoryTitle.toLowerCase().startsWith(
-            '${levelLabel.toLowerCase()}:',
-          )) {
-        cleanAdvisoryTitle = advisoryTitle.substring(levelLabel.length).trim();
-        if (cleanAdvisoryTitle.startsWith(':') ||
-            cleanAdvisoryTitle.startsWith('-')) {
-          cleanAdvisoryTitle = cleanAdvisoryTitle.substring(1).trim();
+        // Remove decision word from advisoryTitle if it's duplicated at the start
+        // This handles cases where AI might include "Caution" in warningText despite instructions
+        String cleanAdvisoryTitle = advisoryTitle;
+        if (advisoryTitle.toLowerCase().startsWith(levelLabel.toLowerCase()) ||
+            advisoryTitle.toLowerCase().startsWith(
+              '${levelLabel.toLowerCase()}:',
+            )) {
+          cleanAdvisoryTitle = advisoryTitle
+              .substring(levelLabel.length)
+              .trim();
+          if (cleanAdvisoryTitle.startsWith(':') ||
+              cleanAdvisoryTitle.startsWith('-')) {
+            cleanAdvisoryTitle = cleanAdvisoryTitle.substring(1).trim();
+          }
         }
-      }
 
-      title = cleanAdvisoryTitle.isEmpty
-          ? levelLabel
-          : '$levelLabel - $cleanAdvisoryTitle';
+        title = cleanAdvisoryTitle.isEmpty
+            ? levelLabel
+            : '$levelLabel - $cleanAdvisoryTitle';
+      }
     }
 
-    final subtitle =
-        effectiveAdvisory?.explanation ?? loc.safeToConsumeSubtitle;
+    // When advisory is unavailable, show explicit message instead of placeholder
+    final subtitle = effectiveAdvisory != null
+        ? effectiveAdvisory.explanation
+        : (isTagalog
+              ? 'Hindi available ang health advisory para sa produkto na ito.'
+              : 'Health advisory unavailable for this product.');
 
     final currentEvaluation = _evaluation;
     final showKidneyFooterNote =
@@ -2367,10 +2519,12 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
 
     final rows = multiAllergenRows
-        ?.map((r) => MultiAllergenDisplayRow(
-              allergen: r.allergen,
-              ingredient: r.ingredient,
-            ))
+        ?.map(
+          (r) => MultiAllergenDisplayRow(
+            allergen: r.allergen,
+            ingredient: r.ingredient,
+          ),
+        )
         .toList();
 
     return AdvisoryBannerWidget(
@@ -2448,13 +2602,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   // or not the user belongs to a health group. It used to live in the Health
   // Advisory banner; it must not be shown there any more.
   //
-  // The amount itself is untouched: it is still `safeServingSize` from the
-  // effective advisory, only populated for users with a scored health
-  // condition. Visibility mirrors the old banner placement exactly (hidden
-  // while loading, when nutrition data is unavailable, when the banner is
-  // hidden for awareness-only / GERD-only users, and for users with no
-  // conditions and no allergens). Group mode returns null -- group members
-  // already get their badge from _buildMemberSwitcher.
+  // The amount is calculated from the selected serving size and the user's
+  // own profile. GERD users and detected allergens have no amount; group
+  // members get their per-member amount from _buildMemberSwitcher.
   Widget? _buildSuggestedAmountBadge(
     BuildContext context,
     ColorScheme colorScheme,
@@ -2467,22 +2617,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     final profile = _userHealthProfile;
-    final hasDirectAllergen =
-        _evaluation?.allergenAssessment.hasDirectAllergen ?? false;
-    final hasOnlyAwarenessConditions =
-        profile != null &&
-        profile.conditions.isNotEmpty &&
-        profile.scoredConditions.isEmpty;
-    if (hasOnlyAwarenessConditions && !hasDirectAllergen) return null;
-    if (_hideAdvisoryForGerdOnly) return null;
+    final evaluation = _evaluation;
+    if (profile == null || evaluation == null) return null;
 
-    final hasNoConditionsAndNoAllergens =
-        ((profile == null || profile.conditions.isEmpty) || _isGerdOnlyClean) &&
-        (profile == null || profile.allergies.isEmpty) &&
-        !hasDirectAllergen;
-
-    final suggestedAmount = _effectiveAdvisory(context)?.safeServingSize;
-    if (hasNoConditionsAndNoAllergens || suggestedAmount == null) return null;
+    final suggestedAmount = ServingSizeCalculator.forProfile(
+      conditions: profile.conditions,
+      nutritionPer100g: _currentProduct.nutritionPer100g,
+      servingSizeG: _selectedSizeG,
+      hasDirectAllergen: evaluation.allergenAssessment.hasDirectAllergen,
+    );
+    if (suggestedAmount == null) return null;
 
     final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
     final suggestedAmountText = isTagalog
@@ -2549,42 +2693,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final detection = GerdTriggerDetector.detect(_currentProduct);
     if (!detection.hasTriggers) return const SizedBox.shrink();
     return _buildGerdWarningCard(context, loc, p);
-  }
-
-  // ── GERD-only display rule ────────────────────────────────────────────
-  //
-  // For a solo user whose ONLY health condition is GERD, exactly one card
-  // is shown, depending on what GerdTriggerDetector finds in the product:
-  //   - trigger(s) detected -> GERD Warning card only (Health Advisory
-  //     card hidden).
-  //   - checked, nothing detected -> Health Advisory card only, using the
-  //     no-condition Suitable advisory (GERD Warning card hidden).
-  // Returns null (rule not applicable, everything renders as before) for
-  // group mode, unavailable nutrition data, and any user who has another
-  // condition or no GERD.
-  GerdDetectionResult? _gerdOnlyDetection() {
-    if (_isGroupMode || _nutritionUnavailable) return null;
-    final profile = _userHealthProfile;
-    if (profile == null || !profile.hasGerd) return null;
-    if (profile.conditions.any((c) => c != HealthCondition.gerd)) return null;
-    return GerdTriggerDetector.detect(_currentProduct);
-  }
-
-  /// GERD-only + trigger(s) detected -> hide the Health Advisory card. A
-  /// direct allergen match is independent of GERD, so it keeps the banner.
-  bool get _hideAdvisoryForGerdOnly {
-    final result = _gerdOnlyDetection();
-    if (result == null || !result.hasTriggers) return false;
-    return !(_evaluation?.allergenAssessment.hasDirectAllergen ?? false);
-  }
-
-  /// GERD-only + product actually checked (ingredient list available) + no
-  /// triggers found. When the ingredient list is missing, "nothing detected"
-  /// really means "couldn't check", so that case keeps its existing display
-  /// (Health Advisory + the GERD card's "not enough information" note).
-  bool get _isGerdOnlyClean {
-    final result = _gerdOnlyDetection();
-    return result != null && !result.hasTriggers && result.hasIngredientData;
   }
 
   // ── GERD Warning card (awareness-only) ────────────────────────────────
@@ -2678,12 +2786,10 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   String _groupConditionName(HealthCondition c, bool tl) {
     switch (c) {
-      case HealthCondition.hypertension:
-        return tl ? 'Alta-presyon' : 'Hypertension';
+      case HealthCondition.cardiovascularDisease:
+        return tl ? 'Sakit sa puso' : 'Cardiovascular disease';
       case HealthCondition.diabetes:
         return 'Diabetes';
-      case HealthCondition.heartCondition:
-        return tl ? 'Sakit sa puso' : 'Heart condition';
       case HealthCondition.gerd:
         return 'GERD';
       case HealthCondition.kidneyDisease:
@@ -3032,6 +3138,60 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // Error banner: shown when advisory loading fails
+  Widget _buildAdvisoryErrorBanner(BuildContext context, AppLocalizations loc) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isTagalog = Localizations.localeOf(context).languageCode == 'tl';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.orange, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.error_outline, color: Colors.orange, size: 36),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isTagalog ? 'Error sa Advisory' : 'Advisory Error',
+                      style: GoogleFonts.outfit(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isTagalog
+                          ? 'Hindi ma-load ang health advisory. Pakisubukang muli sa ibang pagkakataon.'
+                          : 'Health advisory could not be loaded. Please try again later.',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -3832,7 +3992,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           : null;
       final groupLabel = groupName == null
           ? (isTagalog ? 'Hatol ng grupo' : 'Group verdict')
-          : (isTagalog ? 'Hatol ng grupong $groupName' : 'Group $groupName verdict');
+          : (isTagalog
+                ? 'Hatol ng grupong $groupName'
+                : 'Group $groupName verdict');
       sections.add(
         '$groupLabel: ${_levelLabel(_groupLevel)}. '
         '${isTagalog ? "$flaggedCount sa ${_groupMembers.length} na miyembro ang may babala." : "$flaggedCount of ${_groupMembers.length} members flagged."}',
@@ -3875,7 +4037,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ? (isTagalog ? 'Katayuan sa FDA: aktibo.' : 'FDA status: active.')
             : fda.isExpired
             ? (isTagalog ? 'Katayuan sa FDA: paso na.' : 'FDA status: expired.')
-            : (isTagalog ? 'Katayuan sa FDA: hindi beripikado.' : 'FDA status: unverified.'),
+            : (isTagalog
+                  ? 'Katayuan sa FDA: hindi beripikado.'
+                  : 'FDA status: unverified.'),
       );
     }
 
@@ -3923,8 +4087,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         return 'sodium';
       case 'sugarsG':
         return isTagalog ? 'asukal' : 'sugar';
+      case 'totalCarbohydratesG':
+        return isTagalog ? 'carbohydrates' : 'carbohydrates';
       case 'saturatedFatG':
         return 'saturated fat';
+      case 'transFatG':
+        return 'trans fat';
+      case 'proteinG':
+        return isTagalog ? 'protina' : 'protein';
       default:
         return nutrientKey;
     }
@@ -4004,24 +4174,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     final evaluation = _evaluation;
     if (evaluation == null) return _advisory;
 
-    // GERD-only user with no detected GERD triggers: `_advisory` was written
-    // for a user WITH a condition, so build the same no-condition Suitable
-    // advisory instead (deterministic, no AI call -- the same template
-    // GeminiAdvisoryService uses for a Suitable product). A direct allergen
-    // match keeps the normal allergen advisory.
-    final useNoConditionAdvisory =
-        _isGerdOnlyClean && !evaluation.allergenAssessment.hasDirectAllergen;
-
     final labelServingSizeG = evaluation.product.servingSizeG;
-    if (_selectedSizeG == labelServingSizeG && !useNoConditionAdvisory) {
+    if (_selectedSizeG == labelServingSizeG) {
       return _advisory;
     }
 
-    // Use combined nutrient calculation for users without health conditions
     final conditionsEmpty =
-        (_userHealthProfile?.conditions.isEmpty ?? false) ||
-        useNoConditionAdvisory;
-    final useCombinedNutrients = conditionsEmpty;
+        _userHealthProfile == null || _userHealthProfile!.conditions.isEmpty;
     final hasNoConditionsAndNoAllergens =
         conditionsEmpty && !evaluation.allergenAssessment.hasDirectAllergen;
 
@@ -4030,8 +4189,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       reason: FallbackReason.notNeeded,
       languageCode: Localizations.localeOf(context).languageCode,
       servingSizeGOverride: _selectedSizeG,
-      useCombinedNutrients: useCombinedNutrients,
       hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
+      userConditions: _userHealthProfile?.conditions,
     );
   }
 

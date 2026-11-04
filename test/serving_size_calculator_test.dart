@@ -4,12 +4,13 @@ import 'package:claro/core/utils/serving_size_calculator.dart';
 
 void main() {
   group('ServingSizeCalculator', () {
-    test('calculateCombinedNutrients should return null when all nutrients are zero', () {
+    test('returns a full serving when the relevant nutrients are zero', () {
       final nutrition = NutritionInfo(
         caloriesKcal: 0,
         proteinG: 0,
         totalFatG: 0,
         saturatedFatG: 0,
+        transFatG: 0,
         sodiumMg: 0,
         sugarsG: 0,
         totalCarbohydratesG: 0,
@@ -17,21 +18,24 @@ void main() {
         potassiumMg: 0,
       );
 
-      final result = ServingSizeCalculator.calculateCombinedNutrients(
+      final result = ServingSizeCalculator.forProfile(
+        conditions: const [],
         nutritionPer100g: nutrition,
         servingSizeG: 100,
+        hasDirectAllergen: false,
       );
 
-      expect(result, isNull);
+      expect(result, contains('Up to 1 full serving (100g)'));
     });
 
-    test('calculateCombinedNutrients should return correct suggestion for high sodium product', () {
+    test('returns correct suggestion for high sodium product', () {
       // Product with 800mg sodium per 100g (high for sodium)
       final nutrition = NutritionInfo(
         caloriesKcal: 400,
         proteinG: 10,
         totalFatG: 15,
         saturatedFatG: 5,
+        transFatG: 0,
         sodiumMg: 800,
         sugarsG: 5,
         totalCarbohydratesG: 50,
@@ -39,9 +43,11 @@ void main() {
         potassiumMg: 200,
       );
 
-      final result = ServingSizeCalculator.calculateCombinedNutrients(
+      final result = ServingSizeCalculator.forProfile(
+        conditions: const [],
         nutritionPer100g: nutrition,
         servingSizeG: 100,
+        hasDirectAllergen: false,
       );
 
       // WHO sodium limit: 2000mg/day, per meal: 666.67mg
@@ -51,13 +57,14 @@ void main() {
       expect(result, contains('83'));
     });
 
-    test('calculateCombinedNutrients should return correct suggestion for high sugar product', () {
+    test('returns correct suggestion for high sugar product', () {
       // Product with 15g sugars per 100g (high for sugars)
       final nutrition = NutritionInfo(
         caloriesKcal: 400,
         proteinG: 5,
         totalFatG: 10,
         saturatedFatG: 3,
+        transFatG: 0,
         sodiumMg: 200,
         sugarsG: 15,
         totalCarbohydratesG: 70,
@@ -65,9 +72,11 @@ void main() {
         potassiumMg: 200,
       );
 
-      final result = ServingSizeCalculator.calculateCombinedNutrients(
+      final result = ServingSizeCalculator.forProfile(
+        conditions: const [],
         nutritionPer100g: nutrition,
         servingSizeG: 100,
+        hasDirectAllergen: false,
       );
 
       // WHO sugars limit: 50g/day, per meal: 16.67g
@@ -77,13 +86,14 @@ void main() {
       expect(result, contains('1 full serving'));
     });
 
-    test('calculateCombinedNutrients should return correct suggestion for high saturated fat product', () {
+    test('returns correct suggestion for high saturated fat product', () {
       // Product with 10g saturated fat per 100g (high for saturated fat)
       final nutrition = NutritionInfo(
         caloriesKcal: 500,
         proteinG: 10,
         totalFatG: 25,
         saturatedFatG: 10,
+        transFatG: 0,
         sodiumMg: 300,
         sugarsG: 5,
         totalCarbohydratesG: 40,
@@ -91,9 +101,11 @@ void main() {
         potassiumMg: 200,
       );
 
-      final result = ServingSizeCalculator.calculateCombinedNutrients(
+      final result = ServingSizeCalculator.forProfile(
+        conditions: const [],
         nutritionPer100g: nutrition,
         servingSizeG: 100,
+        hasDirectAllergen: false,
       );
 
       // WHO saturated fat limit: 22.2g/day, per meal: 7.4g
@@ -103,13 +115,14 @@ void main() {
       expect(result, contains('74'));
     });
 
-    test('calculateCombinedNutrients should use most restrictive nutrient', () {
+    test('uses the most restrictive no-condition nutrient', () {
       // Product with moderate sodium, high sugar, and high saturated fat
       final nutrition = NutritionInfo(
         caloriesKcal: 450,
         proteinG: 8,
         totalFatG: 20,
         saturatedFatG: 8,
+        transFatG: 0,
         sodiumMg: 500,
         sugarsG: 12,
         totalCarbohydratesG: 60,
@@ -117,9 +130,11 @@ void main() {
         potassiumMg: 200,
       );
 
-      final result = ServingSizeCalculator.calculateCombinedNutrients(
+      final result = ServingSizeCalculator.forProfile(
+        conditions: const [],
         nutritionPer100g: nutrition,
         servingSizeG: 100,
+        hasDirectAllergen: false,
       );
 
       // Sodium: (666.67 / 500) * 100 = 133.33g
@@ -130,13 +145,14 @@ void main() {
       expect(result, contains('93'));
     });
 
-    test('calculateCombinedNutrients should respect serving size limit', () {
+    test('respects the serving size limit', () {
       // Product with very low nutrients but small serving size
       final nutrition = NutritionInfo(
         caloriesKcal: 200,
         proteinG: 5,
         totalFatG: 5,
         saturatedFatG: 1,
+        transFatG: 0,
         sodiumMg: 100,
         sugarsG: 3,
         totalCarbohydratesG: 30,
@@ -144,9 +160,11 @@ void main() {
         potassiumMg: 100,
       );
 
-      final result = ServingSizeCalculator.calculateCombinedNutrients(
+      final result = ServingSizeCalculator.forProfile(
+        conditions: const [],
         nutritionPer100g: nutrition,
         servingSizeG: 50,
+        hasDirectAllergen: false,
       );
 
       // All nutrients would allow more than 50g, but we cap at serving size

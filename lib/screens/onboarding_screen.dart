@@ -106,8 +106,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // themselves keep going to Firestore unchanged (see class doc above).
   Map<String, String> _conditionDisplay(AppLocalizations loc) => {
     'Diabetes': loc.conditionDiabetes,
-    'Alta-presyon': loc.conditionHypertension,
-    'Sakit sa puso': loc.conditionHeartCondition,
+    'Cardiovascular disease': loc.conditionCardiovascularDisease,
+    'Sakit sa puso': loc.conditionCardiovascularDisease,
     'GERD': loc.conditionGerd,
     'Sakit sa bato': loc.conditionKidneyDisease,
     'Mababang Paningin': loc.conditionLowVision,

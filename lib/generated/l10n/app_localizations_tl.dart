@@ -710,13 +710,10 @@ class AppLocalizationsTl extends AppLocalizations {
   String get conditionDiabetes => 'Diabetes';
 
   @override
-  String get conditionHypertension => 'Alta-presyon';
+  String get conditionCardiovascularDisease => 'Sakit sa puso';
 
   @override
-  String get conditionHeartCondition => 'Sakit sa puso';
-
-  @override
-  String get conditionGerd => 'GERD (Gastroesophageal Reflux Disease)';
+  String get conditionGerd => 'GERD';
 
   @override
   String get conditionKidneyDisease => 'Sakit sa bato';
@@ -1168,13 +1165,16 @@ class AppLocalizationsTl extends AppLocalizations {
   }
 
   @override
-  String get bpSodiumLabel => 'Presyon ng dugo - Sodium';
+  String get bpSodiumLabel => 'Sakit sa puso - Sodium';
 
   @override
   String get diabetesSugarsLabel => 'Diabetes - Total sugars';
 
   @override
-  String get heartSatFatLabel => 'Sakit sa puso - Saturated fats';
+  String get diabetesCarbsLabel => 'Diabetes - Carbohydrates';
+
+  @override
+  String get heartSatFatLabel => 'Sakit sa Puso - Saturated fats';
 
   @override
   String get bpSodiumShortLabel => 'Sodium';
@@ -1183,10 +1183,13 @@ class AppLocalizationsTl extends AppLocalizations {
   String get kidneySodiumLabel => 'Sakit sa Bato - Sodium';
 
   @override
-  String get ckdBpSodiumLabel => 'CKD at Presyon ng Dugo - Sodium';
+  String get ckdBpSodiumLabel => 'CKD at Sakit sa Puso - Sodium';
 
   @override
   String get diabetesSugarsShortLabel => 'Total sugars';
+
+  @override
+  String get diabetesCarbsShortLabel => 'Carbohydrates';
 
   @override
   String get heartSatFatShortLabel => 'Saturated fats';
@@ -1199,6 +1202,10 @@ class AppLocalizationsTl extends AppLocalizations {
 
   @override
   String get ofWhoFreeSugarReference => 'ng sanggunian ng WHO para sa asukal';
+
+  @override
+  String exceedsDailyLimitBy(String percentage) =>
+      'Lumampas sa pang-araw-araw na limitasyon nang $percentage%.';
 
   @override
   String get allergenDetectedBadge => 'Allergen Detected';

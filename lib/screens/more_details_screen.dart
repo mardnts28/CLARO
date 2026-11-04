@@ -30,7 +30,7 @@ class MoreDetailsScreen extends StatefulWidget {
   final List<AllergenType> matchedAllergens;
 
   // Health conditions saved on the signed-in user's health profile (e.g.
-  // [HealthCondition.hypertension, HealthCondition.diabetes]) -- the same
+  // [HealthCondition.cardiovascularDisease, HealthCondition.diabetes]) -- the same
   // set WhoCalculator.evaluateProduct() iterates over to build
   // ProductEvaluation.nutrientEvaluations. Used ONLY to decide whether to
   // show a nutrient card's health-condition badge in the "How CLARO
@@ -62,18 +62,25 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
 
   // Official WHO "Healthy diet" fact sheet -- the single reference source
   // cited in the "How CLARO Calculates" guide.
-  static final Uri _whoHealthyDietUri =
-      Uri.parse('https://www.who.int/news-room/fact-sheets/detail/healthy-diet');
+  static final Uri _whoHealthyDietUri = Uri.parse(
+    'https://www.who.int/news-room/fact-sheets/detail/healthy-diet',
+  );
 
   // TapGestureRecognizer for the inline hyperlink in the guide's intro
   // text. Created once and disposed in dispose() (per Flutter's
   // GestureRecognizer contract) rather than recreated on every build.
   late final TapGestureRecognizer _whoLinkRecognizer;
 
+  // TapGestureRecognizer for the "medical practitioners" hyperlink in the
+  // validation note. Created once and disposed in dispose().
+  late final TapGestureRecognizer _expertsLinkRecognizer;
+
   @override
   void initState() {
     super.initState();
-    _whoLinkRecognizer = TapGestureRecognizer()..onTap = _openWhoHealthyDietPage;
+    _whoLinkRecognizer = TapGestureRecognizer()
+      ..onTap = _openWhoHealthyDietPage;
+    _expertsLinkRecognizer = TapGestureRecognizer()..onTap = _showExpertsDialog;
     if (VoiceAssistantService.instance.isEnabled) {
       VoiceAssistantService.instance.announcePage('more_details');
     }
@@ -83,21 +90,29 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
   @override
   void dispose() {
     _whoLinkRecognizer.dispose();
+    _expertsLinkRecognizer.dispose();
     super.dispose();
   }
 
   Future<void> _openWhoHealthyDietPage() async {
     try {
-      final launched = await launchUrl(_whoHealthyDietUri, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(
+        _whoHealthyDietUri,
+        mode: LaunchMode.externalApplication,
+      );
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to open the official WHO website.')),
+          const SnackBar(
+            content: Text('Unable to open the official WHO website.'),
+          ),
         );
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Unable to open the official WHO website.')),
+          const SnackBar(
+            content: Text('Unable to open the official WHO website.'),
+          ),
         );
       }
     }
@@ -108,10 +123,13 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
       if (mounted) setState(() => _loadingStorage = false);
       return;
     }
-    
+
     try {
       final docId = widget.product.category.toLowerCase().replaceAll(' ', '_');
-      final doc = await FirebaseFirestore.instance.collection('categories').doc(docId).get();
+      final doc = await FirebaseFirestore.instance
+          .collection('categories')
+          .doc(docId)
+          .get();
       if (doc.exists && mounted) {
         setState(() {
           _dynamicStorageText = doc.data()?['default_storage'];
@@ -129,23 +147,27 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
   String _toTitleCase(String text) {
     if (text.trim().isEmpty) return text;
     final words = text.split(' ');
-    return words.map((w) {
-      if (w.isEmpty) return w;
-      int prefixLen = 0;
-      while (prefixLen < w.length && (w[prefixLen] == '(' || w[prefixLen] == '[')) {
-        prefixLen++;
-      }
-      if (prefixLen >= w.length) return w;
-      final prefix = w.substring(0, prefixLen);
-      final body = w.substring(prefixLen);
-      if (body.isEmpty) return w;
-      final lower = body.toLowerCase();
-      if (['and', 'or', 'with', 'in', 'of', 'for'].contains(lower) && prefixLen == 0) {
-        return lower;
-      }
-      final formattedBody = lower[0].toUpperCase() + lower.substring(1);
-      return prefix + formattedBody;
-    }).join(' ');
+    return words
+        .map((w) {
+          if (w.isEmpty) return w;
+          int prefixLen = 0;
+          while (prefixLen < w.length &&
+              (w[prefixLen] == '(' || w[prefixLen] == '[')) {
+            prefixLen++;
+          }
+          if (prefixLen >= w.length) return w;
+          final prefix = w.substring(0, prefixLen);
+          final body = w.substring(prefixLen);
+          if (body.isEmpty) return w;
+          final lower = body.toLowerCase();
+          if (['and', 'or', 'with', 'in', 'of', 'for'].contains(lower) &&
+              prefixLen == 0) {
+            return lower;
+          }
+          final formattedBody = lower[0].toUpperCase() + lower.substring(1);
+          return prefix + formattedBody;
+        })
+        .join(' ');
   }
 
   List<String> _parseIngredientsList(List<String> rawIngredients) {
@@ -217,68 +239,85 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 12),
-                  Builder(builder: (context) {
-                    final parsedItems = _parseIngredientsList(product.ingredients);
-                    // Detect GERD triggers for highlighting
-                    final gerdResult = widget.healthProfile?.hasGerd == true
-                        ? GerdTriggerDetector.detect(product)
-                        : null;
-                    final gerdTriggers = gerdResult?.triggers ?? [];
-                    final gerdMatchedIngredients = gerdTriggers
-                        .where((t) => t.matchedIngredient != null)
-                        .map((t) => t.matchedIngredient!.toLowerCase())
-                        .toSet();
+                  Builder(
+                    builder: (context) {
+                      final parsedItems = _parseIngredientsList(
+                        product.ingredients,
+                      );
+                      // Detect GERD triggers for highlighting
+                      final gerdResult = widget.healthProfile?.hasGerd == true
+                          ? GerdTriggerDetector.detect(product)
+                          : null;
+                      final gerdTriggers = gerdResult?.triggers ?? [];
+                      final gerdMatchedIngredients = gerdTriggers
+                          .where((t) => t.matchedIngredient != null)
+                          .map((t) => t.matchedIngredient!.toLowerCase())
+                          .toSet();
 
-                    // Kidney Disease (awareness-only): phosphate additives
-                    final hasKidney = widget.healthProfile?.hasKidneyDisease == true;
+                      // Kidney Disease (awareness-only): phosphate additives
+                      final hasKidney =
+                          widget.healthProfile?.hasKidneyDisease == true;
 
-                    if (parsedItems.isEmpty) {
-                      return Text('—',
+                      if (parsedItems.isEmpty) {
+                        return Text(
+                          '—',
                           style: GoogleFonts.inter(
-                              fontSize: 14, color: colorScheme.onSurface));
-                    }
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: parsedItems.map((item) {
-                        final isGerdTriggerMatch = gerdMatchedIngredients.any((trigger) =>
-                            item.toLowerCase().contains(trigger));
-                        final isPhosphate = hasKidney &&
-                            KidneyNutrientDetector.isPhosphateIngredient(item);
-                        // Same amber highlight for any awareness-only flag
-                        final isGerdTrigger = isGerdTriggerMatch || isPhosphate;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('• ',
-                                  style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: isGerdTrigger
-                                          ? const Color(0xFFE65100)
-                                          : colorScheme.primary)),
-                              Expanded(
-                                child: Text(
-                                  item,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 14,
-                                    color: isGerdTrigger
-                                        ? const Color(0xFFE65100)
-                                        : colorScheme.onSurface,
-                                    fontWeight: isGerdTrigger
-                                        ? FontWeight.w600
-                                        : FontWeight.normal,
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            fontSize: 14,
+                            color: colorScheme.onSurface,
                           ),
                         );
-                      }).toList(),
-                    );
-                  }),
+                      }
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: parsedItems.map((item) {
+                          final isGerdTriggerMatch = gerdMatchedIngredients.any(
+                            (trigger) => item.toLowerCase().contains(trigger),
+                          );
+                          final isPhosphate =
+                              hasKidney &&
+                              KidneyNutrientDetector.isPhosphateIngredient(
+                                item,
+                              );
+                          // Same amber highlight for any awareness-only flag
+                          final isGerdTrigger =
+                              isGerdTriggerMatch || isPhosphate;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '• ',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: isGerdTrigger
+                                        ? const Color(0xFFE65100)
+                                        : colorScheme.primary,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Text(
+                                    item,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      color: isGerdTrigger
+                                          ? const Color(0xFFE65100)
+                                          : colorScheme.onSurface,
+                                      fontWeight: isGerdTrigger
+                                          ? FontWeight.w600
+                                          : FontWeight.normal,
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
                   // Allergen warnings -- ONLY for allergens matched against
                   // the signed-in user's saved health profile
                   // (`widget.matchedAllergens`, the same set the Health
@@ -290,114 +329,90 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                   // rows.
                   if (widget.matchedAllergens.isNotEmpty) ...[
                     const SizedBox(height: 16),
-                    Builder(builder: (context) {
-                      final langCode = Localizations.localeOf(context).languageCode;
-                      // Parallel to product.allergens -- lets us prefer the
-                      // product's own (possibly localized) allergen string
-                      // when one exists, same as the product detail screen.
-                      final productAllergenTypes = product.containsAllergens;
-                      final displayNamesList = <String>[];
-                      for (final type in widget.matchedAllergens) {
-                        final rawIndex = productAllergenTypes.indexOf(type);
-                        final label = rawIndex != -1
-                            ? _getAllergenDisplayName(product.allergens[rawIndex], langCode)
-                            : type.displayLabel;
-                        if (!displayNamesList.contains(label)) displayNamesList.add(label);
-                      }
-                      final displayNames = displayNamesList.join(', ');
-                      return Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFEBEE),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFEF9A9A)),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.warning_amber_rounded,
-                                color: Color(0xFFC62828), size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                loc.containsAllergenPrefix(displayNames),
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFFC62828),
+                    Builder(
+                      builder: (context) {
+                        final langCode = Localizations.localeOf(
+                          context,
+                        ).languageCode;
+                        // Parallel to product.allergens -- lets us prefer the
+                        // product's own (possibly localized) allergen string
+                        // when one exists, same as the product detail screen.
+                        final productAllergenTypes = product.containsAllergens;
+                        final displayNamesList = <String>[];
+                        for (final type in widget.matchedAllergens) {
+                          final rawIndex = productAllergenTypes.indexOf(type);
+                          final label = rawIndex != -1
+                              ? _getAllergenDisplayName(
+                                  product.allergens[rawIndex],
+                                  langCode,
+                                )
+                              : type.displayLabel;
+                          if (!displayNamesList.contains(label))
+                            displayNamesList.add(label);
+                        }
+                        final displayNames = displayNamesList.join(', ');
+                        return Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFEBEE),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFEF9A9A)),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                color: Color(0xFFC62828),
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  loc.containsAllergenPrefix(displayNames),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFFC62828),
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
                   // GERD trigger warnings -- highlight ingredients that may trigger GERD
                   if (widget.healthProfile?.hasGerd == true) ...[
                     const SizedBox(height: 16),
-                    Builder(builder: (context) {
-                      final gerdResult = GerdTriggerDetector.detect(product);
-                      if (!gerdResult.hasTriggers) {
-                        return const SizedBox.shrink();
-                      }
-                      final triggerIngredients = gerdResult.triggers
-                          .where((t) => t.matchedIngredient != null)
-                          .map((t) => t.matchedIngredient!)
-                          .toSet();
-                      if (triggerIngredients.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-                      final displayNames = triggerIngredients.join(', ');
-                      final tl = Localizations.localeOf(context).languageCode == 'tl';
-                      return Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF3E0),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFFFB74D)),
-                        ),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Icon(Icons.local_fire_department_outlined,
-                                color: Color(0xFFE65100), size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                tl
-                                    ? 'Naglalaman ng $displayNames - maaaring mag-trigger ng sintomas ng GERD'
-                                    : 'Contains $displayNames - may trigger GERD symptoms',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: const Color(0xFFE65100),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                  ],
-                  // Kidney Disease awareness -- phosphate additives in the ingredients
-                  if (widget.healthProfile?.hasKidneyDisease == true) ...[
-                    Builder(builder: (context) {
-                      final phosphateItems = _parseIngredientsList(product.ingredients)
-                          .where(KidneyNutrientDetector.isPhosphateIngredient)
-                          .toList();
-                      if (phosphateItems.isEmpty) {
-                        return const SizedBox.shrink();
-                      }
-                      final displayNames = phosphateItems.take(3).join('; ');
-                      final tl = Localizations.localeOf(context).languageCode == 'tl';
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Container(
+                    Builder(
+                      builder: (context) {
+                        final gerdResult = GerdTriggerDetector.detect(product);
+                        if (!gerdResult.hasTriggers) {
+                          return const SizedBox.shrink();
+                        }
+                        final triggerIngredients = gerdResult.triggers
+                            .where((t) => t.matchedIngredient != null)
+                            .map((t) => t.matchedIngredient!)
+                            .toSet();
+                        if (triggerIngredients.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        final displayNames = triggerIngredients.join(', ');
+                        final tl =
+                            Localizations.localeOf(context).languageCode ==
+                            'tl';
+                        return Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF3E0),
                             borderRadius: BorderRadius.circular(8),
@@ -406,14 +421,17 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(Icons.water_drop_outlined,
-                                  color: Color(0xFFE65100), size: 18),
+                              const Icon(
+                                Icons.local_fire_department_outlined,
+                                color: Color(0xFFE65100),
+                                size: 18,
+                              ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   tl
-                                      ? 'Naglalaman ng $displayNames - ang mga phosphate additive ay maaaring may kaugnayan sa kalusugan ng bato'
-                                      : 'Contains $displayNames - phosphate additives may be relevant to kidney health',
+                                      ? 'Naglalaman ng $displayNames - maaaring mag-trigger ng sintomas ng GERD'
+                                      : 'Contains $displayNames - may trigger GERD symptoms',
                                   style: GoogleFonts.inter(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
@@ -423,9 +441,69 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                               ),
                             ],
                           ),
-                        ),
-                      );
-                    }),
+                        );
+                      },
+                    ),
+                  ],
+                  // Kidney Disease awareness -- phosphate additives in the ingredients
+                  if (widget.healthProfile?.hasKidneyDisease == true) ...[
+                    Builder(
+                      builder: (context) {
+                        final phosphateItems =
+                            _parseIngredientsList(product.ingredients)
+                                .where(
+                                  KidneyNutrientDetector.isPhosphateIngredient,
+                                )
+                                .toList();
+                        if (phosphateItems.isEmpty) {
+                          return const SizedBox.shrink();
+                        }
+                        final displayNames = phosphateItems.take(3).join('; ');
+                        final tl =
+                            Localizations.localeOf(context).languageCode ==
+                            'tl';
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF3E0),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFFFFB74D),
+                              ),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(
+                                  Icons.water_drop_outlined,
+                                  color: Color(0xFFE65100),
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    tl
+                                        ? 'Naglalaman ng $displayNames - ang mga phosphate additive ay maaaring may kaugnayan sa kalusugan ng bato'
+                                        : 'Contains $displayNames - phosphate additives may be relevant to kidney health',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFFE65100),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ],
               ),
@@ -448,7 +526,8 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                       padding: EdgeInsets.symmetric(vertical: 20),
                       child: Center(child: CircularProgressIndicator()),
                     )
-                  else if (_dynamicStorageText != null && _dynamicStorageText!.isNotEmpty)
+                  else if (_dynamicStorageText != null &&
+                      _dynamicStorageText!.isNotEmpty)
                     _buildStorageTip(
                       context: context,
                       icon: Icons.info_outline,
@@ -480,7 +559,11 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
             const SizedBox(height: 16),
 
             // ── How CLARO Calculates Your Health Guide Card ───────
-            _buildHowClaroCalculatesCard(context: context, product: product, loc: loc),
+            _buildHowClaroCalculatesCard(
+              context: context,
+              product: product,
+              loc: loc,
+            ),
 
             const SizedBox(height: 24),
           ],
@@ -517,6 +600,8 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
           _buildWhoReferenceText(context, loc),
           const SizedBox(height: 16),
           _buildWhoThresholdTable(context, product, loc),
+          const SizedBox(height: 20),
+          _buildValidationNote(context),
         ],
       ),
     );
@@ -558,40 +643,68 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
     );
   }
 
-  /// Builds the visual WHO-threshold table: one row-card per tracked
-  /// nutrient (Sodium/Hypertension, Sugars/Diabetes, Saturated Fat/Heart
-  /// Condition), each listing the WHO daily reference limit plus the
-  /// Suitable / Moderate / Caution per-100g threshold range for its
-  /// health condition (straight from ConditionThresholds -- Table 3.14 --
-  /// no numbers are computed or displayed here beyond what those
-  /// constants already define). Purely additive/explanatory: no formula,
-  /// no arithmetic shown to the user.
+  /// Builds the visual threshold table for the user's selected conditions.
+  /// Nutrients with Table 3.14 bands read those values directly from
+  /// ConditionThresholds; GERD total fat uses the existing per-serving
+  /// high-fat reference from GerdTriggerDetector.
   ///
   /// Every row-card and every cell inside it uses Expanded/Wrap (never a
   /// fixed width wider than its parent), so this table cannot overflow
   /// horizontally regardless of screen size or how long a localized label
   /// is -- it wraps or shrinks, it never clips past the card edge.
-  Widget _buildWhoThresholdTable(BuildContext context, Product product, AppLocalizations loc) {
-    final rows = <_ThresholdRow>[
-      _ThresholdRow(
-        nutrientKey: 'sodiumMg',
-        condition: HealthCondition.hypertension,
-        unit: 'mg',
-        whoDailyLimit: WhoDailyLimits.sodiumMgPerDay,
-      ),
-      _ThresholdRow(
-        nutrientKey: 'sugarsG',
-        condition: HealthCondition.diabetes,
-        unit: 'g',
-        whoDailyLimit: WhoDailyLimits.sugarsGPerDay,
-      ),
-      _ThresholdRow(
-        nutrientKey: 'saturatedFatG',
-        condition: HealthCondition.heartCondition,
-        unit: 'g',
-        whoDailyLimit: WhoDailyLimits.saturatedFatGPerDay,
-      ),
-    ];
+  Widget _buildWhoThresholdTable(
+    BuildContext context,
+    Product product,
+    AppLocalizations loc,
+  ) {
+    // Build dynamic rows based on user's selected health conditions
+    final rows = <_ThresholdRow>[];
+    final seenNutrientKeys = <String>{};
+
+    for (final condition in widget.userConditions) {
+      if (condition == HealthCondition.gerd) {
+        const nutrientKey = 'totalFatG';
+        if (seenNutrientKeys.add(nutrientKey)) {
+          rows.add(
+            _ThresholdRow(
+              nutrientKey: nutrientKey,
+              condition: condition,
+              unit: 'g',
+              whoDailyLimit: GerdTriggerDetector.totalFatDailyValueG,
+            ),
+          );
+        }
+        continue;
+      }
+
+      final nutrientThresholds = ConditionThresholds.thresholds[condition];
+      if (nutrientThresholds == null) continue;
+
+      for (final entry in nutrientThresholds.entries) {
+        final nutrientKey = entry.key;
+        // Skip if we've already added this nutrient (avoid duplicates)
+        if (seenNutrientKeys.contains(nutrientKey)) continue;
+        seenNutrientKeys.add(nutrientKey);
+
+        // Get the WHO daily limit for this nutrient
+        final whoDailyLimit = _getWhoDailyLimit(nutrientKey);
+        final unit = _getNutrientUnit(nutrientKey);
+
+        rows.add(
+          _ThresholdRow(
+            nutrientKey: nutrientKey,
+            condition: condition,
+            unit: unit,
+            whoDailyLimit: whoDailyLimit,
+          ),
+        );
+      }
+    }
+
+    // If no conditions selected, show default nutritional guidance (key nutrients)
+    if (rows.isEmpty) {
+      rows.addAll(_getDefaultNutrientRows());
+    }
 
     final hasData = product.nutritionalFacts.hasNutritionData;
 
@@ -604,6 +717,66 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
         ],
       ],
     );
+  }
+
+  /// Returns the WHO daily limit for a given nutrient key
+  double _getWhoDailyLimit(String nutrientKey) {
+    switch (nutrientKey) {
+      case 'sodiumMg':
+        return WhoDailyLimits.sodiumMgPerDay;
+      case 'sugarsG':
+        return WhoDailyLimits.sugarsGPerDay;
+      case 'totalCarbohydratesG':
+        return WhoDailyLimits.totalCarbohydratesGPerDay;
+      case 'saturatedFatG':
+        return WhoDailyLimits.saturatedFatGPerDay;
+      case 'transFatG':
+        return WhoDailyLimits.transFatGPerDay;
+      case 'proteinG':
+        return WhoDailyLimits.proteinGPerDay;
+      default:
+        return 0.0;
+    }
+  }
+
+  /// Returns the unit for a given nutrient key
+  String _getNutrientUnit(String nutrientKey) {
+    switch (nutrientKey) {
+      case 'sodiumMg':
+        return 'mg';
+      case 'sugarsG':
+      case 'totalCarbohydratesG':
+      case 'saturatedFatG':
+      case 'transFatG':
+      case 'proteinG':
+        return 'g';
+      default:
+        return '';
+    }
+  }
+
+  /// Returns default nutrient rows to show when no health conditions are selected
+  List<_ThresholdRow> _getDefaultNutrientRows() {
+    return [
+      _ThresholdRow(
+        nutrientKey: 'sodiumMg',
+        condition: HealthCondition.cardiovascularDisease,
+        unit: 'mg',
+        whoDailyLimit: WhoDailyLimits.sodiumMgPerDay,
+      ),
+      _ThresholdRow(
+        nutrientKey: 'sugarsG',
+        condition: HealthCondition.diabetes,
+        unit: 'g',
+        whoDailyLimit: WhoDailyLimits.sugarsGPerDay,
+      ),
+      _ThresholdRow(
+        nutrientKey: 'saturatedFatG',
+        condition: HealthCondition.cardiovascularDisease,
+        unit: 'g',
+        whoDailyLimit: WhoDailyLimits.saturatedFatGPerDay,
+      ),
+    ];
   }
 
   /// One nutrient's row-card: header (nutrient name, condition chip -- only
@@ -620,12 +793,29 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
     AppLocalizations loc,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-    final band = ConditionThresholds.thresholds[row.condition]?[row.nutrientKey];
+    final isGerdFat =
+        row.condition == HealthCondition.gerd && row.nutrientKey == 'totalFatG';
+    final band =
+        ConditionThresholds.thresholds[row.condition]?[row.nutrientKey];
 
     AdvisoryLevel? productLevel;
-    if (hasData && band != null) {
-      final value = WhoCalculator.readNutrientValue(product.nutritionPer100g, row.nutrientKey);
-      productLevel = WhoCalculator.classifyNutrient(row.condition, row.nutrientKey, value);
+    if (hasData && isGerdFat) {
+      productLevel =
+          GerdTriggerDetector.isHighFatPerServing(
+            product.nutritionalFacts.totalFatG,
+          )
+          ? AdvisoryLevel.caution
+          : AdvisoryLevel.suitable;
+    } else if (hasData && band != null) {
+      final value = WhoCalculator.readNutrientValue(
+        product.nutritionPer100g,
+        row.nutrientKey,
+      );
+      productLevel = WhoCalculator.classifyNutrient(
+        row.condition,
+        row.nutrientKey,
+        value,
+      );
     }
 
     // The condition badge only appears when this row's health condition is
@@ -637,8 +827,12 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
     // nutrient's WHO daily reference -- e.g. sodium's 100mg Suitable cutoff
     // is 5% of the 2,000mg WHO daily reference. Derived live from the same
     // constants the ranges above come from, never hardcoded.
-    final suitablePercent = band == null ? null : (band.suitableMaxInclusive / row.whoDailyLimit) * 100;
-    final cautionPercent = band == null ? null : (band.cautionMinInclusive / row.whoDailyLimit) * 100;
+    final suitablePercent = band == null
+        ? null
+        : (band.suitableMaxInclusive / row.whoDailyLimit) * 100;
+    final cautionPercent = band == null
+        ? null
+        : (band.cautionMinInclusive / row.whoDailyLimit) * 100;
 
     return Container(
       width: double.infinity,
@@ -646,7 +840,9 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant.withValues(alpha: 0.4)),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -671,7 +867,10 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
               ),
               if (showConditionBadge)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(6),
@@ -690,16 +889,53 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
           ),
           const SizedBox(height: 4),
           Text(
-            row.nutrientKey == 'sugarsG'
+            isGerdFat
+                ? 'GERD high-fat reference: ${NumberFormatUtils.formatValue(GerdTriggerDetector.highFatPerServingThresholdG)}g per serving (20% of FDA Daily Value)'
+                : row.nutrientKey == 'sugarsG'
                 ? '${loc.whoFreeSugarReferenceLabel}: ${NumberFormatUtils.formatValue(row.whoDailyLimit)}${row.unit}/day'
                 : '${loc.whoReferenceLabel}: ${NumberFormatUtils.formatValue(row.whoDailyLimit)}${row.unit}/day',
             softWrap: true,
-            style: GoogleFonts.inter(fontSize: 11.5, color: colorScheme.onSurfaceVariant),
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 10),
-          if (band == null)
-            Text('—',
-                style: GoogleFonts.inter(fontSize: 12, color: colorScheme.onSurfaceVariant))
+          if (isGerdFat)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildThresholdCell(
+                    context,
+                    level: AdvisoryLevel.suitable,
+                    rangeText:
+                        '< ${NumberFormatUtils.formatValue(GerdTriggerDetector.highFatPerServingThresholdG)}g/serving',
+                    percentText: '< 20% of FDA Daily Value',
+                    isActive: productLevel == AdvisoryLevel.suitable,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _buildThresholdCell(
+                    context,
+                    level: AdvisoryLevel.caution,
+                    rangeText:
+                        '≥ ${NumberFormatUtils.formatValue(GerdTriggerDetector.highFatPerServingThresholdG)}g/serving',
+                    percentText: '≥ 20% of FDA Daily Value',
+                    isActive: productLevel == AdvisoryLevel.caution,
+                  ),
+                ),
+              ],
+            )
+          else if (band == null)
+            Text(
+              '—',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            )
           else
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -710,7 +946,8 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                     level: AdvisoryLevel.suitable,
                     rangeText:
                         '≤ ${NumberFormatUtils.formatValue(band.suitableMaxInclusive)}${row.unit}',
-                    percentText: '≤ ${NumberFormatUtils.formatValue(suitablePercent!)}%',
+                    percentText:
+                        '≤ ${NumberFormatUtils.formatValue(suitablePercent!)}%',
                     isActive: productLevel == AdvisoryLevel.suitable,
                   ),
                 ),
@@ -733,13 +970,14 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
                     level: AdvisoryLevel.caution,
                     rangeText:
                         '≥ ${NumberFormatUtils.formatValue(band.cautionMinInclusive)}${row.unit}',
-                    percentText: '≥ ${NumberFormatUtils.formatValue(cautionPercent)}%',
+                    percentText:
+                        '≥ ${NumberFormatUtils.formatValue(cautionPercent)}%',
                     isActive: productLevel == AdvisoryLevel.caution,
                   ),
                 ),
               ],
             ),
-          if (band != null && !hasData) ...[
+          if ((band != null || isGerdFat) && !hasData) ...[
             const SizedBox(height: 8),
             Text(
               'No nutrition data available to classify this product.',
@@ -782,7 +1020,9 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
         color: isActive ? style.badgeBg : colorScheme.surface,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: isActive ? style.textColor : colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: isActive
+              ? style.textColor
+              : colorScheme.outlineVariant.withValues(alpha: 0.4),
           width: isActive ? 1.5 : 1,
         ),
       ),
@@ -831,8 +1071,14 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
         return loc.bpSodiumShortLabel;
       case 'sugarsG':
         return loc.diabetesSugarsShortLabel;
+      case 'totalCarbohydratesG':
+        return loc.diabetesCarbsShortLabel;
       case 'saturatedFatG':
         return loc.heartSatFatShortLabel;
+      case 'totalFatG':
+        return loc.nutriTotalFat;
+      case 'transFatG':
+        return 'Trans Fat';
       default:
         return nutrientKey;
     }
@@ -846,12 +1092,10 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
   /// swap these for loc.* calls.
   String _conditionDisplayLabel(HealthCondition condition) {
     switch (condition) {
-      case HealthCondition.hypertension:
-        return 'Hypertension';
+      case HealthCondition.cardiovascularDisease:
+        return 'Cardiovascular Disease';
       case HealthCondition.diabetes:
         return 'Diabetes';
-      case HealthCondition.heartCondition:
-        return 'Heart Condition';
       case HealthCondition.gerd:
         return 'GERD';
       case HealthCondition.kidneyDisease:
@@ -859,7 +1103,11 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
     }
   }
 
-  _LevelStyle _levelStyleFor(AdvisoryLevel level, bool isDark, AppLocalizations loc) {
+  _LevelStyle _levelStyleFor(
+    AdvisoryLevel level,
+    bool isDark,
+    AppLocalizations loc,
+  ) {
     switch (level) {
       case AdvisoryLevel.suitable:
         return _LevelStyle(
@@ -926,6 +1174,207 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
     );
   }
 
+  /// Builds the validation note with a clickable "medical practitioners" link.
+  Widget _buildValidationNote(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: 'CLARO\'s Health Analysis has been validated by three ',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: colorScheme.onSurface.withValues(alpha: 0.75),
+                height: 1.4,
+              ),
+            ),
+            TextSpan(
+              text: 'medical practitioners',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.primary,
+                decoration: TextDecoration.underline,
+                decorationColor: colorScheme.primary,
+                height: 1.4,
+              ),
+              recognizer: _expertsLinkRecognizer,
+            ),
+            TextSpan(
+              text: ' from various healthcare institutions.',
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: colorScheme.onSurface.withValues(alpha: 0.75),
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Shows the dialog with CLARO's partnered health experts.
+  void _showExpertsDialog() {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final experts = const [
+      _HealthExpert(
+        fullName: 'Dante T. Lorica MD',
+        licenseNumber: '56069',
+        position: 'Medical Director',
+        institution: 'Technological Institute of the Philippines',
+      ),
+      _HealthExpert(
+        fullName: 'Ehdmar C. Pagulayan',
+        licenseNumber: '0403957',
+        position: 'Head Nurse',
+        institution: 'Taguig City General Hospital',
+      ),
+      _HealthExpert(
+        fullName: 'Chretien Aeza Joven',
+        licenseNumber: '20726',
+        position: 'Staff Nurse',
+        institution: 'Bulacan',
+      ),
+    ];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.verified_user, color: colorScheme.primary, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'CLARO Health Experts',
+                style: GoogleFonts.outfit(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: experts.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              final expert = experts[index];
+              return Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest.withValues(
+                    alpha: 0.3,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      expert.fullName,
+                      style: GoogleFonts.outfit(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildExpertDetailRow(
+                      icon: Icons.badge,
+                      label: 'License No.',
+                      value: expert.licenseNumber,
+                      colorScheme: colorScheme,
+                    ),
+                    const SizedBox(height: 6),
+                    _buildExpertDetailRow(
+                      icon: Icons.work,
+                      label: 'Position',
+                      value: expert.position,
+                      colorScheme: colorScheme,
+                    ),
+                    const SizedBox(height: 6),
+                    _buildExpertDetailRow(
+                      icon: Icons.business,
+                      label: 'Institution',
+                      value: expert.institution,
+                      colorScheme: colorScheme,
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Close',
+              style: GoogleFonts.inter(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds a single detail row for an expert's profile.
+  Widget _buildExpertDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    required ColorScheme colorScheme,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 14, color: colorScheme.onSurfaceVariant),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              children: [
+                TextSpan(
+                  text: '$label: ',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                TextSpan(
+                  text: value,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Builds a single storage tip row with an icon and text.
   Widget _buildStorageTip({
     required BuildContext context,
@@ -954,7 +1403,10 @@ class _MoreDetailsScreenState extends State<MoreDetailsScreen> {
 
   /// Returns the localized display name for a given allergen string.
   String _getAllergenDisplayName(String allergen, String langCode) {
-    final normalized = allergen.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+    final normalized = allergen.toLowerCase().replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
     final isTagalog = langCode == 'tl';
 
     switch (normalized) {
@@ -1002,6 +1454,21 @@ class _ThresholdRow {
     required this.condition,
     required this.unit,
     required this.whoDailyLimit,
+  });
+}
+
+/// Data model for a health expert partnered with CLARO.
+class _HealthExpert {
+  final String fullName;
+  final String licenseNumber;
+  final String position;
+  final String institution;
+
+  const _HealthExpert({
+    required this.fullName,
+    required this.licenseNumber,
+    required this.position,
+    required this.institution,
   });
 }
 

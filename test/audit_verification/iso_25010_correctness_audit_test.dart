@@ -49,8 +49,8 @@ void main() {
       );
     }
 
-    test('1. Hypertension: boundary checks at 100mg and 400mg per 100g', () {
-      final user = makeUser(conditions: [HealthCondition.hypertension]);
+    test('1. Cardiovascular Disease: boundary checks at 100mg and 400mg per 100g', () {
+      final user = makeUser(conditions: [HealthCondition.cardiovascularDisease]);
 
       // Boundary 1: <= 100mg is Suitable (per 100g ranking basis)
       final pSuitable = makeProduct(sodiumMg: 100);
@@ -93,8 +93,8 @@ void main() {
       expect(evalCaution.riskScore, 3);
     });
 
-    test('3. Heart Condition: boundary checks at 1.11g and 4.44g per 100g', () {
-      final user = makeUser(conditions: [HealthCondition.heartCondition]);
+    test('3. Cardiovascular Disease (saturated fat): boundary checks at 1.11g and 4.44g per 100g', () {
+      final user = makeUser(conditions: [HealthCondition.cardiovascularDisease]);
 
       // Boundary 1: <= 1.11g is Suitable
       final pSuitable = makeProduct(saturatedFatG: 1.11);
@@ -161,7 +161,7 @@ void main() {
 
     test('6. Food Allergy: Allergen override forces Caution and ranks last', () {
       final user = makeUser(
-        conditions: [HealthCondition.hypertension],
+        conditions: [HealthCondition.cardiovascularDisease],
         allergies: [AllergenType.fish],
       );
 
@@ -193,7 +193,7 @@ void main() {
     });
 
     test('7. Gemini fallback generation for timeout and parse error', () {
-      final user = makeUser(conditions: [HealthCondition.hypertension]);
+      final user = makeUser(conditions: [HealthCondition.cardiovascularDisease]);
       final product = makeProduct(sodiumMg: 450);
       final eval = WhoCalculator.evaluateProduct(product, user);
 

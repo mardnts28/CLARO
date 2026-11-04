@@ -1406,17 +1406,11 @@ abstract class AppLocalizations {
   /// **'Diabetes'**
   String get conditionDiabetes;
 
-  /// No description provided for @conditionHypertension.
+  /// No description provided for @conditionCardiovascularDisease.
   ///
   /// In en, this message translates to:
-  /// **'Hypertension'**
-  String get conditionHypertension;
-
-  /// No description provided for @conditionHeartCondition.
-  ///
-  /// In en, this message translates to:
-  /// **'Heart condition'**
-  String get conditionHeartCondition;
+  /// **'Cardiovascular disease'**
+  String get conditionCardiovascularDisease;
 
   /// No description provided for @conditionGerd.
   ///
@@ -2249,7 +2243,7 @@ abstract class AppLocalizations {
   /// No description provided for @bpSodiumLabel.
   ///
   /// In en, this message translates to:
-  /// **'Blood pressure - Sodium'**
+  /// **'Cardiovascular Disease - Sodium'**
   String get bpSodiumLabel;
 
   /// No description provided for @diabetesSugarsLabel.
@@ -2258,10 +2252,16 @@ abstract class AppLocalizations {
   /// **'Diabetes - Total sugars'**
   String get diabetesSugarsLabel;
 
+  /// No description provided for @diabetesCarbsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Diabetes - Carbohydrates'**
+  String get diabetesCarbsLabel;
+
   /// No description provided for @heartSatFatLabel.
   ///
   /// In en, this message translates to:
-  /// **'Heart disease - Saturated fats'**
+  /// **'Cardiovascular Disease - Saturated fats'**
   String get heartSatFatLabel;
 
   /// No description provided for @bpSodiumShortLabel.
@@ -2279,7 +2279,7 @@ abstract class AppLocalizations {
   /// No description provided for @ckdBpSodiumLabel.
   ///
   /// In en, this message translates to:
-  /// **'CKD & Blood Pressure - Sodium'**
+  /// **'CKD & Cardiovascular Disease - Sodium'**
   String get ckdBpSodiumLabel;
 
   /// No description provided for @diabetesSugarsShortLabel.
@@ -2287,6 +2287,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Total sugars'**
   String get diabetesSugarsShortLabel;
+
+  /// No description provided for @diabetesCarbsShortLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Carbohydrates'**
+  String get diabetesCarbsShortLabel;
 
   /// No description provided for @heartSatFatShortLabel.
   ///
@@ -2311,6 +2317,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'of Recommended Daily Intake for free sugars'**
   String get ofWhoFreeSugarReference;
+
+  /// Message shown when a nutrient exceeds its daily limit.
+  ///
+  /// In en, this message translates to:
+  /// **'Exceeds the daily limit by {percentage}%.'**
+  String exceedsDailyLimitBy(String percentage);
 
   /// No description provided for @allergenDetectedBadge.
   ///

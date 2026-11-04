@@ -40,98 +40,186 @@ void main() {
       expect(updatedSize, 155.0);
     });
 
-    testWidgets('AdvisoryBannerWidget renders banner title and emphasized subtitle', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: AdvisoryBannerWidget(
-              level: AdvisoryLevel.caution,
-              color: Colors.red,
-              icon: Icons.warning_amber_rounded,
-              title: 'Caution - High Sodium',
-              subtitle:
-                  'This product is high in sodium. Limit portion size. Consume at most 1 serving per day.',
+    testWidgets(
+      'AdvisoryBannerWidget renders banner title and emphasized subtitle',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: AdvisoryBannerWidget(
+                level: AdvisoryLevel.caution,
+                color: Colors.red,
+                icon: Icons.warning_amber_rounded,
+                title: 'Caution - High Sodium',
+                subtitle:
+                    'This product is high in sodium. Limit portion size. Consume at most 1 serving per day.',
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Caution - High Sodium'), findsOneWidget);
-      expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
-    });
+        expect(find.text('Caution - High Sodium'), findsOneWidget);
+        expect(find.byIcon(Icons.warning_amber_rounded), findsOneWidget);
+      },
+    );
 
-    testWidgets('AdvisoryBannerWidget renders multi-allergen rows when provided', (
-      tester,
-    ) async {
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: Scaffold(
-            body: AdvisoryBannerWidget(
-              level: AdvisoryLevel.caution,
-              color: Colors.red,
-              icon: Icons.warning_amber_rounded,
-              title: 'Caution - Allergens',
-              subtitle: 'Contains allergens.',
-              multiAllergenRows: [
-                MultiAllergenDisplayRow(
-                  allergen: 'Soy',
-                  ingredient: 'Soy sauce',
-                ),
-                MultiAllergenDisplayRow(
-                  allergen: 'Wheat',
-                  ingredient: 'Wheat flour',
-                ),
-              ],
+    testWidgets(
+      'AdvisoryBannerWidget renders multi-allergen rows when provided',
+      (tester) async {
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: Scaffold(
+              body: AdvisoryBannerWidget(
+                level: AdvisoryLevel.caution,
+                color: Colors.red,
+                icon: Icons.warning_amber_rounded,
+                title: 'Caution - Allergens',
+                subtitle: 'Contains allergens.',
+                multiAllergenRows: [
+                  MultiAllergenDisplayRow(
+                    allergen: 'Soy',
+                    ingredient: 'Soy sauce',
+                  ),
+                  MultiAllergenDisplayRow(
+                    allergen: 'Wheat',
+                    ingredient: 'Wheat flour',
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('Multiple allergen detected'), findsOneWidget);
-      expect(find.textContaining('Soy:'), findsOneWidget);
-      expect(find.textContaining('Wheat:'), findsOneWidget);
-    });
+        expect(find.text('Multiple allergen detected'), findsOneWidget);
+        expect(find.textContaining('Soy:'), findsOneWidget);
+        expect(find.textContaining('Wheat:'), findsOneWidget);
+      },
+    );
 
-    testWidgets('NutrientRowWidget renders formatted nutrient facts and indicator', (
-      tester,
-    ) async {
-      final eval = DisplayNutrientEval(
-        label: 'Hypertension - Sodium',
-        shortLabel: 'Sodium',
-        nutrientKey: 'sodiumMg',
-        valuePerServing: 1200.0,
-        limit: 2000.0,
-        percentage: 60.0,
-        level: AdvisoryLevel.moderate,
-        unit: 'mg',
-      );
+    testWidgets(
+      'NutrientRowWidget renders formatted nutrient facts and indicator',
+      (tester) async {
+        final eval = DisplayNutrientEval(
+          label: 'Cardiovascular Disease - Sodium',
+          shortLabel: 'Sodium',
+          nutrientKey: 'sodiumMg',
+          valuePerServing: 1200.0,
+          limit: 2000.0,
+          percentage: 60.0,
+          level: AdvisoryLevel.moderate,
+          unit: 'mg',
+        );
 
-      await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          locale: const Locale('en'),
-          home: Scaffold(
-            body: Builder(
-              builder: (context) {
-                return NutrientRowWidget(
-                  evaluation: eval,
-                  isRelatedToUserCondition: true,
-                  colorScheme: Theme.of(context).colorScheme,
-                  loc: AppLocalizations.of(context)!,
-                );
-              },
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  return NutrientRowWidget(
+                    evaluation: eval,
+                    isRelatedToUserCondition: true,
+                    colorScheme: Theme.of(context).colorScheme,
+                    loc: AppLocalizations.of(context)!,
+                  );
+                },
+              ),
             ),
           ),
-        ),
-      );
-      await tester.pumpAndSettle();
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('Hypertension - Sodium'), findsOneWidget);
-      expect(find.byType(LinearProgressIndicator), findsOneWidget);
-      expect(find.textContaining('1,200mg / 2,000mg'), findsOneWidget);
-    });
+        expect(find.text('Cardiovascular Disease - Sodium'), findsOneWidget);
+        expect(find.byType(LinearProgressIndicator), findsOneWidget);
+        expect(find.textContaining('1,200mg / 2,000mg'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'NutrientRowWidget renders carbohydrates for diabetes evaluation',
+      (tester) async {
+        final eval = DisplayNutrientEval(
+          label: 'Diabetes - Carbohydrates',
+          shortLabel: 'Carbohydrates',
+          nutrientKey: 'totalCarbohydratesG',
+          valuePerServing: 75.0,
+          limit: 375.0,
+          percentage: 20.0,
+          level: AdvisoryLevel.moderate,
+          unit: 'g',
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  return NutrientRowWidget(
+                    evaluation: eval,
+                    isRelatedToUserCondition: true,
+                    colorScheme: Theme.of(context).colorScheme,
+                    loc: AppLocalizations.of(context)!,
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Diabetes - Carbohydrates'), findsOneWidget);
+        expect(find.byType(LinearProgressIndicator), findsOneWidget);
+        expect(find.textContaining('75g / 375g'), findsOneWidget);
+        expect(find.textContaining('20%'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'shows only the excess when a nutrient exceeds its daily limit',
+      (tester) async {
+        final eval = DisplayNutrientEval(
+          label: 'Cardiovascular Disease - Sodium',
+          shortLabel: 'Sodium',
+          nutrientKey: 'sodiumMg',
+          valuePerServing: 2500.0,
+          limit: 2000.0,
+          percentage: 125.0,
+          level: AdvisoryLevel.caution,
+          unit: 'mg',
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            locale: const Locale('en'),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) {
+                  return NutrientRowWidget(
+                    evaluation: eval,
+                    isRelatedToUserCondition: true,
+                    colorScheme: Theme.of(context).colorScheme,
+                    loc: AppLocalizations.of(context)!,
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.textContaining('Exceeds the daily limit by 25%.'),
+          findsOneWidget,
+        );
+        expect(find.textContaining('125%'), findsNothing);
+      },
+    );
   });
 }

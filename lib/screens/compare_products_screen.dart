@@ -15,6 +15,8 @@ import '../core/utils/nutrition_availability.dart';
 import '../core/utils/product_characteristics.dart';
 import '../core/utils/success_feedback_utils.dart';
 import '../data/models/health_profile.dart';
+import '../core/utils/group_filter_controller.dart';
+import '../widgets/group_filter_widgets.dart';
 import '../widgets/ranked_product_card.dart';
 import 'product_detail_screen.dart';
 import 'camera_scanner_screen.dart';
@@ -99,12 +101,31 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   UserHealthProfile? _profile;
   List<Product> _comparisonProducts = [];
 
+  // ── Group filter ──────────────────────────────────────────────────────
+  // Non-null when the signed-in user belongs to a health group with at least
+  // one OTHER member. The group name shows as a filter button with a checkbox
+  // (enabled == checked). Tapping it opens a dialog to pick which members'
+  // health conditions/allergies apply. Disabling it (or deselecting every
+  // member) ranks against the user's OWN saved profile only.
+  GroupFilterController? _groupFilter;
+
+  bool get _groupFilterActive => _groupFilter?.isActive ?? false;
+
+  /// The profile the ranking is based on right now: the selected members'
+  /// combined profile while the group filter is active, otherwise the
+  /// user's own.
+  UserHealthProfile? get _baseProfile =>
+      _groupFilterActive ? _groupFilter!.combinedProfile : _profile;
+
   // Empty set == "Overall" (all of the user's conditions, i.e. the
-  // profile as saved). Non-empty == ranking narrowed to just those
+  // profile as saved -- or the group's combined profile while the group
+  // filter is active). Non-empty == ranking narrowed to just those
   // condition(s) -- multi-select, so the user can combine e.g. Diabetes
   // + Hypertension. Defaults to whichever of the 3 conditions are
   // actually on the user's saved health profile once it loads (see
   // _loadRanking), so the initial view already reflects their profile.
+  // Always empty while the group filter is active: the group chip stands
+  // in for the individual condition chips.
   Set<HealthCondition> _selectedConditions = {};
 
   // Product Type / Flavor filter chips -- membership filters (hide
@@ -173,6 +194,12 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     });
   }
 
+  /// Loads the user's active group (null for solo users). Starts with the
+  /// group filter enabled and every member selected.
+  Future<void> _loadGroupFilter(String uid, UserHealthProfile own) async {
+    _groupFilter = await GroupFilterController.load(uid: uid, ownProfile: own);
+  }
+
   Future<void> _loadRanking() async {
     try {
       final uid = _authService.currentUser?.uid;
@@ -212,10 +239,15 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         return;
       }
 
+      // Group users: rank against the group's combined profile by default.
+      if (!GuestSession.isGuest.value && uid != null) {
+        await _loadGroupFilter(uid, profile);
+      }
+
       final ranked = await BackendLocator.productComparisonService
           .compareWithAlternatives(
             scannedProduct: widget.sourceProduct,
-            user: profile,
+            user: _groupFilterActive ? _groupFilter!.combinedProfile : profile,
           );
 
       if (!mounted) return;
@@ -232,9 +264,14 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
         // list just shown -- it's the same ranking, just reflected in
         // the filter UI's default state.
         // Include every condition participating in deterministic ranking.
-        _selectedConditions = HealthCondition.values
-            .where((c) => c.isScored && profile.conditions.contains(c))
-            .toSet();
+        //
+        // With the group filter active, the group chip stands in for the
+        // individual condition chips, so nothing is pre-checked here.
+        _selectedConditions = _groupFilterActive
+            ? <HealthCondition>{}
+            : HealthCondition.values
+                  .where((c) => c.isScored && profile.conditions.contains(c))
+                  .toSet();
       });
 
       _updateVoiceSummary(ranked);
@@ -382,13 +419,15 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   }
 
   /// Re-ranks the SAME comparison set (no new DB fetch, no new Gemini call)
-  /// against a health profile narrowed to just [condition] -- or the full
-  /// profile when [condition] is null ("Overall") -- and applies the given
-  /// Product Type / Flavor tag selections. Runs through the exact same
-  /// WhoCalculator.rankProducts pipeline as the default ranking; the only
-  /// thing that changes is which condition(s) are on the profile passed
-  /// in, so a single-condition filter naturally focuses the score on that
-  /// condition's nutrient(s) without any separate ranking logic. Tag
+  /// against a health profile narrowed to just [conditions] -- or the full
+  /// base profile when [conditions] is empty ("Overall") -- and applies the
+  /// given Product Type / Flavor tag selections. The base profile is the
+  /// group's combined profile while the group filter is active, otherwise
+  /// the user's own saved profile (see [_baseProfile]). Runs through the
+  /// exact same WhoCalculator.rankProducts pipeline as the default ranking;
+  /// the only thing that changes is which condition(s) are on the profile
+  /// passed in, so a single-condition filter naturally focuses the score on
+  /// that condition's nutrient(s) without any separate ranking logic. Tag
   /// filtering happens afterward, in _computeFiltered -- it narrows which
   /// of the re-ranked results are shown, it never changes their order.
   ///
@@ -402,13 +441,14 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     required Set<String> typeTags,
     required Set<String> flavorTags,
   }) {
-    final profile = _profile;
+    final profile = _baseProfile;
     if (profile == null) return;
 
-    // Empty selection == "Overall" -- rank against the profile exactly as
-    // saved (every condition the user has). A non-empty selection narrows
-    // the effective profile to just those condition(s), which can be one
-    // or several at once.
+    // Empty selection == "Overall" -- rank against the base profile exactly
+    // as it stands (every condition the user has, or the whole group's
+    // conditions while the group filter is active). A non-empty selection
+    // narrows the effective profile to just those condition(s), which can
+    // be one or several at once.
     final effectiveProfile = conditions.isEmpty
         ? profile
         : UserHealthProfile(
@@ -458,6 +498,36 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
     );
   }
 
+  /// Opens the member-selection dialog and re-ranks the SAME product set
+  /// against the resulting profile (selected members' combined profile, or
+  /// the user's own when the group filter is disabled). Product Type /
+  /// Flavor filters are kept.
+  Future<void> _openGroupFilterDialog() async {
+    final controller = _groupFilter;
+    final own = _profile;
+    if (controller == null || own == null) return;
+
+    final result = await showGroupFilterDialog(context, controller);
+    if (result == null || !mounted) return;
+
+    controller.update(
+      enabled: result.enabled,
+      selectedIds: result.selectedIds,
+    );
+
+    // Group active: the group button stands in for the condition chips, so
+    // nothing is pre-checked. Group off: the user's own conditions return.
+    _reRankAndFilter(
+      conditions: _groupFilterActive
+          ? <HealthCondition>{}
+          : HealthCondition.values
+                .where((c) => c.isScored && own.conditions.contains(c))
+                .toSet(),
+      typeTags: _selectedTypeTags,
+      flavorTags: _selectedFlavorTags,
+    );
+  }
+
   /// Removes a single condition from the current multi-select, keeping
   /// the rest of the selection (and the Product Type/Flavor filters)
   /// untouched. Mirrors _removeTypeTag/_removeFlavorTag below.
@@ -499,12 +569,10 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   String _conditionLabel(HealthCondition condition) {
     final loc = AppLocalizations.of(context)!;
     switch (condition) {
-      case HealthCondition.hypertension:
-        return loc.conditionHypertension;
+      case HealthCondition.cardiovascularDisease:
+        return loc.conditionCardiovascularDisease;
       case HealthCondition.diabetes:
         return loc.conditionDiabetes;
-      case HealthCondition.heartCondition:
-        return loc.conditionHeartCondition;
       case HealthCondition.gerd:
         return loc.conditionGerd;
       case HealthCondition.kidneyDisease:
@@ -589,28 +657,35 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    sectionTitle(loc.filterConditionTitle),
-                    // Multi-select: any combination of the 3 conditions
-                    // can be checked at once (e.g. Diabetes + Heart
-                    // Condition together).
-                    for (final condition in HealthCondition.values.where(
-                      (c) => c.isScored,
-                    ))
-                      CheckboxListTile(
-                        value: tempConditions.contains(condition),
-                        activeColor: colorScheme.primary,
-                        title: Text(_conditionLabel(condition)),
-                        onChanged: (checked) {
-                          HapticService().vibrate();
-                          setSheetState(() {
-                            if (checked == true) {
-                              tempConditions.add(condition);
-                            } else {
-                              tempConditions.remove(condition);
-                            }
-                          });
-                        },
-                      ),
+                    // While the group filter is active, the group chip on
+                    // the main screen is the health-condition filter, so
+                    // the per-condition checkboxes are hidden here -- ticking
+                    // one would silently override the group. Removing the
+                    // group chip restores them.
+                    if (!_groupFilterActive) ...[
+                      sectionTitle(loc.filterConditionTitle),
+                      // Multi-select: any combination of the 3 conditions
+                      // can be checked at once (e.g. Diabetes + Heart
+                      // Condition together).
+                      for (final condition in HealthCondition.values.where(
+                        (c) => c.isScored,
+                      ))
+                        CheckboxListTile(
+                          value: tempConditions.contains(condition),
+                          activeColor: colorScheme.primary,
+                          title: Text(_conditionLabel(condition)),
+                          onChanged: (checked) {
+                            HapticService().vibrate();
+                            setSheetState(() {
+                              if (checked == true) {
+                                tempConditions.add(condition);
+                              } else {
+                                tempConditions.remove(condition);
+                              }
+                            });
+                          },
+                        ),
+                    ],
 
                     // ── Product Type (only shown if this comparison set
                     // actually has products with a curated type tag) ────
@@ -858,7 +933,8 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
                         ),
-                        if (_selectedConditions.isNotEmpty ||
+                        if (_groupFilterActive ||
+                            _selectedConditions.isNotEmpty ||
                             _hasActiveTagFilters)
                           Positioned(
                             top: -2,
@@ -913,6 +989,14 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
+                  // Group users: the group name is the primary filter
+                  // label (checkbox = enabled). While it is active it
+                  // replaces the individual health-condition chips.
+                  if (_groupFilter != null)
+                    GroupFilterButton(
+                      controller: _groupFilter!,
+                      onTap: _openGroupFilterDialog,
+                    ),
                   for (final condition in _selectedConditions)
                     _buildRemovableChip(
                       label: _conditionLabel(condition),
@@ -1370,7 +1454,7 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
   /// been part of the initial comparison. Previously-ranked products are
   /// kept; duplicates (already in _comparisonProducts) are skipped.
   void _addProductsToRanking(List<Product> newProducts) {
-    final profile = _profile;
+    final profile = _baseProfile;
     if (profile == null) return;
 
     final existingIds = _comparisonProducts.map((p) => p.id).toSet();
@@ -1388,7 +1472,8 @@ class _CompareProductsScreenState extends State<CompareProductsScreen> {
 
     // Re-rank the combined set through the same pipeline used for every
     // other re-rank on this screen, preserving whatever condition /
-    // Product Type / Flavor filters are currently active.
+    // Product Type / Flavor filters (or the group filter) are currently
+    // active.
     _reRankAndFilter(
       conditions: _selectedConditions,
       typeTags: _selectedTypeTags,

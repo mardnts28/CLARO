@@ -18,8 +18,8 @@
 // locked (renaming isn't in scope here) and the grid is pre-selected
 // from that member's current health profile.
 //
-// Uses the SAME condition/allergen keys ('Diabetes', 'Hypertension',
-// 'Heart condition', 'Fish', 'Milk/Dairy', etc. -- see
+// Uses the SAME condition/allergen keys ('Diabetes',
+// 'Cardiovascular disease', 'Fish', 'Milk/Dairy', etc. -- see
 // firestore_label_mappings.dart) so the data this screen produces maps
 // onto HealthCondition/AllergenType via the exact same mapping code the
 // rest of the app already uses.
@@ -50,7 +50,11 @@ class AddManagedMemberScreen extends StatefulWidget {
   // user can only VIEW (not manage) an invited member's own profile.
   final GroupMember? existingMember;
 
-  const AddManagedMemberScreen({super.key, required this.group, this.existingMember});
+  const AddManagedMemberScreen({
+    super.key,
+    required this.group,
+    this.existingMember,
+  });
 
   bool get isEditing => existingMember != null;
 
@@ -62,13 +66,11 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
   final _groupRepository = BackendLocator.groupRepository;
   final _nameController = TextEditingController();
 
-  // Same fixed option set as PersonalInfoScreen/OnboardingScreen, so the
-  // data this screen produces is compatible with firestore_label_mappings.dart
-  // without any changes there. Supports both English and Tagalog labels.
+  // The condition labels are compatible with firestore_label_mappings.dart.
+  // Supports both English and Tagalog labels.
   final Map<String, bool> _conditions = {
     'Diabetes': false,
-    'Hypertension': false,
-    'Heart condition': false,
+    'Cardiovascular disease': false,
     'GERD': false,
     'Kidney disease': false,
     'Low vision': false,
@@ -86,8 +88,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
 
   final Map<String, IconData> _conditionIcons = {
     'Diabetes': Icons.bloodtype_outlined,
-    'Hypertension': Icons.monitor_heart_outlined,
-    'Heart condition': Icons.favorite_border,
+    'Cardiovascular disease': Icons.monitor_heart_outlined,
     'GERD': Icons.local_fire_department_outlined,
     'Kidney disease': Icons.water_drop_outlined,
     'Low vision': Icons.visibility_off_outlined,
@@ -117,10 +118,8 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     switch (key) {
       case 'Diabetes':
         return loc.conditionDiabetes;
-      case 'Hypertension':
-        return loc.conditionHypertension;
-      case 'Heart condition':
-        return loc.conditionHeartCondition;
+      case 'Cardiovascular disease':
+        return loc.conditionCardiovascularDisease;
       case 'GERD':
         return loc.conditionGerd;
       case 'Kidney disease':
@@ -179,7 +178,9 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
       // returns every active member's profile in one call (it's the same
       // call GroupDetailsScreen makes to render its member list), so
       // this just picks this member's entry out of that batch.
-      final profiles = await _groupRepository.getGroupHealthProfiles(widget.group.id);
+      final profiles = await _groupRepository.getGroupHealthProfiles(
+        widget.group.id,
+      );
       final profile = profiles.where((p) => p.userId == member.id).toList();
       if (profile.isNotEmpty && mounted) {
         final p = profile.first;
@@ -207,10 +208,8 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     switch (c) {
       case HealthCondition.diabetes:
         return 'Diabetes';
-      case HealthCondition.hypertension:
-        return 'Hypertension';
-      case HealthCondition.heartCondition:
-        return 'Heart condition';
+      case HealthCondition.cardiovascularDisease:
+        return 'Cardiovascular disease';
       case HealthCondition.gerd:
         return 'GERD';
       case HealthCondition.kidneyDisease:
@@ -296,10 +295,14 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
 
     HapticService().vibrate();
 
-    final selectedConditions =
-        _conditions.entries.where((e) => e.value && e.key != 'None').map((e) => e.key).toList();
-    final selectedAllergens =
-        _allergens.entries.where((e) => e.value).map((e) => e.key).toList();
+    final selectedConditions = _conditions.entries
+        .where((e) => e.value && e.key != 'None')
+        .map((e) => e.key)
+        .toList();
+    final selectedAllergens = _allergens.entries
+        .where((e) => e.value)
+        .map((e) => e.key)
+        .toList();
 
     String memberId;
     try {
@@ -326,7 +329,9 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
       debugPrint('Failed to create/update member record: $e');
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(loc.somethingWentWrong)));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.somethingWentWrong)));
       return;
     }
 
@@ -350,10 +355,16 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     }
 
     if (ok) {
-      SuccessFeedbackUtils.showSuccessSnackBar(context, loc.memberAddedSuccess(name));
+      SuccessFeedbackUtils.showSuccessSnackBar(
+        context,
+        loc.memberAddedSuccess(name),
+      );
       Navigator.pop(context, true);
     } else {
-      SuccessFeedbackUtils.showSuccessSnackBar(context, loc.memberAddedHealthDataFailed(name));
+      SuccessFeedbackUtils.showSuccessSnackBar(
+        context,
+        loc.memberAddedHealthDataFailed(name),
+      );
       Navigator.pop(context, true);
     }
   }
@@ -365,7 +376,11 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     final loc = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: Text(widget.isEditing ? loc.editHealthProfile : loc.addMemberButton)),
+      appBar: AppBar(
+        title: Text(
+          widget.isEditing ? loc.editHealthProfile : loc.addMemberButton,
+        ),
+      ),
       body: SafeArea(
         child: _loadingExisting
             ? const Center(child: CircularProgressIndicator())
@@ -395,19 +410,30 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                         // Darker gray in dark mode so the disabled button
                         // doesn't glare against the dark surface.
                         disabledBackgroundColor:
-                            theme.brightness == Brightness.dark ? Colors.grey.shade800 : Colors.grey.shade400,
+                            theme.brightness == Brightness.dark
+                            ? Colors.grey.shade800
+                            : Colors.grey.shade400,
                         disabledForegroundColor:
-                            theme.brightness == Brightness.dark ? Colors.grey.shade500 : Colors.white,
+                            theme.brightness == Brightness.dark
+                            ? Colors.grey.shade500
+                            : Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: _saving
                           ? const SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
                             )
-                          : Text(widget.isEditing ? loc.save : loc.addMemberButton),
+                          : Text(
+                              widget.isEditing ? loc.save : loc.addMemberButton,
+                            ),
                     ),
                   ),
                 ],
@@ -418,7 +444,11 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
 
   // Avatar picker: image-only options (no text labels), laid out as two
   // rows of four. Tapping the selected avatar again clears it.
-  Widget _buildAvatarSection(ThemeData theme, ColorScheme colorScheme, AppLocalizations loc) {
+  Widget _buildAvatarSection(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppLocalizations loc,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -435,7 +465,11 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
               const SizedBox(width: 8),
               Text(
                 'Avatar',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
               ),
             ],
           ),
@@ -466,7 +500,9 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: selected ? colorScheme.primary : Colors.transparent,
+                              color: selected
+                                  ? colorScheme.primary
+                                  : Colors.transparent,
                               width: 2.5,
                             ),
                           ),
@@ -476,7 +512,10 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                               fit: BoxFit.cover,
                               errorBuilder: (_, _, _) => Container(
                                 color: colorScheme.surfaceContainerHighest,
-                                child: Icon(Icons.person_outline, color: colorScheme.onSurfaceVariant),
+                                child: Icon(
+                                  Icons.person_outline,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
                               ),
                             ),
                           ),
@@ -489,8 +528,15 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                           child: Container(
                             width: 18,
                             height: 18,
-                            decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
-                            child: const Icon(Icons.check, size: 12, color: Colors.white),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.check,
+                              size: 12,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                     ],
@@ -503,7 +549,11 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     );
   }
 
-  Widget _buildConditionsSection(ThemeData theme, ColorScheme colorScheme, AppLocalizations loc) {
+  Widget _buildConditionsSection(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppLocalizations loc,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -516,11 +566,19 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.favorite_outline, color: colorScheme.primary, size: 20),
+              Icon(
+                Icons.favorite_outline,
+                color: colorScheme.primary,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Text(
                 loc.healthConditions,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
               ),
             ],
           ),
@@ -538,7 +596,11 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
     );
   }
 
-  Widget _buildAllergensSection(ThemeData theme, ColorScheme colorScheme, AppLocalizations loc) {
+  Widget _buildAllergensSection(
+    ThemeData theme,
+    ColorScheme colorScheme,
+    AppLocalizations loc,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -551,11 +613,19 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
         children: [
           Row(
             children: [
-              Icon(Icons.warning_amber_outlined, color: colorScheme.primary, size: 20),
+              Icon(
+                Icons.warning_amber_outlined,
+                color: colorScheme.primary,
+                size: 20,
+              ),
               const SizedBox(width: 8),
               Text(
                 loc.allergensLabel,
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: colorScheme.onSurface),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
               ),
             ],
           ),
@@ -580,7 +650,7 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
   // checkmark badge instead of a Switch. Kept as one shared builder here
   // (rather than two near-duplicate grids like onboarding's) since both
   // sections use Material icons instead of onboarding's image assets.
-  // Grid option label. A single word (e.g. "Hypertension") stays on ONE
+  // Grid option label. A single word (e.g. "Diabetes") stays on ONE
   // line and shrinks slightly if the cell is too narrow instead of
   // breaking mid-word; multi-word labels can still wrap to 2 lines.
   Widget _gridLabel(String text, bool selected, ColorScheme colorScheme) {
@@ -596,7 +666,13 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
         child: FittedBox(
           fit: BoxFit.scaleDown,
           alignment: Alignment.center,
-          child: Text(text, maxLines: 1, softWrap: false, textAlign: TextAlign.center, style: style),
+          child: Text(
+            text,
+            maxLines: 1,
+            softWrap: false,
+            textAlign: TextAlign.center,
+            style: style,
+          ),
         ),
       );
     }
@@ -632,10 +708,14 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             decoration: BoxDecoration(
-              color: selected ? colorScheme.surfaceContainerHighest : theme.cardColor,
+              color: selected
+                  ? colorScheme.surfaceContainerHighest
+                  : theme.cardColor,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.outlineVariant,
                 width: selected ? 1.5 : 1,
               ),
             ),
@@ -647,7 +727,9 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                     children: [
                       Icon(
                         icons[key] ?? Icons.circle_outlined,
-                        color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                        color: selected
+                            ? colorScheme.primary
+                            : colorScheme.onSurfaceVariant,
                         size: 28,
                       ),
                       const SizedBox(height: 4),
@@ -665,8 +747,15 @@ class _AddManagedMemberScreenState extends State<AddManagedMemberScreen> {
                     child: Container(
                       width: 16,
                       height: 16,
-                      decoration: BoxDecoration(color: colorScheme.primary, shape: BoxShape.circle),
-                      child: const Icon(Icons.check, size: 10, color: Colors.white),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check,
+                        size: 10,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
               ],

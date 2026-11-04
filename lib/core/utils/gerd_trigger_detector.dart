@@ -72,7 +72,12 @@ class GerdTriggerDetector {
   // 15.6g. This mirrors the >20% "high" boundary WhoCalculator already
   // uses for Recommended Daily Intake limit nutrients (see classifyByWhoPercentage), just
   // applied to total fat instead of sodium/sugars/saturated fat.
-  static const double highFatPerServingThresholdG = 15.6;
+  static const double totalFatDailyValueG = 78;
+  static const double highFatPerServingThresholdG =
+      totalFatDailyValueG * 0.2;
+
+  static bool isHighFatPerServing(double totalFatG) =>
+      totalFatG >= highFatPerServingThresholdG;
 
   static const List<String> _tomatoAcidicKeywords = [
     'tomato',
@@ -141,7 +146,7 @@ class GerdTriggerDetector {
 
     if (hasNutritionData) {
       final fatPerServing = product.nutritionalFacts.totalFatG;
-      if (fatPerServing >= highFatPerServingThresholdG) {
+      if (isHighFatPerServing(fatPerServing)) {
         triggers.add(GerdTriggerMatch(
           type: GerdTriggerType.highFat,
           matchedValue: fatPerServing,
@@ -266,4 +271,3 @@ class GerdTriggerDetector {
     return null;
   }
 }
-

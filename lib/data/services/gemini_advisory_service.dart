@@ -10,6 +10,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as dev;
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -21,6 +22,7 @@ import '../../core/constants/who_fda_thresholds.dart';
 import '../../core/utils/advisory_prompt_builder.dart';
 import '../../core/utils/comparison_calculator.dart';
 import '../../core/utils/fallback_advisory_generator.dart';
+import '../../core/utils/gerd_trigger_detector.dart';
 import '../../core/utils/group_advisory_builder.dart';
 import '../../core/utils/kidney_advisory_facts.dart';
 
@@ -37,6 +39,19 @@ class GeminiAdvisoryService {
   static const _timeout = Duration(seconds: 30);
 
   final Map<String, HealthAdvisory> _cache = {};
+
+  /// Logs to both developer.log (DevTools) and debugPrint (the normal
+  /// `flutter run` console / adb logcat). dev.log alone does not appear in
+  /// logcat, which hid every Gemini error before.
+  void _log(String message, {Object? error, StackTrace? stackTrace}) {
+    dev.log(
+      message,
+      name: 'GeminiAdvisory',
+      error: error,
+      stackTrace: stackTrace,
+    );
+    debugPrint('GeminiAdvisory: $message${error != null ? ' | $error' : ''}');
+  }
 
   /// Posts [prompt] to the Cloudflare Worker and returns Gemini's raw text
   /// response (same shape the old GenerativeModel.generateContent().text
@@ -65,7 +80,10 @@ class GeminiAdvisoryService {
             'generationConfig': {
               'responseMimeType': 'application/json',
               'temperature': 0.4,
-              'maxOutputTokens': 4096,
+              // Thinking-capable models count thinking tokens against this
+              // limit; 4096 could truncate the JSON mid-string and cause a
+              // parse error.
+              'maxOutputTokens': 8192,
             },
           }),
         )
@@ -96,11 +114,31 @@ class GeminiAdvisoryService {
   }) =>
       // Kidney Disease advisories were rewritten (sodium + protein WHO %s and
       // phosphate additives, replacing the old Kidney Disease Warning card),
-      // so their cache keys carry a '_kd2' suffix. The trailing '_v2' marks
-      // the prompt rewrite (Gemini now only rewords finished facts), which
-      // drops every previously cached advisory. Bump it again whenever the
-      // prompt wording changes and old cached text should not be reused.
-      'advisory_cache_${fingerprint}_${productId}_$languageCode${isComparison ? '_cmp' : ''}${fingerprint.contains(HealthCondition.kidneyDisease.name) ? '_kd2' : ''}_v2';
+      // so their cache keys carry a '_kd2' suffix. The trailing '_v5' marks
+      // the latest GERD/Diabetes advisory structure and serving rules,
+      // so stale text and amounts aren't reused.
+      'advisory_cache_${fingerprint}_${productId}_$languageCode${isComparison ? '_cmp' : ''}${fingerprint.contains(HealthCondition.kidneyDisease.name) ? '_kd2' : ''}_v6';
+
+  HealthAdvisory _withoutExcludedServing(
+    HealthAdvisory advisory,
+    ProductEvaluation evaluation,
+    UserHealthProfile user,
+  ) {
+    if (!user.conditions.contains(HealthCondition.gerd) &&
+        !evaluation.allergenAssessment.hasDirectAllergen) {
+      return advisory;
+    }
+
+    return HealthAdvisory(
+      overallLevel: advisory.overallLevel,
+      warningText: advisory.warningText,
+      explanation: advisory.explanation,
+      safeServingSize: null,
+      comparisonExplanation: advisory.comparisonExplanation,
+      source: advisory.source,
+      generatedAt: advisory.generatedAt,
+    );
+  }
 
   Future<HealthAdvisory> generateAdvisory({
     required String scanEventId,
@@ -118,53 +156,67 @@ class GeminiAdvisoryService {
       isComparison: isComparison,
     );
 
-    // 1. Check in-memory RAM cache for instantaneous response
-    final cachedInMemory = _cache[pKey];
-    if (cachedInMemory != null) return cachedInMemory;
-
-    // 2. Check persistent disk cache (survives app restarts and rescans across weeks)
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cachedJsonStr = prefs.getString(pKey);
-      if (cachedJsonStr != null && cachedJsonStr.isNotEmpty) {
-        final decoded = jsonDecode(cachedJsonStr) as Map<String, dynamic>;
-        final advisory = HealthAdvisory.fromJson(decoded);
-        _cache[pKey] = advisory;
-        return advisory;
+    // Comparison advisories embed text that depends on WHICH products were
+    // compared (rank wording, best/worst values), but the key above does not
+    // include that. They are therefore never cached, so a later comparison
+    // cannot be served an earlier comparison's text.
+    if (!isComparison) {
+      // 1. Check in-memory RAM cache for instantaneous response
+      final cachedInMemory = _cache[pKey];
+      if (cachedInMemory != null) {
+        return _withoutExcludedServing(cachedInMemory, evaluation, user);
       }
-    } catch (e) {
-      // Non-fatal: continue to generate or fallback if cache read fails
-      dev.log('Persistent advisory cache read warning', name: 'GeminiAdvisory', error: e);
+
+      // 2. Check persistent disk cache (survives app restarts and rescans)
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final cachedJsonStr = prefs.getString(pKey);
+        if (cachedJsonStr != null && cachedJsonStr.isNotEmpty) {
+          final decoded = jsonDecode(cachedJsonStr) as Map<String, dynamic>;
+          final advisory = _withoutExcludedServing(
+            HealthAdvisory.fromJson(decoded),
+            evaluation,
+            user,
+          );
+          _cache[pKey] = advisory;
+          return advisory;
+        }
+      } catch (e) {
+        // Non-fatal: continue to generate or fallback if cache read fails
+        _log('Persistent advisory cache read warning', error: e);
+      }
     }
 
     // Skip the API entirely when nothing is flagged and this isn't a
     // comparison call -- the fallback template covers "suitable" just as
-    // well, at zero token cost.
+    // well, at zero token cost. This is intentional, not an error.
     if (evaluation.overallLevel == AdvisoryLevel.suitable &&
         !evaluation.allergenAssessment.hasDirectAllergen &&
         !isComparison) {
-      dev.log(
-        'Using fallback for suitable product: overallLevel=${evaluation.overallLevel}, hasAllergen=${evaluation.allergenAssessment.hasDirectAllergen}, isComparison=$isComparison',
-        name: 'GeminiAdvisory',
+      _log(
+        'Skipping Gemini (suitable, no allergen, not a comparison): '
+        'overallLevel=${evaluation.overallLevel}',
       );
-      // Use combined nutrient calculation for users without health conditions
-      final useCombinedNutrients = user.conditions.isEmpty;
-      final hasNoConditionsAndNoAllergens = user.conditions.isEmpty;
+      final hasNoConditionsAndNoAllergens =
+          user.conditions.isEmpty &&
+          !evaluation.allergenAssessment.hasDirectAllergen;
       final advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.notNeeded,
         languageCode: languageCode,
-        useCombinedNutrients: useCombinedNutrients,
         hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
+        userConditions: user.conditions,
       );
-      _cache[pKey] = advisory;
-      _persistAdvisory(pKey, advisory);
-      return advisory;
+      final normalized = _withoutExcludedServing(advisory, evaluation, user);
+      _cache[pKey] = normalized;
+      _persistAdvisory(pKey, normalized);
+      return normalized;
     }
 
-    dev.log(
-      'Calling Gemini for advisory: overallLevel=${evaluation.overallLevel}, hasAllergen=${evaluation.allergenAssessment.hasDirectAllergen}, isComparison=$isComparison, userConditions=${user.conditions.length}',
-      name: 'GeminiAdvisory',
+    _log(
+      'Calling Gemini: overallLevel=${evaluation.overallLevel}, '
+      'hasAllergen=${evaluation.allergenAssessment.hasDirectAllergen}, '
+      'isComparison=$isComparison, userConditions=${user.conditions.length}',
     );
     final prompt = AdvisoryPromptBuilder.build(
       evaluation: evaluation,
@@ -175,8 +227,6 @@ class GeminiAdvisoryService {
     );
 
     HealthAdvisory advisory;
-    // Use combined nutrient calculation for users without health conditions
-    final useCombinedNutrients = user.conditions.isEmpty;
     final hasNoConditionsAndNoAllergens =
         user.conditions.isEmpty &&
         !evaluation.allergenAssessment.hasDirectAllergen;
@@ -192,36 +242,41 @@ class GeminiAdvisoryService {
         text,
         evaluation,
         languageCode,
-        useCombinedNutrients,
         hasNoConditionsAndNoAllergens,
         suggestedServing,
+        user.conditions,
       );
     } on TimeoutException catch (e) {
-      dev.log('GEMINI TIMEOUT', name: 'GeminiAdvisory', error: e);
+      _log('GEMINI TIMEOUT', error: e);
       advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.timeout,
         languageCode: languageCode,
-        useCombinedNutrients: useCombinedNutrients,
         hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
+        userConditions: user.conditions,
       );
     } catch (e, stack) {
-      dev.log('GEMINI ERROR', name: 'GeminiAdvisory', error: e, stackTrace: stack);
+      _log('GEMINI ERROR', error: e, stackTrace: stack);
       advisory = FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.apiError,
         languageCode: languageCode,
-        useCombinedNutrients: useCombinedNutrients,
         hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
+        userConditions: user.conditions,
       );
     }
 
-    _cache[pKey] = advisory;
-    // Only persist AI text -- a fallback caused by a timeout, API error or
-    // parse error shouldn't stick around for weeks just because Gemini was
-    // briefly unreachable or returned something unusable. (The "nothing
-    // flagged" fallback above is intentional and is still persisted.)
-    if (!advisory.isFallback) _persistAdvisory(pKey, advisory);
+    advisory = _withoutExcludedServing(advisory, evaluation, user);
+
+    // Only cache real AI text. A fallback caused by a timeout, API error or
+    // parse error must not stick (in memory OR on disk) just because Gemini
+    // was briefly unreachable or returned something unusable -- the next
+    // scan should try Gemini again. Comparison advisories are never cached
+    // (see above).
+    if (!advisory.isFallback && !isComparison) {
+      _cache[pKey] = advisory;
+      _persistAdvisory(pKey, advisory);
+    }
     return advisory;
   }
 
@@ -242,9 +297,9 @@ class GeminiAdvisoryService {
     String languageCode = 'en',
   }) async {
     final key =
-        // '_v2' marks the group prompt rewrite; bump it whenever the prompt
-        // wording changes so previously cached group text isn't reused.
-        'group_advisory_${GroupAdvisoryBuilder.fingerprint(productId, servingSizeG, facts)}_${languageCode}_v2';
+        // '_v4' marks the latest suggested-serving rules, so previously
+        // cached group amounts aren't reused.
+        'group_advisory_${GroupAdvisoryBuilder.fingerprint(productId, servingSizeG, facts)}_${languageCode}_v4';
 
     final cached = _cache[key];
     if (cached != null) return cached;
@@ -259,7 +314,7 @@ class GeminiAdvisoryService {
         return advisory;
       }
     } catch (e) {
-      dev.log('Group advisory cache read warning', name: 'GeminiAdvisory', error: e);
+      _log('Group advisory cache read warning', error: e);
     }
 
     final level = GroupAdvisoryBuilder.groupLevel(facts.map((f) => f.level));
@@ -268,7 +323,11 @@ class GeminiAdvisoryService {
         facts.any((f) => f.allergens.isNotEmpty);
 
     HealthAdvisory advisory;
+    // True only when the deterministic text was chosen on purpose (nobody
+    // flagged), as opposed to after a Gemini failure.
+    var fallbackIsIntentional = false;
     if (!needsAi) {
+      fallbackIsIntentional = true;
       advisory = GroupAdvisoryBuilder.fallback(
         facts,
         servingSizeG: servingSizeG,
@@ -285,21 +344,25 @@ class GeminiAdvisoryService {
           ),
           timeout: _timeout,
         );
+        final parsed = _parseGroupResponse(
+          text,
+          facts,
+          level,
+          servingSizeG,
+          languageCode,
+        );
+        if (parsed == null) {
+          _log('Group advisory: Gemini reply rejected, using fallback');
+        }
         advisory =
-            _parseGroupResponse(
-              text,
-              facts,
-              level,
-              servingSizeG,
-              languageCode,
-            ) ??
+            parsed ??
             GroupAdvisoryBuilder.fallback(
               facts,
               servingSizeG: servingSizeG,
               languageCode: languageCode,
             );
-      } catch (e) {
-        dev.log('GEMINI GROUP ADVISORY ERROR', name: 'GeminiAdvisory', error: e);
+      } catch (e, stack) {
+        _log('GEMINI GROUP ADVISORY ERROR', error: e, stackTrace: stack);
         advisory = GroupAdvisoryBuilder.fallback(
           facts,
           servingSizeG: servingSizeG,
@@ -308,10 +371,12 @@ class GeminiAdvisoryService {
       }
     }
 
-    _cache[key] = advisory;
-    // Only persist AI text -- a fallback shouldn't stick around for weeks
-    // just because Gemini was briefly unreachable.
-    if (!advisory.isFallback) _persistAdvisory(key, advisory);
+    // Cache AI text, and the deliberate "nobody flagged" template. Do NOT
+    // cache a fallback produced by a Gemini failure -- retry next time.
+    if (!advisory.isFallback || fallbackIsIntentional) {
+      _cache[key] = advisory;
+      _persistAdvisory(key, advisory);
+    }
     return advisory;
   }
 
@@ -346,7 +411,7 @@ class GeminiAdvisoryService {
       if (!facts.any((f) => f.allergens.isNotEmpty) &&
           (_containsProhibitedAdvisoryMedicalClaim(warning) ||
               _containsProhibitedAdvisoryMedicalClaim(explanation))) {
-        dev.log('GROUP PARSE ERROR: advisory contains prohibited medical wording', name: 'GeminiAdvisory');
+        _log('GROUP PARSE ERROR: advisory contains prohibited medical wording');
         return null;
       }
 
@@ -381,7 +446,7 @@ class GeminiAdvisoryService {
         generatedAt: DateTime.now(),
       );
     } catch (e) {
-      dev.log('GROUP PARSE ERROR', name: 'GeminiAdvisory', error: e);
+      _log('GROUP PARSE ERROR', error: e);
       return null;
     }
   }
@@ -392,7 +457,7 @@ class GeminiAdvisoryService {
           prefs.setString(key, jsonEncode(advisory.toJson()));
         })
         .catchError((e) {
-          dev.log('Failed to persist advisory to cache', name: 'GeminiAdvisory', error: e);
+          _log('Failed to persist advisory to cache', error: e);
         });
   }
 
@@ -400,18 +465,18 @@ class GeminiAdvisoryService {
     String? text,
     ProductEvaluation evaluation,
     String languageCode,
-    bool useCombinedNutrients,
     bool hasNoConditionsAndNoAllergens,
     String? suggestedServing,
+    Iterable<HealthCondition> userConditions,
   ) {
     if (text == null || text.trim().isEmpty) {
-      dev.log('EMPTY RESPONSE from Gemini', name: 'GeminiAdvisory');
+      _log('EMPTY RESPONSE from Gemini');
       return FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.emptyResponse,
         languageCode: languageCode,
-        useCombinedNutrients: useCombinedNutrients,
         hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
+        userConditions: userConditions,
       );
     }
     try {
@@ -470,6 +535,89 @@ class GeminiAdvisoryService {
         }
       }
 
+      final conditions = userConditions.toList();
+      if (conditions.length == 1 &&
+          conditions.single == HealthCondition.gerd) {
+        final detection = GerdTriggerDetector.detect(evaluation.product);
+        final ingredientTriggers = detection.triggers
+            .where((t) => t.type != GerdTriggerType.highFat)
+            .map((t) => t.matchedIngredient)
+            .whereType<String>()
+            .toSet();
+        final normalizedExplanation = explanation.toLowerCase();
+        final fat = evaluation.scoredFactors.firstWhere(
+          (f) => f.factorKey == 'gerdTotalFat',
+        );
+        final hasInsufficientInformation =
+            normalizedExplanation.contains('not enough') ||
+            normalizedExplanation.contains('insufficient') ||
+            normalizedExplanation.contains('kulang') ||
+            normalizedExplanation.contains('hindi sapat');
+        final explainsTriggers = ingredientTriggers.isNotEmpty
+            ? ingredientTriggers.every(
+                (ingredient) => normalizedExplanation.contains(
+                  ingredient.toLowerCase(),
+                ),
+              )
+            : detection.hasIngredientData
+            ? normalizedExplanation.contains('trigger') &&
+                  (normalizedExplanation.contains('no ') ||
+                      normalizedExplanation.contains('none') ||
+                      normalizedExplanation.contains('walang'))
+            : hasInsufficientInformation;
+        final fatAmount = fat.valuePerServing?.toStringAsFixed(1);
+        if (!normalizedExplanation.contains('total fat') &&
+            !normalizedExplanation.contains('taba')) {
+          throw const FormatException(
+            'GERD advisory is missing the total-fat evaluation',
+          );
+        }
+        if (fat.isUnknown
+            ? !hasInsufficientInformation
+            : (fatAmount == null || !explanation.contains('${fatAmount}g'))) {
+          throw const FormatException(
+            'GERD advisory is missing the evaluated total-fat amount',
+          );
+        }
+        if (!explainsTriggers ||
+            RegExp(r'[.!?](?=\s|$)').allMatches(explanation.trim()).length !=
+                2) {
+          throw const FormatException(
+            'GERD advisory must reflect trigger detection in exactly two sentences',
+          );
+        }
+      }
+
+      if (conditions.length == 1 &&
+          conditions.single == HealthCondition.diabetes) {
+        final diabetesNutrients = evaluation.nutrientEvaluations
+            .where((e) => e.condition == HealthCondition.diabetes);
+        final sugars = diabetesNutrients.firstWhere(
+          (e) => e.nutrientKey == 'sugarsG',
+        );
+        final carbohydrates = diabetesNutrients.firstWhere(
+          (e) => e.nutrientKey == 'totalCarbohydratesG',
+        );
+        final sugarsPercentage =
+            '${AdvisoryPromptBuilder.displayedPercentage(sugars.whoDailyLimitPercentage).toStringAsFixed(1)}%';
+        final carbohydratesPercentage =
+            '${AdvisoryPromptBuilder.displayedPercentage(carbohydrates.whoDailyLimitPercentage).toStringAsFixed(1)}%';
+        final sentenceCount = RegExp(r'[.!?](?=\s|$)')
+            .allMatches(explanation.trim())
+            .length;
+        final normalizedExplanation = explanation.toLowerCase();
+        if (sentenceCount != 2 ||
+            !normalizedExplanation.contains('total sugars') ||
+            !normalizedExplanation.contains('total carbohydrates') ||
+            !normalizedExplanation.contains('diabetes') ||
+            !explanation.contains(sugarsPercentage) ||
+            !explanation.contains(carbohydratesPercentage)) {
+          throw const FormatException(
+            'Diabetes advisory must identify both nutrients and their WHO percentages in exactly two sentences',
+          );
+        }
+      }
+
       return HealthAdvisory(
         overallLevel: evaluation.overallLevel,
         warningText: warningText,
@@ -480,17 +628,19 @@ class GeminiAdvisoryService {
         generatedAt: DateTime.now(),
       );
     } catch (e) {
-      dev.log('PARSE ERROR – RAW RESPONSE: $text', name: 'GeminiAdvisory', error: e);
+      _log('PARSE ERROR – RAW RESPONSE: $text', error: e);
       return FallbackAdvisoryGenerator.generate(
         evaluation,
         reason: FallbackReason.parseError,
         languageCode: languageCode,
-        useCombinedNutrients: useCombinedNutrients,
         hasNoConditionsAndNoAllergens: hasNoConditionsAndNoAllergens,
+        userConditions: userConditions,
       );
     }
   }
 
+  // Cache keys never start with '$scanEventId::', so this removes nothing.
+  // Kept so existing callers still compile.
   void clearScanEvent(String scanEventId) {
     _cache.removeWhere((k, _) => k.startsWith('$scanEventId::'));
   }
@@ -503,7 +653,7 @@ class GeminiAdvisoryService {
 
   /// Generates the per-nutrient ranking explanation shown on the
   /// comparison card. [healthCondition] is the user's condition name
-  /// (e.g. "hypertension", or a comma-joined list for multiple
+  /// (e.g. "cardiovascular disease", or a comma-joined list for multiple
   /// conditions) so the explanation can tie the nutrient back to *why*
   /// it matters for this user, not just report the raw numbers.
   Future<Map<String, String>> generateRankingExplanation({
@@ -533,6 +683,23 @@ class GeminiAdvisoryService {
       languageCode: languageCode,
     );
 
+    Map<String, String> fallback() => {
+      'explanation': FallbackAdvisoryGenerator.generateRankingExplanation(
+        nutrientName: nutrientName,
+        nutrientUnit: nutrientUnit,
+        thisValue: thisValue,
+        bestValue: bestValue,
+        worstValue: worstValue,
+        rank: rank,
+        totalProducts: totalProducts,
+        thisIsBestNutrient: thisIsBestNutrient,
+        supportingReason: supportingReason,
+        healthCondition: healthCondition,
+        languageCode: languageCode,
+      ),
+      'source': 'Fallback',
+    };
+
     try {
       final text = await _callGemini(prompt, timeout: _timeout);
 
@@ -543,42 +710,18 @@ class GeminiAdvisoryService {
         );
       }
       return {'explanation': explanation, 'source': 'Gemini'};
-    } on TimeoutException catch (_) {
-      final explanation = FallbackAdvisoryGenerator.generateRankingExplanation(
-        nutrientName: nutrientName,
-        nutrientUnit: nutrientUnit,
-        thisValue: thisValue,
-        bestValue: bestValue,
-        worstValue: worstValue,
-        rank: rank,
-        totalProducts: totalProducts,
-        thisIsBestNutrient: thisIsBestNutrient,
-        supportingReason: supportingReason,
-        healthCondition: healthCondition,
-        languageCode: languageCode,
-      );
-      return {'explanation': explanation, 'source': 'Fallback'};
-    } catch (_) {
-      final explanation = FallbackAdvisoryGenerator.generateRankingExplanation(
-        nutrientName: nutrientName,
-        nutrientUnit: nutrientUnit,
-        thisValue: thisValue,
-        bestValue: bestValue,
-        worstValue: worstValue,
-        rank: rank,
-        totalProducts: totalProducts,
-        thisIsBestNutrient: thisIsBestNutrient,
-        supportingReason: supportingReason,
-        healthCondition: healthCondition,
-        languageCode: languageCode,
-      );
-      return {'explanation': explanation, 'source': 'Fallback'};
+    } on TimeoutException catch (e) {
+      _log('GEMINI RANKING TIMEOUT', error: e);
+      return fallback();
+    } catch (e) {
+      _log('GEMINI RANKING ERROR', error: e);
+      return fallback();
     }
   }
 
   String _parseRankingExplanation(String? text) {
     if (text == null || text.trim().isEmpty) {
-      dev.log('EMPTY RESPONSE from Gemini for ranking explanation', name: 'GeminiAdvisory');
+      _log('EMPTY RESPONSE from Gemini for ranking explanation');
       throw const FormatException('Empty response');
     }
     try {
@@ -602,7 +745,10 @@ class GeminiAdvisoryService {
 
       return explanation;
     } catch (e) {
-      dev.log('PARSE ERROR for ranking explanation – RAW RESPONSE: $text', name: 'GeminiAdvisory', error: e);
+      _log(
+        'PARSE ERROR for ranking explanation – RAW RESPONSE: $text',
+        error: e,
+      );
       rethrow;
     }
   }

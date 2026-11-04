@@ -176,9 +176,9 @@ void main() {
       final results = await comparisonService.compareWithAlternatives(
         scannedProduct: scanned,
         user: UserHealthProfile(
-          userId: 'hypertension_user',
-          displayName: 'Hypertensive User',
-          conditions: const [HealthCondition.hypertension],
+          userId: 'cardiovascular_user',
+          displayName: 'Cardiovascular User',
+          conditions: const [HealthCondition.cardiovascularDisease],
           allergies: const [],
         ),
       );
