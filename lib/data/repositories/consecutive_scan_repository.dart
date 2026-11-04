@@ -2,7 +2,7 @@
 //
 // Tracks consecutive-day scanning behavior per product per user.
 // Backed by Firestore at `users/{userId}/consecutive_scans/{productId}`.
-// Used to display health warnings when a product is scanned on 3+ consecutive days.
+// Used to display health warnings when a product is scanned on 2+ consecutive days.
 
 import 'dart:async';
 

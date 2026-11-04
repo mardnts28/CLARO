@@ -94,7 +94,7 @@ class BackendLocator {
   static final HistoryRepository historyRepository = FirebaseHistoryRepository();
 
   // Tracks consecutive-day scanning behavior per product per user.
-  // Used to display health warnings when a product is scanned on 3+ consecutive days.
+  // Used to display health warnings when a product is scanned on 2+ consecutive days.
   static final ConsecutiveScanRepository consecutiveScanRepository =
       FirebaseConsecutiveScanRepository();
 

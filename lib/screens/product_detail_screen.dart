@@ -275,8 +275,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           .getConsecutiveScans(userId: uid, productId: _currentProduct.id);
       if (data != null) {
         final consecutiveDays = data['consecutiveDays'] as int? ?? 0;
-        // Show warning if 3+ consecutive days and not already shown for this visit
-        if (consecutiveDays >= 3 && !_hasShownConsecutiveWarning && mounted) {
+        // Show warning if 2+ consecutive days and not already shown for this visit
+        if (consecutiveDays >= 2 && !_hasShownConsecutiveWarning && mounted) {
           _hasShownConsecutiveWarning = true;
           _showConsecutiveDaysWarning(consecutiveDays);
         }

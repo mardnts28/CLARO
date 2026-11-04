@@ -786,9 +786,10 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       if (distinctProducts.isNotEmpty && widget.returnResultsOnDetect) {
         await _turnOffFlash();
         if (mounted) {
-          for (var p in distinctProducts) {
-            HistoryService().addScanRecord(p);
-          }
+          await Future.wait(
+            distinctProducts.map(HistoryService().addScanRecord),
+          );
+          if (!mounted) return;
           Navigator.pop(context, {
             'products': distinctProducts,
             'productCounts': productCounts,
@@ -797,10 +798,13 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
       } else if (distinctProducts.length == 1) {
         if (mounted) {
           final singleProd = distinctProducts.first;
-          HistoryService().addScanRecord(singleProd);
           _isScreenActive = false;
           await _turnOffFlash();
           await _stopImageStreamIfActive();
+          if (!mounted) return;
+          // Ensure today's scan is reflected in the streak before the
+          // product detail screen checks whether to show the warning.
+          await HistoryService().addScanRecord(singleProd);
           if (!mounted) return;
           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
           Navigator.push(
@@ -831,12 +835,13 @@ class _CameraScannerScreenState extends State<CameraScannerScreen>
         }
       } else if (distinctProducts.length > 1) {
         if (mounted) {
-          for (var p in distinctProducts) {
-            HistoryService().addScanRecord(p);
-          }
           _isScreenActive = false;
           await _turnOffFlash();
           await _stopImageStreamIfActive();
+          if (!mounted) return;
+          await Future.wait(
+            distinctProducts.map(HistoryService().addScanRecord),
+          );
           if (!mounted) return;
           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
           Navigator.push(

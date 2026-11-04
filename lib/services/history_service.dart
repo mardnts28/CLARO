@@ -119,9 +119,9 @@ class HistoryService {
     return sorted;
   }
 
-  /// Fire-and-forget by design (callers like camera_scanner_screen.dart
-  /// don't await this) -- errors are caught and logged rather than thrown,
-  /// so a transient Firestore failure can't crash the scan flow.
+  /// Adds the scan to history and updates its consecutive-day count.
+  /// Errors are caught and logged rather than thrown, so a transient
+  /// Firestore failure can't crash the scan flow.
   Future<void> addScanRecord(Product product) async {
     final userId = _currentUserId;
     if (userId == null) {
