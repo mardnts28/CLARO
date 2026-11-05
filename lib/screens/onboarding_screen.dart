@@ -20,7 +20,7 @@ import 'home_screen.dart';
 /// Basic Info → Health Profile.
 ///
 /// IMPORTANT: the keys in _conditions / _allergens (e.g. 'Diabetes',
-/// 'Alta-presyon', 'Isda') are NOT just UI labels -- they are the exact
+/// 'Sakit sa puso', 'Isda') are NOT just UI labels -- they are the exact
 /// values written to Firestore in saveOnboardingData() and read back by
 /// the backend's health-advisory pipeline (see
 /// firestore_label_mappings.dart, referenced from product_detail_screen
@@ -63,7 +63,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   // Internal storage keys -- DO NOT translate these, see class doc above.
   final Map<String, bool> _conditions = {
     'Diabetes': false,
-    'Alta-presyon': false,
     'Sakit sa puso': false,
     'GERD': false,
     'Sakit sa bato': false,
@@ -83,7 +82,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final Map<String, IconData> _conditionIcons = {
     'Diabetes': Icons.monitor_heart_outlined,
-    'Alta-presyon': Icons.favorite_outline,
     'Sakit sa puso': Icons.favorite_border,
     'GERD': Icons.local_fire_department_outlined,
     'Sakit sa bato': Icons.health_and_safety_outlined,
